@@ -1,0 +1,26 @@
+.DS_Store
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+
+# Dependencies and build output
+node_modules/
+.pnpm-store/
+spikes/kiro-crew/s4-workspace/.probe-state/
+dist/
+coverage/
+.turbo/
+.vite/
+playwright-report/
+test-results/
+
+# Logs and local runtime data
+*.log
+.data/
+*.db-wal
+*.db-shm
+
+# Private source material
+chatgpt-share-*.txt

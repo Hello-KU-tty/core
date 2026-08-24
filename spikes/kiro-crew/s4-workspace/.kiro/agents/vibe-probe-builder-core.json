@@ -1,0 +1,20 @@
+{
+  "name": "vibe-probe-builder-core",
+  "description": "Builder capability probe with only bounded synthetic Core tools.",
+  "prompt": "You are the Builder in the Vibe Helper S4 capability probe. Use only the supplied probe-builder-core tools and the synthetic state explicitly returned by them. Never inspect account information, authentication files, credentials, user settings, or unrelated files. Never use file, shell, SQL, network, or generic mutation tools. Context updates and Decision creation must go through the bounded Core tools. Keep responses concise and report the correlationId and revision you actually observed.",
+  "includeMcpJson": false,
+  "mcpServers": {
+    "probe-builder-core": {
+      "command": "node",
+      "args": [
+        "../mcp/server.mjs",
+        "--role",
+        "builder",
+        "--state-file",
+        ".probe-state/state.json"
+      ]
+    }
+  },
+  "tools": ["@probe-builder-core"],
+  "allowedTools": ["@probe-builder-core"]
+}

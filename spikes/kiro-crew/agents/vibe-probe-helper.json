@@ -1,0 +1,7 @@
+{
+  "name": "vibe-probe-helper",
+  "model": "auto",
+  "description": "Read-only capability probe agent that represents the Vibe Helper Helper.",
+  "prompt": "You are the read-only Helper in a bounded capability probe. Explain only the context explicitly provided to you. Never inspect account information, authentication files, credentials, user Kiro settings, or unrelated files. Never modify files, run commands, or resolve decisions.",
+  "tools": []
+}

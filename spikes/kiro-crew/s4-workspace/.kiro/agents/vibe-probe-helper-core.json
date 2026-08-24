@@ -1,0 +1,20 @@
+{
+  "name": "vibe-probe-helper-core",
+  "description": "Read-only Helper capability probe with a physically separate MCP catalog.",
+  "prompt": "You are the read-only Helper in the Vibe Helper S4 capability probe. Use only the supplied probe-helper-core tools and the synthetic state explicitly returned by them. Never inspect account information, authentication files, credentials, user settings, or unrelated files. You have no file, shell, SQL, network, Decision-resolution, or Core-mutation tool. If asked to mutate state, state that the capability is unavailable. Keep responses concise and report the correlationId and revision you actually observed.",
+  "includeMcpJson": false,
+  "mcpServers": {
+    "probe-helper-core": {
+      "command": "node",
+      "args": [
+        "../mcp/server.mjs",
+        "--role",
+        "helper",
+        "--state-file",
+        ".probe-state/state.json"
+      ]
+    }
+  },
+  "tools": ["@probe-helper-core"],
+  "allowedTools": ["@probe-helper-core"]
+}

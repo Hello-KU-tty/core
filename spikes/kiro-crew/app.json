@@ -1,0 +1,33 @@
+{
+  "name": "vibe-helper-probe",
+  "version": "0.0.4",
+  "displayName": "Vibe Helper Probe",
+  "description": "Validates Crew App chat, event, permission, and context capabilities for Vibe Helper.",
+  "author": "Vibe Helper",
+  "agents": [
+    "agents/vibe-probe-builder.json",
+    "agents/vibe-probe-helper.json",
+    "agents/vibe-probe-analyst.json"
+  ],
+  "ui": {
+    "entry": "dist/index.mjs",
+    "pages": [
+      {
+        "route": "/apps/vibe-helper-probe",
+        "label": "Vibe Helper Probe",
+        "icon": "FlaskConical"
+      }
+    ]
+  },
+  "permissions": {
+    "api": ["/api/chat"],
+    "events": ["slots:own"],
+    "storage": false,
+    "cron": false,
+    "memory": "",
+    "network": false
+  },
+  "platform": {
+    "os": ["macos", "windows"]
+  }
+}
