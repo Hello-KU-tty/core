@@ -1,0 +1,25 @@
+{
+  "name": "@vibe-helper/storage-sqlite",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@vibe-helper/application": "workspace:*",
+    "@vibe-helper/contracts": "workspace:*",
+    "@vibe-helper/domain": "workspace:*",
+    "better-sqlite3": "12.11.1",
+    "drizzle-orm": "0.45.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "9.6.0",
+    "drizzle-kit": "0.31.10"
+  }
+}

@@ -2,7 +2,7 @@
 
 Vibe Helper는 코딩 초보자가 자기에게 실용적인 TypeScript 서비스를 고르고, Kiro Builder와 함께 실제로 만들며, 필요한 순간 Helper와 대화해 개념을 익히도록 돕는 build-first 개발 환경이다. 제품은 개발을 교육용 단계로 끊지 않고 실제 Decision, 작업 맥락과 사용자 행동에서 나온 Evidence를 다음 설명과 project 추천에 연결한다.
 
-현재 repository는 구현 전 bootstrap 문서와 T01 Kiro/Crew capability probe를 포함한다. 제품 application code는 아직 시작하지 않았고, `spikes/kiro-crew/`의 코드는 외부 기능 경계를 확인하기 위한 폐기 가능한 실험물이다.
+현재 repository는 bootstrap 문서, T01 Kiro/Crew capability probe, T02 TypeScript workspace skeleton과 T03 공유 contract/runtime validation을 포함한다. Domain reducer와 storage 기능은 아직 시작하지 않았고, `spikes/kiro-crew/`의 코드는 외부 기능 경계를 확인하기 위한 폐기 가능한 실험물이다.
 
 ## 문서 읽는 순서
 
@@ -32,6 +32,42 @@ MVP host는 Kiro/Crew이고 Agent 중심 Crew App을 primary surface로 삼는�
 
 ## 현재 착수점
 
-T00 기본안과 T01 실행은 2026-08-24 승인됐다. 사용자가 Kiro·Kiro Crew 설치와 로그인을 완료했으며, T01은 macOS에서 app build/install, `vibe-helper-probe` 단일 신뢰, enable과 Gateway restart까지 진행됐다. 현재는 Crew dashboard의 실제 render·두 chat slot·permission runtime 검증 단계다. 상세 계획과 중간 결과는 `docs/spikes/KIRO_CREW_CAPABILITY_SPIKE.md`, `docs/spikes/KIRO_CREW_CAPABILITY_RESULTS.md`에 있다.
+T00과 T01에 이어 T02 repository skeleton과 T03 공유 데이터 계약이 완료됐다. 다음 작업은 T04 Domain reducer와 상태 불변식이다. T01의 상세 계획과 결과는 `docs/spikes/KIRO_CREW_CAPABILITY_SPIKE.md`, `docs/spikes/KIRO_CREW_CAPABILITY_RESULTS.md`에 있다.
 
-구현 명령은 아직 존재하지 않는다. workspace와 명령이 T02에서 실제로 만들어지면 이 문서를 그 검증 결과와 함께 갱신한다.
+## 로컬 개발
+
+필수 도구는 Node.js 24.19.0과 pnpm 11.12.0이다. `.node-version`, `engines`와 preflight가 다른 runtime을 거절한다.
+
+```bash
+pnpm install --frozen-lockfile
+pnpm exec playwright install chromium
+pnpm check
+```
+
+`pnpm check`는 formatting, lint, TypeScript build/typecheck, unit, SQLite integration, package-boundary 및 artifact smoke와 Chromium E2E를 실행한다. 개별 명령은 다음과 같다.
+
+```bash
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm test:unit
+pnpm test:integration
+pnpm build
+pnpm test:smoke
+pnpm test:e2e
+```
+
+## Workspace 경계
+
+```text
+apps/crew-app             Crew App 실행·bundle 경계
+apps/mcp-server           MCP process composition root
+packages/contracts        runtime schema와 shared DTO
+packages/domain           deterministic entity·policy·reducer
+packages/application      use case와 transaction boundary
+packages/storage-sqlite   SQLite repository와 migration
+packages/kiro-adapter     Crew slot·polling·SSE transport 격리
+tests/eval                T07 평가 fixture 경계
+```
+
+T02 package는 후속 작업의 위치와 dependency 방향을 고정했고 T03는 `packages/contracts`의 versioned schema와 Agent/UI runtime validation을 구현했다. 다음으로 reducer는 T04, SQLite schema/repository는 T05, MCP tool은 T06에서 구현한다.

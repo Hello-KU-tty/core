@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "project_00000000-0000-4000-8000-000000000001",
+  "correlationId": "corr_00000000-0000-4000-8000-000000000031",
+  "revision": 1,
+  "title": "Webhook Lens",
+  "status": "DISCOVERY",
+  "createdAt": "2026-08-25T03:00:00.000Z",
+  "updatedAt": "2026-08-25T03:00:00.000Z",
+  "source": { "kind": "USER" },
+  "redactionStatus": "NOT_REQUIRED"
+}

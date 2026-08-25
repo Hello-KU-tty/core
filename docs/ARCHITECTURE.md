@@ -2,9 +2,9 @@
 
 ## 1. 상태
 
-- 상태: 사용자 승인 완료, T01 Kiro/Crew capability 경계 반영
+- 상태: 사용자 승인 완료, T03 공유 contract와 runtime validation 반영
 - 기준 입력: [PROJECT_BRIEF.md](../PROJECT_BRIEF.md), [SPEC.md](SPEC.md)
-- 실제 코드·package manifest·database는 아직 존재하지 않는다.
+- T03 versioned contract와 Agent/UI runtime validation은 구현됐다. reducer와 database schema는 아직 구현하지 않았다.
 - Kiro/Crew 세부 연결은 capability spike 결과에 따라 이 문서를 갱신한다.
 
 ## 2. 선택한 기술 스택과 선택 이유
@@ -20,18 +20,21 @@
 | Persistence | local SQLite | local-first, 단일 사용자 MVP, audit 가능한 관계 데이터 |
 | Generated project | TypeScript | 실행·테스트·배포 고려 범위 제한 |
 
-### 2.2 승인된 개발 도구와 위임된 세부 선택
+### 2.2 승인된 개발 도구와 세부 선택
 
-Node.js active LTS, pnpm workspace, TypeScript strict mode, Vitest와 Playwright는 승인됐다. 정확한 Node version, runtime schema와 SQLite/migration library는 호환성을 검토해 T02 시작 전에 결정 기록에 남긴다.
+T02에서 active LTS와 macOS/Windows 호환성을 검토해 세부 도구를 확정했다. 정확한 근거와 대안은 [DECISIONS.md](DECISIONS.md)에 보존한다.
 
 | 영역 | 선택 | 비고 |
 |---|---|---|
-| Runtime | Node.js active LTS | 정확한 version은 repository skeleton 생성 시 고정 |
-| Workspace | pnpm workspace | apps/packages 분리와 단일 lockfile |
-| Unit/integration test | Vitest | TypeScript domain과 adapter test |
-| Browser test | Playwright | Crew App 핵심 flow와 접근성 smoke |
-| Schema validation | TypeScript runtime schema library | 정확한 library는 T02에서 기록 |
-| SQLite adapter | migration을 지원하는 경량 library | 정확한 library와 migration 방식은 T02에서 기록 |
+| Runtime | Node.js 24.19.0 LTS | `.node-version`과 engine preflight로 고정 |
+| Workspace | pnpm 11.12.0 workspace | apps/packages 분리와 단일 lockfile |
+| Language | TypeScript 7.0.2 strict ESM | project reference와 package public export 사용 |
+| Unit/integration test | Vitest 4.1.11 | TypeScript domain과 adapter test |
+| Browser test | Playwright 1.62.1 | Crew App 핵심 flow와 접근성 smoke |
+| Formatting/lint | Biome 2.5.10 | formatting과 정적 lint를 한 설정에서 수행 |
+| Schema validation | Zod 4.4.3 | Agent/UI 외부 입력과 MCP contract validation |
+| SQLite adapter | better-sqlite3 12.11.1 + Drizzle ORM 0.45.2 | local driver, typed query와 SQL migration |
+| Migration tooling | Drizzle Kit 0.31.10 | versioned SQL migration 생성·검사 |
 
 존재하지 않는 package script와 command는 아직 문서화하지 않는다.
 
@@ -138,21 +141,19 @@ Evidence 분석 실패는 Builder result와 Project History를 롤백하지 않�
 ```text
 apps/
   crew-app/              # Agent 중심 primary UI
+  mcp-server/            # Agent용 typed tool/resource 실행 process
 packages/
   contracts/             # runtime schema와 shared DTO
   domain/                # entity, value object, reducer, policy
   application/           # use case와 transaction boundary
   storage-sqlite/        # repository, migration, query
-  mcp-server/            # Agent용 typed tools/resources
   kiro-adapter/          # Crew session/event/dispatch 연결
-  agent-prompts/         # 배포 가능한 prompt packaging
-  evals/                 # fixture, baseline, scorer, report
-fixtures/
-  campus-drop/           # 첫 end-to-end project fixture
-.kiro/agents/            # IDE/CLI 공용 project-local Builder/Helper
+tests/
+  eval/                  # fixture, baseline, scorer, report
+docs/agent-prompts/      # Agent prompt source of truth
 ```
 
-현재 원문 Prompt는 `docs/agent-prompts/`에 유지한다. 구현 package가 생겨도 이 문서를 임의 복사해 drift시키지 않고 source 또는 build input 관계를 명시한다.
+실제 package 경계는 T02에서 위 구조로 확정했다. Campus Drop fixture와 `.kiro/agents/` product config는 각각 T18과 T19에서 추가한다. 현재 원문 Prompt는 `docs/agent-prompts/`에 유지한다. 구현 package가 생겨도 이 문서를 임의 복사해 drift시키지 않고 source 또는 build input 관계를 명시한다.
 
 ### 4.2 contracts
 
@@ -516,13 +517,13 @@ Crew App의 `permissions.api`는 T01에서 host SDK의 client-side path guard로
 
 ### 10.1 계획
 
-- Node.js active LTS
-- pnpm workspace
+- Node.js 24.19.0 LTS
+- pnpm 11.12.0 workspace
 - local Kiro/Crew account/session
 - SQLite local file
 - TypeScript project fixture
 
-정확한 설치·실행·test command는 package manifest와 script가 실제로 생성된 뒤 README와 AGENTS에 기록한다.
+설치는 `pnpm install --frozen-lockfile`, 전체 검증은 `pnpm check`를 사용한다. typecheck, unit, integration, build, smoke와 E2E의 개별 명령은 README와 AGENTS에 기록한다.
 
 ### 10.2 local data
 

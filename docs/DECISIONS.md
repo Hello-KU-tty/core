@@ -146,6 +146,22 @@
 - **검토한 대안:** npm workspace, Bun, Jest, Node test runner, 다른 runtime schema 및 SQLite library.
 - **tradeoff:** pnpm은 workspace 효율이 좋지만 사용자 환경에 Corepack/pnpm 준비가 필요하다. 도구 수를 늘리면 초기 설정과 Kiro 환경 호환성 부담이 커진다.
 
+## 2026-08-25: T02 repository skeleton 세부 도구와 경계
+
+- **상태:** 승인
+- **맥락:** T02를 시작하려면 active LTS의 정확한 Node version, runtime schema, SQLite/migration 조합, lint/format 도구와 실행 package 위치를 고정해야 한다. 로컬 기본 Node.js v26.4.0은 Current이고 Node.js v24.19.0 LTS가 별도로 설치돼 있다. `node:sqlite`는 v24.19.0에서도 release candidate이며, `better-sqlite3` v13은 Windows에서 불필요한 node-gyp toolchain을 요구하는 문제가 보고됐다. T01은 Zod 4와 MCP SDK 2.0.0, React 18.3 기반 Crew App을 실제 runtime에서 통과시켰다.
+- **결정:** Node.js 24.19.0, pnpm 11.12.0, TypeScript 7.0.2 strict ESM, Zod 4.4.3, Vitest 4.1.11, Playwright 1.62.1과 Biome 2.5.10을 고정한다. Crew App은 T01 host 경계를 유지해 React 18.3.1을 쓰고 Vite 8.2.2 및 `@vitejs/plugin-react` 6.1.0으로 빌드한다. local SQLite는 `better-sqlite3` 12.11.1과 Drizzle ORM 0.45.2/Drizzle Kit 0.31.10 조합을 사용한다. 실행 가능한 MCP process는 `apps/mcp-server`, 재사용 가능한 Core·storage·adapter는 `packages/*`에 둔다. pnpm recursive script와 TypeScript project reference로 orchestration하며 Turborepo는 추가하지 않는다. dependency lifecycle script는 실제 설치에 필요한 `better-sqlite3`와 `esbuild` package 이름만 허용한다.
+- **검토한 대안:** 현재 기본 Node.js v26 사용, `node:sqlite`, `better-sqlite3` v13, Kysely, Drizzle 1.0 RC, ESLint+Prettier, `packages/mcp-server`, Turborepo.
+- **tradeoff:** Node 24와 `better-sqlite3` v12 고정은 최신 Current runtime과 SQLite binding의 신기능을 늦게 받지만 Windows install과 재현성이 좋아진다. Drizzle stable은 SQL migration과 typed query를 제공하지만 storage implementation에만 격리해야 한다. Biome 단일 도구는 설정과 의존성을 줄이는 대신 package dependency graph는 별도 smoke test로 검증한다.
+
+## 2026-08-25: T03 공유 contract 식별자·version·provenance 규칙
+
+- **상태:** 승인
+- **맥락:** T03 contract는 Agent, UI, Core와 이후 SQLite가 같은 record를 식별하고 검증하는 기준이다. `schema version`, entity revision과 stale-write token을 섞거나 Evidence source의 작성 주체를 자유 문자열로 받으면 구버전 payload, 잘못된 lineage와 Agent-authored false mastery를 contract 단계에서 구분하기 어렵다.
+- **결정:** Zod strict object와 그 schema에서 추론한 TypeScript type을 단일 source로 사용한다. 첫 wire contract는 `schemaVersion: 1`만 수용하고 명시적 migrator가 생기기 전 구버전·미래 version과 초과 field를 거절한다. stable ID는 entity prefix와 소문자 RFC 4122 UUID v4를 결합하고, timestamp는 UTC RFC 3339, immutable record revision은 1부터 증가하며 stale-write용 expected revision은 0을 허용한다. correlation ID는 한 논리 흐름을, idempotency key는 한 제출 재시도를 추적한다. source reference는 kind가 작성 주체를 고정하는 discriminated union으로 만들고 Evidence Proposal의 직접 근거에는 user-authored source만 허용한다. code, diff, test와 Agent message는 보조 context reference로만 둘 수 있다. contract의 file reference는 상대 POSIX path만 허용하며 absolute path, `..`, backslash와 NUL을 거절한다. 실제 filesystem canonicalization과 workspace containment는 T06에서 다시 강제한다.
+- **검토한 대안:** 임의 string ID, ULID 신규 의존성, offset 허용 timestamp, TypeScript interface와 Zod schema 중복 작성, 모든 source에 별도 `author` 문자열 허용, contract에서 filesystem 접근까지 수행.
+- **tradeoff:** strict v1은 초기 호환성보다 오류의 조기 발견을 우선하며 contract 변경 시 fixture와 명시적 migration이 필요하다. UUID는 사람이 읽기 길지만 추가 의존성 없이 Core에서 안전하게 생성할 수 있다. path schema만으로 symlink나 실제 root 탈출을 막을 수 없으므로 T06의 canonical containment 검증이 필수다.
+
 ## 2026-08-25: Crew/Gateway/session 연동 방식
 
 - **상태:** 승인

@@ -10,15 +10,21 @@ node_modules/
 .pnpm-store/
 spikes/kiro-crew/s4-workspace/.probe-state/
 dist/
+dist-types/
 coverage/
 .turbo/
 .vite/
+*.tsbuildinfo
 playwright-report/
 test-results/
 
 # Logs and local runtime data
 *.log
 .data/
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
 *.db-wal
 *.db-shm
 

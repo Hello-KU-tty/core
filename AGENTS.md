@@ -34,7 +34,9 @@
 
 ## 코드와 검증
 
-- TypeScript strict mode를 기본으로 하고 package boundary를 지킨다. 구체 도구와 명령은 T00/T02에서 승인·생성된 뒤 이 항목에 기록한다.
+- Node.js 24.19.0, pnpm 11.12.0과 TypeScript strict mode를 사용하고 package boundary를 지킨다. `.node-version`, `package.json` engine과 preflight를 우회하지 않는다.
+- 설치는 `pnpm install --frozen-lockfile`, 전체 검증은 `pnpm check`를 사용한다. 개별 검증 명령은 `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, `pnpm test:integration`, `pnpm build`, `pnpm test:smoke`, `pnpm test:e2e`다.
+- lifecycle build script는 `pnpm-workspace.yaml`에 명시된 `better-sqlite3`와 `esbuild`만 허용한다. 새 package의 install script를 허용하기 전에 필요성과 공급망 경계를 결정 기록에 남긴다.
 - 변경 범위에 맞는 unit, contract, storage integration, Agent fixture/eval과 UI/E2E를 실행한다.
 - Kiro 기능은 공식 문서 또는 재현 가능한 capability spike로 확인한다. 검증되지 않은 API나 session 공유를 가정하지 않는다.
 - Campus Drop은 Golden Path fixture일 뿐이다. unseen learning goal과 Personal Need 유무를 함께 검증한다.

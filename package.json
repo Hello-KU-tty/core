@@ -1,0 +1,31 @@
+{
+  "name": "vibe-helper",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.12.0",
+  "engines": {
+    "node": "24.19.x",
+    "pnpm": "11.12.x"
+  },
+  "scripts": {
+    "preflight": "node ./scripts/check-toolchain.mjs",
+    "build": "pnpm preflight && tsc -b --pretty false && pnpm --filter @vibe-helper/crew-app build:bundle",
+    "typecheck": "pnpm preflight && tsc -b --pretty false",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "test:unit": "pnpm preflight && vitest run tests/unit",
+    "test:integration": "pnpm preflight && vitest run packages",
+    "test:smoke": "pnpm preflight && vitest run tests/smoke",
+    "test:e2e": "pnpm preflight && playwright test",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:unit && pnpm test:integration && pnpm build && pnpm test:smoke && pnpm test:e2e"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.10",
+    "@playwright/test": "1.62.1",
+    "@types/node": "24.13.3",
+    "typescript": "7.0.2",
+    "vitest": "4.1.11"
+  }
+}

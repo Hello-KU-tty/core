@@ -1,0 +1,15 @@
+{
+  "name": "@vibe-helper/mcp-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/main.js",
+  "types": "./dist/main.d.ts",
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.0.0",
+    "@vibe-helper/application": "workspace:*",
+    "@vibe-helper/contracts": "workspace:*",
+    "@vibe-helper/storage-sqlite": "workspace:*",
+    "zod": "4.4.3"
+  }
+}

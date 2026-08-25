@@ -77,7 +77,13 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - R2·R3 위험을 계속 수용할지 또는 fallback을 쓸지 결정돼 있다.
 - 검증되지 않은 Kiro 기능을 이후 작업의 전제로 남기지 않는다.
 
-### [>] T02. 저장소 골격과 검증 도구 구성
+### [x] T02. 저장소 골격과 검증 도구 구성
+
+**검증 기록**
+
+- 2026-08-25 Node.js 24.19.0과 pnpm 11.12.0에서 `pnpm check` 전체가 통과했다.
+- clean copy에서 `pnpm install --frozen-lockfile`, typecheck, SQLite integration, build와 module-boundary/artifact smoke를 재현했다.
+- Crew App이 storage/transport 세부사항을 직접 import하지 않는 dependency graph test와 source map·절대 경로·local data ignore 검증을 추가했다.
 
 **범위**
 
@@ -102,7 +108,14 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - UI package가 storage 구현이나 Kiro transport 세부사항을 직접 import하지 않는다.
 - source map이나 log에 secret이 들어가지 않는 기본 환경 설정이 있다.
 
-### [ ] T03. 공유 데이터 계약과 runtime validation
+### [x] T03. 공유 데이터 계약과 runtime validation
+
+**검증 기록**
+
+- 2026-08-25 Node.js 24.19.0과 pnpm 11.12.0에서 `pnpm check` 전체가 통과했다.
+- contract integration 54개, workspace unit 2개, smoke 4개와 Chromium E2E 1개가 통과했다.
+- strict schema v1의 정상·누락·초과·구버전 JSON fixture, JSON round trip, enum·ID·UTC timestamp·path·lineage·source provenance·Agent 권한 거절을 검증했다.
+- Discovery, Learning Spec, Build/Decision, Activity/Episode, Evidence/Concept Ledger, audit, evaluation과 Agent/UI request가 public contract export에서 확인됐다.
 
 **범위**
 
@@ -126,7 +139,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - 잘못된 enum, 권한, path, version과 source reference가 명확한 오류로 거절된다.
 - Agent별로 읽고 쓸 수 있는 payload가 contract 수준에서 구분된다.
 
-### [ ] T04. Domain reducer와 상태 불변식
+### [>] T04. Domain reducer와 상태 불변식
 
 **범위**
 
