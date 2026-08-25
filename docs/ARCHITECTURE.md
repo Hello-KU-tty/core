@@ -2,9 +2,9 @@
 
 ## 1. 상태
 
-- 상태: 사용자 승인 완료, T03 공유 contract와 runtime validation 반영
+- 상태: 사용자 승인 완료, T04 domain reducer와 상태 불변식 반영
 - 기준 입력: [PROJECT_BRIEF.md](../PROJECT_BRIEF.md), [SPEC.md](SPEC.md)
-- T03 versioned contract와 Agent/UI runtime validation은 구현됐다. reducer와 database schema는 아직 구현하지 않았다.
+- T03 versioned contract와 Agent/UI runtime validation, T04 pure reducer와 Evidence policy v1.0.0은 구현됐다. database schema는 아직 구현하지 않았다.
 - Kiro/Crew 세부 연결은 capability spike 결과에 따라 이 문서를 갱신한다.
 
 ## 2. 선택한 기술 스택과 선택 이유
@@ -297,6 +297,7 @@ CanonicalConcept 1 ── N MisconceptionIssue
 
 - 사용자 이해 Evidence에는 user-authored source가 필요하다.
 - OBSERVED는 Builder report와 code/task 근거로 만들 수 있으나 사용자 이해를 뜻하지 않는다.
+- CONTRADICTION은 state를 지지하지 않는 `MISCONCEPTION_SIGNAL` accepted Evidence로 보존하고 open issue를 열거나 보강한다.
 - accepted State는 accepted Evidence와 reducer version으로 재현할 수 있어야 한다.
 - TRANSFERRED는 다른 기능 또는 project context와 낮은 prompt dependence가 필요하다.
 

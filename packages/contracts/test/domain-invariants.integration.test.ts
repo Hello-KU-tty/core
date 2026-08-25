@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  acceptedEvidenceSchema,
   activityEventSchema,
   conceptStateSchema,
   decisionRequestSchema,
@@ -14,6 +15,7 @@ import {
   relativePosixPathSchema,
 } from '../src/index.ts'
 import {
+  acceptedEvidenceFixture,
   activityEventFixture,
   candidateFixture,
   confirmedLearningSpecFixture,
@@ -139,5 +141,36 @@ describe('Build, Event, and Evidence provenance invariants', () => {
       }).success,
     ).toBe(false)
     expect(conceptStateSchema.safeParse('MISCONCEPTION').success).toBe(false)
+  })
+
+  it('keeps contradiction Evidence separate from user-understanding State support', () => {
+    expect(
+      acceptedEvidenceSchema.safeParse({
+        ...acceptedEvidenceFixture,
+        kind: 'MISCONCEPTION_SIGNAL',
+        signal: 'CONTRADICTION',
+        strength: 'MEDIUM',
+        promptDependence: 'LIGHT_HINT',
+        userEvidenceSources: acceptedEvidenceFixture.userEvidenceSources,
+        supportsState: undefined,
+      }).success,
+    ).toBe(false)
+
+    const {
+      supportsState: _supportsState,
+      signal: _signal,
+      strength: _strength,
+      promptDependence: _promptDependence,
+      ...baseEvidence
+    } = acceptedEvidenceFixture
+    expect(
+      acceptedEvidenceSchema.safeParse({
+        ...baseEvidence,
+        kind: 'MISCONCEPTION_SIGNAL',
+        signal: 'CONTRADICTION',
+        strength: 'MEDIUM',
+        promptDependence: 'LIGHT_HINT',
+      }).success,
+    ).toBe(true)
   })
 })

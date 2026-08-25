@@ -194,6 +194,14 @@
 - **검토한 대안:** 처음부터 고정 confidence score, LLM의 직관만 사용, 사용자 검증 생략.
 - **tradeoff:** 초기 state가 보수적이거나 둔할 수 있지만 근거 없이 false mastery를 만드는 것보다 안전하다.
 
+## 2026-08-25: T04 초기 domain reducer와 Evidence 정책
+
+- **상태:** 승인
+- **맥락:** T03 wire contract는 provenance와 기본 shape를 검증하지만 cross-record lineage, state transition, duplicate replay와 Evidence 채택은 아직 결정하지 않는다. 특히 기존 accepted Evidence union에는 contradiction을 정직하게 보존할 종류가 없어 `MisconceptionIssue.openedByEvidenceId`를 충족할 수 없고, accepted Evidence만으로 reducer 입력을 재현하는 데 필요한 Episode와 Evidence 분류 정보가 부족하다. 숫자 confidence threshold는 T07 fixture와 T23 pilot 전까지 확정하지 않기로 했다.
+- **결정:** T04 domain 함수는 ID와 시각을 입력으로 받는 순수 함수로 만들고 `APPLIED`, `NO_OP`, `REJECTED` 결과와 versioned trace를 반환한다. Candidate merge는 첫 target Candidate의 다음 revision으로 이어가며 모든 target의 최신 revision을 parent로 보존한다. Spec 확인은 최신 draft와 내용이 같은 user-authored next revision만 허용한다. Task, Decision과 Episode는 명시적인 허용 전이만 적용한다. accepted Evidence에는 Episode, signal, strength와 prompt dependence를 보존하고 state를 지지하지 않는 `MISCONCEPTION_SIGNAL` variant를 추가한다. 초기 Evidence 정책은 QUESTION, NONE, WEAK와 DIRECTLY_LED로 state를 올리지 않고, 유효한 REPHRASE는 최대 EXPLAINED, 직접 유도되지 않은 STRONG PREDICTION·JUSTIFIED_DECISION·APPLICATION은 최대 DEMONSTRATED로 제한한다. TRANSFERRED는 이전 DEMONSTRATED 근거와 다른 Task 또는 Project의 STRONG·INDEPENDENT TRANSFER를 함께 요구한다. CONTRADICTION은 open issue를 열거나 보강하되 Concept State를 자동 강등하지 않는다.
+- **검토한 대안:** domain이 현재 시각과 ID를 직접 생성, duplicate를 오류로만 처리, Analyst proposal의 maximum state를 그대로 적용, contradiction을 USER_UNDERSTANDING Evidence로 위장, 한 번의 contradiction으로 state 강등, pilot 전에 confidence score와 반복 횟수 threshold 고정.
+- **tradeoff:** 초기 정책은 false mastery를 줄이는 대신 약한 학습 신호를 state에 반영하지 않아 보수적으로 보일 수 있다. accepted Evidence payload가 조금 커지지만 reducer replay와 audit가 단순해진다. 정책 조정은 reducer version, 결정 기록과 회귀 fixture를 함께 변경해야 한다.
+
 ## 2026-08-24: 구현 세부 선택 위임
 
 - **상태:** 승인

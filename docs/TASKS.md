@@ -139,7 +139,15 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - 잘못된 enum, 권한, path, version과 source reference가 명확한 오류로 거절된다.
 - Agent별로 읽고 쓸 수 있는 payload가 contract 수준에서 구분된다.
 
-### [>] T04. Domain reducer와 상태 불변식
+### [x] T04. Domain reducer와 상태 불변식
+
+**검증 기록**
+
+- 2026-08-25 Node.js 24.19.0과 pnpm 11.12.0에서 `pnpm check` 전체가 통과했다.
+- unit 2개, package contract/domain/storage 78개, smoke 4개와 Chromium E2E 1개가 통과했다.
+- Candidate merge/refinement lineage, immutable Spec 확인, Task/Decision 허용 전이, Episode event scope와 중복 replay를 검증했다.
+- Evidence policy v1.0.0에서 Agent-authored source, weak/directly-led 신호, 과도한 maximum state와 stale/duplicate proposal을 이유와 함께 거절했다.
+- contradiction은 `MISCONCEPTION_SIGNAL`로 open issue에 분리하고 State를 강등하지 않으며, 동일 Evidence log의 순서가 달라도 같은 State와 trace를 만드는 것을 검증했다.
 
 **범위**
 
@@ -163,7 +171,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - Analyst가 직접 state를 변경할 수 없고 invalid proposal은 이유와 함께 거절된다.
 - Agent 설명, 단순 확인과 카드 클릭만으로 `DEMONSTRATED` 이상이 되지 않는다.
 
-### [ ] T05. SQLite schema, repository와 migration
+### [>] T05. SQLite schema, repository와 migration
 
 **범위**
 
