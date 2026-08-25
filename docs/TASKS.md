@@ -195,7 +195,17 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - migration 실패가 기존 DB를 부분 변경하지 않는다.
 - secret redaction 이전의 raw payload가 DB에 저장되지 않는다.
 
-### [>] T06. Application use case와 MCP 권한 경계
+### [x] T06. Application use case와 MCP 권한 경계
+
+**승인 기록**
+
+- 2026-08-25 사용자가 역할 고정 MCP catalog, 요청당 2 MiB payload 제한, canonical workspace containment, canonical request hash 기반 idempotency와 공식 MCP client contract test 계획을 승인했다.
+- user-authored Discovery feedback은 UI application command로만 처리하고 Discovery Agent MCP catalog에는 노출하지 않는다.
+
+**검증 기록**
+
+- 2026-08-25 Node.js 24.19.0에서 format, lint, typecheck, Drizzle schema, unit 2개, package/app integration 100개, build, smoke 4개를 통과했다.
+- macOS sandbox가 Chromium Mach port 등록을 막는 조건을 분리한 뒤 승인된 외부 실행에서 Playwright Chromium E2E 1개를 통과했다.
 
 **범위**
 
@@ -219,7 +229,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - Builder도 생성 workspace 바깥 path에 접근할 수 없다.
 - 임의 SQL, 임의 file read/write와 문서에 없는 범용 tool이 노출되지 않는다.
 
-### [ ] T07. 평가 harness와 기준 fixture 선구축
+### [>] T07. 평가 harness와 기준 fixture 선구축
 
 **범위**
 

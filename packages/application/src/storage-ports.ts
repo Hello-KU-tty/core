@@ -62,9 +62,40 @@ export interface IdempotencyReceipt {
   readonly key: string
   readonly correlationId: string
   readonly operation: string
+  readonly requestHash: string
+  readonly responseJson: string
+  readonly responseHash: string
   readonly resourceId: string
-  readonly resourceRevision?: number
+  readonly resourceRevision: number
   readonly recordedAt: string
+}
+
+export interface DiscoveryAggregate {
+  readonly project: Project
+  readonly session: DiscoverySession
+  readonly rounds: readonly CandidateRound[]
+  readonly candidates: readonly ProjectCandidateRevision[]
+  readonly feedback: readonly DiscoveryFeedback[]
+  readonly learningSpecs: readonly LearningSpecRevision[]
+  readonly relevantLedgerEntries: readonly ConceptLedgerEntry[]
+}
+
+export interface BuilderTaskAggregate {
+  readonly project: Project
+  readonly learningSpec: LearningSpecRevision
+  readonly task: BuilderTask
+  readonly liveContext: LiveProjectContext | null
+  readonly decisionRequests: readonly DecisionRequest[]
+  readonly decisionResolutions: readonly DecisionResolution[]
+  readonly decisionApplications: readonly DecisionApplication[]
+  readonly completionReport: TaskCompletionReport | null
+}
+
+export interface EpisodeAggregate {
+  readonly episode: Episode
+  readonly events: readonly ActivityEvent[]
+  readonly relevantLedgerEntries: readonly ConceptLedgerEntry[]
+  readonly evidenceProposals: readonly EvidenceProposal[]
 }
 
 export interface ProjectRecoveryState {
@@ -117,7 +148,15 @@ export interface PersistenceRepository {
   appendIdempotencyReceipt(record: IdempotencyReceipt): PersistenceWriteResult
 
   recoverProject(projectId: string): ProjectRecoveryState | null
+  readDiscoveryAggregate(projectId: string, discoverySessionId?: string): DiscoveryAggregate | null
+  readDiscoveryAggregateBySession(discoverySessionId: string): DiscoveryAggregate | null
+  readBuilderTaskAggregate(projectId: string, taskId: string): BuilderTaskAggregate | null
+  readEpisodeAggregate(projectId: string, episodeId: string): EpisodeAggregate | null
+  readCanonicalConceptById(conceptId: string): CanonicalConcept | null
+  readCanonicalConceptByName(canonicalName: string): CanonicalConcept | null
+  readIdempotencyReceipt(key: string): IdempotencyReceipt | null
   readEvidenceTrace(conceptId: string): EvidenceTrace | null
+  readEvidenceTracesForProject(projectId: string): readonly EvidenceTrace[]
 }
 
 export interface StorageUnitOfWork {

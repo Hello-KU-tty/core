@@ -326,6 +326,25 @@ export const conceptLedgerEntrySchema = z
     }
   })
 
+export const evidenceBatchApplicationResultSchema = z.strictObject({
+  schemaVersion: schemaVersionSchema,
+  episodeId: episodeIdSchema,
+  episodeRevision: entityRevisionSchema,
+  correlationId: correlationIdSchema,
+  outcomes: z
+    .array(
+      z.strictObject({
+        proposalId: evidenceProposalIdSchema,
+        decision: evidenceDecisionSchema,
+        acceptedEvidenceId: evidenceIdSchema.optional(),
+        conceptId: conceptIdSchema.optional(),
+        ledgerRevision: entityRevisionSchema.optional(),
+      }),
+    )
+    .min(1)
+    .max(100),
+})
+
 export type ConceptState = z.infer<typeof conceptStateSchema>
 export type EvidenceSignal = z.infer<typeof evidenceSignalSchema>
 export type EvidenceStrength = z.infer<typeof evidenceStrengthSchema>
@@ -339,3 +358,4 @@ export type AcceptedEvidence = z.infer<typeof acceptedEvidenceSchema>
 export type MisconceptionIssue = z.infer<typeof misconceptionIssueSchema>
 export type ConceptStateSnapshot = z.infer<typeof conceptStateSnapshotSchema>
 export type ConceptLedgerEntry = z.infer<typeof conceptLedgerEntrySchema>
+export type EvidenceBatchApplicationResult = z.infer<typeof evidenceBatchApplicationResultSchema>

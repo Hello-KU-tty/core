@@ -179,6 +179,36 @@ describe('SQLite persistence repository', () => {
       misconceptionIssues: [records.issue],
       auditRecords: [records.audit],
     })
+    expect(reopened.repository.readDiscoveryAggregate(ids.project, ids.discoverySession)).toEqual({
+      project: records.project,
+      session: records.session,
+      rounds: [records.round],
+      candidates: [records.candidate],
+      feedback: [records.selection],
+      learningSpecs: [records.draftSpec, records.confirmedSpec],
+      relevantLedgerEntries: [records.ledger],
+    })
+    expect(reopened.repository.readBuilderTaskAggregate(ids.project, ids.task)).toEqual({
+      project: records.project,
+      learningSpec: records.confirmedSpec,
+      task: records.task,
+      liveContext: records.context,
+      decisionRequests: [records.decision],
+      decisionResolutions: [],
+      decisionApplications: [],
+      completionReport: null,
+    })
+    expect(reopened.repository.readEpisodeAggregate(ids.project, ids.episode)).toEqual({
+      episode: records.episode,
+      events: [records.event],
+      relevantLedgerEntries: [records.ledger],
+      evidenceProposals: [records.evidenceProposal],
+    })
+    expect(reopened.repository.readCanonicalConceptById(ids.concept)).toEqual(records.concept)
+    expect(reopened.repository.readCanonicalConceptByName('RUNTIME VALIDATION')).toEqual(
+      records.concept,
+    )
+    expect(reopened.repository.readEvidenceTracesForProject(ids.project)).toHaveLength(1)
     reopened.close()
   })
 
@@ -244,15 +274,27 @@ describe('SQLite persistence repository', () => {
       key: ids.idempotency,
       correlationId: ids.correlation,
       operation: 'project.create',
+      requestHash: 'a'.repeat(64),
+      responseJson: '{"accepted":true}',
+      responseHash: '11a49f853eb8befe94fef278d487125cd20930b9e41c4c0934394443e7f00878',
       resourceId: ids.project,
       resourceRevision: 1,
       recordedAt: timestamp,
     } as const
     expect(storage.repository.appendIdempotencyReceipt(receipt).outcome).toBe('INSERTED')
     expect(storage.repository.appendIdempotencyReceipt(receipt).outcome).toBe('NO_OP')
+    expect(storage.repository.readIdempotencyReceipt(ids.idempotency)).toEqual(receipt)
     expect(() =>
       storage.repository.appendIdempotencyReceipt({ ...receipt, operation: 'project.update' }),
     ).toThrowError(expect.objectContaining({ code: 'STORAGE_CONFLICT' }))
+    expect(() =>
+      storage.repository.appendIdempotencyReceipt({
+        ...receipt,
+        key: 'idem_00000000-0000-4000-8000-000000000099',
+        responseJson: '',
+        responseHash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'VALIDATION_FAILED' }))
     storage.close()
   })
 })

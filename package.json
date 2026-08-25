@@ -17,7 +17,7 @@
     "format:check": "biome format .",
     "db:check": "pnpm --filter @vibe-helper/storage-sqlite db:check",
     "test:unit": "pnpm preflight && vitest run tests/unit",
-    "test:integration": "pnpm preflight && vitest run packages",
+    "test:integration": "pnpm preflight && vitest run packages apps",
     "test:smoke": "pnpm preflight && vitest run tests/smoke",
     "test:e2e": "pnpm preflight && playwright test",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm db:check && pnpm test:unit && pnpm test:integration && pnpm build && pnpm test:smoke && pnpm test:e2e"

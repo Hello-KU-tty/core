@@ -10,6 +10,7 @@ import {
   learningSpecIdSchema,
   nonEmptyTextSchema,
   projectIdSchema,
+  relativePosixPathSchema,
   schemaVersionSchema,
   taskIdSchema,
 } from './primitives.js'
@@ -84,6 +85,14 @@ export const uiLaunchResultCommandSchema = z.strictObject({
   projectId: projectIdSchema,
 })
 
+export const generatedResultDescriptorSchema = z.strictObject({
+  schemaVersion: schemaVersionSchema,
+  correlationId: correlationIdSchema,
+  projectId: projectIdSchema,
+  workspacePath: relativePosixPathSchema,
+  status: z.literal('READY'),
+})
+
 export const uiRequestSchema = z.discriminatedUnion('kind', [
   uiStartDiscoveryCommandSchema,
   uiRecordDiscoveryFeedbackCommandSchema,
@@ -95,3 +104,4 @@ export const uiRequestSchema = z.discriminatedUnion('kind', [
 ])
 
 export type UiRequest = z.infer<typeof uiRequestSchema>
+export type GeneratedResultDescriptor = z.infer<typeof generatedResultDescriptorSchema>

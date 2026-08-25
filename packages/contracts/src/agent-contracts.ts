@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { activityEventSchema, episodeSchema } from './activity.js'
 import {
   builderTaskSchema,
+  decisionApplicationSchema,
   decisionRequestSchema,
   decisionResolutionSchema,
   liveProjectContextSchema,
@@ -10,6 +11,7 @@ import {
 } from './build.js'
 import {
   candidateRoundSchema,
+  discoveryFeedbackSchema,
   discoverySessionSchema,
   projectCandidateRevisionSchema,
   projectSchema,
@@ -291,6 +293,7 @@ export const discoveryContextSchema = z.strictObject({
   session: discoverySessionSchema,
   rounds: z.array(candidateRoundSchema).max(100),
   candidates: z.array(projectCandidateRevisionSchema).max(1_000),
+  feedback: z.array(discoveryFeedbackSchema).max(1_000),
   relevantLedgerEntries: z.array(conceptLedgerEntrySchema).max(20),
 })
 
@@ -329,6 +332,14 @@ export const episodeContextSchema = z.strictObject({
   relevantLedgerEntries: z.array(conceptLedgerEntrySchema).max(20),
 })
 
+export const decisionResultSchema = z.strictObject({
+  schemaVersion: schemaVersionSchema,
+  correlationId: correlationIdSchema,
+  request: decisionRequestSchema,
+  resolution: decisionResolutionSchema.nullable(),
+  application: decisionApplicationSchema.nullable(),
+})
+
 export const commandReceiptSchema = z.strictObject({
   schemaVersion: schemaVersionSchema,
   correlationId: correlationIdSchema,
@@ -345,4 +356,5 @@ export type DiscoveryContext = z.infer<typeof discoveryContextSchema>
 export type BuilderTaskContext = z.infer<typeof builderTaskContextSchema>
 export type HelperContext = z.infer<typeof helperContextSchema>
 export type EpisodeContext = z.infer<typeof episodeContextSchema>
+export type DecisionResult = z.infer<typeof decisionResultSchema>
 export type CommandReceipt = z.infer<typeof commandReceiptSchema>

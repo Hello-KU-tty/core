@@ -2,9 +2,9 @@
 
 ## 1. 상태
 
-- 상태: 사용자 승인 완료, T04 domain reducer와 상태 불변식 반영
+- 상태: 사용자 승인 완료, T06 application/MCP 권한 경계 반영 및 T07 평가 harness 착수 가능
 - 기준 입력: [PROJECT_BRIEF.md](../PROJECT_BRIEF.md), [SPEC.md](SPEC.md)
-- T03 versioned contract와 Agent/UI runtime validation, T04 pure reducer와 Evidence policy v1.0.0은 구현됐다. database schema는 아직 구현하지 않았다.
+- T03 versioned contract와 Agent/UI runtime validation, T04 pure reducer와 Evidence policy v1.0.0, T05 SQLite schema/repository/migration, T06 application use case와 역할 고정 MCP server는 구현됐다.
 - Kiro/Crew 세부 연결은 capability spike 결과에 따라 이 문서를 갱신한다.
 
 ## 2. 선택한 기술 스택과 선택 이유
@@ -192,6 +192,8 @@ Domain은 Kiro SDK, React와 SQLite library에 의존하지 않는다.
 
 Application transaction은 SQLite repository interface를 통해 상태를 변경한다.
 
+T06의 application handler는 Agent와 UI transport가 공유하는 검증·transaction 경계다. Agent 생성 품질, Builder의 실제 shell/file 실행, Helper 대화 정책과 Episode dispatch/retry는 각각 T08~T13에서 연결하지만, 현재 contract의 저장·조회·상태 전이와 Evidence reducer 호출은 mock 없이 처리한다.
+
 ### 4.5 storage-sqlite
 
 - immutable append history와 stable head/current projection
@@ -212,6 +214,8 @@ file DB는 host가 명시한 절대 data directory 아래 `vibe-helper.sqlite` �
 - domain/application command 호출
 - raw SQL과 arbitrary file operation 미노출
 - correlation id 반환
+
+T06 MCP process는 시작 시 하나의 Agent role에 고정하고 그 role의 tool만 등록한다. payload 안의 actor claim은 process role과 다시 대조하되 authorization source로 신뢰하지 않는다. validated request의 canonical JSON UTF-8 크기는 2 MiB로 제한하고, 더 작은 contract별 array/text 제한도 그대로 적용한다.
 
 ### 4.7 kiro-adapter
 
@@ -326,11 +330,11 @@ Discovery Agent:
 
 - `get_discovery_context`
 - `submit_candidate_round`
-- `record_discovery_feedback`
 - `submit_learning_spec`
 
 Builder Agent:
 
+- `get_builder_task`
 - `start_task`
 - `update_build_context`
 - `request_user_decision`
@@ -353,6 +357,8 @@ Evidence Analyst:
 - proposal tool은 DB row를 직접 만들지 않고 application command를 호출한다.
 - schema version과 idempotency/correlation key를 포함한다.
 - error는 retryable, user_action_required, permanent로 분류한다.
+
+`record_discovery_feedback`은 user-authored provenance를 보존하기 위해 Agent tool로 노출하지 않고 UI application command로만 처리한다. Agent가 user source를 주장하는 payload를 제출해도 caller identity가 바뀌지 않는다.
 
 ### 6.2 UI command/query
 
@@ -418,6 +424,10 @@ State 변경은 Core만 수행한다.
 - output allowlist
 - destructive action 거절
 - audit correlation id
+
+Idempotent command는 strict validation 뒤 canonical JSON의 SHA-256 hash를 receipt에 저장한다. 같은 key와 같은 hash는 원래 receipt를 반환하고, 같은 key를 다른 payload에 재사용하면 상태 변경 없이 거절한다. idempotency receipt, domain write와 audit은 같은 transaction에 포함한다.
+
+Contract의 상대 POSIX path 검증 뒤에도 host가 제공한 절대 generated-workspace root와 project workspace를 canonicalize한다. 기존 target은 `realpath`, 아직 없는 target은 가장 가까운 기존 조상을 기준으로 symlink 탈출과 sibling-prefix 혼동을 거절한다. T06은 범용 file/shell/SQL tool을 노출하지 않으며 실제 Builder executor는 T10에서 같은 workspace policy를 재사용한다.
 
 Crew App의 `permissions.api`는 T01에서 host SDK의 client-side path guard로 확인됐다. 활성화된 App code가 same-origin fetch 자체를 못 하게 하는 server-side capability로 간주하지 않는다. Crew App에는 범용 URL·header·method 입력을 받는 fetch wrapper를 두지 않고, adapter의 고정 endpoint마다 request/response schema와 redaction test를 둔다. credential·개인정보 보호는 앱별 trust, Core/MCP 권한과 저장 전 redaction으로 방어한다.
 

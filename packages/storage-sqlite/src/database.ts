@@ -3,6 +3,7 @@ import { dirname, isAbsolute, join, normalize, parse } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import {
+  ApplicationError,
   PersistenceError,
   type PersistenceRepository,
   type StorageUnitOfWork,
@@ -100,7 +101,7 @@ export class SqliteStorage implements StorageUnitOfWork {
     try {
       return transaction()
     } catch (error) {
-      if (error instanceof PersistenceError) {
+      if (error instanceof PersistenceError || error instanceof ApplicationError) {
         throw error
       }
       throw new PersistenceError(

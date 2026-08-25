@@ -210,6 +210,14 @@
 - **검토한 대안:** 모든 field 완전 정규화, entity 종류를 구분하지 않는 단일 event/JSON table, repository가 임의 SQL과 raw payload 저장을 노출, repository 내부에서 OS home directory를 추측, migration 전 backup 생략, corruption 시 DB 자동 재생성.
 - **tradeoff:** canonical JSON과 indexed column이 일부 정보를 중복하지만 contract round trip과 relational query를 함께 얻는다. storage가 수행하는 credential pattern 검사는 redaction service를 대체하지 않으며 false negative를 막기 위해 T21에서 별도 redaction/eval을 강화해야 한다. backup 때문에 migration 시작 비용이 늘지만 local single-user DB의 recoverability를 우선한다. Drizzle 0.45의 전체 declaration surface는 TypeScript 7 strict build에서 optional backend type 오류를 만들므로 schema는 migration input으로 격리해 `drizzle-kit check`로 검증하고, runtime query는 strict TypeScript repository 안의 bound `better-sqlite3` statement로 제한한다.
 
+## 2026-08-25: T06 application과 역할 고정 MCP 보안 경계
+
+- **상태:** 승인
+- **맥락:** T03 contract는 actor와 상대 path shape를 검증하고 T05 storage는 transaction과 immutable receipt를 제공하지만, 실제 caller role, payload 크기, symlink를 포함한 workspace containment, stale write와 idempotent replay를 application/MCP 경계에서 함께 강제하지 않는다. Architecture의 초기 tool 목록에는 user-authored Discovery feedback을 Agent가 기록하는 것처럼 보이는 항목도 남아 있었다.
+- **결정:** application handler를 Agent와 UI가 공유하는 command/query 및 transaction 경계로 구현한다. MCP process는 시작 시 Discovery, Builder, Helper 또는 Evidence Analyst 한 role에 고정하고 해당 catalog만 등록하며 payload의 actor claim을 다시 검증한다. validated canonical JSON UTF-8 요청은 2 MiB로 제한한다. user-authored Discovery feedback은 UI application command로만 받고 Discovery Agent tool에서 제외한다. idempotent command는 canonical request SHA-256 hash와 결과 resource/revision receipt를 저장해 같은 key·같은 hash만 replay하고 key 재사용은 거절한다. workspace root와 project workspace는 host가 명시한 절대 path를 사용하며 existing target은 realpath, missing target은 nearest existing ancestor를 기준으로 containment를 확인한다. T06 MCP에는 raw SQL, 범용 file read/write, shell 또는 network tool을 노출하지 않는다. protocol-level allowlist test에는 server와 같은 2.0.0의 공식 MCP client package를 test dependency로 사용한다.
+- **검토한 대안:** 하나의 MCP catalog를 prompt로만 제한, payload actor를 caller identity로 신뢰, SDK 기본 10 MiB transport 제한만 사용, lexical path prefix만 검사, 결과를 저장하지 않는 in-memory idempotency, Discovery Agent가 user feedback source를 대신 주장, custom JSON-RPC test client 작성.
+- **tradeoff:** role별 process/config와 aggregate query가 늘어나지만 권한 누출과 session 간 상태 혼동을 줄인다. 2 MiB cap은 contract의 이론적 최대 조합보다 작을 수 있으므로 비정상적으로 긴 batch는 나눠 제출해야 한다. canonicalization은 filesystem 조회가 필요하지만 path-bearing mutation 전에만 수행하며 실제 Builder shell confinement는 T10에서 같은 policy에 연결한다. 공식 client test dependency 하나가 늘지만 실제 `tools/list`/`tools/call` protocol 회귀를 직접 검증할 수 있다.
+
 ## 2026-08-24: 구현 세부 선택 위임
 
 - **상태:** 승인

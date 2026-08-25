@@ -11,5 +11,8 @@
     "@vibe-helper/contracts": "workspace:*",
     "@vibe-helper/storage-sqlite": "workspace:*",
     "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.0.0"
   }
 }

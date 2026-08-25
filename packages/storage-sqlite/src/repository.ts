@@ -1,4 +1,7 @@
 import {
+  type BuilderTaskAggregate,
+  type DiscoveryAggregate,
+  type EpisodeAggregate,
   PersistenceError,
   type EvidenceTrace,
   type IdempotencyReceipt,
@@ -85,6 +88,10 @@ interface HeadVersionRow {
 
 interface IssueHeadRow {
   readonly head_storage_revision: number
+}
+
+interface ProjectIdentityRow {
+  readonly project_id: string
 }
 
 interface VersionedAppendOptions<T> {
@@ -1197,9 +1204,13 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
       !correlationIdSchema.safeParse(input.correlationId).success ||
       !stableEntityIdSchema.safeParse(input.resourceId).success ||
       !utcTimestampSchema.safeParse(input.recordedAt).success ||
+      !/^[0-9a-f]{64}$/u.test(input.requestHash) ||
+      !/^[0-9a-f]{64}$/u.test(input.responseHash) ||
+      !this.#isCanonicalJson(input.responseJson) ||
+      this.#hashForJson(input.responseJson) !== input.responseHash ||
       !/^[a-z][a-z0-9_.-]{0,79}$/u.test(input.operation) ||
-      (input.resourceRevision !== undefined &&
-        (!Number.isInteger(input.resourceRevision) || input.resourceRevision < 1))
+      !Number.isInteger(input.resourceRevision) ||
+      input.resourceRevision < 1
     ) {
       throw new PersistenceError(
         'VALIDATION_FAILED',
@@ -1225,7 +1236,7 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
               input.correlationId,
               input.operation,
               input.resourceId,
-              input.resourceRevision ?? null,
+              input.resourceRevision,
               input.recordedAt,
               payloadJson,
               payloadHash,
@@ -1233,6 +1244,273 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
         },
       ),
     )
+  }
+
+  readDiscoveryAggregate(
+    projectId: string,
+    discoverySessionId?: string,
+  ): DiscoveryAggregate | null {
+    if (
+      !projectSchema.shape.id.safeParse(projectId).success ||
+      (discoverySessionId !== undefined &&
+        !discoverySessionSchema.shape.id.safeParse(discoverySessionId).success)
+    ) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Discovery aggregate identity is invalid')
+    }
+    return this.#read(() => {
+      const project = this.#projectHead(projectId)
+      if (project === null) return null
+      const session =
+        discoverySessionId === undefined
+          ? this.#headRecord(
+              `SELECT revisions.payload_json, revisions.payload_hash
+               FROM discovery_sessions heads
+               JOIN discovery_session_revisions revisions
+                 ON revisions.session_id = heads.id AND revisions.revision = heads.head_revision
+               WHERE heads.project_id = ?
+               ORDER BY heads.updated_at DESC LIMIT 1`,
+              [projectId],
+              discoverySessionSchema,
+            )
+          : this.#headRecord(
+              `SELECT revisions.payload_json, revisions.payload_hash
+               FROM discovery_sessions heads
+               JOIN discovery_session_revisions revisions
+                 ON revisions.session_id = heads.id AND revisions.revision = heads.head_revision
+               WHERE heads.project_id = ? AND heads.id = ?`,
+              [projectId, discoverySessionId],
+              discoverySessionSchema,
+            )
+      if (session === null) return null
+
+      const rounds = this.#recordList(
+        'SELECT payload_json, payload_hash FROM candidate_rounds WHERE session_id = ? ORDER BY round_index ASC',
+        [session.id],
+        candidateRoundSchema,
+      )
+      const candidates = this.#recordList(
+        'SELECT payload_json, payload_hash FROM candidate_revisions WHERE session_id = ? ORDER BY candidate_id ASC, revision ASC',
+        [session.id],
+        projectCandidateRevisionSchema,
+      )
+      const feedback = this.#recordList(
+        'SELECT payload_json, payload_hash FROM discovery_feedback WHERE session_id = ? ORDER BY created_at ASC',
+        [session.id],
+        discoveryFeedbackSchema,
+      )
+      const learningSpecs = this.#recordList(
+        'SELECT payload_json, payload_hash FROM learning_spec_revisions WHERE project_id = ? ORDER BY spec_id ASC, revision ASC',
+        [projectId],
+        learningSpecRevisionSchema,
+      )
+      const relevantLedgerEntries = this.#allLedgerHeads()
+        .filter((entry) => entry.relatedProjectIds.includes(projectId))
+        .slice(0, 20)
+      return {
+        project,
+        session,
+        rounds,
+        candidates,
+        feedback,
+        learningSpecs,
+        relevantLedgerEntries,
+      }
+    })
+  }
+
+  readDiscoveryAggregateBySession(discoverySessionId: string): DiscoveryAggregate | null {
+    if (!discoverySessionSchema.shape.id.safeParse(discoverySessionId).success) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Discovery session identity is invalid')
+    }
+    return this.#read(() => {
+      const owner = this.#sqlite
+        .prepare<[string], ProjectIdentityRow>(
+          'SELECT project_id FROM discovery_sessions WHERE id = ?',
+        )
+        .get(discoverySessionId)
+      return owner === undefined
+        ? null
+        : this.readDiscoveryAggregate(owner.project_id, discoverySessionId)
+    })
+  }
+
+  readBuilderTaskAggregate(projectId: string, taskId: string): BuilderTaskAggregate | null {
+    if (
+      !projectSchema.shape.id.safeParse(projectId).success ||
+      !builderTaskSchema.shape.id.safeParse(taskId).success
+    ) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Builder aggregate identity is invalid')
+    }
+    return this.#read(() => {
+      const project = this.#projectHead(projectId)
+      if (project === null) return null
+      const task = this.#headRecord(
+        `SELECT revisions.payload_json, revisions.payload_hash
+         FROM tasks heads
+         JOIN task_revisions revisions
+           ON revisions.task_id = heads.id AND revisions.revision = heads.head_revision
+         WHERE heads.project_id = ? AND heads.id = ?`,
+        [projectId, taskId],
+        builderTaskSchema,
+      )
+      if (task === null) return null
+      const learningSpec = this.#headRecord(
+        `SELECT payload_json, payload_hash FROM learning_spec_revisions
+         WHERE project_id = ? AND spec_id = ? AND revision = ?`,
+        [projectId, task.learningSpecId, task.learningSpecRevision],
+        learningSpecRevisionSchema,
+      )
+      if (learningSpec === null) {
+        throw new PersistenceError('CORRUPT_DATABASE', 'Builder Task references a missing Spec')
+      }
+      const liveContext = this.#headRecord(
+        `SELECT versions.payload_json, versions.payload_hash
+         FROM live_contexts heads
+         JOIN live_context_versions versions
+           ON versions.context_id = heads.id AND versions.context_version = heads.head_version
+         WHERE heads.project_id = ? AND heads.task_id = ?`,
+        [projectId, taskId],
+        liveProjectContextSchema,
+      )
+      const decisionRequests = this.#recordList(
+        'SELECT payload_json, payload_hash FROM decision_requests WHERE project_id = ? AND task_id = ? ORDER BY requested_at ASC',
+        [projectId, taskId],
+        decisionRequestSchema,
+      )
+      const decisionResolutions = this.#recordList(
+        `SELECT resolutions.payload_json, resolutions.payload_hash
+         FROM decision_resolutions resolutions
+         JOIN decision_requests requests ON requests.id = resolutions.decision_id
+         WHERE requests.project_id = ? AND requests.task_id = ? ORDER BY resolutions.resolved_at ASC`,
+        [projectId, taskId],
+        decisionResolutionSchema,
+      )
+      const decisionApplications = this.#recordList(
+        `SELECT applications.payload_json, applications.payload_hash
+         FROM decision_applications applications
+         JOIN decision_requests requests ON requests.id = applications.decision_id
+         WHERE requests.project_id = ? AND requests.task_id = ? ORDER BY applications.applied_at ASC`,
+        [projectId, taskId],
+        decisionApplicationSchema,
+      )
+      const completionReport = this.#headRecord(
+        'SELECT payload_json, payload_hash FROM completion_reports WHERE project_id = ? AND task_id = ? ORDER BY completed_at DESC LIMIT 1',
+        [projectId, taskId],
+        taskCompletionReportSchema,
+      )
+      return {
+        project,
+        learningSpec,
+        task,
+        liveContext,
+        decisionRequests,
+        decisionResolutions,
+        decisionApplications,
+        completionReport,
+      }
+    })
+  }
+
+  readEpisodeAggregate(projectId: string, episodeId: string): EpisodeAggregate | null {
+    if (
+      !projectSchema.shape.id.safeParse(projectId).success ||
+      !episodeSchema.shape.id.safeParse(episodeId).success
+    ) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Episode aggregate identity is invalid')
+    }
+    return this.#read(() => {
+      const episode = this.#headRecord(
+        `SELECT revisions.payload_json, revisions.payload_hash
+         FROM episodes heads
+         JOIN episode_revisions revisions
+           ON revisions.episode_id = heads.id AND revisions.revision = heads.head_revision
+         WHERE heads.project_id = ? AND heads.id = ?`,
+        [projectId, episodeId],
+        episodeSchema,
+      )
+      if (episode === null) return null
+      const events = this.#recordList(
+        `SELECT events.payload_json, events.payload_hash
+         FROM episode_event_edges edges
+         JOIN activity_events events ON events.id = edges.event_id
+         WHERE edges.episode_id = ? AND edges.episode_revision = ?
+         ORDER BY edges.position ASC`,
+        [episode.id, episode.revision],
+        activityEventSchema,
+      )
+      const conceptIds = new Set(
+        episode.conceptCandidates.flatMap((candidate) =>
+          candidate.conceptId === undefined ? [] : [candidate.conceptId],
+        ),
+      )
+      const conceptNames = new Set(
+        episode.conceptCandidates.map((candidate) => candidate.originalExpression.toLowerCase()),
+      )
+      const relevantLedgerEntries = this.#allLedgerHeads()
+        .filter(
+          (entry) =>
+            conceptIds.has(entry.concept.id) ||
+            conceptNames.has(entry.concept.canonicalName.toLowerCase()) ||
+            entry.acceptedAliases.some((alias) => conceptNames.has(alias.toLowerCase())),
+        )
+        .slice(0, 20)
+      const evidenceProposals = this.#recordList(
+        'SELECT payload_json, payload_hash FROM evidence_proposals WHERE episode_id = ? ORDER BY proposed_at ASC',
+        [episode.id],
+        evidenceProposalSchema,
+      )
+      return { episode, events, relevantLedgerEntries, evidenceProposals }
+    })
+  }
+
+  readCanonicalConceptById(conceptId: string): CanonicalConcept | null {
+    if (!canonicalConceptSchema.shape.id.safeParse(conceptId).success) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Concept ID is invalid')
+    }
+    return this.#read(() => this.#conceptHead(conceptId))
+  }
+
+  readCanonicalConceptByName(canonicalName: string): CanonicalConcept | null {
+    if (canonicalName.trim().length === 0 || canonicalName.length > 120) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Concept name is invalid')
+    }
+    return this.#read(() =>
+      this.#headRecord(
+        `SELECT revisions.payload_json, revisions.payload_hash
+         FROM canonical_concepts heads
+         JOIN canonical_concept_revisions revisions
+           ON revisions.concept_id = heads.id AND revisions.revision = heads.head_revision
+         WHERE lower(heads.canonical_name) = lower(?) LIMIT 1`,
+        [canonicalName.trim()],
+        canonicalConceptSchema,
+      ),
+    )
+  }
+
+  readIdempotencyReceipt(key: string): IdempotencyReceipt | null {
+    if (!idempotencyKeySchema.safeParse(key).success) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Idempotency key is invalid')
+    }
+    return this.#read(() => {
+      const row = this.#payloadRow(
+        'SELECT payload_json, payload_hash FROM idempotency_receipts WHERE key = ?',
+        [key],
+      )
+      if (row === undefined) return null
+      if (this.#hashForJson(row.payload_json) !== row.payload_hash) {
+        throw new PersistenceError('CORRUPT_DATABASE', 'Stored idempotency receipt hash mismatch')
+      }
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(row.payload_json)
+      } catch {
+        throw new PersistenceError('CORRUPT_DATABASE', 'Stored idempotency receipt is invalid')
+      }
+      if (!this.#isIdempotencyReceipt(parsed)) {
+        throw new PersistenceError('CORRUPT_DATABASE', 'Stored idempotency receipt is invalid')
+      }
+      return parsed
+    })
   }
 
   recoverProject(projectId: string): ProjectRecoveryState | null {
@@ -1414,6 +1692,84 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
     })
   }
 
+  readEvidenceTracesForProject(projectId: string): readonly EvidenceTrace[] {
+    if (!projectSchema.shape.id.safeParse(projectId).success) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Project ID is invalid')
+    }
+    return this.#read(() => {
+      const rows = this.#sqlite
+        .prepare<[string, string], { readonly concept_id: string }>(
+          `SELECT DISTINCT concept_id FROM accepted_evidence WHERE project_id = ?
+           UNION SELECT DISTINCT concept_id FROM evidence_proposals
+             WHERE project_id = ? AND concept_id IS NOT NULL
+           ORDER BY concept_id ASC`,
+        )
+        .all(projectId, projectId)
+      return rows.flatMap((row) => {
+        const trace = this.readEvidenceTrace(row.concept_id)
+        return trace === null ? [] : [trace]
+      })
+    })
+  }
+
+  #projectHead(projectId: string): Project | null {
+    return this.#headRecord(
+      `SELECT revisions.payload_json, revisions.payload_hash
+       FROM projects heads
+       JOIN project_revisions revisions
+         ON revisions.project_id = heads.id AND revisions.revision = heads.head_revision
+       WHERE heads.id = ?`,
+      [projectId],
+      projectSchema,
+    )
+  }
+
+  #conceptHead(conceptId: string): CanonicalConcept | null {
+    return this.#headRecord(
+      `SELECT revisions.payload_json, revisions.payload_hash
+       FROM canonical_concepts heads
+       JOIN canonical_concept_revisions revisions
+         ON revisions.concept_id = heads.id AND revisions.revision = heads.head_revision
+       WHERE heads.id = ?`,
+      [conceptId],
+      canonicalConceptSchema,
+    )
+  }
+
+  #allLedgerHeads(): readonly ConceptLedgerEntry[] {
+    return this.#recordList(
+      `SELECT revisions.payload_json, revisions.payload_hash
+       FROM concept_ledgers heads
+       JOIN concept_ledger_revisions revisions
+         ON revisions.ledger_id = heads.id AND revisions.revision = heads.head_revision
+       ORDER BY revisions.updated_at DESC`,
+      [],
+      conceptLedgerEntrySchema,
+    )
+  }
+
+  #isIdempotencyReceipt(value: unknown): value is IdempotencyReceipt {
+    if (typeof value !== 'object' || value === null) return false
+    const receipt = value as Partial<IdempotencyReceipt>
+    return (
+      idempotencyKeySchema.safeParse(receipt.key).success &&
+      correlationIdSchema.safeParse(receipt.correlationId).success &&
+      typeof receipt.operation === 'string' &&
+      /^[a-z][a-z0-9_.-]{0,79}$/u.test(receipt.operation) &&
+      typeof receipt.requestHash === 'string' &&
+      /^[0-9a-f]{64}$/u.test(receipt.requestHash) &&
+      typeof receipt.responseJson === 'string' &&
+      this.#isCanonicalJson(receipt.responseJson) &&
+      typeof receipt.responseHash === 'string' &&
+      /^[0-9a-f]{64}$/u.test(receipt.responseHash) &&
+      this.#hashForJson(receipt.responseJson) === receipt.responseHash &&
+      stableEntityIdSchema.safeParse(receipt.resourceId).success &&
+      Number.isInteger(receipt.resourceRevision) &&
+      (receipt.resourceRevision ?? 0) >= 1 &&
+      utcTimestampSchema.safeParse(receipt.recordedAt).success
+    )
+  }
+
   #appendVersioned<T>(options: VersionedAppendOptions<T>): PersistenceWriteResult {
     const existing = this.#payloadRow(options.existingSql, options.existingParams)
     if (existing !== undefined) {
@@ -1499,6 +1855,14 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
 
   #hashForJson(payloadJson: string): string {
     return createHash('sha256').update(payloadJson).digest('hex')
+  }
+
+  #isCanonicalJson(payloadJson: string): boolean {
+    try {
+      return stableStringify(JSON.parse(payloadJson)) === payloadJson
+    } catch {
+      return false
+    }
   }
 
   #write<T>(resourceId: string, work: () => T): T {
