@@ -171,7 +171,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - Analyst가 직접 state를 변경할 수 없고 invalid proposal은 이유와 함께 거절된다.
 - Agent 설명, 단순 확인과 카드 클릭만으로 `DEMONSTRATED` 이상이 되지 않는다.
 
-### [>] T05. SQLite schema, repository와 migration
+### [x] T05. SQLite schema, repository와 migration
 
 **범위**
 
@@ -195,7 +195,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - migration 실패가 기존 DB를 부분 변경하지 않는다.
 - secret redaction 이전의 raw payload가 DB에 저장되지 않는다.
 
-### [ ] T06. Application use case와 MCP 권한 경계
+### [>] T06. Application use case와 MCP 권한 경계
 
 **범위**
 

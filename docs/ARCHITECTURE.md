@@ -194,14 +194,15 @@ Application transaction은 SQLite repository interface를 통해 상태를 변�
 
 ### 4.5 storage-sqlite
 
-- migration과 schema version
-- transaction과 foreign key
-- repository implementation
-- audit query와 Evidence Trace
-- backup/export boundary
-- redacted test fixture
+- immutable append history와 stable head/current projection
+- revision·관계 key의 relational column, composite foreign key와 strict DTO canonical JSON
+- application-owned repository port와 Unit of Work의 SQLite implementation
+- Project restart recovery query와 audit/Evidence Trace query
+- Drizzle schema, forward SQL migration과 `drizzle-kit check`
+- `quick_check`, foreign-key integrity check, pending migration 전 verified backup
+- contract 재검증과 credential-like payload 최종 거부선
 
-SQLite path와 backup 정책은 local app packaging spike에서 결정한다.
+file DB는 host가 명시한 절대 data directory 아래 `vibe-helper.sqlite` 고정 이름을 사용한다. OS별 production app-data 기본 위치는 T28 packaging에서 정한다. corruption이나 migration 실패 시 기존 DB를 자동 삭제·교체하지 않는다. Drizzle 0.45의 전체 declaration surface는 TypeScript 7 strict build와 호환되지 않으므로 schema는 migration input으로 격리하고 `drizzle-kit check`로 검사한다. runtime repository는 bound `better-sqlite3` statement만 내부에서 사용하며 application이나 MCP에 raw SQL을 노출하지 않는다.
 
 ### 4.6 mcp-server
 
@@ -313,7 +314,7 @@ CanonicalConcept 1 ── N MisconceptionIssue
 - source Agent 또는 user
 - redaction status
 
-정확한 DDL은 storage task에서 승인한다.
+정확한 DDL과 forward migration은 `packages/storage-sqlite/src/schema.ts`와 `packages/storage-sqlite/drizzle/`에 둔다. append row의 contract JSON은 stable key order와 SHA-256 hash로 검증하며 selected Candidate, active Task, Decision 상태, Live Context와 Concept Ledger head는 별도 projection으로 복구한다. `AnalysisJob`과 evaluation 결과 table은 각각 T13과 T07에서 contract가 확정된 뒤 forward migration으로 추가한다.
 
 ## 6. API 및 외부 연동 계약
 

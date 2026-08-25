@@ -202,6 +202,14 @@
 - **검토한 대안:** domain이 현재 시각과 ID를 직접 생성, duplicate를 오류로만 처리, Analyst proposal의 maximum state를 그대로 적용, contradiction을 USER_UNDERSTANDING Evidence로 위장, 한 번의 contradiction으로 state 강등, pilot 전에 confidence score와 반복 횟수 threshold 고정.
 - **tradeoff:** 초기 정책은 false mastery를 줄이는 대신 약한 학습 신호를 state에 반영하지 않아 보수적으로 보일 수 있다. accepted Evidence payload가 조금 커지지만 reducer replay와 audit가 단순해진다. 정책 조정은 reducer version, 결정 기록과 회귀 fixture를 함께 변경해야 한다.
 
+## 2026-08-25: T05 SQLite hybrid schema와 복구 경계
+
+- **상태:** 승인
+- **맥락:** T03 strict contract와 T04 reducer 결과를 local SQLite에 보존하면서 revision lineage, restart 복구, Evidence Trace와 audit query를 지원해야 한다. 모든 nested DTO를 컬럼으로 완전 정규화하면 contract 변경마다 DDL이 과도하게 흔들리고, 단일 generic JSON table은 foreign key와 projection invariant를 강제하기 어렵다. 실제 OS app-data 위치는 packaging 전에는 확정되지 않았다.
+- **결정:** stable ID, revision, status, correlation, timestamp와 조회·관계 key는 SQLite column과 foreign key로 두고, 각 strict contract DTO 전체는 canonical JSON과 SHA-256 hash로 함께 보존하는 hybrid schema를 사용한다. immutable revision/event/proposal/audit table과 selected Candidate, active Task, pending Decision, 최신 Context·Concept State projection을 분리하고 같은 transaction에서 갱신한다. application package에는 repository port와 Unit of Work interface만 두며 use case는 T06에서 구현한다. storage는 raw Crew/Agent transport payload를 받지 않고 contract schema로 재검증한 record만 저장하며, 알려진 credential pattern은 redaction status와 무관하게 마지막 방어선에서 거절한다. file DB는 host가 명시적으로 제공한 data directory 아래 고정 filename을 사용하고 production default path는 T28 packaging에서 결정한다. pending migration 전 sibling backup을 만들고, Drizzle transaction migration과 `PRAGMA quick_check`를 사용한다. corruption이나 migration 실패 시 원본을 자동 삭제·교체하지 않는다.
+- **검토한 대안:** 모든 field 완전 정규화, entity 종류를 구분하지 않는 단일 event/JSON table, repository가 임의 SQL과 raw payload 저장을 노출, repository 내부에서 OS home directory를 추측, migration 전 backup 생략, corruption 시 DB 자동 재생성.
+- **tradeoff:** canonical JSON과 indexed column이 일부 정보를 중복하지만 contract round trip과 relational query를 함께 얻는다. storage가 수행하는 credential pattern 검사는 redaction service를 대체하지 않으며 false negative를 막기 위해 T21에서 별도 redaction/eval을 강화해야 한다. backup 때문에 migration 시작 비용이 늘지만 local single-user DB의 recoverability를 우선한다. Drizzle 0.45의 전체 declaration surface는 TypeScript 7 strict build에서 optional backend type 오류를 만들므로 schema는 migration input으로 격리해 `drizzle-kit check`로 검증하고, runtime query는 strict TypeScript repository 안의 bound `better-sqlite3` statement로 제한한다.
+
 ## 2026-08-24: 구현 세부 선택 위임
 
 - **상태:** 승인

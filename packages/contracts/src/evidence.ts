@@ -331,6 +331,7 @@ export type EvidenceSignal = z.infer<typeof evidenceSignalSchema>
 export type EvidenceStrength = z.infer<typeof evidenceStrengthSchema>
 export type PromptDependence = z.infer<typeof promptDependenceSchema>
 export type CanonicalConcept = z.infer<typeof canonicalConceptSchema>
+export type ConceptAliasProposal = z.infer<typeof conceptAliasProposalSchema>
 export type EvidenceProposal = z.infer<typeof evidenceProposalSchema>
 export type EvidenceProposalBatch = z.infer<typeof evidenceProposalBatchSchema>
 export type EvidenceDecision = z.infer<typeof evidenceDecisionSchema>

@@ -1,2 +1,8 @@
-// SQLite repositories, schema, and migrations are introduced in T05.
-export {}
+export {
+  openInMemorySqliteStorage,
+  openSqliteStorage,
+  SqliteStorage,
+  type SqliteStorageOptions,
+  type StorageIntegrityResult,
+} from './database.js'
+export { SqlitePersistenceRepository } from './repository.js'
