@@ -156,6 +156,7 @@ export const discoverySubmitLearningSpecCommandSchema = z
     kind: z.literal('DISCOVERY_SUBMIT_LEARNING_SPEC'),
     idempotencyKey: idempotencyKeySchema,
     expectedSessionRevision: expectedRevisionSchema,
+    expectedSpecRevision: expectedRevisionSchema,
     learningSpec: learningSpecRevisionSchema,
   })
   .superRefine((command, context) => {
@@ -302,6 +303,7 @@ export const discoveryContextSchema = z.strictObject({
   rounds: z.array(candidateRoundSchema).max(100),
   candidates: z.array(projectCandidateRevisionSchema).max(1_000),
   feedback: z.array(discoveryFeedbackSchema).max(1_000),
+  learningSpec: learningSpecRevisionSchema.nullable(),
   relevantLedgerEntries: z.array(conceptLedgerEntrySchema).max(20),
 })
 

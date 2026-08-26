@@ -3,9 +3,16 @@ import { describe, expect, it } from 'vitest'
 import {
   uiRequestSchema,
   uiResolveDecisionCommandSchema,
+  uiReturnToDiscoveryCommandSchema,
   uiStartDiscoveryCommandSchema,
+  uiUpdateLearningSpecCommandSchema,
 } from '../src/index.ts'
-import { decisionResolutionFixture, discoveryInputFixture, ids } from './fixtures.js'
+import {
+  decisionResolutionFixture,
+  discoveryInputFixture,
+  ids,
+  learningSpecDraftContentFixture,
+} from './fixtures.js'
 
 describe('UI external input contracts', () => {
   const startDiscoveryCommand = {
@@ -48,5 +55,36 @@ describe('UI external input contracts', () => {
         correlationId: 'corr_00000000-0000-4000-8000-000000000099',
       }).success,
     ).toBe(false)
+  })
+
+  it('accepts direct Spec editing and new-session Discovery return commands', () => {
+    const update = {
+      schemaVersion: 1,
+      kind: 'UI_UPDATE_LEARNING_SPEC',
+      correlationId: ids.correlation,
+      actor: { kind: 'UI' },
+      idempotencyKey: ids.idempotency,
+      projectId: ids.project,
+      learningSpecId: ids.learningSpec,
+      expectedSessionRevision: 3,
+      expectedSpecRevision: 1,
+      draft: learningSpecDraftContentFixture,
+    } as const
+    const returned = {
+      schemaVersion: 1,
+      kind: 'UI_RETURN_TO_DISCOVERY',
+      correlationId: ids.correlation,
+      actor: { kind: 'UI' },
+      idempotencyKey: ids.idempotency,
+      projectId: ids.project,
+      discoverySessionId: ids.discoverySession,
+      expectedSessionRevision: 3,
+      expectedSpecRevision: 1,
+    } as const
+
+    expect(uiUpdateLearningSpecCommandSchema.parse(update)).toEqual(update)
+    expect(uiReturnToDiscoveryCommandSchema.parse(returned)).toEqual(returned)
+    expect(uiRequestSchema.safeParse(update).success).toBe(true)
+    expect(uiRequestSchema.safeParse(returned).success).toBe(true)
   })
 })

@@ -85,6 +85,22 @@ describe('Discovery and Learning Spec invariants', () => {
 
     const { confirmation: _confirmation, ...withoutConfirmation } = confirmedLearningSpecFixture
     expect(learningSpecRevisionSchema.safeParse(withoutConfirmation).success).toBe(false)
+    expect(
+      learningSpecRevisionSchema.safeParse({
+        ...confirmedLearningSpecFixture,
+        expectedDecisions: [],
+      }).success,
+    ).toBe(false)
+    expect(
+      learningSpecRevisionSchema.safeParse({
+        ...confirmedLearningSpecFixture,
+        scope: confirmedLearningSpecFixture.scope.map((item) =>
+          item.category === 'AGENT_SUPPORT'
+            ? { ...item, conceptNames: ['discriminated union'] }
+            : item,
+        ),
+      }).success,
+    ).toBe(false)
   })
 })
 

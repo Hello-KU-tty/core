@@ -37,6 +37,7 @@ import {
   episodeFixture,
   evidenceProposalBatchFixture,
   ids,
+  learningSpecDraftContentFixture,
   liveContextFixture,
   projectFixture,
   timestamp,
@@ -51,7 +52,9 @@ const fixedIdGenerator = (() => {
   }
 })()
 
-const createHarness = async () => {
+const createHarness = async (
+  options: { readonly generateId?: (prefix: string) => string } = {},
+) => {
   const workspaceRoot = await mkdtemp(join(tmpdir(), 'vibe-helper-application-workspaces-'))
   const storage = await openInMemorySqliteStorage()
   const workspacePolicy = await WorkspacePathPolicy.create(workspaceRoot)
@@ -59,9 +62,47 @@ const createHarness = async () => {
     storage,
     workspacePolicy,
     now: () => new Date(timestamp),
-    generateId: fixedIdGenerator,
+    generateId: options.generateId ?? fixedIdGenerator,
   })
   return { service, storage, workspaceRoot, workspacePolicy }
+}
+
+const seedSpecReview = (
+  storage: Awaited<ReturnType<typeof openInMemorySqliteStorage>>,
+  includeDraft = false,
+): void => {
+  storage.transaction((repository) => {
+    repository.appendProject(
+      projectSchema.parse({
+        ...projectFixture,
+        status: 'DISCOVERY',
+        generatedWorkspacePath: undefined,
+      }),
+    )
+    repository.appendDiscoverySession(discoverySessionSchema.parse(discoverySessionFixture))
+    repository.appendCandidate(projectCandidateRevisionSchema.parse(candidateFixture))
+    repository.appendCandidateRound(candidateRoundSchema.parse(candidateRoundFixture))
+    repository.appendDiscoveryFeedback(discoveryFeedbackSchema.parse(discoveryFeedbackFixture))
+    repository.appendDiscoverySession(
+      discoverySessionSchema.parse({
+        ...discoverySessionFixture,
+        revision: 2,
+        status: 'SELECTED',
+        closedAt: timestamp,
+      }),
+    )
+    repository.appendProject(
+      projectSchema.parse({
+        ...projectFixture,
+        revision: 2,
+        status: 'SPEC_REVIEW',
+        generatedWorkspacePath: undefined,
+      }),
+    )
+    if (includeDraft) {
+      repository.appendLearningSpec(learningSpecRevisionSchema.parse(draftLearningSpecFixture))
+    }
+  })
 }
 
 const seedBuilderGraph = (storage: Awaited<ReturnType<typeof openInMemorySqliteStorage>>): void => {
@@ -474,6 +515,133 @@ describe('ApplicationService boundary', () => {
     expect(postSelectionRound).toMatchObject({
       success: false,
       error: { code: 'DISCOVERY_SESSION_NOT_ACTIVE' },
+    })
+  })
+})
+
+describe('T09 Learning Spec application flow', () => {
+  it('creates, directly revises, and confirms a draft without creating a Builder Task', async () => {
+    const { service, storage } = await createHarness()
+    seedSpecReview(storage)
+
+    const submitRequest = {
+      schemaVersion: 1,
+      kind: 'DISCOVERY_SUBMIT_LEARNING_SPEC',
+      correlationId: ids.correlation,
+      actor: { kind: 'AGENT', role: 'DISCOVERY' },
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000081',
+      expectedSessionRevision: 2,
+      expectedSpecRevision: 0,
+      learningSpec: draftLearningSpecFixture,
+    } as const
+    const submitted = await service.executeAgent('DISCOVERY', submitRequest)
+    const replayed = await service.executeAgent('DISCOVERY', submitRequest)
+    expect(submitted).toMatchObject({ success: true, data: { resourceRevision: 1 } })
+    expect(replayed).toEqual(submitted)
+    expect(storage.repository.recoverProject(ids.project)?.activeTask).toBeNull()
+    expect(
+      await service.executeAgent('DISCOVERY', {
+        schemaVersion: 1,
+        kind: 'DISCOVERY_GET_CONTEXT',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'DISCOVERY' },
+        projectId: ids.project,
+        discoverySessionId: ids.discoverySession,
+      }),
+    ).toMatchObject({
+      success: true,
+      data: { session: { revision: 3 }, learningSpec: { id: ids.learningSpec, revision: 1 } },
+    })
+
+    const revisedDraft = {
+      ...learningSpecDraftContentFixture,
+      productPurpose: 'Compare redacted webhook variants locally before implementation.',
+    }
+    const revised = await service.executeUi({
+      schemaVersion: 1,
+      kind: 'UI_UPDATE_LEARNING_SPEC',
+      correlationId: ids.correlation,
+      actor: { kind: 'UI' },
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000082',
+      projectId: ids.project,
+      learningSpecId: ids.learningSpec,
+      expectedSessionRevision: 3,
+      expectedSpecRevision: 1,
+      draft: revisedDraft,
+    })
+    expect(revised).toMatchObject({ success: true, data: { resourceRevision: 2 } })
+
+    const stale = await service.executeUi({
+      schemaVersion: 1,
+      kind: 'UI_UPDATE_LEARNING_SPEC',
+      correlationId: ids.correlation,
+      actor: { kind: 'UI' },
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000083',
+      projectId: ids.project,
+      learningSpecId: ids.learningSpec,
+      expectedSessionRevision: 3,
+      expectedSpecRevision: 1,
+      draft: revisedDraft,
+    })
+    expect(stale).toMatchObject({ success: false, error: { code: 'DISCOVERY_SESSION_STALE' } })
+
+    const confirmed = await service.executeUi({
+      schemaVersion: 1,
+      kind: 'UI_CONFIRM_LEARNING_SPEC',
+      correlationId: ids.correlation,
+      actor: { kind: 'UI' },
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000084',
+      projectId: ids.project,
+      learningSpecId: ids.learningSpec,
+      expectedSpecRevision: 2,
+    })
+    expect(confirmed).toMatchObject({ success: true, data: { resourceRevision: 3 } })
+    expect(storage.repository.recoverProject(ids.project)).toMatchObject({
+      learningSpec: {
+        revision: 3,
+        status: 'CONFIRMED',
+        productPurpose: revisedDraft.productPurpose,
+        source: { kind: 'USER' },
+      },
+      activeTask: null,
+    })
+  })
+
+  it('supersedes the draft and returns through a new Discovery session', async () => {
+    const newSessionId = 'discovery_session_00000000-0000-4000-8000-000000000085'
+    let generatedSequence = 90
+    const { service, storage } = await createHarness({
+      generateId: (prefix) => {
+        if (prefix === 'discovery_session') return newSessionId
+        generatedSequence += 1
+        return `${prefix}_00000000-0000-4000-8000-${String(generatedSequence).padStart(12, '0')}`
+      },
+    })
+    seedSpecReview(storage, true)
+
+    const returned = await service.executeUi({
+      schemaVersion: 1,
+      kind: 'UI_RETURN_TO_DISCOVERY',
+      correlationId: ids.correlation,
+      actor: { kind: 'UI' },
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000086',
+      projectId: ids.project,
+      discoverySessionId: ids.discoverySession,
+      expectedSessionRevision: 2,
+      expectedSpecRevision: 1,
+    })
+    expect(returned).toMatchObject({ success: true, data: { resourceRevision: 1 } })
+
+    expect(storage.repository.readDiscoveryAggregateBySession(ids.discoverySession)).toMatchObject({
+      session: { revision: 2, status: 'SELECTED' },
+      learningSpecs: [
+        { revision: 1, status: 'DRAFT' },
+        { revision: 2, status: 'SUPERSEDED' },
+      ],
+    })
+    expect(storage.repository.readDiscoveryAggregateBySession(newSessionId)).toMatchObject({
+      project: { status: 'DISCOVERY' },
+      session: { revision: 1, status: 'ACTIVE', input: discoveryInputFixture },
     })
   })
 })

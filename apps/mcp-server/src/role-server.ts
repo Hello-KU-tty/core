@@ -16,6 +16,7 @@ import {
   discoverySubmitCandidateRoundCommandSchema,
   discoverySubmitCandidateRoundToolInputSchema,
   discoverySubmitLearningSpecCommandSchema,
+  discoverySubmitLearningSpecToolInputSchema,
   helperGetContextQuerySchema,
   helperRequestContextRefreshCommandSchema,
   type AgentRole,
@@ -51,7 +52,7 @@ export const ROLE_TOOL_CATALOG: Readonly<Record<AgentRole, readonly RoleToolDefi
       name: 'submit_learning_spec',
       title: 'Submit Learning Spec',
       description: 'Submit a draft Learning Spec for the selected Candidate revision.',
-      inputSchema: discoverySubmitLearningSpecCommandSchema,
+      inputSchema: discoverySubmitLearningSpecToolInputSchema,
       readOnly: false,
     },
   ],
@@ -137,7 +138,7 @@ export interface RoleBoundMcpServerOptions {
   readonly role: AgentRole
   readonly application: ApplicationService
   readonly now?: () => Date
-  readonly generateId?: (prefix: 'candidate' | 'candidate_round') => string
+  readonly generateId?: (prefix: 'candidate' | 'candidate_round' | 'learning_spec') => string
 }
 
 function toJsonObject(value: unknown): JSONObject {
@@ -162,7 +163,8 @@ async function submitCandidateRoundFromTool(options: RoleBoundMcpServerOptions, 
   const context = discoveryContextSchema.parse(contextResult.data)
   const createdAt = (options.now ?? (() => new Date()))().toISOString()
   const generateId =
-    options.generateId ?? ((prefix: 'candidate' | 'candidate_round') => `${prefix}_${randomUUID()}`)
+    options.generateId ??
+    ((prefix: 'candidate' | 'candidate_round' | 'learning_spec') => `${prefix}_${randomUUID()}`)
   const candidates = toolInput.candidates.map((draft) => {
     const { lineage, ...content } = draft
     const identity =
@@ -224,6 +226,67 @@ async function submitCandidateRoundFromTool(options: RoleBoundMcpServerOptions, 
   )
 }
 
+async function submitLearningSpecFromTool(options: RoleBoundMcpServerOptions, input: unknown) {
+  const toolInput = discoverySubmitLearningSpecToolInputSchema.parse(input)
+  const contextResult = await options.application.executeAgent('DISCOVERY', {
+    schemaVersion: 1,
+    kind: 'DISCOVERY_GET_CONTEXT',
+    correlationId: toolInput.correlationId,
+    actor: { kind: 'AGENT', role: 'DISCOVERY' },
+    projectId: toolInput.projectId,
+    discoverySessionId: toolInput.discoverySessionId,
+  })
+  if (!contextResult.success) return contextResult
+  const context = discoveryContextSchema.parse(contextResult.data)
+  const selection = [...context.feedback].reverse().find((feedback) => feedback.intent === 'SELECT')
+  const selectedCandidate = selection?.targets[0]
+  if (selectedCandidate === undefined) {
+    return options.application.executeAgent('DISCOVERY', {
+      schemaVersion: 1,
+      kind: 'DISCOVERY_SUBMIT_LEARNING_SPEC',
+      correlationId: toolInput.correlationId,
+      actor: { kind: 'AGENT', role: 'DISCOVERY' },
+      idempotencyKey: toolInput.idempotencyKey,
+      expectedSessionRevision: toolInput.expectedSessionRevision,
+      expectedSpecRevision: toolInput.expectedSpecRevision,
+      learningSpec: {},
+    })
+  }
+  const now = (options.now ?? (() => new Date()))().toISOString()
+  const generateId =
+    options.generateId ??
+    ((prefix: 'candidate' | 'candidate_round' | 'learning_spec') => `${prefix}_${randomUUID()}`)
+  const current = context.learningSpec
+  const learningSpec = {
+    schemaVersion: 1 as const,
+    id: current?.id ?? generateId('learning_spec'),
+    projectId: toolInput.projectId,
+    correlationId: toolInput.correlationId,
+    revision: current === null ? 1 : current.revision + 1,
+    ...(current === null ? {} : { parentRevision: current.revision }),
+    selectedCandidate,
+    ...toolInput.draft,
+    status: 'DRAFT' as const,
+    createdAt: current?.createdAt ?? now,
+    updatedAt: now,
+    source: { kind: 'AGENT' as const, role: 'DISCOVERY' as const },
+    redactionStatus: 'NOT_REQUIRED' as const,
+  }
+  return options.application.executeAgent(
+    'DISCOVERY',
+    discoverySubmitLearningSpecCommandSchema.parse({
+      schemaVersion: 1,
+      kind: 'DISCOVERY_SUBMIT_LEARNING_SPEC',
+      correlationId: toolInput.correlationId,
+      actor: { kind: 'AGENT', role: 'DISCOVERY' },
+      idempotencyKey: toolInput.idempotencyKey,
+      expectedSessionRevision: toolInput.expectedSessionRevision,
+      expectedSpecRevision: toolInput.expectedSpecRevision,
+      learningSpec,
+    }),
+  )
+}
+
 export function createRoleBoundMcpServer(options: RoleBoundMcpServerOptions): McpServer {
   const server = new McpServer({
     name: `vibe-helper-${options.role.toLowerCase().replace('_', '-')}`,
@@ -248,7 +311,9 @@ export function createRoleBoundMcpServer(options: RoleBoundMcpServerOptions): Mc
         const result =
           options.role === 'DISCOVERY' && tool.name === 'submit_candidate_round'
             ? await submitCandidateRoundFromTool(options, input)
-            : await options.application.executeAgent(options.role, input)
+            : options.role === 'DISCOVERY' && tool.name === 'submit_learning_spec'
+              ? await submitLearningSpecFromTool(options, input)
+              : await options.application.executeAgent(options.role, input)
         const payload = toJsonObject(result.success ? result.data : result.error)
         return {
           content: [{ type: 'text', text: JSON.stringify(payload) }],

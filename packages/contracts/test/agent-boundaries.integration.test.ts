@@ -6,6 +6,7 @@ import {
   builderUpdateLiveContextCommandSchema,
   discoverySubmitCandidateRoundCommandSchema,
   discoverySubmitLearningSpecCommandSchema,
+  discoverySubmitLearningSpecToolInputSchema,
   helperGetContextQuerySchema,
   validateAgentRequest,
 } from '../src/index.ts'
@@ -14,6 +15,7 @@ import {
   candidateRoundFixture,
   confirmedLearningSpecFixture,
   draftLearningSpecFixture,
+  learningSpecDraftContentFixture,
   evidenceProposalBatchFixture,
   ids,
   liveContextFixture,
@@ -125,6 +127,7 @@ describe('Agent-specific request contracts', () => {
       actor: { kind: 'AGENT', role: 'DISCOVERY' },
       idempotencyKey: ids.idempotency,
       expectedSessionRevision: 1,
+      expectedSpecRevision: 0,
       learningSpec: draftLearningSpecFixture,
     } as const
 
@@ -133,6 +136,33 @@ describe('Agent-specific request contracts', () => {
       discoverySubmitLearningSpecCommandSchema.safeParse({
         ...command,
         learningSpec: confirmedLearningSpecFixture,
+      }).success,
+    ).toBe(false)
+
+    expect(
+      discoverySubmitLearningSpecToolInputSchema.safeParse({
+        schemaVersion: 1,
+        projectId: ids.project,
+        discoverySessionId: ids.discoverySession,
+        correlationId: ids.correlation,
+        idempotencyKey: ids.idempotency,
+        expectedSessionRevision: 1,
+        expectedSpecRevision: 0,
+        draft: learningSpecDraftContentFixture,
+      }).success,
+    ).toBe(true)
+    expect(
+      discoverySubmitLearningSpecToolInputSchema.safeParse({
+        schemaVersion: 1,
+        projectId: ids.project,
+        discoverySessionId: ids.discoverySession,
+        correlationId: ids.correlation,
+        idempotencyKey: ids.idempotency,
+        expectedSessionRevision: 1,
+        expectedSpecRevision: 0,
+        draft: learningSpecDraftContentFixture,
+        learningSpecId: ids.learningSpec,
+        source: { kind: 'AGENT', role: 'DISCOVERY' },
       }).success,
     ).toBe(false)
   })

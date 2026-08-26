@@ -235,6 +235,14 @@
 - **검토한 대안:** feedback에 미래 resulting revision 저장, Agent가 완성된 Application command와 provenance 생성, PIN 후보만 별도 table로 관리, SELECT를 Agent tool에 노출, Kiro transport field를 Application strict contract까지 허용, server logging keepalive, Candidate draft를 여러 tool call로 staging한 뒤 atomic finalize, persistent HTTP MCP, Kiro Agent Engine v3로 즉시 전환, timeout을 mock 성공으로 대체.
 - **tradeoff:** 다음 round는 전체 current Candidate reference와 적용 feedback 목록을 보내야 하고 transport adapter 코드가 늘어난다. 대신 실패 전 feedback과 성공한 결과의 인과관계, stale retry, user selection provenance가 재현 가능하며 Kiro 전용 세부사항이 stable Core contract로 누출되지 않는다. CLI 2의 느린 단일 tool input lifecycle 결함은 T09의 selected-Candidate→Spec 계약을 막지 않으므로 T09로 진행한다. server logging keepalive는 효과가 없어 제거했고, staging은 partial Agent draft 상태와 새 contract를 만들며 persistent HTTP는 process/security 경계를 늘리므로 target Crew host에서도 재현될 때 T15에서만 승인한다. v3 probe는 v2 custom Agent를 upgrade하지 못하고 default Agent로 fallback했으므로 비교 근거로 쓰지 않으며 T19에서 native config로 재검증한다. T21은 clean session의 fresh 8-Candidate run과 retry 무중복성을 release gate로 둔다.
 
+## 2026-08-27: T09 Learning Spec revision과 Discovery 복귀 경계
+
+- **상태:** 승인
+- **맥락:** T03~T08은 Learning Spec record와 변경 없는 사용자 확정, selected Candidate와 terminal Discovery Session을 보존하지만, Discovery Agent가 Spec ID·revision·timestamp·source까지 직접 제출하고 최신 draft를 context에서 읽지 못한다. 또한 `조금 바꾸기`와 `다른 주제로 돌아가기`를 안전하게 표현할 application transition이 없다. 선택이 끝난 T08 Session을 다시 열면 terminal selection과 feedback-to-round 인과관계가 깨진다.
+- **결정:** Agent와 UI는 Learning Spec의 의미 내용만 제안하며 role-bound/application adapter가 selected Candidate, Spec ID, next revision, parent, timestamp, source와 redaction status를 채운다. 첫 draft는 selected Candidate에 연결된 revision 1이고, 조정은 같은 Spec·Candidate의 current draft 바로 다음 revision만 허용한다. 사용자는 Agent가 다시 쓴 draft 또는 직접 편집한 draft를 명시적으로 확정할 수 있으며, 확정 revision은 current draft와 내용이 같아야 한다. `다른 주제로 돌아가기`는 selected Session을 재활성화하지 않고 같은 입력에서 새 Discovery Session을 만들며 current draft를 `SUPERSEDED`로 닫는다. Core의 필수 Evidence target은 `LEARNER_FOCUS` concept만 사용하고 `AGENT_SUPPORT`와 `EXCLUDED`를 제외한다.
+- **검토한 대안:** Agent가 stable metadata를 계속 생성, 기존 selected Session 재개, Spec 수정을 confirmation payload에 함께 포함, Spec feedback 전용 table 추가, 세 scope의 모든 concept을 Builder/Evidence 목표로 사용.
+- **tradeoff:** 새 session 때문에 Project의 Discovery history가 하나 늘고 Spec 조정에 revision이 추가되지만 T08 terminal invariant와 provenance를 보존한다. 별도 Spec feedback entity를 만들지 않아 자연어 요청 원문은 Crew conversation 경계에 남지만 저장된 draft의 author와 revision은 명확하다. 직접 편집과 Agent 재작성은 같은 domain policy를 공유해 UI 선택권과 deterministic validation을 함께 유지한다.
+
 ## 2026-08-24: 구현 세부 선택 위임
 
 - **상태:** 승인

@@ -5,15 +5,24 @@ import { join } from 'node:path'
 import { Client } from '@modelcontextprotocol/client'
 import { InMemoryTransport, type McpServer } from '@modelcontextprotocol/server'
 import { ApplicationService, WorkspacePathPolicy } from '@vibe-helper/application'
-import { discoverySessionSchema, projectSchema, type AgentRole } from '@vibe-helper/contracts'
+import {
+  candidateRoundSchema,
+  discoveryFeedbackSchema,
+  discoverySessionSchema,
+  projectCandidateRevisionSchema,
+  projectSchema,
+  type AgentRole,
+} from '@vibe-helper/contracts'
 import { describe, expect, it } from 'vitest'
 
 import { openInMemorySqliteStorage } from '../../../packages/storage-sqlite/src/index.js'
 import {
   candidateFixture,
   candidateRoundFixture,
+  discoveryFeedbackFixture,
   discoverySessionFixture,
   ids,
+  learningSpecDraftContentFixture,
   projectFixture,
   timestamp,
 } from '../../../packages/contracts/test/fixtures.js'
@@ -28,8 +37,9 @@ interface ConnectedHarness {
 
 interface ConnectRoleOptions {
   readonly seedDiscovery?: boolean
+  readonly seedSpecReview?: boolean
   readonly now?: () => Date
-  readonly generateId?: (prefix: 'candidate' | 'candidate_round') => string
+  readonly generateId?: (prefix: 'candidate' | 'candidate_round' | 'learning_spec') => string
 }
 
 const connectRole = async (
@@ -48,6 +58,37 @@ const connectRole = async (
         }),
       )
       repository.appendDiscoverySession(discoverySessionSchema.parse(discoverySessionFixture))
+    })
+  }
+  if (options.seedSpecReview) {
+    storage.transaction((repository) => {
+      repository.appendProject(
+        projectSchema.parse({
+          ...projectFixture,
+          status: 'DISCOVERY',
+          generatedWorkspacePath: undefined,
+        }),
+      )
+      repository.appendDiscoverySession(discoverySessionSchema.parse(discoverySessionFixture))
+      repository.appendCandidate(projectCandidateRevisionSchema.parse(candidateFixture))
+      repository.appendCandidateRound(candidateRoundSchema.parse(candidateRoundFixture))
+      repository.appendDiscoveryFeedback(discoveryFeedbackSchema.parse(discoveryFeedbackFixture))
+      repository.appendDiscoverySession(
+        discoverySessionSchema.parse({
+          ...discoverySessionFixture,
+          revision: 2,
+          status: 'SELECTED',
+          closedAt: timestamp,
+        }),
+      )
+      repository.appendProject(
+        projectSchema.parse({
+          ...projectFixture,
+          revision: 2,
+          status: 'SPEC_REVIEW',
+          generatedWorkspacePath: undefined,
+        }),
+      )
     })
   }
   const application = new ApplicationService({
@@ -234,6 +275,74 @@ describe('role-bound MCP server', () => {
         candidates: [
           {
             id: generatedCandidateId,
+            createdAt: timestamp,
+            source: { kind: 'AGENT', role: 'DISCOVERY' },
+          },
+        ],
+      })
+    } finally {
+      await harness.close()
+    }
+  })
+
+  it('expands semantic Spec content with selected Candidate and trusted revision metadata', async () => {
+    const generatedSpecId = 'learning_spec_00000000-0000-4000-8000-000000000073'
+    const harness = await connectRole('DISCOVERY', {
+      seedSpecReview: true,
+      now: () => new Date(timestamp),
+      generateId: () => generatedSpecId,
+    })
+    try {
+      const result = await harness.client.callTool({
+        name: 'submit_learning_spec',
+        arguments: {
+          __tool_use_purpose: 'Submit a recommended Learning Spec for the selected Candidate.',
+          schemaVersion: 1,
+          projectId: ids.project,
+          discoverySessionId: ids.discoverySession,
+          correlationId: ids.correlation,
+          idempotencyKey: 'idem_00000000-0000-4000-8000-000000000074',
+          expectedSessionRevision: 2,
+          expectedSpecRevision: 0,
+          draft: learningSpecDraftContentFixture,
+        },
+      })
+      expect(result).toMatchObject({
+        structuredContent: { accepted: true, resourceRevision: 1 },
+      })
+      const revised = await harness.client.callTool({
+        name: 'submit_learning_spec',
+        arguments: {
+          schemaVersion: 1,
+          projectId: ids.project,
+          discoverySessionId: ids.discoverySession,
+          correlationId: ids.correlation,
+          idempotencyKey: 'idem_00000000-0000-4000-8000-000000000075',
+          expectedSessionRevision: 3,
+          expectedSpecRevision: 1,
+          draft: {
+            ...learningSpecDraftContentFixture,
+            productPurpose: 'Compare redacted webhook variants locally.',
+          },
+        },
+      })
+      expect(revised).toMatchObject({
+        structuredContent: { accepted: true, resourceRevision: 2 },
+      })
+      expect(harness.storage.repository.readDiscoveryAggregate(ids.project)).toMatchObject({
+        session: { revision: 4, status: 'SELECTED' },
+        learningSpecs: [
+          {
+            id: generatedSpecId,
+            revision: 1,
+            selectedCandidate: { candidateId: ids.candidate, revision: 1 },
+            createdAt: timestamp,
+            source: { kind: 'AGENT', role: 'DISCOVERY' },
+          },
+          {
+            id: generatedSpecId,
+            revision: 2,
+            parentRevision: 1,
             createdAt: timestamp,
             source: { kind: 'AGENT', role: 'DISCOVERY' },
           },

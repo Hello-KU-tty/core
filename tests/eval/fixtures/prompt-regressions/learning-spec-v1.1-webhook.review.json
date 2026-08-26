@@ -1,0 +1,15 @@
+[
+  {
+    "criterionKey": "scope_appropriateness",
+    "dimension": "SPEC_SCOPE",
+    "reviewMode": "HUMAN",
+    "status": "PASSED",
+    "explanation": "Discriminated unions and runtime validation drive the core payload-matching interaction, while the local UI shell remains implementation support and credential plus hosted-storage work stays outside the MVP. The unknown-field behavior is a real product Decision rather than a cosmetic choice.",
+    "evidenceReferences": [
+      "learningSpec.scope",
+      "learningSpec.mvpFeatures",
+      "learningSpec.expectedDecisions"
+    ],
+    "metrics": []
+  }
+]

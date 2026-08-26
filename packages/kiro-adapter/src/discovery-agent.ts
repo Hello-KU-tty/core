@@ -5,11 +5,11 @@ import {
   discoveryContextSchema,
   discoveryGetContextQuerySchema,
   discoverySubmitCandidateRoundToolInputSchema,
-  discoverySubmitLearningSpecCommandSchema,
+  discoverySubmitLearningSpecToolInputSchema,
   type LearningSpecRevision,
 } from '@vibe-helper/contracts'
 
-export const DISCOVERY_PROMPT_VERSION = '1.0.1' as const
+export const DISCOVERY_PROMPT_VERSION = '1.1.0' as const
 export const DISCOVERY_PROMPT_SOURCE = 'docs/agent-prompts/discovery.md' as const
 export const DISCOVERY_AGENT_NAME = 'vibe-helper-discovery' as const
 export const DISCOVERY_MCP_SERVER_NAME = 'vibe-helper-discovery-core' as const
@@ -112,7 +112,7 @@ export class DiscoveryAgentToolAdapter {
   }
 
   async submitLearningSpec(input: unknown): Promise<CommandReceipt> {
-    const request = discoverySubmitLearningSpecCommandSchema.parse(input)
+    const request = discoverySubmitLearningSpecToolInputSchema.parse(input)
     const response = await this.#caller.callTool('submit_learning_spec', request)
     return parseToolResponse(response, commandReceiptSchema)
   }

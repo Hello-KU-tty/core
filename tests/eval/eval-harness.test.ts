@@ -7,9 +7,11 @@ import {
   discoveryInputSchema,
   evaluationCriterionResultSchema,
   evaluationFixtureSchema,
+  learningSpecRevisionSchema,
   projectCandidateRevisionSchema,
   type EvaluationCaseResult,
 } from '@vibe-helper/contracts'
+import { requiredEvidenceConceptNames } from '@vibe-helper/domain'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -183,6 +185,48 @@ describe('T08 Discovery Agent regression', () => {
         }),
         expect.objectContaining({ criterionKey: 'semantic_diversity', status: 'PASSED' }),
         expect.objectContaining({ criterionKey: 'concept_necessity', status: 'PASSED' }),
+      ]),
+    )
+  })
+})
+
+describe('T09 Learning Spec prompt regression', () => {
+  it('keeps all scope boundaries while deriving required Evidence from Learner Focus only', async () => {
+    const fixture = evaluationFixtureSchema.parse(
+      await loadInput(
+        'tests/eval/fixtures/prompt-regressions/learning-spec-v1.1-webhook.manifest.json',
+      ),
+    )
+    const subject = parseEvaluationSubject(
+      await loadInput('tests/eval/fixtures/prompt-regressions/learning-spec-v1.1-webhook.json'),
+    )
+    const reviews = evaluationCriterionResultSchema
+      .array()
+      .parse(
+        await loadInput(
+          'tests/eval/fixtures/prompt-regressions/learning-spec-v1.1-webhook.review.json',
+        ),
+      )
+    const result = evaluateCalibrationCase({
+      fixture,
+      subject,
+      humanReviews: new Map(reviews.map((review) => [review.criterionKey, review])),
+    })
+    const spec = learningSpecRevisionSchema.parse(subject.learningSpec)
+
+    expect(new Set(spec.scope.map((item) => item.category))).toEqual(
+      new Set(['LEARNER_FOCUS', 'AGENT_SUPPORT', 'EXCLUDED']),
+    )
+    expect(requiredEvidenceConceptNames(spec)).toEqual([
+      'discriminated union',
+      'runtime validation',
+    ])
+    expect(result.status).toBe('PASSED')
+    expect(result.criterionResults).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ criterionKey: 'contract_valid', status: 'PASSED' }),
+        expect.objectContaining({ criterionKey: 'scope_boundaries', status: 'PASSED' }),
+        expect.objectContaining({ criterionKey: 'scope_appropriateness', status: 'PASSED' }),
       ]),
     )
   })

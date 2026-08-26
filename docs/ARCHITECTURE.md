@@ -2,9 +2,9 @@
 
 ## 1. 상태
 
-- 상태: 사용자 승인 완료, T08 Discovery Agent·반복 Candidate loop 반영 및 T09 Learning Spec 착수 가능
+- 상태: 사용자 승인 완료, T09 Learning Spec 생성·조정·확정 반영 및 T10 Builder Task 착수 가능
 - 기준 입력: [PROJECT_BRIEF.md](../PROJECT_BRIEF.md), [SPEC.md](SPEC.md)
-- T03 versioned contract와 Agent/UI runtime validation, T04 pure reducer와 Evidence policy v1.0.0, T05 SQLite schema/repository/migration, T06 application use case와 역할 고정 MCP server, T07 criterion 기반 evaluation contract와 harness, T08 Discovery Agent prompt v1.0.1과 feedback-to-round loop는 구현됐다.
+- T03 versioned contract와 Agent/UI runtime validation, T04 pure reducer와 Evidence policy v1.0.0, T05 SQLite schema/repository/migration, T06 application use case와 역할 고정 MCP server, T07 criterion 기반 evaluation contract와 harness, T08 Candidate loop, T09 Discovery Agent prompt v1.1.0과 Learning Spec revision flow는 구현됐다.
 - Kiro/Crew 세부 연결은 capability spike 결과에 따라 이 문서를 갱신한다.
 
 ## 2. 선택한 기술 스택과 선택 이유
@@ -192,7 +192,7 @@ Domain은 Kiro SDK, React와 SQLite library에 의존하지 않는다.
 
 Application transaction은 SQLite repository interface를 통해 상태를 변경한다.
 
-T06의 application handler는 Agent와 UI transport가 공유하는 검증·transaction 경계다. T08은 현재 round의 latest Candidate에만 user feedback을 허용하고, SELECT가 아닌 미적용 feedback 전체를 다음 Candidate Round의 `appliedFeedbackIds`로 연결한다. Application은 pin/reject/merge/revise/shrink/expand/regenerate별 다음 revision과 정확한 round 구성, stale selection과 SELECT 이후 terminal 상태를 transaction 안에서 검증한다. Builder의 실제 shell/file 실행, Helper 대화 정책과 Episode dispatch/retry는 T10~T13에서 연결한다.
+T06의 application handler는 Agent와 UI transport가 공유하는 검증·transaction 경계다. T08은 현재 round의 latest Candidate에만 user feedback을 허용하고, SELECT가 아닌 미적용 feedback 전체를 다음 Candidate Round의 `appliedFeedbackIds`로 연결한다. Application은 pin/reject/merge/revise/shrink/expand/regenerate별 다음 revision과 정확한 round 구성, stale selection과 SELECT 이후 terminal 상태를 transaction 안에서 검증한다. T09은 selected Candidate에 대한 current Spec draft만 연속 revision으로 조정하고, user confirmation에서 내용 변경을 금지한다. 직접 UI 수정과 Discovery Agent 재작성은 같은 domain policy를 사용하며, 주제 복귀는 기존 selected Session을 재활성화하지 않고 draft를 `SUPERSEDED`로 만든 뒤 새 Discovery Session을 연다. Builder의 실제 shell/file 실행, Helper 대화 정책과 Episode dispatch/retry는 T10~T13에서 연결한다.
 
 ### 4.5 storage-sqlite
 
@@ -229,7 +229,7 @@ T08의 Discovery `submit_candidate_round` 외부 schema는 의미 후보 draft, 
 - token/latency/usage observation
 - stale session과 reconnect 처리
 
-Discovery prompt 원문은 `docs/agent-prompts/discovery.md` 하나이며 T08 버전은 1.0.1이다. Node adapter는 원문을 읽고 version marker를 검증해 Kiro Agent definition과 tool allowlist를 만든다. Prompt는 Core context를 먼저 읽고 다음 round에 pending feedback을 적용하도록 지시하며, Candidate/Round ID와 source 같은 Core-owned 메타데이터를 생성하지 않고 명시적 SELECT도 수행하지 않는다. 구조화된 설명과 rationale은 한 문장, 목록은 의미를 보존하는 최소 항목으로 제한해 장시간 단일 tool input 생성을 줄인다.
+Discovery prompt 원문은 `docs/agent-prompts/discovery.md` 하나이며 T09 버전은 1.1.0이다. Node adapter는 원문을 읽고 version marker를 검증해 Kiro Agent definition과 tool allowlist를 만든다. Prompt는 Core context를 먼저 읽고 다음 round에 pending feedback을 적용하며 selected Candidate 뒤에는 current Learning Spec을 기준으로 권장 draft를 생성·조정하도록 지시한다. Candidate/Round/Spec ID, revision, timestamp와 source 같은 Core-owned 메타데이터를 생성하지 않고 명시적 SELECT, Spec confirmation 또는 Session 재개도 수행하지 않는다. 구조화된 설명과 rationale은 판단에 필요한 길이로 제한해 장시간 단일 tool input 생성을 줄인다.
 
 Crew 0.3.0의 App event bridge는 실제 stream을 App DOM event로 전달하지 않고, generic App API client는 `/api/chat` SSE를 JSON으로 파싱한다. 따라서 event는 MVP primary 경로에서 제외한다. raw fetch는 same-origin `POST /api/chat` 하나와 고정 payload로 제한하고, slot 생성·history/result 조회는 permission-checked App API를 사용한다. 이 세부사항은 UI나 Core가 아니라 이 adapter에만 존재한다. 참고: <https://kiro.dev/docs/crew/apps/sdk/>
 
@@ -276,6 +276,9 @@ SelectedRevision  1 ── N LearningSpecRevision
 - revision은 parent 또는 merge source를 보존한다.
 - feedback은 결과 revision을 미리 주장하지 않고, 다음 round가 적용한 feedback ID와 현재 Candidate 집합을 소유한다.
 - selection은 현재 round의 latest revision에 대한 user-authored UI command만 허용하며 session을 terminal 상태로 바꾼다.
+- selected Candidate의 첫 Spec은 revision 1이며 Agent-authored 권장안이다. 조정은 같은 Spec·Candidate의 current draft 다음 revision만 허용하고 Agent 또는 사용자가 작성할 수 있다.
+- confirmation은 current draft와 같은 내용의 user-authored next revision이며, 주제 복귀는 draft를 `SUPERSEDED`로 닫고 새 Discovery Session을 만든다.
+- 필수 Evidence target은 `LEARNER_FOCUS` concept만 사용한다.
 - Final/Refined 별도 entity를 만들지 않는다.
 
 ### 5.2 Build
@@ -366,6 +369,8 @@ Evidence Analyst:
 - error는 retryable, user_action_required, permanent로 분류한다.
 
 `record_discovery_feedback`은 user-authored provenance를 보존하기 위해 Agent tool로 노출하지 않고 UI application command로만 처리한다. Agent가 user source를 주장하는 payload를 제출해도 caller identity가 바뀌지 않는다.
+
+`submit_learning_spec`의 Agent-facing schema는 semantic draft, project/session scope와 expected revision만 받는다. role-bound adapter가 current selected Candidate와 Spec을 조회해 stable metadata를 채운 뒤 Application command로 변환한다. UI는 current draft 직접 수정, 내용 불변 확정과 새 Session을 여는 Discovery 복귀 command를 사용한다.
 
 ### 6.2 UI command/query
 
@@ -510,6 +515,7 @@ Crew App의 `permissions.api`는 T01에서 host SDK의 client-side path guard로
 - 사람이 검토하지 않은 의미 criterion은 `NEEDS_REVIEW`이며 자동 통과로 바꾸지 않음
 - T07 calibration baseline은 harness의 good/bad 구별을 고정하며 제품 성능 baseline으로 해석하지 않음
 - T08 실제 Kiro 출력 회귀: canonical Discovery prompt version, strict Candidate contract, 구조 signature와 기록된 의미 다양성·Concept Necessity review
+- T09 Spec 회귀: prompt v1.1.0, strict three-scope contract, Learner Focus 전용 Evidence target, direct/Agent revision과 recorded scope review
 - live probe와 replay 결과를 구분하고 timeout이나 transport failure를 mock 성공으로 바꾸지 않음
 - DIRECTLY_LED 반복, contradiction/misconception, independent transfer와 실제 Agent output 평가는 T13 이후 fixture를 확장
 - generic Kiro/simple memory/ablation 비교는 T24에서 같은 `BaselineResult` 계약으로 기록

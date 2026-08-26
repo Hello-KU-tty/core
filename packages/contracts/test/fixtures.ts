@@ -157,13 +157,7 @@ export const discoveryFeedbackFixture = {
   redactionStatus: 'NOT_REQUIRED',
 } as const
 
-export const draftLearningSpecFixture = {
-  schemaVersion: 1,
-  id: ids.learningSpec,
-  projectId: ids.project,
-  correlationId: ids.correlation,
-  revision: 1,
-  selectedCandidate: { candidateId: ids.candidate, revision: 1 },
+export const learningSpecDraftContentFixture = {
   productPurpose: 'Inspect redacted webhook variants locally.',
   targetUsers: ['A developer learning typed API events'],
   primaryUsageMoment: 'While implementing a webhook endpoint.',
@@ -198,6 +192,16 @@ export const draftLearningSpecFixture = {
   ],
   runtimeConstraint: 'TYPESCRIPT',
   deploymentConstraints: ['Local execution for MVP'],
+} as const
+
+export const draftLearningSpecFixture = {
+  schemaVersion: 1,
+  id: ids.learningSpec,
+  projectId: ids.project,
+  correlationId: ids.correlation,
+  revision: 1,
+  selectedCandidate: { candidateId: ids.candidate, revision: 1 },
+  ...learningSpecDraftContentFixture,
   status: 'DRAFT',
   createdAt: timestamp,
   updatedAt: timestamp,

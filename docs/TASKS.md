@@ -296,7 +296,17 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - 고정된 10개 주제를 순환하지 않고 unseen goal에서도 의미 있게 다른 후보가 나온다.
 - Agent가 사용자의 명시적 선택 전 후보를 Final로 바꾸지 못한다.
 
-### [>] T09. Learning Spec 생성·조정·확정
+### [x] T09. Learning Spec 생성·조정·확정
+
+**검증 기록**
+
+- 2026-08-27 Node.js 24.19.0과 pnpm 11.12.0에서 format, lint, typecheck, Drizzle schema, unit 2개, package/app integration 119개, eval 7개, build와 smoke 4개가 통과했다.
+- macOS sandbox의 Chromium Mach port 제한을 분리한 승인된 외부 실행에서 Playwright E2E 1개가 통과했다.
+- selected Candidate에 대한 첫 Agent draft, Agent와 사용자의 연속 revision, stale/idempotent 경계, 내용 불변 사용자 확정과 확정 전 Builder Task 미생성을 domain/application/MCP integration test로 검증했다.
+- `다른 주제로 돌아가기`는 selected Session을 다시 열지 않고 current draft를 `SUPERSEDED`로 닫은 뒤 같은 입력의 새 active Discovery Session을 만들며 이전 selection과 Spec lineage를 보존한다.
+- Discovery prompt v1.1.0과 role-bound `submit_learning_spec`은 의미 내용만 Agent에게 받고 Spec ID, selected Candidate, revision, parent, timestamp, source와 redaction status를 Core 경계에서 채운다. 공식 MCP client test에서 첫 draft와 다음 revision의 SQLite 저장을 검증했다.
+- `LEARNER_FOCUS` concept만 필수 Evidence target으로 도출하고 `AGENT_SUPPORT`와 `EXCLUDED`는 제외됨을 deterministic test와 prompt regression fixture의 자동·사람 review로 확인했다.
+- 로그인된 Kiro CLI 2.19.2의 Agent Engine v2와 `claude-haiku-4.5`로 bounded live Spec runner를 실행했다. synthetic selected Candidate를 읽은 Agent가 prompt v1.1.0의 semantic-only 입력으로 role-bound MCP→Application→SQLite에 DRAFT Spec revision 1을 저장했고 Session revision 4와 Core-owned metadata가 검증됐다. 생성 결과는 discriminated union/runtime validation을 `LEARNER_FOCUS`, local UI shell을 `AGENT_SUPPORT`, live credential/hosted storage를 `EXCLUDED`로 유지했으며 실제 Decision 후보와 local TypeScript 제약을 포함했다.
 
 **범위**
 
@@ -320,7 +330,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - `AGENT_SUPPORT`와 `EXCLUDED` 항목이 Evidence 목표로 잘못 계산되지 않는다.
 - 초기 진입은 확인 중심이되 Spec의 실질적 제어권은 사용자에게 남는다.
 
-### [ ] T10. Builder Task, workspace와 Live Context
+### [>] T10. Builder Task, workspace와 Live Context
 
 **범위**
 

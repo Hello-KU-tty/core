@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "learningSpec": {
+    "schemaVersion": 1,
+    "id": "learning_spec_20000000-0000-4000-8000-000000000101",
+    "projectId": "project_20000000-0000-4000-8000-000000000001",
+    "correlationId": "corr_20000000-0000-4000-8000-000000000003",
+    "revision": 1,
+    "selectedCandidate": {
+      "candidateId": "candidate_20000000-0000-4000-8000-000000000005",
+      "revision": 1
+    },
+    "productPurpose": "Compare redacted webhook payloads with safe TypeScript event contracts on the local machine.",
+    "targetUsers": ["TypeScript developers learning external event contracts"],
+    "primaryUsageMoment": "Before implementing a webhook handler for an unfamiliar provider.",
+    "successMoment": "A pasted payload matches one typed variant and explains every rejected field.",
+    "mvpFeatures": [
+      "Paste one redacted payload",
+      "Match a discriminated event variant",
+      "Explain runtime validation failures"
+    ],
+    "scope": [
+      {
+        "category": "LEARNER_FOCUS",
+        "title": "Typed event variant matching",
+        "rationale": "The core interaction depends on narrowing a payload to one safe event type.",
+        "conceptNames": ["discriminated union", "runtime validation"]
+      },
+      {
+        "category": "AGENT_SUPPORT",
+        "title": "Local UI shell",
+        "rationale": "The interface is necessary to try samples but is not the target learning goal.",
+        "conceptNames": ["local UI shell"]
+      },
+      {
+        "category": "EXCLUDED",
+        "title": "Live provider and hosted storage",
+        "rationale": "Credentials and hosted payload retention would expand the security and deployment boundary.",
+        "conceptNames": ["live provider credentials", "hosted payload storage"]
+      }
+    ],
+    "expectedDecisions": [
+      {
+        "category": "PRODUCT_BEHAVIOR",
+        "description": "Choose whether unknown fields are rejected immediately or retained for inspection.",
+        "whyUserInputMatters": "The choice changes whether the tool optimizes for strict safety or debugging visibility."
+      }
+    ],
+    "runtimeConstraint": "TYPESCRIPT",
+    "deploymentConstraints": ["Local reproducible execution only for MVP"],
+    "status": "DRAFT",
+    "createdAt": "2026-08-27T00:00:00.000Z",
+    "updatedAt": "2026-08-27T00:00:00.000Z",
+    "source": { "kind": "AGENT", "role": "DISCOVERY" },
+    "redactionStatus": "VERIFIED_REDACTED"
+  },
+  "scopeExpectation": {
+    "learnerFocusConcepts": ["discriminated union", "runtime validation"],
+    "agentSupportConcepts": ["local UI shell"],
+    "excludedFeatureTerms": ["live provider credentials", "hosted payload storage"]
+  }
+}

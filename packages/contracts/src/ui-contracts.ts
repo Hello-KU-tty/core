@@ -2,11 +2,13 @@ import { z } from 'zod'
 
 import { decisionResolutionSchema } from './build.js'
 import { discoveryFeedbackSchema, discoveryInputSchema } from './discovery.js'
+import { learningSpecDraftContentSchema } from './learning-spec.js'
 import {
   conceptIdSchema,
   correlationIdSchema,
   entityRevisionSchema,
   idempotencyKeySchema,
+  discoverySessionIdSchema,
   learningSpecIdSchema,
   nonEmptyTextSchema,
   projectIdSchema,
@@ -49,6 +51,27 @@ export const uiConfirmLearningSpecCommandSchema = z.strictObject({
   projectId: projectIdSchema,
   learningSpecId: learningSpecIdSchema,
   expectedSpecRevision: entityRevisionSchema,
+})
+
+export const uiUpdateLearningSpecCommandSchema = z.strictObject({
+  ...uiRequestMetadata,
+  kind: z.literal('UI_UPDATE_LEARNING_SPEC'),
+  idempotencyKey: idempotencyKeySchema,
+  projectId: projectIdSchema,
+  learningSpecId: learningSpecIdSchema,
+  expectedSessionRevision: entityRevisionSchema,
+  expectedSpecRevision: entityRevisionSchema,
+  draft: learningSpecDraftContentSchema,
+})
+
+export const uiReturnToDiscoveryCommandSchema = z.strictObject({
+  ...uiRequestMetadata,
+  kind: z.literal('UI_RETURN_TO_DISCOVERY'),
+  idempotencyKey: idempotencyKeySchema,
+  projectId: projectIdSchema,
+  discoverySessionId: discoverySessionIdSchema,
+  expectedSessionRevision: entityRevisionSchema,
+  expectedSpecRevision: z.int().nonnegative(),
 })
 
 export const uiResolveDecisionCommandSchema = z
@@ -96,7 +119,9 @@ export const generatedResultDescriptorSchema = z.strictObject({
 export const uiRequestSchema = z.discriminatedUnion('kind', [
   uiStartDiscoveryCommandSchema,
   uiRecordDiscoveryFeedbackCommandSchema,
+  uiUpdateLearningSpecCommandSchema,
   uiConfirmLearningSpecCommandSchema,
+  uiReturnToDiscoveryCommandSchema,
   uiResolveDecisionCommandSchema,
   uiOpenHelperQuerySchema,
   uiReadEvidenceTraceQuerySchema,

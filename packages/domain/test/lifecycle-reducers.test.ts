@@ -6,8 +6,11 @@ import {
   confirmLearningSpec,
   openDecision,
   reduceCandidateRevision,
+  requiredEvidenceConceptNames,
   resolveDecision,
   transitionBuilderTask,
+  supersedeLearningSpec,
+  writeLearningSpecDraft,
 } from '../src/index.ts'
 import {
   activityEventFixture,
@@ -123,6 +126,65 @@ describe('Candidate revision reducer', () => {
 })
 
 describe('Learning Spec confirmation reducer', () => {
+  it('creates and revises only the selected Candidate draft', () => {
+    const created = writeLearningSpecDraft({
+      history: [],
+      proposed: draftLearningSpecFixture,
+      selectedCandidate: candidateFixture,
+      selection: discoveryFeedbackFixture,
+    })
+    expect(created.outcome).toBe('APPLIED')
+    expect(
+      writeLearningSpecDraft({
+        history: [],
+        proposed: { ...draftLearningSpecFixture, source: { kind: 'USER' } },
+        selectedCandidate: candidateFixture,
+        selection: discoveryFeedbackFixture,
+      }).trace.reasonCode,
+    ).toBe('LEARNING_SPEC_INITIAL_REVISION_INVALID')
+
+    const revised = {
+      ...draftLearningSpecFixture,
+      revision: 2,
+      parentRevision: 1,
+      productPurpose: 'Inspect and compare redacted webhook variants locally.',
+      source: { kind: 'USER' as const },
+    }
+    const updated = writeLearningSpecDraft({
+      history: [draftLearningSpecFixture],
+      proposed: revised,
+      selectedCandidate: candidateFixture,
+      selection: discoveryFeedbackFixture,
+    })
+    expect(updated.outcome).toBe('APPLIED')
+    expect(updated.trace.reasonCode).toBe('LEARNING_SPEC_DRAFT_REVISED')
+
+    expect(
+      writeLearningSpecDraft({
+        history: [draftLearningSpecFixture],
+        proposed: { ...revised, revision: 3, parentRevision: 2 },
+        selectedCandidate: candidateFixture,
+        selection: discoveryFeedbackFixture,
+      }).trace.reasonCode,
+    ).toBe('LEARNING_SPEC_REVISION_NOT_NEXT')
+  })
+
+  it('supersedes an unchanged draft and derives Evidence targets from Learner Focus only', () => {
+    const superseded = {
+      ...draftLearningSpecFixture,
+      revision: 2,
+      parentRevision: 1,
+      status: 'SUPERSEDED',
+      source: { kind: 'CORE' as const },
+    }
+    const result = supersedeLearningSpec({
+      history: [draftLearningSpecFixture],
+      proposed: superseded,
+    })
+    expect(result.outcome).toBe('APPLIED')
+    expect(requiredEvidenceConceptNames(draftLearningSpecFixture)).toEqual(['discriminated union'])
+  })
+
   it('confirms an unchanged current draft and makes retries idempotent', () => {
     const result = confirmLearningSpec({
       history: [draftLearningSpecFixture],

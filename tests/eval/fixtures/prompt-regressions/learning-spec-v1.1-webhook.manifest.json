@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture_00000000-0000-4000-8000-000000000113",
+  "name": "Discovery Agent v1.1.0 Learning Spec regression",
+  "description": "Redacted prompt regression fixture for selected-Candidate to Learning Spec generation while the live Kiro login gate is tracked separately.",
+  "kind": "SPEC_SCOPE",
+  "inputPath": "tests/eval/fixtures/inputs/webhook-lens.json",
+  "expectedContractDomains": ["LEARNING_SPEC"],
+  "criteria": [
+    {
+      "key": "contract_valid",
+      "dimension": "CONTRACT_INTEGRITY",
+      "reviewMode": "AUTOMATED",
+      "description": "The recommended draft satisfies the strict Learning Spec contract.",
+      "successDefinition": "Runtime validation succeeds with all three scope categories."
+    },
+    {
+      "key": "scope_boundaries",
+      "dimension": "SPEC_SCOPE",
+      "reviewMode": "AUTOMATED",
+      "description": "Learner, support and excluded boundaries match the selected Candidate.",
+      "successDefinition": "Expected concepts are in their categories and excluded features are absent from MVP features."
+    },
+    {
+      "key": "scope_appropriateness",
+      "dimension": "SPEC_SCOPE",
+      "reviewMode": "HUMAN",
+      "description": "The recommendation is useful without forcing adjacent UI, credential or hosting work into the learning goal.",
+      "successDefinition": "A reviewer finds the three scopes and actual Decision candidate appropriate."
+    }
+  ],
+  "scenarioTags": ["prompt regression", "selected candidate", "unseen", "local TypeScript"],
+  "fixtureVersion": "1.1.0",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED"
+}

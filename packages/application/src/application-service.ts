@@ -46,6 +46,8 @@ import {
   reduceConceptState,
   resolveDecision,
   transitionBuilderTask,
+  supersedeLearningSpec,
+  writeLearningSpecDraft,
 } from '@vibe-helper/domain'
 
 import { ApplicationError, type ApplicationResult, createOperationError } from './errors.js'
@@ -84,6 +86,7 @@ export type UiApplicationResponse =
 
 type IdPrefix =
   | 'discovery_session'
+  | 'learning_spec'
   | 'audit'
   | 'concept'
   | 'evidence_decision'
@@ -133,6 +136,38 @@ function candidateReferenceKey(reference: {
 
 function candidateRecordKey(candidate: ProjectCandidateRevision): string {
   return `${candidate.id}:${candidate.revision}`
+}
+
+function selectedFeedback(aggregate: DiscoveryAggregate): DiscoveryFeedback | undefined {
+  return [...aggregate.feedback].reverse().find((feedback) => feedback.intent === 'SELECT')
+}
+
+function selectedCandidate(
+  aggregate: DiscoveryAggregate,
+  selection: DiscoveryFeedback | undefined = selectedFeedback(aggregate),
+): ProjectCandidateRevision | undefined {
+  const target = selection?.targets[0]
+  return target === undefined
+    ? undefined
+    : aggregate.candidates.find(
+        (candidate) =>
+          candidate.id === target.candidateId && candidate.revision === target.revision,
+      )
+}
+
+function currentLearningSpec(
+  aggregate: DiscoveryAggregate,
+  selection: DiscoveryFeedback | undefined = selectedFeedback(aggregate),
+): LearningSpecRevision | null {
+  const target = selection?.targets[0]
+  if (target === undefined) return null
+  return latestByRevision(
+    aggregate.learningSpecs.filter(
+      (spec) =>
+        spec.selectedCandidate.candidateId === target.candidateId &&
+        spec.selectedCandidate.revision === target.revision,
+    ),
+  )
 }
 
 function sameStringSet(left: ReadonlySet<string>, right: ReadonlySet<string>): boolean {
@@ -226,8 +261,12 @@ export class ApplicationService {
         return this.#startDiscovery(request)
       case 'UI_RECORD_DISCOVERY_FEEDBACK':
         return this.#recordDiscoveryFeedback(request)
+      case 'UI_UPDATE_LEARNING_SPEC':
+        return this.#updateLearningSpec(request)
       case 'UI_CONFIRM_LEARNING_SPEC':
         return this.#confirmLearningSpec(request)
+      case 'UI_RETURN_TO_DISCOVERY':
+        return this.#returnToDiscovery(request)
       case 'UI_RESOLVE_DECISION':
         return this.#resolveUserDecision(request)
       case 'UI_OPEN_HELPER':
@@ -309,6 +348,7 @@ export class ApplicationService {
       rounds: aggregate.rounds,
       candidates: aggregate.candidates,
       feedback: aggregate.feedback,
+      learningSpec: currentLearningSpec(aggregate),
       relevantLedgerEntries: aggregate.relevantLedgerEntries,
     })
   }
@@ -423,25 +463,54 @@ export class ApplicationService {
             request.correlationId,
             'DISCOVERY_SESSION_STALE',
           )
-          const selected = [...scoped.feedback]
-            .reverse()
-            .find((feedback) => feedback.intent === 'SELECT')
-          const selectedCandidate = scoped.candidates.find(
-            (candidate) =>
-              candidate.id === request.learningSpec.selectedCandidate.candidateId &&
-              candidate.revision === request.learningSpec.selectedCandidate.revision,
-          )
+          if (
+            scoped.project.status !== 'SPEC_REVIEW' ||
+            scoped.session.status !== 'SELECTED' ||
+            scoped.session.correlationId !== request.correlationId
+          ) {
+            throw this.#validationError(
+              request.correlationId,
+              'LEARNING_SPEC_REVIEW_NOT_ACTIVE',
+              'Learning Spec drafts require a selected Candidate in active Spec review.',
+            )
+          }
+          const selected = selectedFeedback(scoped)
+          const selectedCandidateRecord = selectedCandidate(scoped, selected)
           if (
             selected === undefined ||
-            selectedCandidate === undefined ||
-            selected.targets[0]?.candidateId !== selectedCandidate.id ||
-            selected.targets[0]?.revision !== selectedCandidate.revision
+            selectedCandidateRecord === undefined ||
+            request.learningSpec.selectedCandidate.candidateId !== selectedCandidateRecord.id ||
+            request.learningSpec.selectedCandidate.revision !== selectedCandidateRecord.revision
           ) {
             throw this.#validationError(
               request.correlationId,
               'LEARNING_SPEC_CANDIDATE_NOT_SELECTED',
               'Learning Spec must reference the user-selected Candidate revision.',
             )
+          }
+          const current = currentLearningSpec(scoped, selected)
+          this.#assertRevision(
+            request.expectedSpecRevision,
+            current?.revision ?? 0,
+            request.correlationId,
+            'LEARNING_SPEC_STALE',
+          )
+          if (current !== null && current.id !== request.learningSpec.id) {
+            throw this.#validationError(
+              request.correlationId,
+              'LEARNING_SPEC_IDENTITY_CHANGED',
+              'Learning Spec refinement must keep the current Spec identity.',
+            )
+          }
+          const history = scoped.learningSpecs.filter((spec) => spec.id === request.learningSpec.id)
+          const reduced = writeLearningSpecDraft({
+            history,
+            proposed: request.learningSpec,
+            selectedCandidate: selectedCandidateRecord,
+            selection: selected,
+          })
+          if (reduced.outcome === 'REJECTED') {
+            throw this.#domainError(request.correlationId, reduced.reasonCode)
           }
           repository.appendLearningSpec(request.learningSpec)
           const nextSession = {
@@ -471,6 +540,86 @@ export class ApplicationService {
           }
         },
       ),
+    )
+  }
+
+  #updateLearningSpec(
+    request: Extract<UiRequest, { kind: 'UI_UPDATE_LEARNING_SPEC' }>,
+  ): CommandReceipt {
+    const updatedAt = this.#timestamp()
+    return this.#storage.transaction((repository) =>
+      this.#idempotent(repository, request, 'ui.update_learning_spec', commandReceiptSchema, () => {
+        const scoped = this.#readDiscoveryByProject(
+          repository,
+          request.projectId,
+          request.correlationId,
+        )
+        this.#assertRevision(
+          request.expectedSessionRevision,
+          scoped.session.revision,
+          request.correlationId,
+          'DISCOVERY_SESSION_STALE',
+        )
+        const selection = selectedFeedback(scoped)
+        const selectedCandidateRecord = selectedCandidate(scoped, selection)
+        const history = scoped.learningSpecs.filter((spec) => spec.id === request.learningSpecId)
+        const current = latestByRevision(history)
+        this.#assertRevision(
+          request.expectedSpecRevision,
+          current?.revision ?? 0,
+          request.correlationId,
+          'LEARNING_SPEC_STALE',
+        )
+        if (
+          scoped.project.status !== 'SPEC_REVIEW' ||
+          scoped.session.status !== 'SELECTED' ||
+          selection === undefined ||
+          selectedCandidateRecord === undefined ||
+          current === null
+        ) {
+          throw this.#validationError(
+            request.correlationId,
+            'LEARNING_SPEC_NOT_EDITABLE',
+            'A current draft in selected Spec review is required for direct editing.',
+          )
+        }
+        const proposed: LearningSpecRevision = {
+          ...current,
+          ...request.draft,
+          revision: current.revision + 1,
+          parentRevision: current.revision,
+          status: 'DRAFT',
+          updatedAt,
+          source: { kind: 'USER' },
+        }
+        const reduced = writeLearningSpecDraft({
+          history,
+          proposed,
+          selectedCandidate: selectedCandidateRecord,
+          selection,
+        })
+        if (reduced.outcome === 'REJECTED') {
+          throw this.#domainError(request.correlationId, reduced.reasonCode)
+        }
+        repository.appendLearningSpec(proposed)
+        const nextSession = {
+          ...scoped.session,
+          revision: scoped.session.revision + 1,
+          updatedAt,
+        }
+        repository.appendDiscoverySession(nextSession)
+        this.#appendAudit(repository, {
+          correlationId: request.correlationId,
+          actor: { kind: 'USER' },
+          action: 'UPDATED',
+          resource: { type: 'LEARNING_SPEC', id: proposed.id, revision: proposed.revision },
+          summary: 'Stored a user-authored Learning Spec draft revision.',
+          changedFields: ['revision'],
+          occurredAt: updatedAt,
+        })
+        const response = this.#receipt(request.correlationId, proposed.revision)
+        return { response, resourceId: proposed.id, resourceRevision: proposed.revision }
+      }),
     )
   }
 
@@ -613,15 +762,14 @@ export class ApplicationService {
           )
           if (current === null)
             throw this.#notFound(request.correlationId, 'LEARNING_SPEC_NOT_FOUND')
-          const selection = [...scoped.feedback]
-            .reverse()
-            .find((feedback) => feedback.intent === 'SELECT')
-          const selectedCandidate = scoped.candidates.find(
-            (candidate) =>
-              candidate.id === current.selectedCandidate.candidateId &&
-              candidate.revision === current.selectedCandidate.revision,
-          )
-          if (selection === undefined || selectedCandidate === undefined) {
+          const selection = selectedFeedback(scoped)
+          const selectedCandidateRecord = selectedCandidate(scoped, selection)
+          if (
+            scoped.project.status !== 'SPEC_REVIEW' ||
+            scoped.session.status !== 'SELECTED' ||
+            selection === undefined ||
+            selectedCandidateRecord === undefined
+          ) {
             throw this.#validationError(
               request.correlationId,
               'LEARNING_SPEC_SELECTION_REQUIRED',
@@ -640,7 +788,7 @@ export class ApplicationService {
           const reduced = confirmLearningSpec({
             history,
             proposed,
-            selectedCandidate,
+            selectedCandidate: selectedCandidateRecord,
             selection,
           })
           if (reduced.outcome === 'REJECTED') {
@@ -660,6 +808,95 @@ export class ApplicationService {
           return { response, resourceId: proposed.id, resourceRevision: proposed.revision }
         },
       ),
+    )
+  }
+
+  #returnToDiscovery(
+    request: Extract<UiRequest, { kind: 'UI_RETURN_TO_DISCOVERY' }>,
+  ): CommandReceipt {
+    const returnedAt = this.#timestamp()
+    const newSessionId = this.#generateId('discovery_session')
+    return this.#storage.transaction((repository) =>
+      this.#idempotent(repository, request, 'ui.return_to_discovery', commandReceiptSchema, () => {
+        const scoped = this.#readDiscoveryBySession(
+          repository,
+          request.discoverySessionId,
+          request.correlationId,
+        )
+        this.#assertRevision(
+          request.expectedSessionRevision,
+          scoped.session.revision,
+          request.correlationId,
+          'DISCOVERY_SESSION_STALE',
+        )
+        if (
+          scoped.project.id !== request.projectId ||
+          scoped.project.status !== 'SPEC_REVIEW' ||
+          scoped.session.status !== 'SELECTED' ||
+          scoped.session.correlationId !== request.correlationId
+        ) {
+          throw this.#validationError(
+            request.correlationId,
+            'LEARNING_SPEC_REVIEW_NOT_ACTIVE',
+            'Returning to Discovery requires the selected Spec review session.',
+          )
+        }
+        const current = currentLearningSpec(scoped)
+        this.#assertRevision(
+          request.expectedSpecRevision,
+          current?.revision ?? 0,
+          request.correlationId,
+          'LEARNING_SPEC_STALE',
+        )
+        if (current !== null) {
+          const history = scoped.learningSpecs.filter((spec) => spec.id === current.id)
+          const proposed: LearningSpecRevision = {
+            ...current,
+            revision: current.revision + 1,
+            parentRevision: current.revision,
+            status: 'SUPERSEDED',
+            updatedAt: returnedAt,
+            source: { kind: 'CORE' },
+          }
+          const reduced = supersedeLearningSpec({ history, proposed })
+          if (reduced.outcome === 'REJECTED') {
+            throw this.#domainError(request.correlationId, reduced.reasonCode)
+          }
+          repository.appendLearningSpec(proposed)
+        }
+        const newSession = {
+          schemaVersion: 1 as const,
+          id: newSessionId,
+          projectId: scoped.project.id,
+          correlationId: request.correlationId,
+          revision: 1,
+          input: scoped.session.input,
+          status: 'ACTIVE' as const,
+          openedAt: returnedAt,
+          updatedAt: returnedAt,
+          source: { kind: 'USER' as const },
+          redactionStatus: scoped.session.redactionStatus,
+        }
+        repository.appendDiscoverySession(newSession)
+        repository.appendProject({
+          ...scoped.project,
+          revision: scoped.project.revision + 1,
+          status: 'DISCOVERY',
+          updatedAt: returnedAt,
+          source: { kind: 'USER' },
+        })
+        this.#appendAudit(repository, {
+          correlationId: request.correlationId,
+          actor: { kind: 'USER' },
+          action: 'UPDATED',
+          resource: { type: 'DISCOVERY_SESSION', id: newSession.id, revision: 1 },
+          summary: 'Returned to Discovery in a new session without reopening the selected session.',
+          changedFields: ['status'],
+          occurredAt: returnedAt,
+        })
+        const response = this.#receipt(request.correlationId, 1)
+        return { response, resourceId: newSession.id, resourceRevision: 1 }
+      }),
     )
   }
 

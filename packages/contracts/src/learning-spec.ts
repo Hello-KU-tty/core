@@ -5,7 +5,10 @@ import {
   actorSchema,
   correlationIdSchema,
   decisionCategorySchema,
+  discoverySessionIdSchema,
   entityRevisionSchema,
+  expectedRevisionSchema,
+  idempotencyKeySchema,
   labelSchema,
   learningScopeCategorySchema,
   learningSpecIdSchema,
@@ -37,6 +40,83 @@ export const learningSpecConfirmationSchema = z.strictObject({
   confirmedBy: z.strictObject({ kind: z.literal('USER') }),
 })
 
+const learningSpecContentShape = {
+  productPurpose: nonEmptyTextSchema,
+  targetUsers: z.array(shortTextSchema).min(1).max(8),
+  primaryUsageMoment: nonEmptyTextSchema,
+  successMoment: nonEmptyTextSchema,
+  mvpFeatures: z.array(shortTextSchema).min(1).max(30),
+  scope: z.array(learningScopeItemSchema).min(1).max(60),
+  expectedDecisions: z.array(expectedDecisionAreaSchema).min(1).max(20),
+  runtimeConstraint: z.literal('TYPESCRIPT'),
+  deploymentConstraints: z.array(shortTextSchema).min(1).max(12),
+} as const
+
+function requireAllScopeCategories(
+  value: {
+    readonly scope: readonly {
+      readonly category: string
+      readonly conceptNames: readonly string[]
+    }[]
+  },
+  context: z.core.$RefinementCtx,
+): void {
+  const categories = new Set(value.scope.map((item) => item.category))
+  for (const category of learningScopeCategorySchema.options) {
+    if (!categories.has(category)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['scope'],
+        message: `Learning Spec must represent ${category}`,
+        input: value,
+      })
+    }
+  }
+  if (
+    !value.scope.some((item) => item.category === 'LEARNER_FOCUS' && item.conceptNames.length > 0)
+  ) {
+    context.addIssue({
+      code: 'custom',
+      path: ['scope'],
+      message: 'Learning Spec requires at least one Learner Focus concept',
+      input: value,
+    })
+  }
+
+  const categoryByConcept = new Map<string, string>()
+  for (const item of value.scope) {
+    for (const conceptName of item.conceptNames) {
+      const key = conceptName.trim().toLocaleLowerCase('en-US')
+      const existingCategory = categoryByConcept.get(key)
+      if (existingCategory !== undefined && existingCategory !== item.category) {
+        context.addIssue({
+          code: 'custom',
+          path: ['scope'],
+          message: `Learning Spec concept ${conceptName} cannot belong to multiple scope categories`,
+          input: value,
+        })
+      }
+      categoryByConcept.set(key, item.category)
+    }
+  }
+}
+
+export const learningSpecDraftContentSchema = z
+  .strictObject(learningSpecContentShape)
+  .superRefine(requireAllScopeCategories)
+
+export const discoverySubmitLearningSpecToolInputSchema = z.strictObject({
+  __tool_use_purpose: nonEmptyTextSchema.optional(),
+  schemaVersion: schemaVersionSchema,
+  projectId: projectIdSchema,
+  discoverySessionId: discoverySessionIdSchema,
+  correlationId: correlationIdSchema,
+  idempotencyKey: idempotencyKeySchema,
+  expectedSessionRevision: expectedRevisionSchema,
+  expectedSpecRevision: expectedRevisionSchema,
+  draft: learningSpecDraftContentSchema,
+})
+
 export const learningSpecRevisionSchema = z
   .strictObject({
     schemaVersion: schemaVersionSchema,
@@ -46,15 +126,7 @@ export const learningSpecRevisionSchema = z
     revision: entityRevisionSchema,
     parentRevision: entityRevisionSchema.optional(),
     selectedCandidate: candidateRevisionReferenceSchema,
-    productPurpose: nonEmptyTextSchema,
-    targetUsers: z.array(shortTextSchema).min(1).max(8),
-    primaryUsageMoment: nonEmptyTextSchema,
-    successMoment: nonEmptyTextSchema,
-    mvpFeatures: z.array(shortTextSchema).min(1).max(30),
-    scope: z.array(learningScopeItemSchema).min(1).max(60),
-    expectedDecisions: z.array(expectedDecisionAreaSchema).max(20),
-    runtimeConstraint: z.literal('TYPESCRIPT'),
-    deploymentConstraints: z.array(shortTextSchema).max(12),
+    ...learningSpecContentShape,
     status: learningSpecStatusSchema,
     confirmation: learningSpecConfirmationSchema.optional(),
     createdAt: utcTimestampSchema,
@@ -99,18 +171,10 @@ export const learningSpecRevisionSchema = z
       })
     }
 
-    const categories = new Set(spec.scope.map((item) => item.category))
-    for (const category of learningScopeCategorySchema.options) {
-      if (!categories.has(category)) {
-        context.addIssue({
-          code: 'custom',
-          path: ['scope'],
-          message: `Learning Spec must represent ${category}`,
-        })
-      }
-    }
+    requireAllScopeCategories(spec, context)
   })
 
 export type LearningScopeItem = z.infer<typeof learningScopeItemSchema>
 export type ExpectedDecisionArea = z.infer<typeof expectedDecisionAreaSchema>
+export type LearningSpecDraftContent = z.infer<typeof learningSpecDraftContentSchema>
 export type LearningSpecRevision = z.infer<typeof learningSpecRevisionSchema>

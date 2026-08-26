@@ -19,6 +19,7 @@ import {
   discoveryFeedbackFixture,
   discoverySessionFixture,
   ids,
+  learningSpecDraftContentFixture,
   projectFixture,
 } from '../../contracts/test/fixtures.js'
 
@@ -38,6 +39,8 @@ describe('Discovery Agent adapter', () => {
     })
     expect(definition.prompt).toContain('appliedFeedbackIds')
     expect(definition.prompt).toContain('사용자가 UI에서 직접 기록하는 action')
+    expect(definition.prompt).toContain('expectedSpecRevision')
+    expect(definition.prompt).toContain('Spec ID, selected Candidate reference')
     expect(DISCOVERY_TOOL_NAMES).toEqual([
       'get_discovery_context',
       'submit_candidate_round',
@@ -68,6 +71,7 @@ describe('Discovery Agent adapter', () => {
               rounds: [candidateRoundFixture],
               candidates: [candidateFixture],
               feedback: [discoveryFeedbackFixture],
+              learningSpec: null,
               relevantLedgerEntries: [],
             },
           }
@@ -126,7 +130,23 @@ describe('Discovery Agent adapter', () => {
       diversityCheck: candidateRoundFixture.diversityCheck,
     })
     expect(receipt.resourceRevision).toBe(2)
-    expect(calls).toEqual(['get_discovery_context', 'submit_candidate_round'])
+
+    const specReceipt = await adapter.submitLearningSpec({
+      schemaVersion: 1,
+      projectId: ids.project,
+      discoverySessionId: ids.discoverySession,
+      correlationId: ids.correlation,
+      idempotencyKey: ids.idempotency,
+      expectedSessionRevision: 2,
+      expectedSpecRevision: 0,
+      draft: learningSpecDraftContentFixture,
+    })
+    expect(specReceipt.resourceRevision).toBe(2)
+    expect(calls).toEqual([
+      'get_discovery_context',
+      'submit_candidate_round',
+      'submit_learning_spec',
+    ])
   })
 
   it('fails closed when a Core tool response is malformed', async () => {

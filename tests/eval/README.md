@@ -13,6 +13,7 @@ pnpm test:eval
 - `fixtures/subjects`: scorer 자체를 보정하는 good/bad Agent 출력과 Core 입력이다.
 - `fixtures/reviews`: 의미 판단이 필요한 criterion에 대한 기록된 사람 review다.
 - `fixtures/agent-runs`: 실제 Agent 출력에서 서버 메타데이터만 정규화한 prompt-version 회귀 fixture와 사람 review다. calibration corpus에는 섞지 않는다.
+- `fixtures/prompt-regressions`: 실제 live 성공을 주장하지 않는 redacted prompt/contract 회귀 fixture와 사람 review다. 외부 로그인 gate와 분리해 scope 정책 회귀를 검출한다.
 - `baselines/calibration-v1.json`: 현재 scorer가 good/bad 보정 사례를 구별하는지 고정한 결과다.
 - `results`: 실제 Agent 실행 조건, 성공 범위와 알려진 실행 제한을 사실대로 기록한다.
 - `src`: fixture loader, scorer registry, harness와 Evaluation Run/Baseline artifact 생성기다.
@@ -40,5 +41,7 @@ pnpm test:eval
 T08부터 실제 Kiro 출력은 `fixtures/agent-runs`에서 별도 회귀 사례로 검증한다. 이 사례는 prompt와 transport 변경의 회귀를 잡지만 T07 scorer calibration이나 T24 비교 baseline을 대신하지 않는다.
 
 로그인된 Kiro CLI 환경에서는 `pnpm test:eval:live-discovery`로 fresh stdio MCP 경로를 검증한다. 기본 회귀 모델은 Kiro CLI 2의 장시간 단일 tool input 전송 결함을 피하면서 품질 review를 통과한 `claude-haiku-4.5`이며, `VIBE_HELPER_LIVE_EVAL_MODEL=auto`로 host 결함을 재현할 수 있다. 이 기본값은 T24의 제품 모델 비교 결정을 대신하지 않는다. 실행 timeout은 `VIBE_HELPER_LIVE_EVAL_TIMEOUT_MS`로 60초~20분 범위에서 조정할 수 있다.
+
+T09의 selected-Candidate→Learning Spec 경로는 `pnpm test:eval:live-spec`으로 별도 실행한다. 이 runner는 synthetic selected Candidate를 Application/SQLite에 만든 뒤 Agent에게 semantic draft만 제출하게 하고 Core-owned metadata와 저장 결과를 확인한다. Kiro CLI가 로그아웃 상태면 Agent 결과를 만들지 않고 인증 오류로 실패하며 mock 성공으로 대체하지 않는다.
 
 새 fixture는 개인정보·credential·실제 사용자 경로를 포함하지 않고 `containsPersonalData: false`, `redactionStatus: VERIFIED_REDACTED`를 유지해야 한다. 자동 criterion을 추가하면 scorer registry와 good/bad 보정 사례를 함께 추가한다.
