@@ -4,7 +4,7 @@
     "dimension": "DISCOVERY_DIVERSITY",
     "reviewMode": "HUMAN",
     "status": "PASSED",
-    "explanation": "The eight candidates span response inspection, configuration guarding, webhook routing, dynamic forms, CLI parsing, API diffs, notification dispatch and error exploration, with distinct core interactions and output forms.",
+    "explanation": "The eight candidates span configuration composition, error recovery, API response guards, payment webhooks, database results, plugin hooks, multi-step forms and event routing, with distinct core interactions and target users.",
     "evidenceReferences": [
       "discovery.candidates[*].title",
       "discovery.candidates[*].coreInteraction",
@@ -17,7 +17,7 @@
     "dimension": "CONCEPT_NECESSITY",
     "reviewMode": "HUMAN",
     "status": "PASSED",
-    "explanation": "Every candidate receives untrusted or variant-shaped data whose central behavior requires runtime validation followed by safe discriminated-union narrowing.",
+    "explanation": "Every candidate handles variant-shaped data whose central interaction requires discriminated-union narrowing and runtime validation rather than adding those concepts decoratively.",
     "evidenceReferences": ["discovery.candidates[*].technologyNecessity"],
     "metrics": []
   }

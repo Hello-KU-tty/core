@@ -10,6 +10,12 @@ import { loadDiscoveryAgentDefinition } from '../packages/kiro-adapter/dist/disc
 import { openSqliteStorage } from '../packages/storage-sqlite/dist/index.js'
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const liveModel = process.env.VIBE_HELPER_LIVE_EVAL_MODEL ?? 'claude-haiku-4.5'
+const liveEffort = process.env.VIBE_HELPER_LIVE_EVAL_EFFORT ?? 'low'
+const timeoutMs = Number(process.env.VIBE_HELPER_LIVE_EVAL_TIMEOUT_MS ?? 600_000)
+if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 60_000 || timeoutMs > 1_200_000) {
+  throw new TypeError('VIBE_HELPER_LIVE_EVAL_TIMEOUT_MS must be 60000..1200000')
+}
 const inputPath = resolve(
   repositoryRoot,
   process.argv[2] ?? 'tests/eval/fixtures/inputs/webhook-lens.json',
@@ -55,8 +61,6 @@ if (!started.success) {
   storage.close()
   throw new Error(`Could not seed live Discovery evaluation: ${started.error.code}`)
 }
-storage.close()
-
 const definition = await loadDiscoveryAgentDefinition(repositoryRoot)
 const serverName = 'vibe-helper-discovery-core'
 const agentConfig = {
@@ -68,6 +72,8 @@ const agentConfig = {
     [serverName]: {
       command: process.execPath,
       args: [join(repositoryRoot, 'apps/mcp-server/dist/main.js')],
+      timeout: 60_000,
+      requestTimeout: 600_000,
       env: {
         VIBE_HELPER_AGENT_ROLE: 'DISCOVERY',
         VIBE_HELPER_DATA_DIR: dataDirectory,
@@ -77,15 +83,20 @@ const agentConfig = {
   },
   tools: definition.tools,
   allowedTools: definition.allowedTools,
+  ...(liveModel === 'auto' ? {} : { model: liveModel }),
 }
 const agentConfigPath = join(agentWorkspace, '.kiro', 'agents', `${definition.name}.json`)
 await writeFile(agentConfigPath, `${JSON.stringify(agentConfig, null, 2)}\n`, 'utf8')
+process.stdout.write(
+  `${JSON.stringify({ phase: 'STARTED', runtimeRoot, liveModel, liveEffort, agentEngine: 'v2', timeoutMs })}\n`,
+)
 
 const turn = [
   'Run one synthetic, redacted Discovery evaluation.',
   `Call get_discovery_context for projectId ${ids.project} and discoverySessionId ${ids.session}.`,
   `Use correlationId ${ids.correlation} for every tool call.`,
   'Then generate an initial Candidate Round with exactly 8 meaningfully different TypeScript project Candidates and submit it with submit_candidate_round. Eight is an allowed approximate initial round, not a fixed product contract.',
+  'Keep every text field to one short sentence and use the smallest useful arrays so the complete round can be submitted promptly without losing semantic differences.',
   'Use appliedFeedbackIds=[], carriedCandidates=[], lineage kind NEW for every Candidate, a new schema-valid idempotency key, and expectedSessionRevision=1.',
   'Do not invent Candidate/Round IDs, timestamps, source, redaction status, round index, or input snapshot; the role-bound adapter supplies them.',
   'Do not submit a Learning Spec and do not select a Candidate.',
@@ -101,26 +112,42 @@ const run = await new Promise((resolveRun, rejectRun) => {
       definition.name,
       '--agent-engine',
       'v2',
+      '--effort',
+      liveEffort,
       '--no-interactive',
       '--require-mcp-startup',
       '--trust-tools=@vibe-helper-discovery-core',
       '--output-format',
       'stream-json',
+      '--verbose',
       turn,
     ],
-    { cwd: agentWorkspace, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] },
+    {
+      cwd: agentWorkspace,
+      env: process.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: true,
+    },
   )
   const stdout = []
   const stderr = []
   let timedOut = false
   let forceKillTimeout
+  const terminateProcessGroup = (signal) => {
+    if (child.pid === undefined) return
+    try {
+      process.kill(-child.pid, signal)
+    } catch {
+      child.kill(signal)
+    }
+  }
   child.stdout.on('data', (chunk) => stdout.push(Buffer.from(chunk)))
   child.stderr.on('data', (chunk) => stderr.push(Buffer.from(chunk)))
   const timeout = setTimeout(() => {
     timedOut = true
-    child.kill('SIGTERM')
-    forceKillTimeout = setTimeout(() => child.kill('SIGKILL'), 5_000)
-  }, 360_000)
+    terminateProcessGroup('SIGTERM')
+    forceKillTimeout = setTimeout(() => terminateProcessGroup('SIGKILL'), 10_000)
+  }, timeoutMs)
   child.once('error', (error) => {
     clearTimeout(timeout)
     clearTimeout(forceKillTimeout)
@@ -136,16 +163,16 @@ const transcriptPath = join(runtimeRoot, 'kiro-stream.jsonl')
 const errorPath = join(runtimeRoot, 'kiro-stderr.log')
 await Promise.all([writeFile(transcriptPath, run.stdout), writeFile(errorPath, run.stderr)])
 if (run.timedOut || run.code !== 0) {
+  storage.close()
   throw new Error(
-    `Live Discovery Agent ${run.timedOut ? 'exceeded 360 seconds' : `exited with ${String(run.code)}`}. Inspect ${errorPath} and ${transcriptPath}.`,
+    `Live Discovery Agent ${run.timedOut ? `exceeded ${String(timeoutMs)} milliseconds` : `exited with ${String(run.code)}`}. Inspect ${errorPath} and ${transcriptPath}.`,
   )
 }
 
-const resultStorage = await openSqliteStorage({ dataDirectory })
-const aggregate = resultStorage.repository.readDiscoveryAggregate(ids.project, ids.session)
-resultStorage.close()
+const aggregate = storage.repository.readDiscoveryAggregate(ids.project, ids.session)
 const round = aggregate?.rounds.at(-1)
 if (aggregate === null || aggregate === undefined || round === undefined) {
+  storage.close()
   throw new Error(`Discovery Agent did not store a Candidate Round. Inspect ${transcriptPath}.`)
 }
 const roundKeys = new Set(
@@ -160,12 +187,17 @@ await writeFile(
   `${JSON.stringify({ schemaVersion: 1, discovery: { round, candidates } }, null, 2)}\n`,
   'utf8',
 )
+storage.close()
 process.stdout.write(
   `${JSON.stringify({
     runtimeRoot,
     subjectPath,
     transcriptPath,
     promptVersion: definition.promptVersion,
+    liveModel,
+    liveEffort,
+    agentEngine: 'v2',
+    timeoutMs,
     candidateCount: candidates.length,
     sessionRevision: aggregate.session.revision,
   })}\n`,

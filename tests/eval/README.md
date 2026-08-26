@@ -39,4 +39,6 @@ pnpm test:eval
 
 T08부터 실제 Kiro 출력은 `fixtures/agent-runs`에서 별도 회귀 사례로 검증한다. 이 사례는 prompt와 transport 변경의 회귀를 잡지만 T07 scorer calibration이나 T24 비교 baseline을 대신하지 않는다.
 
+로그인된 Kiro CLI 환경에서는 `pnpm test:eval:live-discovery`로 fresh stdio MCP 경로를 검증한다. 기본 회귀 모델은 Kiro CLI 2의 장시간 단일 tool input 전송 결함을 피하면서 품질 review를 통과한 `claude-haiku-4.5`이며, `VIBE_HELPER_LIVE_EVAL_MODEL=auto`로 host 결함을 재현할 수 있다. 이 기본값은 T24의 제품 모델 비교 결정을 대신하지 않는다. 실행 timeout은 `VIBE_HELPER_LIVE_EVAL_TIMEOUT_MS`로 60초~20분 범위에서 조정할 수 있다.
+
 새 fixture는 개인정보·credential·실제 사용자 경로를 포함하지 않고 `containsPersonalData: false`, `redactionStatus: VERIFIED_REDACTED`를 유지해야 한다. 자동 criterion을 추가하면 scorer registry와 good/bad 보정 사례를 함께 추가한다.

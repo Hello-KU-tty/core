@@ -32,7 +32,7 @@ MVP host는 Kiro/Crew이고 Agent 중심 Crew App을 primary surface로 삼는�
 
 ## 현재 착수점
 
-T00~T08이 완료됐고 현재 착수 작업은 T09 Learning Spec 생성·조정·확정이다. T08은 canonical Discovery prompt v1.0.0, Kiro용 최소 입력 tool adapter, feedback-to-round revision loop와 UI-only 명시적 선택을 구현했다. 평가 실행법과 자동/사람 review 경계는 `tests/eval/README.md`, 실제 Agent 회귀 결과는 `tests/eval/results/discovery-agent-v1.0.0.md`, AC 추적표는 `tests/eval/TRACEABILITY.md`에 있다. T01의 상세 계획과 결과는 `docs/spikes/KIRO_CREW_CAPABILITY_SPIKE.md`, `docs/spikes/KIRO_CREW_CAPABILITY_RESULTS.md`에 있다.
+T00~T08이 완료됐고 현재 착수 작업은 T09 Learning Spec 생성·조정·확정이다. T08은 canonical Discovery prompt v1.0.1, Kiro용 최소 입력 tool adapter, feedback-to-round revision loop와 UI-only 명시적 선택을 구현했다. 실제 Kiro CLI 2/Haiku의 fresh 8-Candidate round가 MCP→Application→SQLite에 저장됐고, 느린 `auto` run의 stdio lifecycle 결함은 T15·T19·T21 재검증 gate로 남겼다. 평가 실행법과 자동/사람 review 경계는 `tests/eval/README.md`, 현재 Agent 회귀 결과는 `tests/eval/results/discovery-agent-v1.0.1.md`, AC 추적표는 `tests/eval/TRACEABILITY.md`에 있다. T01의 상세 계획과 결과는 `docs/spikes/KIRO_CREW_CAPABILITY_SPIKE.md`, `docs/spikes/KIRO_CREW_CAPABILITY_RESULTS.md`에 있다.
 
 ## 로컬 개발
 

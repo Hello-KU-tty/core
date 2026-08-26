@@ -269,8 +269,9 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - 2026-08-26 Node.js 24.19.0과 pnpm 11.12.0에서 format, lint, typecheck, Drizzle schema, unit 2개, package/app integration 113개, eval 6개, build와 smoke 4개가 통과했다.
 - macOS sandbox의 Chromium Mach port 제한을 분리한 승인된 외부 실행에서 Playwright E2E 1개가 통과했다.
 - Candidate feedback은 결과 revision을 미리 기록하지 않고 다음 round의 `appliedFeedbackIds`로 연결했으며 PIN, REJECT, MERGE, REVISE, SHRINK, EXPAND, REGENERATE와 SELECT의 lineage/current-round invariant를 domain/application test로 검증했다.
-- Discovery prompt v1.0.0을 canonical 문서에서 로드하고 role-bound MCP adapter가 Candidate/Round ID, revision, timestamp, provenance와 input snapshot을 공급하는 최소 tool input을 contract test로 검증했다. Agent catalog에는 user feedback, 범용 file/shell/SQL/network 또는 SELECT tool이 없다.
-- synthetic unseen 입력에서 실제 Kiro→MCP→Application→SQLite의 3개 Candidate round 저장이 완료됐다. 8개 run은 bounded live 실행을 통과했다고 주장하지 않고, 실제 Kiro가 생성한 동일 payload의 현재 MCP/Application/SQLite replay 수락과 redacted fixture의 strict/semantic eval 통과를 별도 기록했다.
+- Discovery prompt v1.0.1을 canonical 문서에서 로드하고 role-bound MCP adapter가 Candidate/Round ID, revision, timestamp, provenance와 input snapshot을 공급하는 최소 tool input을 contract test로 검증했다. Agent catalog에는 user feedback, 범용 file/shell/SQL/network 또는 SELECT tool이 없다.
+- synthetic unseen 입력에서 Kiro CLI 2.19.2 Agent Engine v2와 `claude-haiku-4.5`가 실제 MCP→Application→SQLite로 8개 Candidate Round를 약 90초에 저장하고 정상 종료했다. 해당 출력은 strict contract·구조 scorer와 기록된 사람의 의미 다양성·Concept Necessity review를 통과했다.
+- 같은 CLI 2의 `auto` 모델은 생성 시간이 길어질 때 첫 submit 전에 `Transport closed`가 재현됐다. 동일 payload가 fresh 공식 stdio MCP client에서 즉시 수락되므로 Core 결함이 아닌 host lifecycle 결함으로 분류했고, T09 진행을 막지 않되 T15·T19·T21에 제품 host 재검증 gate를 남겼다.
 - 현재 round의 latest revision만 선택 가능하고 user-authored SELECT 뒤 Project가 `SPEC_REVIEW`, Discovery Session이 `SELECTED`가 되며 이후 feedback/round가 거절됨을 integration test로 확인했다.
 
 **범위**
@@ -448,6 +449,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - 필수 Learning Goal과 선택 Personal Need 입력, Candidate grid/list, 자유 대화와 refinement action을 구현한다.
 - 입력 placeholder에 구체적인 활용 예시를 순환 또는 문맥에 맞게 보여준다.
 - Final Candidate와 권장 Spec 확인은 부담을 낮추되 되돌리기와 직접 수정이 가능하게 한다.
+- Candidate 생성 중 진행 상태, 안전한 재시도와 host 연결 종료를 이미 저장된 상태와 구분해 보여주고 8개 안팎 initial round의 실제 latency를 관측한다.
 
 **선행 조건**
 
@@ -464,6 +466,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - keyboard만으로 입력, 후보 조정, 확정과 되돌리기가 가능하다.
 - `이렇게 확정하기` 같은 권장 기본 action이 사용자에게 시험이나 어려운 사전 판단처럼 보이지 않는다.
 - 사용자가 만족할 때까지 refine candidate와 final candidate 사이를 반복할 수 있다.
+- target Crew host에서 느린 모델의 Candidate submit 연결 종료가 재현되면 T08 atomic round invariant를 보존하는 staged draft batch 또는 지원되는 persistent transport 중 하나를 결정 기록으로 승인하고 구현한다.
 
 ### [ ] T16. Agent 중심 Build·Helper 동시 UI와 Decision UI
 
@@ -545,6 +548,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - Crew App과 동일한 project, task, context, decision과 ledger를 읽는다.
 - Agent 중심과 Code 중심을 숙련 단계가 아닌 사용자 취향으로 표현한다.
 - 별도 extension/webview를 만들지 않고 T01에서 검증한 Agent config와 MCP 경계만 사용한다.
+- 설치 시점의 Kiro Agent Engine과 project-local Agent config를 다시 검증하고 CLI 2 config를 v3에 묵시적으로 fallback시키지 않는다.
 
 **선행 조건**
 
@@ -561,6 +565,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - AC-MVP-012가 T01에서 확인한 현실적 범위 안에서 통과한다.
 - 동일 Decision을 두 mode에서 중복 해결하거나 서로 다른 state로 만들지 않는다.
 - Code 중심 사용자를 상위 단계, Agent 중심 사용자를 초보 단계로 표시하지 않는다.
+- 선택한 Kiro engine에서 custom Agent identity, model, MCP allowlist와 8개 Candidate round의 fresh 실행이 확인되거나 지원 version 제한이 명시된다.
 
 ### [ ] T20. 보안·개인정보·접근성·복구 hardening
 
@@ -594,6 +599,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - Golden Path와 unseen input으로 전체 flow를 반복 검증한다.
 - unit, contract, integration, Agent fixture, E2E와 manual review 결과를 acceptance criterion에 연결한다.
 - 알려진 제한, 재현 절차와 대회 제출 전 강화 backlog를 확정한다.
+- clean Kiro session에서 8개 안팎 Candidate round를 중단 없이 저장하고, 연결 종료 시 중복 round 없이 재시도되는지 검증한다.
 
 **선행 조건**
 
@@ -610,6 +616,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - AC-MVP-001~014가 모두 통과하거나, 사용자가 승인한 제한으로 결정 기록에 남아 있다.
 - clean environment에서 전체 flow가 재현된다.
 - MVP 이후에는 계약 변경 없이 기준 결과와 비교할 수 있도록 fixture와 prompt version을 고정한다.
+- T08에서 관측한 CLI 2 stdio lifecycle 결함은 target host에서 해결되거나 사용자 승인 제한과 재시도 UX로 남아야 한다.
 
 ## 3. MVP 이후: 대회 제출 전 경쟁력 강화
 

@@ -4,7 +4,7 @@
 
 - 상태: 사용자 승인 완료, T08 Discovery Agent·반복 Candidate loop 반영 및 T09 Learning Spec 착수 가능
 - 기준 입력: [PROJECT_BRIEF.md](../PROJECT_BRIEF.md), [SPEC.md](SPEC.md)
-- T03 versioned contract와 Agent/UI runtime validation, T04 pure reducer와 Evidence policy v1.0.0, T05 SQLite schema/repository/migration, T06 application use case와 역할 고정 MCP server, T07 criterion 기반 evaluation contract와 harness, T08 Discovery Agent prompt v1.0.0과 feedback-to-round loop는 구현됐다.
+- T03 versioned contract와 Agent/UI runtime validation, T04 pure reducer와 Evidence policy v1.0.0, T05 SQLite schema/repository/migration, T06 application use case와 역할 고정 MCP server, T07 criterion 기반 evaluation contract와 harness, T08 Discovery Agent prompt v1.0.1과 feedback-to-round loop는 구현됐다.
 - Kiro/Crew 세부 연결은 capability spike 결과에 따라 이 문서를 갱신한다.
 
 ## 2. 선택한 기술 스택과 선택 이유
@@ -229,7 +229,7 @@ T08의 Discovery `submit_candidate_round` 외부 schema는 의미 후보 draft, 
 - token/latency/usage observation
 - stale session과 reconnect 처리
 
-Discovery prompt 원문은 `docs/agent-prompts/discovery.md` 하나이며 T08 버전은 1.0.0이다. Node adapter는 원문을 읽고 version marker를 검증해 Kiro Agent definition과 tool allowlist를 만든다. Prompt는 Core context를 먼저 읽고 다음 round에 pending feedback을 적용하도록 지시하며, Candidate/Round ID와 source 같은 Core-owned 메타데이터를 생성하지 않고 명시적 SELECT도 수행하지 않는다.
+Discovery prompt 원문은 `docs/agent-prompts/discovery.md` 하나이며 T08 버전은 1.0.1이다. Node adapter는 원문을 읽고 version marker를 검증해 Kiro Agent definition과 tool allowlist를 만든다. Prompt는 Core context를 먼저 읽고 다음 round에 pending feedback을 적용하도록 지시하며, Candidate/Round ID와 source 같은 Core-owned 메타데이터를 생성하지 않고 명시적 SELECT도 수행하지 않는다. 구조화된 설명과 rationale은 한 문장, 목록은 의미를 보존하는 최소 항목으로 제한해 장시간 단일 tool input 생성을 줄인다.
 
 Crew 0.3.0의 App event bridge는 실제 stream을 App DOM event로 전달하지 않고, generic App API client는 `/api/chat` SSE를 JSON으로 파싱한다. 따라서 event는 MVP primary 경로에서 제외한다. raw fetch는 same-origin `POST /api/chat` 하나와 고정 payload로 제한하고, slot 생성·history/result 조회는 permission-checked App API를 사용한다. 이 세부사항은 UI나 Core가 아니라 이 adapter에만 존재한다. 참고: <https://kiro.dev/docs/crew/apps/sdk/>
 
@@ -618,9 +618,9 @@ Crew App manifest와 workspace Agent packaging의 정확한 배포 형태는 T02
 
 ### R7. Kiro quota와 latency
 
-- 위험: background 분석이 사용자 build를 방해
-- 대응: Episode 종료 후 async 분석, 호출·usage 관측, retry/backoff
-- 대안: fixture/demo는 prevalidated Episode와 live interactive call을 분리하되 실제 데이터 계약은 동일하게 유지
+- 위험: background 분석이 사용자 build를 방해하거나 Kiro CLI 2가 느린 8-Candidate 단일 tool input 생성 중 stdio MCP 연결을 닫음
+- 대응: Episode 종료 후 async 분석, 호출·usage 관측, retry/backoff, 간결한 Discovery payload와 검증된 live 회귀 모델 사용
+- 대안: target Crew host에서도 연결 종료가 재현되면 T15에서 atomic round를 보존하는 staged draft submit 또는 지원되는 persistent transport를 결정하고, T19에서 current Kiro engine의 native Agent config를 재검증
 
 ### R8. 사용자 데이터와 개인정보
 

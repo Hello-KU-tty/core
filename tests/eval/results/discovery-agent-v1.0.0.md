@@ -4,7 +4,7 @@
 - Input: synthetic unseen `webhook-lens.json`; no Personal Need or personal data
 - Runtime: Kiro CLI 2.19.2, Agent Engine v2, model `auto`, role-bound stdio MCP
 - Prompt: `docs/agent-prompts/discovery.md` version 1.0.0
-- Stored fixture: Agent-authored semantic fields are preserved; server-issued identifiers, timestamp and redaction status are normalized and manually checked before commit.
+- Historical fixture: Agent-authored semantic fields were preserved for this run; the active regression fixture was later refreshed by prompt v1.0.1.
 
 ## Result
 
