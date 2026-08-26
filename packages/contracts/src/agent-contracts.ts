@@ -105,7 +105,7 @@ export const discoverySubmitCandidateRoundCommandSchema = z
     idempotencyKey: idempotencyKeySchema,
     expectedSessionRevision: expectedRevisionSchema,
     round: candidateRoundSchema,
-    candidates: z.array(projectCandidateRevisionSchema).min(1).max(30),
+    candidates: z.array(projectCandidateRevisionSchema).max(30),
   })
   .superRefine((command, context) => {
     if (command.round.correlationId !== command.correlationId) {
@@ -116,10 +116,20 @@ export const discoverySubmitCandidateRoundCommandSchema = z
       })
     }
 
-    const submittedCandidates = new Set(
-      command.candidates.map((candidate) => `${candidate.id}:${candidate.revision}`),
+    const roundCandidates = new Set(
+      command.round.candidates.map((candidate) => `${candidate.candidateId}:${candidate.revision}`),
     )
+    const submittedCandidates = new Set<string>()
     for (const [index, candidate] of command.candidates.entries()) {
+      const key = `${candidate.id}:${candidate.revision}`
+      if (submittedCandidates.has(key)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['candidates', index],
+          message: 'Submitted Candidate revisions must be unique',
+        })
+      }
+      submittedCandidates.add(key)
       if (
         candidate.discoverySessionId !== command.round.discoverySessionId ||
         candidate.correlationId !== command.correlationId
@@ -130,13 +140,11 @@ export const discoverySubmitCandidateRoundCommandSchema = z
           message: 'Candidate must match its Round session and correlation ID',
         })
       }
-    }
-    for (const [index, reference] of command.round.candidates.entries()) {
-      if (!submittedCandidates.has(`${reference.candidateId}:${reference.revision}`)) {
+      if (!roundCandidates.has(key)) {
         context.addIssue({
           code: 'custom',
-          path: ['round', 'candidates', index],
-          message: 'Candidate Round reference must be present in the submitted Candidate batch',
+          path: ['candidates', index],
+          message: 'Every submitted Candidate revision must appear in the Candidate Round',
         })
       }
     }

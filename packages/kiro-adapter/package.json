@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./prompt-node": {
+      "types": "./dist/discovery-prompt-node.d.ts",
+      "import": "./dist/discovery-prompt-node.js"
     }
   },
   "dependencies": {

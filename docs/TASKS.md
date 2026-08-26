@@ -262,7 +262,16 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - Campus Drop만 통과하도록 특화된 구현은 unseen fixture에서 드러난다.
 - 각 MVP acceptance criterion이 어떤 test/eval로 검증되는지 추적표가 있다.
 
-### [>] T08. Discovery Agent와 반복 Candidate loop
+### [x] T08. Discovery Agent와 반복 Candidate loop
+
+**검증 기록**
+
+- 2026-08-26 Node.js 24.19.0과 pnpm 11.12.0에서 format, lint, typecheck, Drizzle schema, unit 2개, package/app integration 113개, eval 6개, build와 smoke 4개가 통과했다.
+- macOS sandbox의 Chromium Mach port 제한을 분리한 승인된 외부 실행에서 Playwright E2E 1개가 통과했다.
+- Candidate feedback은 결과 revision을 미리 기록하지 않고 다음 round의 `appliedFeedbackIds`로 연결했으며 PIN, REJECT, MERGE, REVISE, SHRINK, EXPAND, REGENERATE와 SELECT의 lineage/current-round invariant를 domain/application test로 검증했다.
+- Discovery prompt v1.0.0을 canonical 문서에서 로드하고 role-bound MCP adapter가 Candidate/Round ID, revision, timestamp, provenance와 input snapshot을 공급하는 최소 tool input을 contract test로 검증했다. Agent catalog에는 user feedback, 범용 file/shell/SQL/network 또는 SELECT tool이 없다.
+- synthetic unseen 입력에서 실제 Kiro→MCP→Application→SQLite의 3개 Candidate round 저장이 완료됐다. 8개 run은 bounded live 실행을 통과했다고 주장하지 않고, 실제 Kiro가 생성한 동일 payload의 현재 MCP/Application/SQLite replay 수락과 redacted fixture의 strict/semantic eval 통과를 별도 기록했다.
+- 현재 round의 latest revision만 선택 가능하고 user-authored SELECT 뒤 Project가 `SPEC_REVIEW`, Discovery Session이 `SELECTED`가 되며 이후 feedback/round가 거절됨을 integration test로 확인했다.
 
 **범위**
 
@@ -286,7 +295,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - 고정된 10개 주제를 순환하지 않고 unseen goal에서도 의미 있게 다른 후보가 나온다.
 - Agent가 사용자의 명시적 선택 전 후보를 Final로 바꾸지 못한다.
 
-### [ ] T09. Learning Spec 생성·조정·확정
+### [>] T09. Learning Spec 생성·조정·확정
 
 **범위**
 

@@ -135,16 +135,6 @@ export function reduceCandidateRevision(
         entityIds,
       })
     }
-    if (
-      !feedback.resultingRevisions.some((reference) => key(reference) === candidateKey(proposed))
-    ) {
-      return rejected({
-        operation: OPERATION,
-        reasonCode: 'CANDIDATE_RESULT_NOT_DECLARED',
-        entityIds,
-      })
-    }
-
     if (feedback.intent === 'MERGE') {
       const primary = feedback.targets[0]
       if (
@@ -175,6 +165,17 @@ export function reduceCandidateRevision(
           entityIds,
         })
       }
+    }
+
+    if (
+      feedback.intent === 'REGENERATE' &&
+      (proposed.revision !== 1 || proposed.parentRevisions.length !== 0)
+    ) {
+      return rejected({
+        operation: OPERATION,
+        reasonCode: 'CANDIDATE_REGENERATION_LINEAGE_INVALID',
+        entityIds,
+      })
     }
   }
 

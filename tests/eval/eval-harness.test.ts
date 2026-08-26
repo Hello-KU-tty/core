@@ -3,7 +3,11 @@ import path from 'node:path'
 
 import {
   baselineResultSchema,
+  candidateRoundSchema,
   discoveryInputSchema,
+  evaluationCriterionResultSchema,
+  evaluationFixtureSchema,
+  projectCandidateRevisionSchema,
   type EvaluationCaseResult,
 } from '@vibe-helper/contracts'
 import { describe, expect, it } from 'vitest'
@@ -14,6 +18,7 @@ import {
   evaluateCalibrationCorpus,
   loadCalibrationCases,
   loadEvaluationFixtures,
+  parseEvaluationSubject,
   validateFixtureScorerCoverage,
 } from './src/index.js'
 
@@ -136,5 +141,49 @@ describe('T07 deterministic calibration', () => {
     expect(run.status).toBe('COMPLETED')
     expect(run.results.some((result) => result.status === 'FAILED')).toBe(true)
     expect(baseline).toEqual(committed)
+  })
+})
+
+describe('T08 Discovery Agent regression', () => {
+  it('replays the redacted eight-Candidate Kiro output through strict quality scorers', async () => {
+    const fixture = evaluationFixtureSchema.parse(
+      await loadInput('tests/eval/fixtures/agent-runs/discovery-agent-v1-webhook.manifest.json'),
+    )
+    const subject = parseEvaluationSubject(
+      await loadInput('tests/eval/fixtures/agent-runs/discovery-agent-v1-webhook.json'),
+    )
+    const reviews = evaluationCriterionResultSchema
+      .array()
+      .parse(
+        await loadInput('tests/eval/fixtures/agent-runs/discovery-agent-v1-webhook.review.json'),
+      )
+    const result = evaluateCalibrationCase({
+      fixture,
+      subject,
+      humanReviews: new Map(reviews.map((review) => [review.criterionKey, review])),
+    })
+
+    const round = candidateRoundSchema.parse(subject.discovery?.round)
+    const candidates = subject.discovery?.candidates.map((candidate) =>
+      projectCandidateRevisionSchema.parse(candidate),
+    )
+
+    expect(round.source).toEqual({ kind: 'AGENT', role: 'DISCOVERY' })
+    expect(round.inputSnapshot).not.toHaveProperty('availableTime')
+    expect(round.candidates).toHaveLength(8)
+    expect(candidates).toHaveLength(8)
+    expect(candidates?.every((candidate) => candidate.source.role === 'DISCOVERY')).toBe(true)
+    expect(result.status).toBe('PASSED')
+    expect(result.criterionResults).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ criterionKey: 'contract_valid', status: 'PASSED' }),
+        expect.objectContaining({
+          criterionKey: 'no_structural_mode_collapse',
+          status: 'PASSED',
+        }),
+        expect.objectContaining({ criterionKey: 'semantic_diversity', status: 'PASSED' }),
+        expect.objectContaining({ criterionKey: 'concept_necessity', status: 'PASSED' }),
+      ]),
+    )
   })
 })

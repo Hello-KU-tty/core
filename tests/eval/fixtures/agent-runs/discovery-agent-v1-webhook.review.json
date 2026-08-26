@@ -1,0 +1,24 @@
+[
+  {
+    "criterionKey": "semantic_diversity",
+    "dimension": "DISCOVERY_DIVERSITY",
+    "reviewMode": "HUMAN",
+    "status": "PASSED",
+    "explanation": "The eight candidates span response inspection, configuration guarding, webhook routing, dynamic forms, CLI parsing, API diffs, notification dispatch and error exploration, with distinct core interactions and output forms.",
+    "evidenceReferences": [
+      "discovery.candidates[*].title",
+      "discovery.candidates[*].coreInteraction",
+      "discovery.round.diversityCheck"
+    ],
+    "metrics": []
+  },
+  {
+    "criterionKey": "concept_necessity",
+    "dimension": "CONCEPT_NECESSITY",
+    "reviewMode": "HUMAN",
+    "status": "PASSED",
+    "explanation": "Every candidate receives untrusted or variant-shaped data whose central behavior requires runtime validation followed by safe discriminated-union narrowing.",
+    "evidenceReferences": ["discovery.candidates[*].technologyNecessity"],
+    "metrics": []
+  }
+]

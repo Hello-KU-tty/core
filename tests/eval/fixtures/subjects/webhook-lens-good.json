@@ -7,6 +7,7 @@
       "discoverySessionId": "discovery_session_00000000-0000-4000-8000-000000000202",
       "correlationId": "corr_00000000-0000-4000-8000-000000000207",
       "roundIndex": 1,
+      "appliedFeedbackIds": [],
       "inputSnapshot": {
         "learningGoal": "TypeScript discriminated union과 runtime validation을 배우고 싶다",
         "currentLevel": "BEGINNER",

@@ -1,0 +1,913 @@
+{
+  "schemaVersion": 1,
+  "discovery": {
+    "round": {
+      "appliedFeedbackIds": [],
+      "candidates": [
+        {
+          "candidateId": "candidate_00000000-0000-4000-8000-000000000804",
+          "revision": 1
+        },
+        {
+          "candidateId": "candidate_00000000-0000-4000-8000-000000000805",
+          "revision": 1
+        },
+        {
+          "candidateId": "candidate_00000000-0000-4000-8000-000000000806",
+          "revision": 1
+        },
+        {
+          "candidateId": "candidate_00000000-0000-4000-8000-000000000807",
+          "revision": 1
+        },
+        {
+          "candidateId": "candidate_00000000-0000-4000-8000-000000000808",
+          "revision": 1
+        },
+        {
+          "candidateId": "candidate_00000000-0000-4000-8000-000000000809",
+          "revision": 1
+        },
+        {
+          "candidateId": "candidate_00000000-0000-4000-8000-000000000810",
+          "revision": 1
+        },
+        {
+          "candidateId": "candidate_00000000-0000-4000-8000-000000000811",
+          "revision": 1
+        }
+      ],
+      "correlationId": "corr_00000000-0000-4000-8000-000000000803",
+      "createdAt": "2026-08-26T05:24:43.522Z",
+      "discoverySessionId": "discovery_session_00000000-0000-4000-8000-000000000802",
+      "diversityCheck": {
+        "dimensionsReviewed": [
+          "PROBLEM_DOMAIN",
+          "TARGET_USER",
+          "CORE_INTERACTION",
+          "DATA_SHAPE",
+          "USER_APPEAL"
+        ],
+        "modeCollapseDetected": false,
+        "rationale": "8개 후보가 서로 다른 문제 영역(네트워크 캡처, 설정 검증, 이벤트 라우팅, 동적 UI, CLI 파싱, 스키마 비교, 다채널 전송, 에러 분석)을 다루며, 산출물 형태(프록시+대시보드, CLI, 서버, 웹앱, 라이브러리)도 다양하다. 핵심 상호작용도 실시간 스트리밍 관찰, 파일 감시, 이벤트 매칭, 인터랙티브 빌딩, 문자열 파싱, diff 분석, 라우팅 디스패치, 패턴 탐색으로 구분된다. CRUD 반복이나 테마만 다른 구조적 동일성은 없다."
+      },
+      "generationRationale": "사용자의 학습 목표(TypeScript discriminated union + runtime validation)와 관심 영역(developer tools, API debugging)을 기반으로 8개의 후보를 생성했다. 각 후보는 문제 영역(네트워크 디버깅, 설정 관리, 이벤트 처리, 폼 빌딩, CLI 파싱, 스키마 비교, 알림 라우팅, 에러 분석), 대상 사용자, 핵심 상호작용 패턴, 산출물 형태(프록시 도구, CLI, 서버, 웹앱, 라이브러리)가 충분히 다르도록 설계했다. discriminated union과 runtime validation이 각 프로젝트의 핵심 아키텍처에 자연스럽게 필요한 경우만 선정했다.",
+      "id": "candidate_round_00000000-0000-4000-8000-000000000801",
+      "inputSnapshot": {
+        "currentLevel": "BEGINNER",
+        "interestAreas": [
+          "developer tools",
+          "API debugging"
+        ],
+        "learningGoal": "TypeScript discriminated union과 runtime validation을 배우고 싶다"
+      },
+      "redactionStatus": "VERIFIED_REDACTED",
+      "roundIndex": 1,
+      "schemaVersion": 1,
+      "source": {
+        "kind": "AGENT",
+        "role": "DISCOVERY"
+      }
+    },
+    "candidates": [
+      {
+        "appeal": "API 디버깅 시 콘솔 로그를 뒤지는 대신, 타입별로 깔끔하게 분류된 응답 히스토리를 보며 문제를 빠르게 좁힐 수 있다",
+        "coreConcepts": [
+          "discriminated union으로 HTTP 응답 variant 모델링",
+          "runtime validation으로 raw JSON을 union variant에 매핑",
+          "type narrowing을 통한 variant별 UI 렌더링",
+          "tagged union 기반 필터링 로직"
+        ],
+        "coreInteraction": "프록시로 HTTP 응답을 가로채고, 각 응답을 discriminated union 타입으로 분류한 뒤, 분류 결과를 대시보드에서 필터링하며 패턴을 파악한다",
+        "correlationId": "corr_00000000-0000-4000-8000-000000000803",
+        "createdAt": "2026-08-26T05:24:43.522Z",
+        "discoverySessionId": "discovery_session_00000000-0000-4000-8000-000000000802",
+        "evaluation": [
+          {
+            "assessment": "POSITIVE",
+            "criterion": "CONCEPT_NECESSITY",
+            "rationale": "HTTP 응답의 다양한 형태를 discriminated union으로 모델링하는 것이 핵심 아키텍처이며, runtime validation 없이는 raw 응답을 안전하게 분류할 수 없다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "PERSONAL_UTILITY",
+            "rationale": "API 디버깅 관심사와 직접 연결되며, 실제 개발 워크플로에서 반복 사용할 수 있다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "ADOPTION_FEASIBILITY",
+            "rationale": "본인이 첫 사용자로서 자신의 개발 환경에서 즉시 사용 가능하다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "LEARNER_FIT",
+            "rationale": "discriminated union과 validation의 역할이 명확하게 드러나는 구조다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "SCOPE_FEASIBILITY",
+            "rationale": "로컬 프록시 + 웹 UI로 MVP 범위가 명확하다"
+          },
+          {
+            "assessment": "MIXED",
+            "criterion": "ADJACENT_COMPLEXITY",
+            "rationale": "프록시 서버 설정과 WebSocket 통신이 추가 복잡도이나 Agent가 담당 가능하다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "DEPLOYABILITY",
+            "rationale": "로컬 도구로 배포 부담 없이 npm 패키지로 배포 가능하다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "DISTINCTIVENESS",
+            "rationale": "네트워크 레벨 캡처와 타입 기반 분류를 결합한 독특한 접근이다"
+          }
+        ],
+        "generationTags": [
+          "DIRECT"
+        ],
+        "id": "candidate_00000000-0000-4000-8000-000000000804",
+        "mvpFeatures": [
+          "로컬 프록시 서버로 HTTP 요청/응답 캡처",
+          "응답을 discriminated union variant로 자동 분류",
+          "variant별 필터가 있는 웹 대시보드",
+          "분류 실패 시 validation 에러 상세 표시",
+          "캡처된 응답 목록의 타임라인 뷰"
+        ],
+        "parentRevisions": [],
+        "redactionStatus": "VERIFIED_REDACTED",
+        "revision": 1,
+        "risks": [
+          "프록시 설정이 초보자에게 진입장벽이 될 수 있음",
+          "HTTPS 트래픽 처리 시 인증서 문제 복잡도 증가",
+          "실사용 트래픽 없이 테스트 데이터 생성이 필요할 수 있음"
+        ],
+        "schemaVersion": 1,
+        "source": {
+          "kind": "AGENT",
+          "role": "DISCOVERY"
+        },
+        "suggestedScope": {
+          "agentSupport": [
+            "프록시 서버 네트워크 설정",
+            "웹 대시보드 UI 컴포넌트",
+            "WebSocket 실시간 스트리밍"
+          ],
+          "excluded": [
+            "HTTPS 인증서 관리",
+            "클라우드 배포",
+            "요청 수정/리플레이 기능"
+          ],
+          "learnerFocus": [
+            "discriminated union 타입 설계",
+            "Zod 등으로 runtime validation schema 작성",
+            "type narrowing 기반 분기 로직",
+            "validation 실패 처리"
+          ]
+        },
+        "summary": "HTTP 응답을 캡처하고 discriminated union으로 분류해 성공/에러/타임아웃 패턴을 시각화하는 로컬 디버깅 도구",
+        "targetUsers": [
+          "API를 연동하며 다양한 응답 형태를 디버깅하는 프론트엔드/백엔드 개발자"
+        ],
+        "technologyNecessity": "HTTP 응답은 성공(data 포함), 클라이언트 에러(validation message 포함), 서버 에러(retry hint 포함), 타임아웃(duration 포함) 등 구조가 완전히 다르다. discriminated union으로 각 케이스를 모델링하고, 실제 네트워크 응답을 runtime validation으로 올바른 variant에 안전하게 매핑해야 한다",
+        "title": "API Response Inspector",
+        "usageMoment": "외부 API 연동 중 간헐적 에러가 발생할 때, 프록시를 띄워 실시간으로 응답 패턴을 확인하고 어떤 유형의 실패가 반복되는지 즉시 파악한다"
+      },
+      {
+        "appeal": "설정 파일 실수로 프로덕션이 깨지는 경험을 한 번이라도 했다면, 타입 안전한 검증 도구의 가치를 체감할 수 있다",
+        "coreConcepts": [
+          "환경별 설정을 discriminated union variant로 모델링",
+          "runtime validation으로 파싱된 객체 검증",
+          "union narrowing 후 variant별 기본값 적용",
+          "validation 에러를 구조화된 리포트로 출력"
+        ],
+        "coreInteraction": "설정 파일의 가능한 형태를 discriminated union으로 선언하고, 파일 변경 시 CLI가 runtime validation을 수행해 어떤 variant에 해당하는지 또는 유효하지 않은지 즉시 알려준다",
+        "correlationId": "corr_00000000-0000-4000-8000-000000000803",
+        "createdAt": "2026-08-26T05:24:43.522Z",
+        "discoverySessionId": "discovery_session_00000000-0000-4000-8000-000000000802",
+        "evaluation": [
+          {
+            "assessment": "POSITIVE",
+            "criterion": "CONCEPT_NECESSITY",
+            "rationale": "환경별로 구조가 다른 설정을 union으로 모델링하고 런타임에 검증하는 것이 도구의 존재 이유다"
+          },
+          {
+            "assessment": "MIXED",
+            "criterion": "PERSONAL_UTILITY",
+            "rationale": "개발자 도구 관심사에 부합하나, 직접적 API 디버깅과는 거리가 있다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "ADOPTION_FEASIBILITY",
+            "rationale": "자신의 프로젝트 설정 파일에 즉시 적용 가능하다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "LEARNER_FIT",
+            "rationale": "union variant 설계와 validation이 핵심 루프의 전부다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "SCOPE_FEASIBILITY",
+            "rationale": "CLI 도구로 UI 부담 없이 핵심 로직에 집중 가능하다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "ADJACENT_COMPLEXITY",
+            "rationale": "YAML 파서 외에 큰 부수 복잡도가 없다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "DEPLOYABILITY",
+            "rationale": "npm CLI 패키지로 간단히 배포 가능하다"
+          },
+          {
+            "assessment": "MIXED",
+            "criterion": "DISTINCTIVENESS",
+            "rationale": "JSON Schema 도구와 유사하나 discriminated union 관점의 차별화가 필요하다"
+          }
+        ],
+        "generationTags": [
+          "DIRECT"
+        ],
+        "id": "candidate_00000000-0000-4000-8000-000000000805",
+        "mvpFeatures": [
+          "스키마 정의 DSL 또는 TypeScript 파일로 union 선언",
+          "YAML/JSON 파일을 파싱하고 union variant에 매칭",
+          "variant 매칭 실패 시 상세 에러 메시지 출력",
+          "watch 모드로 파일 변경 시 자동 재검증",
+          "CI용 exit code와 리포트 포맷 지원"
+        ],
+        "parentRevisions": [],
+        "redactionStatus": "VERIFIED_REDACTED",
+        "revision": 1,
+        "risks": [
+          "스키마 정의 문법 설계가 어려울 수 있음",
+          "기존 JSON Schema 도구와 차별점을 명확히 해야 함",
+          "설정 파일 복잡도에 따라 테스트 케이스 작성 부담"
+        ],
+        "schemaVersion": 1,
+        "source": {
+          "kind": "AGENT",
+          "role": "DISCOVERY"
+        },
+        "suggestedScope": {
+          "agentSupport": [
+            "YAML/JSON 파서 통합",
+            "CLI 프레임워크 설정",
+            "file watcher 구현"
+          ],
+          "excluded": [
+            "GUI 에디터",
+            "원격 설정 서버 연동",
+            "스키마 자동 추론"
+          ],
+          "learnerFocus": [
+            "discriminated union으로 설정 variant 설계",
+            "Zod/io-ts로 runtime validation schema 구성",
+            "validation 에러 구조화 및 리포팅",
+            "type narrowing 기반 기본값 병합 로직"
+          ]
+        },
+        "summary": "YAML/JSON 설정 파일의 스키마를 discriminated union으로 정의하고 변경 시 자동 검증하는 CLI 도구",
+        "targetUsers": [
+          "복잡한 설정 파일을 관리하는 DevOps 엔지니어 및 프로젝트 리드"
+        ],
+        "technologyNecessity": "설정 파일은 환경별(dev/staging/prod), 서비스 타입별(web/worker/cron)로 필수 필드가 완전히 다르다. discriminated union으로 각 variant를 정의하고, raw YAML/JSON을 runtime에 파싱하여 올바른 variant인지 검증해야 한다",
+        "title": "Config Schema Guardian",
+        "usageMoment": "CI 파이프라인이나 pre-commit hook에서 설정 파일이 변경될 때마다 자동으로 검증이 실행되어, 잘못된 설정이 배포되기 전에 잡힌다"
+      },
+      {
+        "appeal": "webhook 처리 코드가 if-else 지옥이 되는 것을 방지하고, 새 이벤트 추가 시 exhaustive check로 안전하게 확장할 수 있다",
+        "coreConcepts": [
+          "webhook 이벤트를 discriminated union으로 모델링",
+          "runtime validation으로 untrusted payload 검증",
+          "exhaustive pattern matching으로 핸들러 라우팅",
+          "never 타입으로 누락 케이스 컴파일 타임 감지"
+        ],
+        "coreInteraction": "외부 서비스에서 오는 다양한 webhook payload를 runtime에 검증하고 discriminated union으로 분류한 뒤, 각 이벤트 타입에 맞는 핸들러에 type-safe하게 전달한다",
+        "correlationId": "corr_00000000-0000-4000-8000-000000000803",
+        "createdAt": "2026-08-26T05:24:43.522Z",
+        "discoverySessionId": "discovery_session_00000000-0000-4000-8000-000000000802",
+        "evaluation": [
+          {
+            "assessment": "POSITIVE",
+            "criterion": "CONCEPT_NECESSITY",
+            "rationale": "webhook은 discriminated union의 교과서적 사용처이며 runtime validation이 보안상 필수다"
+          },
+          {
+            "assessment": "MIXED",
+            "criterion": "PERSONAL_UTILITY",
+            "rationale": "API 관련이지만 디버깅보다는 처리 파이프라인에 가깝다"
+          },
+          {
+            "assessment": "MIXED",
+            "criterion": "ADOPTION_FEASIBILITY",
+            "rationale": "실제 webhook을 보내는 서비스 설정이 필요하거나 모의 데이터로 테스트해야 한다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "LEARNER_FIT",
+            "rationale": "union + validation + exhaustive match가 핵심 루프에 모두 녹아있다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "SCOPE_FEASIBILITY",
+            "rationale": "단일 엔드포인트 서버로 MVP 범위가 작다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "ADJACENT_COMPLEXITY",
+            "rationale": "HTTP 서버 외 부수 복잡도가 낮다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "DEPLOYABILITY",
+            "rationale": "로컬 서버 또는 간단한 클라우드 배포 가능"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "DISTINCTIVENESS",
+            "rationale": "이벤트 라우팅이라는 런타임 문제를 타입 시스템으로 해결하는 독특한 각도다"
+          }
+        ],
+        "generationTags": [
+          "DIRECT"
+        ],
+        "id": "candidate_00000000-0000-4000-8000-000000000806",
+        "mvpFeatures": [
+          "webhook 수신 HTTP 엔드포인트",
+          "이벤트 타입별 discriminated union 정의",
+          "수신 payload runtime validation 및 분류",
+          "타입별 핸들러 등록 및 라우팅",
+          "exhaustive check로 미처리 이벤트 감지",
+          "처리 결과 로그 대시보드"
+        ],
+        "parentRevisions": [],
+        "redactionStatus": "VERIFIED_REDACTED",
+        "revision": 1,
+        "risks": [
+          "실제 webhook 없이 테스트 데이터 생성 필요",
+          "signature 검증 로직이 서비스마다 다름",
+          "이벤트 타입이 많아지면 초기 스키마 작성 부담"
+        ],
+        "schemaVersion": 1,
+        "source": {
+          "kind": "AGENT",
+          "role": "DISCOVERY"
+        },
+        "suggestedScope": {
+          "agentSupport": [
+            "HTTP 서버 boilerplate",
+            "로그 저장 및 대시보드 UI",
+            "webhook signature 검증"
+          ],
+          "excluded": [
+            "실제 외부 서비스 연동",
+            "큐 기반 비동기 처리",
+            "재시도 로직"
+          ],
+          "learnerFocus": [
+            "discriminated union으로 이벤트 타입 계층 설계",
+            "runtime validation pipeline 구축",
+            "exhaustive matching 패턴 구현",
+            "validation 실패 에러 핸들링"
+          ]
+        },
+        "summary": "수신되는 webhook 이벤트를 discriminated union으로 타입 분류하고 조건별 핸들러로 라우팅하는 미들웨어 서버",
+        "targetUsers": [
+          "Stripe, GitHub 등 여러 webhook을 처리하는 백엔드 개발자"
+        ],
+        "technologyNecessity": "webhook payload는 같은 엔드포인트로 완전히 다른 구조의 이벤트가 들어온다. type 필드로 구분되는 discriminated union이 자연스러운 모델이며, 외부에서 오는 JSON이므로 runtime validation이 필수다",
+        "title": "Webhook Event Router",
+        "usageMoment": "새로운 webhook 이벤트 타입을 추가할 때, union에 variant를 추가하고 핸들러를 작성하면 타입 시스템이 누락된 케이스를 잡아준다"
+      },
+      {
+        "appeal": "매번 폼 코드를 처음부터 작성하는 대신, 스키마 하나로 타입 안전한 동적 폼을 빠르게 만들 수 있다",
+        "coreConcepts": [
+          "필드 타입을 discriminated union으로 모델링",
+          "필드 variant별 validation 규칙 정의",
+          "runtime에 스키마 JSON을 validation하여 안전한 폼 구조 확인",
+          "type narrowing으로 필드별 렌더링 분기"
+        ],
+        "coreInteraction": "텍스트/숫자/선택/날짜 등 다양한 필드 타입을 discriminated union으로 정의하고, 폼 스키마에 따라 UI를 렌더링하며, 사용자 입력을 필드 타입별 validation 규칙으로 실시간 검증한다",
+        "correlationId": "corr_00000000-0000-4000-8000-000000000803",
+        "createdAt": "2026-08-26T05:24:43.522Z",
+        "discoverySessionId": "discovery_session_00000000-0000-4000-8000-000000000802",
+        "evaluation": [
+          {
+            "assessment": "POSITIVE",
+            "criterion": "CONCEPT_NECESSITY",
+            "rationale": "필드 타입별 구조 차이가 discriminated union의 핵심 사용 사례이며 동적 입력이므로 runtime validation이 필수다"
+          },
+          {
+            "assessment": "MIXED",
+            "criterion": "PERSONAL_UTILITY",
+            "rationale": "사내 도구 제작에 유용하나 API 디버깅 관심사와는 거리가 있다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "ADOPTION_FEASIBILITY",
+            "rationale": "본인이 직접 사용하거나 팀 내부 도구로 즉시 활용 가능하다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "LEARNER_FIT",
+            "rationale": "필드 추가 시마다 union variant와 validation을 작성하는 반복 학습이 자연스럽다"
+          },
+          {
+            "assessment": "MIXED",
+            "criterion": "SCOPE_FEASIBILITY",
+            "rationale": "UI 렌더링 부분이 상당하나 Agent 지원으로 관리 가능하다"
+          },
+          {
+            "assessment": "MIXED",
+            "criterion": "ADJACENT_COMPLEXITY",
+            "rationale": "React 렌더링과 에디터 통합이 부수 복잡도이나 Agent가 담당한다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "DEPLOYABILITY",
+            "rationale": "정적 웹앱으로 간단히 배포 가능하다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "DISTINCTIVENESS",
+            "rationale": "동적 UI 생성이라는 다른 후보와 완전히 다른 상호작용 패턴이다"
+          }
+        ],
+        "generationTags": [
+          "EXPAND"
+        ],
+        "id": "candidate_00000000-0000-4000-8000-000000000807",
+        "mvpFeatures": [
+          "필드 타입 discriminated union 정의",
+          "JSON 스키마 파싱 및 runtime validation",
+          "스키마 기반 동적 폼 렌더링",
+          "필드별 실시간 입력 validation",
+          "validation 에러 인라인 표시",
+          "스키마 에디터와 미리보기 split view"
+        ],
+        "parentRevisions": [],
+        "redactionStatus": "VERIFIED_REDACTED",
+        "revision": 1,
+        "risks": [
+          "UI 컴포넌트 작업량이 학습 시간을 압박할 수 있음",
+          "필드 타입이 많아지면 union이 비대해질 수 있음",
+          "실제 사용 시나리오 없이 동기 유지 어려울 수 있음"
+        ],
+        "schemaVersion": 1,
+        "source": {
+          "kind": "AGENT",
+          "role": "DISCOVERY"
+        },
+        "suggestedScope": {
+          "agentSupport": [
+            "React 폼 컴포넌트 렌더링",
+            "split view 레이아웃",
+            "JSON 에디터 통합"
+          ],
+          "excluded": [
+            "폼 제출 백엔드",
+            "다단계 폼 로직",
+            "조건부 필드 표시 규칙"
+          ],
+          "learnerFocus": [
+            "discriminated union으로 필드 타입 시스템 설계",
+            "각 variant의 validation 규칙 구현",
+            "runtime schema validation",
+            "type narrowing 기반 조건부 렌더링"
+          ]
+        },
+        "summary": "동적 폼의 필드 타입을 discriminated union으로 정의하고, 사용자 입력을 실시간 validation하는 인터랙티브 폼 빌더",
+        "targetUsers": [
+          "커스텀 폼이 필요한 SaaS 개발자나 사내 도구 제작자"
+        ],
+        "technologyNecessity": "폼 필드는 텍스트(maxLength), 숫자(min/max), 선택(options), 날짜(range) 등 타입마다 구조와 validation 규칙이 완전히 다르다. discriminated union으로 필드 variant를 정의하고, 사용자 입력을 runtime에 해당 variant의 규칙으로 검증해야 한다",
+        "title": "Form Schema Playground",
+        "usageMoment": "새로운 내부 도구용 폼이 필요할 때, JSON으로 스키마를 정의하면 즉시 동작하는 폼이 생성되고, 입력값이 타입별 규칙에 따라 검증된다"
+      },
+      {
+        "appeal": "CLI 도구를 만들 때 인자 파싱 코드가 지저분해지는 문제를 타입 시스템으로 깔끔하게 해결하는 경험을 할 수 있다",
+        "coreConcepts": [
+          "서브커맨드를 discriminated union variant로 모델링",
+          "argv 문자열 배열을 runtime validation으로 구조화",
+          "exhaustive matching으로 커맨드별 핸들러 라우팅",
+          "validation 실패 시 도움말 자동 생성"
+        ],
+        "coreInteraction": "서브커맨드별로 다른 인자 구조를 discriminated union으로 선언하고, 실제 argv 입력을 runtime에 파싱하여 올바른 서브커맨드 variant에 매핑한 뒤 type-safe하게 실행한다",
+        "correlationId": "corr_00000000-0000-4000-8000-000000000803",
+        "createdAt": "2026-08-26T05:24:43.522Z",
+        "discoverySessionId": "discovery_session_00000000-0000-4000-8000-000000000802",
+        "evaluation": [
+          {
+            "assessment": "POSITIVE",
+            "criterion": "CONCEPT_NECESSITY",
+            "rationale": "서브커맨드별 다른 인자 구조가 discriminated union의 자연스러운 사용처이며 문자열 입력 파싱에 runtime validation이 필수다"
+          },
+          {
+            "assessment": "MIXED",
+            "criterion": "PERSONAL_UTILITY",
+            "rationale": "개발자 도구 관심사에 부합하나 API 디버깅과는 직접 관련 없다"
+          },
+          {
+            "assessment": "MIXED",
+            "criterion": "ADOPTION_FEASIBILITY",
+            "rationale": "자체 CLI 도구를 만들 계획이 있어야 실용적이다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "LEARNER_FIT",
+            "rationale": "커맨드 추가 시마다 union + validation + handler를 작성하는 반복 학습 구조다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "SCOPE_FEASIBILITY",
+            "rationale": "라이브러리 형태로 범위가 명확하다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "ADJACENT_COMPLEXITY",
+            "rationale": "argv 파싱 외에 부수 복잡도가 거의 없다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "DEPLOYABILITY",
+            "rationale": "npm 패키지로 간단히 배포 가능하다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "DISTINCTIVENESS",
+            "rationale": "라이브러리/프레임워크 제작이라는 다른 후보와 다른 산출물 형태다"
+          }
+        ],
+        "generationTags": [
+          "EXPAND"
+        ],
+        "id": "candidate_00000000-0000-4000-8000-000000000808",
+        "mvpFeatures": [
+          "서브커맨드 union 타입 선언 API",
+          "argv 파싱 및 runtime validation",
+          "커맨드별 핸들러 등록 및 exhaustive 실행",
+          "validation 에러 시 자동 usage 메시지 생성",
+          "옵션 플래그 및 위치 인자 지원",
+          "help 서브커맨드 자동 생성"
+        ],
+        "parentRevisions": [],
+        "redactionStatus": "VERIFIED_REDACTED",
+        "revision": 1,
+        "risks": [
+          "yargs, commander 등 기존 도구와의 차별점 명확화 필요",
+          "초보자에게 제네릭 타입 설계가 어려울 수 있음",
+          "실제 사용할 CLI가 없으면 동기 유지 어려움"
+        ],
+        "schemaVersion": 1,
+        "source": {
+          "kind": "AGENT",
+          "role": "DISCOVERY"
+        },
+        "suggestedScope": {
+          "agentSupport": [
+            "argv tokenizer 구현",
+            "터미널 출력 포매팅",
+            "테스트 harness 설정"
+          ],
+          "excluded": [
+            "셸 자동완성 스크립트 생성",
+            "플러그인 시스템",
+            "대화형 프롬프트 모드"
+          ],
+          "learnerFocus": [
+            "discriminated union으로 커맨드 구조 설계",
+            "문자열 입력의 runtime validation",
+            "exhaustive pattern matching",
+            "에러 메시지 구조화"
+          ]
+        },
+        "summary": "복잡한 CLI 명령어 구조를 discriminated union으로 모델링하고, 사용자 입력을 런타임에 파싱·검증하는 타입 안전한 CLI 프레임워크",
+        "targetUsers": [
+          "자체 CLI 도구를 만드는 개발자, 오픈소스 CLI 도구 제작자"
+        ],
+        "technologyNecessity": "CLI의 서브커맨드(init, build, deploy 등)는 각각 요구하는 인자가 완전히 다르다. discriminated union으로 커맨드 구조를 정의하고, 문자열 argv를 runtime에 파싱하여 올바른 variant인지 검증해야 한다",
+        "title": "CLI Argument Parser",
+        "usageMoment": "새 서브커맨드를 추가할 때 union variant만 정의하면 타입 시스템이 핸들러 구현을 강제하고, 잘못된 인자 조합을 컴파일 타임에 잡아준다"
+      },
+      {
+        "appeal": "API 변경이 클라이언트를 깨뜨릴지 미리 알 수 있어, PR 리뷰에서 \"이거 breaking 아닌가요?\"라는 질문을 자동으로 답할 수 있다",
+        "coreConcepts": [
+          "스키마 변경 유형을 discriminated union으로 모델링",
+          "diff 결과를 runtime validation으로 변경 variant에 매핑",
+          "variant별 호환성 판단 로직",
+          "exhaustive reporting으로 모든 변경 유형 커버"
+        ],
+        "coreInteraction": "두 버전의 API 스키마를 비교하여 변경 사항을 discriminated union(추가/수정/삭제/타입변경)으로 분류하고, 각 변경의 호환성을 runtime validation으로 판단한다",
+        "correlationId": "corr_00000000-0000-4000-8000-000000000803",
+        "createdAt": "2026-08-26T05:24:43.522Z",
+        "discoverySessionId": "discovery_session_00000000-0000-4000-8000-000000000802",
+        "evaluation": [
+          {
+            "assessment": "POSITIVE",
+            "criterion": "CONCEPT_NECESSITY",
+            "rationale": "변경 유형별 다른 판단 로직이 discriminated union의 핵심 가치를 직접 활용하며 외부 스키마 파싱에 runtime validation이 필수다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "PERSONAL_UTILITY",
+            "rationale": "API 디버깅 관심사와 직접 연결되며 API 개발 워크플로에 실용적이다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "ADOPTION_FEASIBILITY",
+            "rationale": "자신의 API 프로젝트에 즉시 적용하거나 팀 CI에 추가 가능하다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "LEARNER_FIT",
+            "rationale": "변경 유형을 하나씩 추가하며 union과 validation을 반복 학습한다"
+          },
+          {
+            "assessment": "MIXED",
+            "criterion": "SCOPE_FEASIBILITY",
+            "rationale": "스키마 파싱이 복잡할 수 있으나 JSON Schema로 제한하면 관리 가능하다"
+          },
+          {
+            "assessment": "MIXED",
+            "criterion": "ADJACENT_COMPLEXITY",
+            "rationale": "트리 비교 알고리즘이 필요하나 Agent가 담당 가능하다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "DEPLOYABILITY",
+            "rationale": "CLI 도구로 간단히 배포 가능하다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "DISTINCTIVENESS",
+            "rationale": "스키마 비교라는 분석적 문제 영역이 다른 후보와 차별된다"
+          }
+        ],
+        "generationTags": [
+          "DIRECT"
+        ],
+        "id": "candidate_00000000-0000-4000-8000-000000000809",
+        "mvpFeatures": [
+          "두 JSON/OpenAPI 스키마 파일 비교",
+          "변경 사항을 discriminated union variant로 분류",
+          "variant별 breaking/non-breaking 판단",
+          "구조화된 diff 리포트 출력",
+          "CI 연동용 exit code 지원",
+          "변경 요약 마크다운 생성"
+        ],
+        "parentRevisions": [],
+        "redactionStatus": "VERIFIED_REDACTED",
+        "revision": 1,
+        "risks": [
+          "OpenAPI 스키마 파싱 복잡도가 높을 수 있음",
+          "변경 유형 분류 규칙이 엣지 케이스가 많음",
+          "초보자에게 스키마 비교 알고리즘이 어려울 수 있음"
+        ],
+        "schemaVersion": 1,
+        "source": {
+          "kind": "AGENT",
+          "role": "DISCOVERY"
+        },
+        "suggestedScope": {
+          "agentSupport": [
+            "JSON/OpenAPI 스키마 파싱",
+            "트리 비교 알고리즘",
+            "마크다운 리포트 포매팅"
+          ],
+          "excluded": [
+            "GUI diff 뷰어",
+            "자동 마이그레이션 생성",
+            "버전 히스토리 관리"
+          ],
+          "learnerFocus": [
+            "변경 유형 discriminated union 설계",
+            "diff 결과의 runtime validation",
+            "variant별 호환성 판단 로직 구현",
+            "exhaustive check로 누락 유형 방지"
+          ]
+        },
+        "summary": "API 엔드포인트의 요청/응답 스키마 변경을 감지하고, breaking change를 discriminated union 기반으로 분류해 리포팅하는 도구",
+        "targetUsers": [
+          "API를 버전 관리하는 백엔드 팀, API 소비자와 소통하는 개발자"
+        ],
+        "technologyNecessity": "스키마 변경은 필드 추가(safe), 필드 삭제(breaking), 타입 변경(조건부 breaking), 필수→선택(safe) 등 종류마다 판단 로직이 완전히 다르다. discriminated union으로 변경 유형을 모델링하고, 실제 스키마 diff를 runtime에 파싱하여 올바른 유형에 매핑해야 한다",
+        "title": "API Contract Diff Checker",
+        "usageMoment": "API 스키마를 수정한 뒤 커밋 전에 도구를 실행하면, 어떤 변경이 breaking인지 non-breaking인지 즉시 분류된 리포트를 받는다"
+      },
+      {
+        "appeal": "이메일은 제목+본문, 슬랙은 채널+블록, SMS는 번호+짧은 텍스트 등 채널마다 전혀 다른 구조를 하나의 타입 시스템으로 관리하는 깔끔함을 경험할 수 있다",
+        "coreConcepts": [
+          "채널별 알림을 discriminated union으로 모델링",
+          "API 요청 payload의 runtime validation",
+          "type narrowing으로 채널별 어댑터 선택",
+          "validation 실패 시 구조화된 에러 응답"
+        ],
+        "coreInteraction": "알림 요청을 받으면 채널별 discriminated union으로 분류하고, 각 채널의 필수 필드를 runtime validation한 뒤, 검증 통과 시 해당 채널 어댑터로 전송한다",
+        "correlationId": "corr_00000000-0000-4000-8000-000000000803",
+        "createdAt": "2026-08-26T05:24:43.522Z",
+        "discoverySessionId": "discovery_session_00000000-0000-4000-8000-000000000802",
+        "evaluation": [
+          {
+            "assessment": "POSITIVE",
+            "criterion": "CONCEPT_NECESSITY",
+            "rationale": "채널별 완전히 다른 payload 구조가 discriminated union의 전형적 사용처이며 외부 API 입력에 runtime validation이 필수다"
+          },
+          {
+            "assessment": "MIXED",
+            "criterion": "PERSONAL_UTILITY",
+            "rationale": "사이드 프로젝트에 유용할 수 있으나 API 디버깅 관심사와는 거리가 있다"
+          },
+          {
+            "assessment": "MIXED",
+            "criterion": "ADOPTION_FEASIBILITY",
+            "rationale": "mock 어댑터로 시작 가능하나 실제 채널 연동 시 설정 부담이 있다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "LEARNER_FIT",
+            "rationale": "새 채널 추가 시마다 variant + validation + adapter를 작성하는 명확한 학습 루프다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "SCOPE_FEASIBILITY",
+            "rationale": "mock 어댑터로 제한하면 MVP가 간결하다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "ADJACENT_COMPLEXITY",
+            "rationale": "실제 전송을 제외하면 HTTP 서버 외 복잡도가 낮다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "DEPLOYABILITY",
+            "rationale": "단일 서버로 간단히 배포 가능하다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "DISTINCTIVENESS",
+            "rationale": "다채널 라우팅이라는 실무적 문제로 다른 후보와 영역이 다르다"
+          }
+        ],
+        "generationTags": [
+          "DISCOVER"
+        ],
+        "id": "candidate_00000000-0000-4000-8000-000000000810",
+        "mvpFeatures": [
+          "알림 요청 수신 API 엔드포인트",
+          "채널별 discriminated union 타입 정의",
+          "수신 payload runtime validation",
+          "채널별 어댑터 인터페이스 및 mock 구현",
+          "전송 결과 로그",
+          "validation 에러 상세 응답"
+        ],
+        "parentRevisions": [],
+        "redactionStatus": "VERIFIED_REDACTED",
+        "revision": 1,
+        "risks": [
+          "실제 전송 없이 mock만으로는 동기 유지 어려울 수 있음",
+          "채널 추가 시 외부 SDK 의존성 증가",
+          "알림 시스템 자체의 운영 복잡도"
+        ],
+        "schemaVersion": 1,
+        "source": {
+          "kind": "AGENT",
+          "role": "DISCOVERY"
+        },
+        "suggestedScope": {
+          "agentSupport": [
+            "HTTP 서버 설정",
+            "실제 채널 SDK 연동",
+            "로그 저장소"
+          ],
+          "excluded": [
+            "실제 이메일/SMS 전송",
+            "알림 템플릿 시스템",
+            "구독 관리 및 사용자 설정"
+          ],
+          "learnerFocus": [
+            "discriminated union으로 채널 타입 설계",
+            "runtime validation pipeline",
+            "type narrowing 기반 어댑터 라우팅",
+            "에러 응답 구조화"
+          ]
+        },
+        "summary": "다채널 알림(이메일/슬랙/SMS/푸시)을 discriminated union으로 모델링하고, 채널별 payload를 검증·전송하는 통합 알림 서버",
+        "targetUsers": [
+          "여러 알림 채널을 통합 관리하려는 소규모 팀 또는 사이드 프로젝트 개발자"
+        ],
+        "technologyNecessity": "알림 채널마다 payload 구조가 완전히 다르다(이메일: subject+html, 슬랙: channel+blocks, SMS: phone+shortText). discriminated union으로 채널 variant를 정의하고, API 요청을 runtime에 검증하여 올바른 채널에 매핑해야 한다",
+        "title": "Notification Dispatch Hub",
+        "usageMoment": "앱에서 알림을 보낼 때 단일 API로 요청하면, 채널에 맞는 형식 검증과 전송이 자동으로 이루어진다"
+      },
+      {
+        "appeal": "에러 로그를 텍스트로 뒤지는 대신, 타입별로 구조화된 에러 카탈로그에서 패턴을 시각적으로 파악할 수 있다",
+        "coreConcepts": [
+          "에러 유형을 discriminated union으로 계층 모델링",
+          "raw 에러 데이터의 runtime validation",
+          "type narrowing으로 variant별 상세 뷰 렌더링",
+          "union 확장 시 exhaustive check로 누락 방지"
+        ],
+        "coreInteraction": "앱에서 발생하는 에러를 수집하고, 각 에러를 discriminated union(네트워크에러/밸리데이션에러/인증에러/비즈니스에러)으로 분류한 뒤, 유형별 빈도와 패턴을 대시보드에서 탐색한다",
+        "correlationId": "corr_00000000-0000-4000-8000-000000000803",
+        "createdAt": "2026-08-26T05:24:43.522Z",
+        "discoverySessionId": "discovery_session_00000000-0000-4000-8000-000000000802",
+        "evaluation": [
+          {
+            "assessment": "POSITIVE",
+            "criterion": "CONCEPT_NECESSITY",
+            "rationale": "에러 유형별 완전히 다른 구조가 discriminated union의 핵심 가치를 보여주며 외부 데이터 수집에 runtime validation이 필수다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "PERSONAL_UTILITY",
+            "rationale": "API 디버깅 관심사의 연장선에서 에러 패턴 분석에 실용적이다"
+          },
+          {
+            "assessment": "MIXED",
+            "criterion": "ADOPTION_FEASIBILITY",
+            "rationale": "자체 앱에서 에러를 보내도록 연동해야 하므로 초기 설정이 필요하다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "LEARNER_FIT",
+            "rationale": "에러 유형 추가 시마다 union + validation + 뷰를 작성하는 반복 학습이다"
+          },
+          {
+            "assessment": "MIXED",
+            "criterion": "SCOPE_FEASIBILITY",
+            "rationale": "대시보드 UI가 상당하나 Agent 지원으로 관리 가능하다"
+          },
+          {
+            "assessment": "MIXED",
+            "criterion": "ADJACENT_COMPLEXITY",
+            "rationale": "차트 라이브러리와 데이터 저장이 부수 복잡도이나 Agent가 담당한다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "DEPLOYABILITY",
+            "rationale": "웹앱으로 배포 가능하며 로컬에서도 사용 가능하다"
+          },
+          {
+            "assessment": "POSITIVE",
+            "criterion": "DISTINCTIVENESS",
+            "rationale": "에러 분석이라는 관찰·모니터링 영역으로 다른 후보와 문제 도메인이 다르다"
+          }
+        ],
+        "generationTags": [
+          "DISCOVER"
+        ],
+        "id": "candidate_00000000-0000-4000-8000-000000000811",
+        "mvpFeatures": [
+          "에러 수집 API 엔드포인트",
+          "에러 유형 discriminated union 정의",
+          "수집 데이터 runtime validation 및 분류",
+          "유형별 에러 빈도 대시보드",
+          "variant별 상세 정보 뷰",
+          "시간대별 에러 트렌드 차트"
+        ],
+        "parentRevisions": [],
+        "redactionStatus": "VERIFIED_REDACTED",
+        "revision": 1,
+        "risks": [
+          "실제 에러 데이터 없이 테스트하기 어려울 수 있음",
+          "Sentry 등 기존 도구와 차별점 필요",
+          "대시보드 UI 작업량이 클 수 있음"
+        ],
+        "schemaVersion": 1,
+        "source": {
+          "kind": "AGENT",
+          "role": "DISCOVERY"
+        },
+        "suggestedScope": {
+          "agentSupport": [
+            "대시보드 UI 컴포넌트",
+            "차트 라이브러리 통합",
+            "에러 수집 서버 설정"
+          ],
+          "excluded": [
+            "소스맵 연동",
+            "알림 규칙 엔진",
+            "팀 협업 기능"
+          ],
+          "learnerFocus": [
+            "discriminated union으로 에러 계층 설계",
+            "runtime validation으로 에러 데이터 분류",
+            "type narrowing 기반 조건부 렌더링",
+            "union 확장과 exhaustive check"
+          ]
+        },
+        "summary": "애플리케이션 에러를 계층적 discriminated union으로 분류하고, 발생 패턴을 분석하는 에러 트래킹 대시보드",
+        "targetUsers": [
+          "자체 에러 분류 체계를 원하는 소규모 팀, Sentry 대안을 찾는 개인 프로젝트 개발자"
+        ],
+        "technologyNecessity": "에러는 유형마다 포함 정보가 완전히 다르다(네트워크: url+status, 밸리데이션: field+rule, 인증: token+expiry). discriminated union으로 에러 variant를 정의하고, 수집된 raw 에러 데이터를 runtime validation으로 올바른 variant에 매핑해야 한다",
+        "title": "Error Catalog Explorer",
+        "usageMoment": "프로덕션에서 에러가 급증할 때 대시보드를 열면, 어떤 유형의 에러가 늘었는지 즉시 파악하고 variant별 상세 정보로 원인을 좁힌다"
+      }
+    ]
+  }
+}

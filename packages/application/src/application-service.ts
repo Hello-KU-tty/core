@@ -7,6 +7,7 @@ import {
   auditRecordSchema,
   type BuilderTaskContext,
   builderTaskContextSchema,
+  type CandidateRound,
   type CanonicalConcept,
   canonicalConceptSchema,
   type CommandReceipt,
@@ -17,6 +18,7 @@ import {
   decisionResultSchema,
   type DiscoveryContext,
   discoveryContextSchema,
+  type DiscoveryFeedback,
   type EpisodeContext,
   episodeContextSchema,
   type EvidenceBatchApplicationResult,
@@ -29,6 +31,7 @@ import {
   type LearningSpecRevision,
   type OperationError,
   type Project,
+  type ProjectCandidateRevision,
   type UiRequest,
   uiRequestSchema,
   validateAgentRequest,
@@ -119,6 +122,21 @@ function latestByRevision<T extends { readonly revision: number }>(items: readon
 
 function unique<T>(items: readonly T[]): T[] {
   return [...new Set(items)]
+}
+
+function candidateReferenceKey(reference: {
+  readonly candidateId: string
+  readonly revision: number
+}): string {
+  return `${reference.candidateId}:${reference.revision}`
+}
+
+function candidateRecordKey(candidate: ProjectCandidateRevision): string {
+  return `${candidate.id}:${candidate.revision}`
+}
+
+function sameStringSet(left: ReadonlySet<string>, right: ReadonlySet<string>): boolean {
+  return left.size === right.size && [...left].every((value) => right.has(value))
 }
 
 function readCorrelationId(input: unknown): string | undefined {
@@ -316,6 +334,13 @@ export class ApplicationService {
             request.correlationId,
             'DISCOVERY_SESSION_STALE',
           )
+          if (scoped.session.status !== 'ACTIVE' || scoped.project.status !== 'DISCOVERY') {
+            throw this.#validationError(
+              request.correlationId,
+              'DISCOVERY_SESSION_NOT_ACTIVE',
+              'Candidate Rounds can be submitted only while Discovery is active.',
+            )
+          }
           if (
             request.round.roundIndex !== scoped.rounds.length + 1 ||
             canonicalJson(request.round.inputSnapshot) !== canonicalJson(scoped.session.input)
@@ -326,17 +351,15 @@ export class ApplicationService {
               'Candidate Round does not immediately follow the stored Discovery state.',
             )
           }
+          const feedbackByCandidate = this.#validateCandidateRoundLoop(
+            scoped,
+            request.round,
+            request.candidates,
+            request.correlationId,
+          )
           let history = [...scoped.candidates]
           for (const candidate of request.candidates) {
-            const feedback = [...scoped.feedback]
-              .reverse()
-              .find((item) =>
-                item.resultingRevisions.some(
-                  (reference) =>
-                    reference.candidateId === candidate.id &&
-                    reference.revision === candidate.revision,
-                ),
-              )
+            const feedback = feedbackByCandidate.get(candidateRecordKey(candidate))
             const result = reduceCandidateRevision({
               existing: history,
               proposed: candidate,
@@ -472,25 +495,53 @@ export class ApplicationService {
             request.correlationId,
             'DISCOVERY_SESSION_STALE',
           )
-          if (!scoped.rounds.some((round) => round.id === request.feedback.roundId)) {
+          if (
+            scoped.session.status !== 'ACTIVE' ||
+            scoped.project.status !== 'DISCOVERY' ||
+            scoped.session.correlationId !== request.correlationId
+          ) {
             throw this.#validationError(
               request.correlationId,
-              'DISCOVERY_ROUND_NOT_FOUND',
-              'Discovery feedback references an unknown Candidate Round.',
+              'DISCOVERY_SESSION_NOT_ACTIVE',
+              'Discovery Feedback can be recorded only for the active Discovery session.',
             )
           }
-          const candidateKeys = new Set(
-            scoped.candidates.map((candidate) => `${candidate.id}:${candidate.revision}`),
-          )
+          const latestRound = scoped.rounds.at(-1)
+          if (latestRound === undefined || latestRound.id !== request.feedback.roundId) {
+            throw this.#validationError(
+              request.correlationId,
+              'DISCOVERY_ROUND_NOT_CURRENT',
+              'Discovery Feedback must reference the current Candidate Round.',
+            )
+          }
+          const candidateKeys = new Set(latestRound.candidates.map(candidateReferenceKey))
           if (
             request.feedback.targets.some(
-              (target) => !candidateKeys.has(`${target.candidateId}:${target.revision}`),
+              (target) => !candidateKeys.has(candidateReferenceKey(target)),
             )
           ) {
             throw this.#validationError(
               request.correlationId,
               'DISCOVERY_CANDIDATE_NOT_FOUND',
-              'Discovery feedback references an unknown Candidate revision.',
+              'Discovery Feedback targets must be visible in the current Candidate Round.',
+            )
+          }
+          const latestRevisionByCandidate = new Map<string, number>()
+          for (const candidate of scoped.candidates) {
+            latestRevisionByCandidate.set(
+              candidate.id,
+              Math.max(latestRevisionByCandidate.get(candidate.id) ?? 0, candidate.revision),
+            )
+          }
+          if (
+            request.feedback.targets.some(
+              (target) => latestRevisionByCandidate.get(target.candidateId) !== target.revision,
+            )
+          ) {
+            throw this.#validationError(
+              request.correlationId,
+              'DISCOVERY_CANDIDATE_STALE',
+              'Discovery Feedback cannot target a superseded Candidate revision.',
             )
           }
           repository.appendDiscoveryFeedback(request.feedback)
@@ -1327,6 +1378,248 @@ export class ApplicationService {
       workspacePath: project.generatedWorkspacePath,
       status: 'READY',
     })
+  }
+
+  #validateCandidateRoundLoop(
+    scoped: DiscoveryAggregate,
+    round: CandidateRound,
+    submittedCandidates: readonly ProjectCandidateRevision[],
+    correlationId: string,
+  ): ReadonlyMap<string, DiscoveryFeedback> {
+    if (round.correlationId !== scoped.session.correlationId) {
+      throw this.#validationError(
+        correlationId,
+        'DISCOVERY_CORRELATION_MISMATCH',
+        'Candidate Round must remain in the Discovery session correlation scope.',
+      )
+    }
+
+    const existingByKey = new Map(
+      scoped.candidates.map((candidate) => [candidateRecordKey(candidate), candidate]),
+    )
+    const latestByCandidate = new Map<string, ProjectCandidateRevision>()
+    for (const candidate of scoped.candidates) {
+      const latest = latestByCandidate.get(candidate.id)
+      if (latest === undefined || candidate.revision > latest.revision) {
+        latestByCandidate.set(candidate.id, candidate)
+      }
+    }
+    const submittedByKey = new Map(
+      submittedCandidates.map((candidate) => [candidateRecordKey(candidate), candidate]),
+    )
+    const roundKeys = new Set(round.candidates.map(candidateReferenceKey))
+    const submittedKeys = new Set(submittedByKey.keys())
+
+    for (const [key, candidate] of submittedByKey) {
+      if (existingByKey.has(key)) {
+        throw this.#validationError(
+          correlationId,
+          'CANDIDATE_ALREADY_STORED',
+          'Candidate Round submissions must contain only new Candidate revisions.',
+        )
+      }
+      if (
+        candidate.discoverySessionId !== scoped.session.id ||
+        candidate.correlationId !== scoped.session.correlationId
+      ) {
+        throw this.#validationError(
+          correlationId,
+          'CANDIDATE_SCOPE_MISMATCH',
+          'Submitted Candidate must remain in the active Discovery scope.',
+        )
+      }
+    }
+
+    for (const reference of round.candidates) {
+      const key = candidateReferenceKey(reference)
+      const existing = existingByKey.get(key)
+      if (existing === undefined && !submittedByKey.has(key)) {
+        throw this.#validationError(
+          correlationId,
+          'CANDIDATE_ROUND_REFERENCE_NOT_FOUND',
+          'Candidate Round references must be either stored or submitted in the same command.',
+        )
+      }
+      if (
+        existing !== undefined &&
+        latestByCandidate.get(existing.id)?.revision !== existing.revision
+      ) {
+        throw this.#validationError(
+          correlationId,
+          'CANDIDATE_ROUND_REFERENCE_STALE',
+          'Candidate Round cannot carry a superseded Candidate revision.',
+        )
+      }
+    }
+
+    if (round.roundIndex === 1) {
+      if (
+        scoped.rounds.length !== 0 ||
+        scoped.candidates.length !== 0 ||
+        round.appliedFeedbackIds.length !== 0 ||
+        !sameStringSet(roundKeys, submittedKeys)
+      ) {
+        throw this.#validationError(
+          correlationId,
+          'INITIAL_CANDIDATE_ROUND_INVALID',
+          'The initial Candidate Round must contain only its new submissions and no Feedback.',
+        )
+      }
+      return new Map()
+    }
+
+    const previousRound = scoped.rounds.at(-1)
+    if (previousRound === undefined) {
+      throw this.#validationError(
+        correlationId,
+        'CANDIDATE_ROUND_PREDECESSOR_MISSING',
+        'A refinement Candidate Round requires a preceding Round.',
+      )
+    }
+    const pendingFeedback = scoped.feedback.filter(
+      (feedback) => feedback.roundId === previousRound.id && feedback.intent !== 'SELECT',
+    )
+    const pendingFeedbackIds = new Set(pendingFeedback.map((feedback) => feedback.id))
+    const appliedFeedbackIds = new Set(round.appliedFeedbackIds)
+    if (
+      pendingFeedback.length === 0 ||
+      !sameStringSet(pendingFeedbackIds, appliedFeedbackIds) ||
+      pendingFeedback.some((feedback) => feedback.createdAt > round.createdAt)
+    ) {
+      throw this.#validationError(
+        correlationId,
+        'CANDIDATE_ROUND_FEEDBACK_MISMATCH',
+        'A refinement Round must apply exactly the pending Feedback from the preceding Round.',
+      )
+    }
+
+    const previousReferences = previousRound.candidates
+    const previousIds = new Set(previousReferences.map((reference) => reference.candidateId))
+    const pinnedIds = new Set(
+      pendingFeedback
+        .filter((feedback) => feedback.intent === 'PIN')
+        .flatMap((feedback) => feedback.targets.map((target) => target.candidateId)),
+    )
+    const rejectedIds = new Set(
+      pendingFeedback
+        .filter((feedback) => feedback.intent === 'REJECT')
+        .flatMap((feedback) => feedback.targets.map((target) => target.candidateId)),
+    )
+    const regenerations = pendingFeedback.filter((feedback) => feedback.intent === 'REGENERATE')
+    if (regenerations.length > 1) {
+      throw this.#validationError(
+        correlationId,
+        'DISCOVERY_REGENERATION_CONFLICT',
+        'Only one regeneration request can be applied by a Candidate Round.',
+      )
+    }
+    const regeneration = regenerations[0]
+    const regeneratedIds = new Set(
+      regeneration === undefined
+        ? []
+        : regeneration.targets.length === 0
+          ? previousReferences
+              .filter((reference) => !pinnedIds.has(reference.candidateId))
+              .map((reference) => reference.candidateId)
+          : regeneration.targets.map((target) => target.candidateId),
+    )
+    const replacementIds = new Set(regeneratedIds)
+    const feedbackByCandidate = new Map<string, DiscoveryFeedback>()
+
+    const registerExpectedRevision = (
+      feedback: DiscoveryFeedback,
+      target: { readonly candidateId: string; readonly revision: number },
+    ): void => {
+      const expectedKey = `${target.candidateId}:${target.revision + 1}`
+      if (feedbackByCandidate.has(expectedKey)) {
+        throw this.#validationError(
+          correlationId,
+          'DISCOVERY_FEEDBACK_CONFLICT',
+          'Multiple Feedback records cannot create the same Candidate revision.',
+        )
+      }
+      replacementIds.add(target.candidateId)
+      feedbackByCandidate.set(expectedKey, feedback)
+    }
+
+    for (const feedback of pendingFeedback) {
+      if (['REVISE', 'SHRINK', 'EXPAND'].includes(feedback.intent)) {
+        const target = feedback.targets[0]
+        if (target !== undefined) registerExpectedRevision(feedback, target)
+      } else if (feedback.intent === 'MERGE') {
+        const primary = feedback.targets[0]
+        if (primary !== undefined) registerExpectedRevision(feedback, primary)
+        for (const target of feedback.targets) replacementIds.add(target.candidateId)
+      }
+    }
+
+    const conflictingId = [...rejectedIds].find(
+      (candidateId) => pinnedIds.has(candidateId) || replacementIds.has(candidateId),
+    )
+    const pinnedRegenerationConflict = [...pinnedIds].find((candidateId) =>
+      regeneratedIds.has(candidateId),
+    )
+    if (conflictingId !== undefined || pinnedRegenerationConflict !== undefined) {
+      throw this.#validationError(
+        correlationId,
+        'DISCOVERY_FEEDBACK_CONFLICT',
+        'Pinned, rejected, and replaced Candidate targets must not conflict.',
+      )
+    }
+
+    let regenerationSubmissionCount = 0
+    for (const [key, candidate] of submittedByKey) {
+      const creatingFeedback = feedbackByCandidate.get(key)
+      if (creatingFeedback !== undefined) continue
+      if (
+        regeneration !== undefined &&
+        candidate.revision === 1 &&
+        candidate.parentRevisions.length === 0 &&
+        !previousIds.has(candidate.id)
+      ) {
+        feedbackByCandidate.set(key, regeneration)
+        regenerationSubmissionCount += 1
+        continue
+      }
+      throw this.#validationError(
+        correlationId,
+        'CANDIDATE_SUBMISSION_NOT_REQUESTED',
+        'New Candidate revisions must correspond to refinement, merge, or regeneration Feedback.',
+      )
+    }
+    if (regeneration !== undefined && regenerationSubmissionCount === 0) {
+      throw this.#validationError(
+        correlationId,
+        'CANDIDATE_REGENERATION_EMPTY',
+        'Regeneration Feedback must produce at least one new Candidate.',
+      )
+    }
+    for (const expectedKey of feedbackByCandidate.keys()) {
+      if (!submittedByKey.has(expectedKey)) {
+        throw this.#validationError(
+          correlationId,
+          'CANDIDATE_FEEDBACK_RESULT_MISSING',
+          'Every refinement or merge Feedback must produce its next Candidate revision.',
+        )
+      }
+    }
+
+    const expectedRoundKeys = new Set<string>()
+    for (const reference of previousReferences) {
+      if (!rejectedIds.has(reference.candidateId) && !replacementIds.has(reference.candidateId)) {
+        expectedRoundKeys.add(candidateReferenceKey(reference))
+      }
+    }
+    for (const key of submittedKeys) expectedRoundKeys.add(key)
+    if (!sameStringSet(roundKeys, expectedRoundKeys)) {
+      throw this.#validationError(
+        correlationId,
+        'CANDIDATE_ROUND_CONTENT_INVALID',
+        'Candidate Round must preserve unaffected revisions and apply every Feedback result.',
+      )
+    }
+
+    return feedbackByCandidate
   }
 
   #readDiscoveryBySession(

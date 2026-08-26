@@ -40,28 +40,31 @@ describe('Candidate revision reducer', () => {
     ...discoveryFeedbackFixture,
     intent: 'REVISE',
     targets: [{ candidateId: ids.candidate, revision: 1 }],
-    resultingRevisions: [{ candidateId: ids.candidate, revision: 2 }],
   } as const
 
-  it('applies a consecutive revision and treats an exact replay as a no-op', () => {
-    const applied = reduceCandidateRevision({
-      existing: [candidateFixture],
-      proposed: revisedCandidate,
-      feedback: reviseFeedback,
-    })
-    expect(applied.outcome).toBe('APPLIED')
-    if (applied.outcome !== 'APPLIED') return
-    expect(applied.value).toHaveLength(2)
-    expect(applied.trace.supportingIds).toEqual([`${ids.candidate}:1`])
+  it.each(['REVISE', 'SHRINK', 'EXPAND'] as const)(
+    'applies a consecutive %s revision and treats an exact replay as a no-op',
+    (intent) => {
+      const feedback = { ...reviseFeedback, intent }
+      const applied = reduceCandidateRevision({
+        existing: [candidateFixture],
+        proposed: revisedCandidate,
+        feedback,
+      })
+      expect(applied.outcome).toBe('APPLIED')
+      if (applied.outcome !== 'APPLIED') return
+      expect(applied.value).toHaveLength(2)
+      expect(applied.trace.supportingIds).toEqual([`${ids.candidate}:1`])
 
-    const replayed = reduceCandidateRevision({
-      existing: applied.value,
-      proposed: revisedCandidate,
-      feedback: reviseFeedback,
-    })
-    expect(replayed.outcome).toBe('NO_OP')
-    expect(replayed.trace.reasonCode).toBe('CANDIDATE_DUPLICATE')
-  })
+      const replayed = reduceCandidateRevision({
+        existing: applied.value,
+        proposed: revisedCandidate,
+        feedback,
+      })
+      expect(replayed.outcome).toBe('NO_OP')
+      expect(replayed.trace.reasonCode).toBe('CANDIDATE_DUPLICATE')
+    },
+  )
 
   it('continues the first merge target and preserves every latest parent', () => {
     const secondCandidate = { ...candidateFixture, id: secondCandidateId, title: 'Schema Journal' }
@@ -80,7 +83,6 @@ describe('Candidate revision reducer', () => {
         { candidateId: ids.candidate, revision: 1 },
         { candidateId: secondCandidateId, revision: 1 },
       ],
-      resultingRevisions: [{ candidateId: ids.candidate, revision: 2 }],
     } as const
 
     const result = reduceCandidateRevision({
@@ -102,6 +104,21 @@ describe('Candidate revision reducer', () => {
         proposed: { ...candidateFixture, title: 'Conflicting payload' },
       }).trace.reasonCode,
     ).toBe('CANDIDATE_REVISION_CONFLICT')
+  })
+
+  it('requires regenerated Candidates to start a new lineage', () => {
+    const regenerateFeedback = {
+      ...discoveryFeedbackFixture,
+      intent: 'REGENERATE',
+      targets: [],
+    } as const
+    expect(
+      reduceCandidateRevision({
+        existing: [candidateFixture],
+        proposed: revisedCandidate,
+        feedback: regenerateFeedback,
+      }).trace.reasonCode,
+    ).toBe('CANDIDATE_REGENERATION_LINEAGE_INVALID')
   })
 })
 

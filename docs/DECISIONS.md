@@ -226,6 +226,15 @@
 - **검토한 대안:** exact string golden answer, 하나의 weighted score, 모든 항목 자동 heuristic, 모든 항목 수동 review, T07에서 실제 Kiro baseline을 미리 주장, 평가 결과를 repository JSON에만 저장.
 - **tradeoff:** semantic 품질에는 reviewer 시간이 필요하고 T23 전에는 reviewer agreement를 주장할 수 없다. 대신 자동 검증의 재현성과 사람 판단의 정직한 경계가 분명해지고, prompt를 fixture 문구에 맞춰 과적합하는 위험과 false precision을 줄인다.
 
+## 2026-08-26: T08 feedback-to-round 계약과 Discovery Agent 경계
+
+- **상태:** 승인
+- **맥락:** user feedback이 아직 생성되지 않은 결과 revision을 미리 참조하게 하면 retry와 실패 뒤 causal history가 거짓이 된다. 반대로 Agent에게 Candidate/Round ID, timestamp, source와 input snapshot까지 생성하게 하면 의미 생성과 Core 상태 소유권이 섞인다. Kiro CLI 2.19.2는 선언한 tool input 외에 `__tool_use_purpose` transport field를 주입하는 동작도 실제 실행에서 확인됐다.
+- **결정:** user-authored feedback은 현재 round의 latest Candidate revision만 target으로 기록하고 결과를 소유하지 않는다. SELECT가 아닌 pending feedback은 다음 Candidate Round가 `appliedFeedbackIds`로 정확히 연결하며, round는 유지된 latest revision과 새 revision의 완전한 현재 집합을 보존한다. Application이 PIN, REJECT, MERGE, REVISE, SHRINK, EXPAND와 REGENERATE의 target·lineage·next revision·carried set을 deterministic하게 검증한다. SELECT는 UI command만 허용하고 Discovery Session과 Project를 terminal 상태로 바꿔 이후 feedback/round를 거절한다. Discovery Agent tool에는 의미 draft와 lineage만 노출하고 role-bound adapter가 검증된 context에서 Core-owned ID, revision, timestamp, provenance, redaction과 input snapshot을 채운다. `__tool_use_purpose`는 Agent-facing transport schema에서만 선택적으로 수용해 버린다. canonical prompt는 `docs/agent-prompts/discovery.md` version 1.0.0이며 tool allowlist 외의 file, shell, SQL, network 권한은 추가하지 않는다.
+- **검증:** synthetic unseen 입력에서 실제 Kiro→role-bound MCP→Application→SQLite의 3개 Candidate round가 end-to-end 저장됐다. 8개 생성 run은 360초 제한과 이후 stdio 재연결 실패가 있어 uninterrupted pass로 주장하지 않는다. 다만 그 run의 실제 Kiro-authored 8개 payload는 수정된 MCP/Application/SQLite 경계에 그대로 replay되어 수락됐고, server metadata만 정규화한 fixture가 strict contract·구조 scorer와 기록된 사람의 의미 다양성·Concept Necessity review를 통과한다.
+- **검토한 대안:** feedback에 미래 resulting revision 저장, Agent가 완성된 Application command와 provenance 생성, PIN 후보만 별도 table로 관리, SELECT를 Agent tool에 노출, Kiro transport field를 Application strict contract까지 허용, timeout을 mock 성공으로 대체.
+- **tradeoff:** 다음 round는 전체 current Candidate reference와 적용 feedback 목록을 보내야 하고 transport adapter 코드가 늘어난다. 대신 실패 전 feedback과 성공한 결과의 인과관계, stale retry, user selection provenance가 재현 가능하며 Kiro 전용 세부사항이 stable Core contract로 누출되지 않는다. 8개 live generation latency와 stdio session 복구는 알려진 runner 제한으로 남아 후속 host 안정화에서 다시 검증한다.
+
 ## 2026-08-24: 구현 세부 선택 위임
 
 - **상태:** 승인

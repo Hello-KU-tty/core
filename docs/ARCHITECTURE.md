@@ -2,9 +2,9 @@
 
 ## 1. 상태
 
-- 상태: 사용자 승인 완료, T07 평가 harness·fixture·저장 경계 반영 및 T08 Discovery Agent 착수 가능
+- 상태: 사용자 승인 완료, T08 Discovery Agent·반복 Candidate loop 반영 및 T09 Learning Spec 착수 가능
 - 기준 입력: [PROJECT_BRIEF.md](../PROJECT_BRIEF.md), [SPEC.md](SPEC.md)
-- T03 versioned contract와 Agent/UI runtime validation, T04 pure reducer와 Evidence policy v1.0.0, T05 SQLite schema/repository/migration, T06 application use case와 역할 고정 MCP server, T07 criterion 기반 evaluation contract와 harness는 구현됐다.
+- T03 versioned contract와 Agent/UI runtime validation, T04 pure reducer와 Evidence policy v1.0.0, T05 SQLite schema/repository/migration, T06 application use case와 역할 고정 MCP server, T07 criterion 기반 evaluation contract와 harness, T08 Discovery Agent prompt v1.0.0과 feedback-to-round loop는 구현됐다.
 - Kiro/Crew 세부 연결은 capability spike 결과에 따라 이 문서를 갱신한다.
 
 ## 2. 선택한 기술 스택과 선택 이유
@@ -192,7 +192,7 @@ Domain은 Kiro SDK, React와 SQLite library에 의존하지 않는다.
 
 Application transaction은 SQLite repository interface를 통해 상태를 변경한다.
 
-T06의 application handler는 Agent와 UI transport가 공유하는 검증·transaction 경계다. Agent 생성 품질, Builder의 실제 shell/file 실행, Helper 대화 정책과 Episode dispatch/retry는 각각 T08~T13에서 연결하지만, 현재 contract의 저장·조회·상태 전이와 Evidence reducer 호출은 mock 없이 처리한다.
+T06의 application handler는 Agent와 UI transport가 공유하는 검증·transaction 경계다. T08은 현재 round의 latest Candidate에만 user feedback을 허용하고, SELECT가 아닌 미적용 feedback 전체를 다음 Candidate Round의 `appliedFeedbackIds`로 연결한다. Application은 pin/reject/merge/revise/shrink/expand/regenerate별 다음 revision과 정확한 round 구성, stale selection과 SELECT 이후 terminal 상태를 transaction 안에서 검증한다. Builder의 실제 shell/file 실행, Helper 대화 정책과 Episode dispatch/retry는 T10~T13에서 연결한다.
 
 ### 4.5 storage-sqlite
 
@@ -217,6 +217,8 @@ file DB는 host가 명시한 절대 data directory 아래 `vibe-helper.sqlite` �
 
 T06 MCP process는 시작 시 하나의 Agent role에 고정하고 그 role의 tool만 등록한다. payload 안의 actor claim은 process role과 다시 대조하되 authorization source로 신뢰하지 않는다. validated request의 canonical JSON UTF-8 크기는 2 MiB로 제한하고, 더 작은 contract별 array/text 제한도 그대로 적용한다.
 
+T08의 Discovery `submit_candidate_round` 외부 schema는 의미 후보 draft, lineage, 적용 feedback과 carried Candidate reference만 받는다. role-bound adapter가 검증된 최신 Discovery context를 조회해 Candidate/Round ID, revision, timestamp, source, input snapshot과 redaction 상태를 채운 뒤 공통 Application command를 호출한다. Kiro가 tool input에 주입하는 `__tool_use_purpose`는 이 transport 경계에서만 허용하고 Application payload에는 전달하지 않는다.
+
 ### 4.7 kiro-adapter
 
 - Crew chat slot/session 생성과 복구
@@ -226,6 +228,8 @@ T06 MCP process는 시작 시 하나의 Agent role에 고정하고 그 role의 t
 - MCP registration
 - token/latency/usage observation
 - stale session과 reconnect 처리
+
+Discovery prompt 원문은 `docs/agent-prompts/discovery.md` 하나이며 T08 버전은 1.0.0이다. Node adapter는 원문을 읽고 version marker를 검증해 Kiro Agent definition과 tool allowlist를 만든다. Prompt는 Core context를 먼저 읽고 다음 round에 pending feedback을 적용하도록 지시하며, Candidate/Round ID와 source 같은 Core-owned 메타데이터를 생성하지 않고 명시적 SELECT도 수행하지 않는다.
 
 Crew 0.3.0의 App event bridge는 실제 stream을 App DOM event로 전달하지 않고, generic App API client는 `/api/chat` SSE를 JSON으로 파싱한다. 따라서 event는 MVP primary 경로에서 제외한다. raw fetch는 same-origin `POST /api/chat` 하나와 고정 payload로 제한하고, slot 생성·history/result 조회는 permission-checked App API를 사용한다. 이 세부사항은 UI나 Core가 아니라 이 adapter에만 존재한다. 참고: <https://kiro.dev/docs/crew/apps/sdk/>
 
@@ -261,7 +265,8 @@ MVP에는 별도 Open VSX extension/webview나 `apps/kiro-panel`을 만들지 �
 DiscoverySession 1 ── N CandidateRound
 CandidateRound    1 ── N ProjectCandidateRevision
 CandidateRevision N ── N ParentRevision
-CandidateRound    1 ── N DiscoveryFeedback
+CandidateRound(previous) 1 ── N DiscoveryFeedback
+CandidateRound(next)     N ── N applied DiscoveryFeedback
 SelectedRevision  1 ── N LearningSpecRevision
 ```
 
@@ -269,6 +274,8 @@ SelectedRevision  1 ── N LearningSpecRevision
 
 - selected candidate는 기존 revision을 참조한다.
 - revision은 parent 또는 merge source를 보존한다.
+- feedback은 결과 revision을 미리 주장하지 않고, 다음 round가 적용한 feedback ID와 현재 Candidate 집합을 소유한다.
+- selection은 현재 round의 latest revision에 대한 user-authored UI command만 허용하며 session을 terminal 상태로 바꾼다.
 - Final/Refined 별도 entity를 만들지 않는다.
 
 ### 5.2 Build
@@ -502,6 +509,8 @@ Crew App의 `permissions.api`는 T01에서 host SDK의 client-side path guard로
 - Campus Drop 회귀 입력과 서로 다른 unseen Learning Goal, Personal Need 유무를 함께 유지
 - 사람이 검토하지 않은 의미 criterion은 `NEEDS_REVIEW`이며 자동 통과로 바꾸지 않음
 - T07 calibration baseline은 harness의 good/bad 구별을 고정하며 제품 성능 baseline으로 해석하지 않음
+- T08 실제 Kiro 출력 회귀: canonical Discovery prompt version, strict Candidate contract, 구조 signature와 기록된 의미 다양성·Concept Necessity review
+- live probe와 replay 결과를 구분하고 timeout이나 transport failure를 mock 성공으로 바꾸지 않음
 - DIRECTLY_LED 반복, contradiction/misconception, independent transfer와 실제 Agent output 평가는 T13 이후 fixture를 확장
 - generic Kiro/simple memory/ablation 비교는 T24에서 같은 `BaselineResult` 계약으로 기록
 

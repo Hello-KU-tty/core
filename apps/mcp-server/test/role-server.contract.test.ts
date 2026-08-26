@@ -5,27 +5,61 @@ import { join } from 'node:path'
 import { Client } from '@modelcontextprotocol/client'
 import { InMemoryTransport, type McpServer } from '@modelcontextprotocol/server'
 import { ApplicationService, WorkspacePathPolicy } from '@vibe-helper/application'
-import type { AgentRole } from '@vibe-helper/contracts'
+import { discoverySessionSchema, projectSchema, type AgentRole } from '@vibe-helper/contracts'
 import { describe, expect, it } from 'vitest'
 
 import { openInMemorySqliteStorage } from '../../../packages/storage-sqlite/src/index.js'
-import { ids } from '../../../packages/contracts/test/fixtures.js'
+import {
+  candidateFixture,
+  candidateRoundFixture,
+  discoverySessionFixture,
+  ids,
+  projectFixture,
+  timestamp,
+} from '../../../packages/contracts/test/fixtures.js'
 import { createRoleBoundMcpServer, ROLE_TOOL_CATALOG } from '../src/role-server.js'
 
 interface ConnectedHarness {
   readonly client: Client
   readonly server: McpServer
+  readonly storage: Awaited<ReturnType<typeof openInMemorySqliteStorage>>
   close(): Promise<void>
 }
 
-const connectRole = async (role: AgentRole): Promise<ConnectedHarness> => {
+interface ConnectRoleOptions {
+  readonly seedDiscovery?: boolean
+  readonly now?: () => Date
+  readonly generateId?: (prefix: 'candidate' | 'candidate_round') => string
+}
+
+const connectRole = async (
+  role: AgentRole,
+  options: ConnectRoleOptions = {},
+): Promise<ConnectedHarness> => {
   const workspaceRoot = await mkdtemp(join(tmpdir(), 'vibe-helper-mcp-workspaces-'))
   const storage = await openInMemorySqliteStorage()
+  if (options.seedDiscovery) {
+    storage.transaction((repository) => {
+      repository.appendProject(
+        projectSchema.parse({
+          ...projectFixture,
+          status: 'DISCOVERY',
+          generatedWorkspacePath: undefined,
+        }),
+      )
+      repository.appendDiscoverySession(discoverySessionSchema.parse(discoverySessionFixture))
+    })
+  }
   const application = new ApplicationService({
     storage,
     workspacePolicy: await WorkspacePathPolicy.create(workspaceRoot),
   })
-  const server = createRoleBoundMcpServer({ role, application })
+  const server = createRoleBoundMcpServer({
+    role,
+    application,
+    ...(options.now === undefined ? {} : { now: options.now }),
+    ...(options.generateId === undefined ? {} : { generateId: options.generateId }),
+  })
   const client = new Client({ name: 'vibe-helper-contract-test', version: '0.0.0' })
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
   await server.connect(serverTransport)
@@ -33,6 +67,7 @@ const connectRole = async (role: AgentRole): Promise<ConnectedHarness> => {
   return {
     client,
     server,
+    storage,
     close: async () => {
       await client.close()
       await server.close()
@@ -133,6 +168,76 @@ describe('role-bound MCP server', () => {
           code: 'ACTIVE_TASK_NOT_FOUND',
           correlationId: ids.correlation,
         },
+      })
+    } finally {
+      await harness.close()
+    }
+  })
+
+  it('expands a concise Discovery proposal with trusted metadata before application', async () => {
+    const generatedCandidateId = 'candidate_00000000-0000-4000-8000-000000000071'
+    const generatedRoundId = 'candidate_round_00000000-0000-4000-8000-000000000072'
+    const harness = await connectRole('DISCOVERY', {
+      seedDiscovery: true,
+      now: () => new Date(timestamp),
+      generateId: (prefix) => (prefix === 'candidate' ? generatedCandidateId : generatedRoundId),
+    })
+    try {
+      const result = await harness.client.callTool({
+        name: 'submit_candidate_round',
+        arguments: {
+          __tool_use_purpose: 'Submit a synthetic initial Discovery round.',
+          schemaVersion: 1,
+          projectId: ids.project,
+          discoverySessionId: ids.discoverySession,
+          correlationId: ids.correlation,
+          idempotencyKey: ids.idempotency,
+          expectedSessionRevision: 1,
+          appliedFeedbackIds: [],
+          carriedCandidates: [],
+          candidates: [
+            {
+              lineage: { kind: 'NEW' },
+              title: candidateFixture.title,
+              summary: candidateFixture.summary,
+              targetUsers: candidateFixture.targetUsers,
+              coreInteraction: candidateFixture.coreInteraction,
+              usageMoment: candidateFixture.usageMoment,
+              appeal: candidateFixture.appeal,
+              personalNeedRelationship: candidateFixture.personalNeedRelationship,
+              technologyNecessity: candidateFixture.technologyNecessity,
+              coreConcepts: candidateFixture.coreConcepts,
+              mvpFeatures: candidateFixture.mvpFeatures,
+              suggestedScope: candidateFixture.suggestedScope,
+              risks: candidateFixture.risks,
+              generationTags: candidateFixture.generationTags,
+              evaluation: candidateFixture.evaluation,
+            },
+          ],
+          generationRationale: candidateRoundFixture.generationRationale,
+          diversityCheck: candidateRoundFixture.diversityCheck,
+        },
+      })
+      expect(result).toMatchObject({
+        structuredContent: { accepted: true, resourceRevision: 2 },
+      })
+      expect(harness.storage.repository.readDiscoveryAggregate(ids.project)).toMatchObject({
+        session: { revision: 2 },
+        rounds: [
+          {
+            id: generatedRoundId,
+            inputSnapshot: discoverySessionFixture.input,
+            candidates: [{ candidateId: generatedCandidateId, revision: 1 }],
+            source: { kind: 'AGENT', role: 'DISCOVERY' },
+          },
+        ],
+        candidates: [
+          {
+            id: generatedCandidateId,
+            createdAt: timestamp,
+            source: { kind: 'AGENT', role: 'DISCOVERY' },
+          },
+        ],
       })
     } finally {
       await harness.close()

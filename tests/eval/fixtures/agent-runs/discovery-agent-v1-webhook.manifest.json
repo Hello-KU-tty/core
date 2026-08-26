@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture_00000000-0000-4000-8000-000000000112",
+  "name": "Discovery Agent v1 webhook run",
+  "description": "Redacted regression fixture derived from an actual Kiro Discovery Agent candidate round for an unseen learning goal.",
+  "kind": "UNSEEN_DISCOVERY",
+  "inputPath": "tests/eval/fixtures/inputs/webhook-lens.json",
+  "expectedContractDomains": ["DISCOVERY"],
+  "criteria": [
+    {
+      "key": "contract_valid",
+      "dimension": "CONTRACT_INTEGRITY",
+      "reviewMode": "AUTOMATED",
+      "description": "The actual Agent-authored Candidate Round and all Candidates satisfy strict contracts.",
+      "successDefinition": "Runtime validation and Candidate references succeed."
+    },
+    {
+      "key": "no_structural_mode_collapse",
+      "dimension": "DISCOVERY_DIVERSITY",
+      "reviewMode": "AUTOMATED",
+      "description": "Candidates do not repeat the same exact interaction and feature structure.",
+      "successDefinition": "Every normalized structural signature is distinct."
+    },
+    {
+      "key": "semantic_diversity",
+      "dimension": "DISCOVERY_DIVERSITY",
+      "reviewMode": "HUMAN",
+      "description": "Candidate product experiences are meaningfully different.",
+      "successDefinition": "A reviewer can identify distinct problems, users, interactions and data shapes."
+    },
+    {
+      "key": "concept_necessity",
+      "dimension": "CONCEPT_NECESSITY",
+      "reviewMode": "HUMAN",
+      "description": "Discriminated unions and runtime validation are not decorative additions.",
+      "successDefinition": "The target concepts are required by every candidate's central behavior."
+    }
+  ],
+  "scenarioTags": ["actual Kiro output", "unseen", "no personal need", "developer tools"],
+  "fixtureVersion": "1.0.0",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED"
+}

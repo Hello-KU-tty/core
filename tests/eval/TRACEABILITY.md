@@ -1,11 +1,11 @@
 # MVP acceptance criterion 추적표
 
-T07 시점의 평가는 Agent 구현 전 계약과 품질 실패 검출 기반이다. 아래 `현재 근거`는 완료된 검증만 뜻하며, 실제 수직 흐름 완료 판정은 `최종 검증` 작업에서 수행한다.
+T08 시점의 평가는 계약·품질 실패 검출 기반과 첫 실제 Discovery Agent 회귀를 포함한다. 아래 `현재 근거`는 완료된 검증만 뜻하며, 실제 수직 흐름 완료 판정은 `최종 검증` 작업에서 수행한다.
 
 | Acceptance criterion | 현재 test/eval 근거 | 현재 보장 | 최종 검증 |
 |---|---|---|---|
-| AC-MVP-001 | `eval-harness.test.ts`의 unseen/Personal Need corpus, `webhook-lens-good`, `candidate-mode-collapse` | 고정 입력 목록과 구조적 mode collapse를 드러낼 입력·scorer | T08, T21 |
-| AC-MVP-002 | `schema-runtime.integration.test.ts`, `domain-invariants.integration.test.ts`의 Candidate revision/lineage contract | revision과 명시적 selection 계약 | T08, T21 |
+| AC-MVP-001 | unseen/Personal Need corpus, `candidate-mode-collapse`, actual Kiro `discovery-agent-v1-webhook` regression | 고정 taxonomy 없이 unseen goal에서 생성한 8개 후보의 strict contract, 구조 차이와 기록된 의미 다양성·Concept Necessity review | T21 |
+| AC-MVP-002 | Candidate reducer와 Application integration의 PIN/REJECT/MERGE/REVISE/SHRINK/EXPAND/REGENERATE/SELECT, MCP adapter contract | feedback-to-round lineage, stale target 거절, UI-only 명시적 selection과 terminal Discovery | T21 |
 | AC-MVP-003 | `spec-scope-leak`, `scope_boundaries`, Learning Spec contract test | 세 scope의 구조와 잘못된 범위 배치 검출 | T09, T15, T21 |
 | AC-MVP-004 | Builder Task/Completion Report contract와 application integration test | 실제 build 흐름에 필요한 DTO·상태 경계 | T10, T18, T21 |
 | AC-MVP-005 | `stale-context`, `context_fresh`, role server contract test | stale/incomplete Context와 Helper read-only 경계 검출 | T10, T12, T16, T21 |

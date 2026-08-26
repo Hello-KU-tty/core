@@ -7,7 +7,9 @@ import {
   correlationIdSchema,
   discoverySessionIdSchema,
   entityRevisionSchema,
+  expectedRevisionSchema,
   feedbackIdSchema,
+  idempotencyKeySchema,
   labelSchema,
   nonEmptyTextSchema,
   projectIdSchema,
@@ -113,6 +115,23 @@ export const candidateScopeSuggestionSchema = z.strictObject({
   excluded: z.array(shortTextSchema).max(20),
 })
 
+const projectCandidateContentShape = {
+  title: labelSchema,
+  summary: shortTextSchema,
+  targetUsers: z.array(shortTextSchema).min(1).max(8),
+  coreInteraction: nonEmptyTextSchema,
+  usageMoment: nonEmptyTextSchema,
+  appeal: nonEmptyTextSchema,
+  personalNeedRelationship: nonEmptyTextSchema.optional(),
+  technologyNecessity: nonEmptyTextSchema,
+  coreConcepts: z.array(labelSchema).min(1).max(12),
+  mvpFeatures: z.array(shortTextSchema).min(1).max(20),
+  suggestedScope: candidateScopeSuggestionSchema,
+  risks: z.array(shortTextSchema).max(12),
+  generationTags: z.array(candidateGenerationTagSchema).min(1).max(4),
+  evaluation: candidateEvaluationSchema,
+} as const
+
 export const projectCandidateRevisionSchema = z
   .strictObject({
     schemaVersion: schemaVersionSchema,
@@ -121,20 +140,7 @@ export const projectCandidateRevisionSchema = z
     correlationId: correlationIdSchema,
     revision: entityRevisionSchema,
     parentRevisions: z.array(candidateRevisionReferenceSchema).max(8),
-    title: labelSchema,
-    summary: shortTextSchema,
-    targetUsers: z.array(shortTextSchema).min(1).max(8),
-    coreInteraction: nonEmptyTextSchema,
-    usageMoment: nonEmptyTextSchema,
-    appeal: nonEmptyTextSchema,
-    personalNeedRelationship: nonEmptyTextSchema.optional(),
-    technologyNecessity: nonEmptyTextSchema,
-    coreConcepts: z.array(labelSchema).min(1).max(12),
-    mvpFeatures: z.array(shortTextSchema).min(1).max(20),
-    suggestedScope: candidateScopeSuggestionSchema,
-    risks: z.array(shortTextSchema).max(12),
-    generationTags: z.array(candidateGenerationTagSchema).min(1).max(4),
-    evaluation: candidateEvaluationSchema,
+    ...projectCandidateContentShape,
     createdAt: utcTimestampSchema,
     source: z.strictObject({ kind: z.literal('AGENT'), role: z.literal('DISCOVERY') }),
     redactionStatus: redactionStatusSchema,
@@ -184,20 +190,70 @@ export const candidateDiversityCheckSchema = z.strictObject({
   rationale: nonEmptyTextSchema,
 })
 
-export const candidateRoundSchema = z.strictObject({
+export const candidateDraftSchema = z.strictObject({
+  lineage: z.discriminatedUnion('kind', [
+    z.strictObject({ kind: z.literal('NEW') }),
+    z.strictObject({
+      kind: z.literal('REVISION'),
+      candidateId: candidateIdSchema,
+      revision: entityRevisionSchema,
+      parentRevisions: z.array(candidateRevisionReferenceSchema).min(1).max(8),
+    }),
+  ]),
+  ...projectCandidateContentShape,
+})
+
+export const discoverySubmitCandidateRoundToolInputSchema = z.strictObject({
+  __tool_use_purpose: nonEmptyTextSchema.optional(),
   schemaVersion: schemaVersionSchema,
-  id: candidateRoundIdSchema,
+  projectId: projectIdSchema,
   discoverySessionId: discoverySessionIdSchema,
   correlationId: correlationIdSchema,
-  roundIndex: entityRevisionSchema,
-  inputSnapshot: discoveryInputSchema,
-  candidates: z.array(candidateRevisionReferenceSchema).min(1).max(30),
+  idempotencyKey: idempotencyKeySchema,
+  expectedSessionRevision: expectedRevisionSchema,
+  appliedFeedbackIds: z.array(feedbackIdSchema).max(100),
+  carriedCandidates: z.array(candidateRevisionReferenceSchema).max(30),
+  candidates: z.array(candidateDraftSchema).max(30),
   generationRationale: nonEmptyTextSchema,
   diversityCheck: candidateDiversityCheckSchema,
-  createdAt: utcTimestampSchema,
-  source: z.strictObject({ kind: z.literal('AGENT'), role: z.literal('DISCOVERY') }),
-  redactionStatus: redactionStatusSchema,
 })
+
+export const candidateRoundSchema = z
+  .strictObject({
+    schemaVersion: schemaVersionSchema,
+    id: candidateRoundIdSchema,
+    discoverySessionId: discoverySessionIdSchema,
+    correlationId: correlationIdSchema,
+    roundIndex: entityRevisionSchema,
+    inputSnapshot: discoveryInputSchema,
+    appliedFeedbackIds: z.array(feedbackIdSchema).max(100),
+    candidates: z.array(candidateRevisionReferenceSchema).min(1).max(30),
+    generationRationale: nonEmptyTextSchema,
+    diversityCheck: candidateDiversityCheckSchema,
+    createdAt: utcTimestampSchema,
+    source: z.strictObject({ kind: z.literal('AGENT'), role: z.literal('DISCOVERY') }),
+    redactionStatus: redactionStatusSchema,
+  })
+  .superRefine((round, context) => {
+    if (new Set(round.appliedFeedbackIds).size !== round.appliedFeedbackIds.length) {
+      context.addIssue({
+        code: 'custom',
+        path: ['appliedFeedbackIds'],
+        message: 'Applied Discovery Feedback IDs must be unique',
+      })
+    }
+
+    const references = round.candidates.map(
+      (candidate) => `${candidate.candidateId}:${candidate.revision}`,
+    )
+    if (new Set(references).size !== references.length) {
+      context.addIssue({
+        code: 'custom',
+        path: ['candidates'],
+        message: 'Candidate Round references must be unique',
+      })
+    }
+  })
 
 export const discoveryFeedbackIntentSchema = z.enum([
   'PIN',
@@ -220,7 +276,6 @@ export const discoveryFeedbackSchema = z
     intent: discoveryFeedbackIntentSchema,
     targets: z.array(candidateRevisionReferenceSchema).max(8),
     message: nonEmptyTextSchema.optional(),
-    resultingRevisions: z.array(candidateRevisionReferenceSchema).max(30),
     createdAt: utcTimestampSchema,
     source: z.strictObject({ kind: z.literal('USER') }),
     redactionStatus: redactionStatusSchema,
@@ -247,6 +302,21 @@ export const discoveryFeedbackSchema = z
         message: `${feedback.intent} feedback requires a candidate revision`,
       })
     }
+    if (['REVISE', 'SHRINK', 'EXPAND'].includes(feedback.intent) && feedback.targets.length !== 1) {
+      context.addIssue({
+        code: 'custom',
+        path: ['targets'],
+        message: `${feedback.intent} feedback requires exactly one candidate revision`,
+      })
+    }
+    const targetKeys = feedback.targets.map((target) => `${target.candidateId}:${target.revision}`)
+    if (new Set(targetKeys).size !== targetKeys.length) {
+      context.addIssue({
+        code: 'custom',
+        path: ['targets'],
+        message: 'Discovery Feedback targets must be unique',
+      })
+    }
   })
 
 export type Project = z.infer<typeof projectSchema>
@@ -256,3 +326,7 @@ export type ProjectCandidateRevision = z.infer<typeof projectCandidateRevisionSc
 export type CandidateRound = z.infer<typeof candidateRoundSchema>
 export type DiscoveryFeedback = z.infer<typeof discoveryFeedbackSchema>
 export type CandidateRevisionReference = z.infer<typeof candidateRevisionReferenceSchema>
+export type CandidateDraft = z.infer<typeof candidateDraftSchema>
+export type DiscoverySubmitCandidateRoundToolInput = z.infer<
+  typeof discoverySubmitCandidateRoundToolInputSchema
+>

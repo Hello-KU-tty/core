@@ -124,6 +124,7 @@ export const candidateRoundFixture = {
   correlationId: ids.correlation,
   roundIndex: 1,
   inputSnapshot: discoveryInputFixture,
+  appliedFeedbackIds: [],
   candidates: [{ candidateId: ids.candidate, revision: 1 }],
   generationRationale: 'The round explores a local developer-tool interaction.',
   diversityCheck: {
@@ -151,7 +152,6 @@ export const discoveryFeedbackFixture = {
   intent: 'SELECT',
   targets: [{ candidateId: ids.candidate, revision: 1 }],
   message: 'Use this direction.',
-  resultingRevisions: [],
   createdAt: timestamp,
   source: { kind: 'USER' },
   redactionStatus: 'NOT_REQUIRED',

@@ -12,7 +12,9 @@ pnpm test:eval
 - `fixtures/manifests`: fixture 종류, contract domain, 자동/사람 criterion과 version을 선언한다.
 - `fixtures/subjects`: scorer 자체를 보정하는 good/bad Agent 출력과 Core 입력이다.
 - `fixtures/reviews`: 의미 판단이 필요한 criterion에 대한 기록된 사람 review다.
+- `fixtures/agent-runs`: 실제 Agent 출력에서 서버 메타데이터만 정규화한 prompt-version 회귀 fixture와 사람 review다. calibration corpus에는 섞지 않는다.
 - `baselines/calibration-v1.json`: 현재 scorer가 good/bad 보정 사례를 구별하는지 고정한 결과다.
+- `results`: 실제 Agent 실행 조건, 성공 범위와 알려진 실행 제한을 사실대로 기록한다.
 - `src`: fixture loader, scorer registry, harness와 Evaluation Run/Baseline artifact 생성기다.
 - `TRACEABILITY.md`: AC-MVP-001~014의 현재 test/eval과 최종 검증 작업을 연결한다.
 
@@ -34,5 +36,7 @@ pnpm test:eval
 ## Baseline 경계
 
 `calibration-v1.json`은 제품이나 Kiro Agent의 성능 baseline이 아니다. 좋은 사례는 통과하고 false mastery, false misconception, stale context, scope leak, trivial Decision, mode collapse와 redaction leak은 의도대로 구별하는지 확인하는 harness calibration이다. Generic Kiro, simple memory와 ablation 비교는 실제 Agent가 연결된 뒤 T24에서 같은 `BaselineResult` 계약으로 기록한다. 가중 점수와 threshold는 T22 protocol 동결 전에는 도입하지 않는다.
+
+T08부터 실제 Kiro 출력은 `fixtures/agent-runs`에서 별도 회귀 사례로 검증한다. 이 사례는 prompt와 transport 변경의 회귀를 잡지만 T07 scorer calibration이나 T24 비교 baseline을 대신하지 않는다.
 
 새 fixture는 개인정보·credential·실제 사용자 경로를 포함하지 않고 `containsPersonalData: false`, `redactionStatus: VERIFIED_REDACTED`를 유지해야 한다. 자동 criterion을 추가하면 scorer registry와 good/bad 보정 사례를 함께 추가한다.

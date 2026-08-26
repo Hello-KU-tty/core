@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+
 import { McpServer, type JSONObject } from '@modelcontextprotocol/server'
 import type { ApplicationService } from '@vibe-helper/application'
 import {
@@ -10,7 +12,9 @@ import {
   builderStartTaskCommandSchema,
   builderUpdateLiveContextCommandSchema,
   discoveryGetContextQuerySchema,
+  discoveryContextSchema,
   discoverySubmitCandidateRoundCommandSchema,
+  discoverySubmitCandidateRoundToolInputSchema,
   discoverySubmitLearningSpecCommandSchema,
   helperGetContextQuerySchema,
   helperRequestContextRefreshCommandSchema,
@@ -38,8 +42,9 @@ export const ROLE_TOOL_CATALOG: Readonly<Record<AgentRole, readonly RoleToolDefi
     {
       name: 'submit_candidate_round',
       title: 'Submit Candidate Round',
-      description: 'Submit a version-checked Candidate Round proposal.',
-      inputSchema: discoverySubmitCandidateRoundCommandSchema,
+      description:
+        'Submit Candidate meaning and lineage; the role-bound adapter supplies trusted record metadata.',
+      inputSchema: discoverySubmitCandidateRoundToolInputSchema,
       readOnly: false,
     },
     {
@@ -131,6 +136,8 @@ export const ROLE_TOOL_CATALOG: Readonly<Record<AgentRole, readonly RoleToolDefi
 export interface RoleBoundMcpServerOptions {
   readonly role: AgentRole
   readonly application: ApplicationService
+  readonly now?: () => Date
+  readonly generateId?: (prefix: 'candidate' | 'candidate_round') => string
 }
 
 function toJsonObject(value: unknown): JSONObject {
@@ -139,6 +146,82 @@ function toJsonObject(value: unknown): JSONObject {
     throw new TypeError('MCP application response must be a JSON object')
   }
   return parsed as JSONObject
+}
+
+async function submitCandidateRoundFromTool(options: RoleBoundMcpServerOptions, input: unknown) {
+  const toolInput = discoverySubmitCandidateRoundToolInputSchema.parse(input)
+  const contextResult = await options.application.executeAgent('DISCOVERY', {
+    schemaVersion: 1,
+    kind: 'DISCOVERY_GET_CONTEXT',
+    correlationId: toolInput.correlationId,
+    actor: { kind: 'AGENT', role: 'DISCOVERY' },
+    projectId: toolInput.projectId,
+    discoverySessionId: toolInput.discoverySessionId,
+  })
+  if (!contextResult.success) return contextResult
+  const context = discoveryContextSchema.parse(contextResult.data)
+  const createdAt = (options.now ?? (() => new Date()))().toISOString()
+  const generateId =
+    options.generateId ?? ((prefix: 'candidate' | 'candidate_round') => `${prefix}_${randomUUID()}`)
+  const candidates = toolInput.candidates.map((draft) => {
+    const { lineage, ...content } = draft
+    const identity =
+      lineage.kind === 'NEW'
+        ? {
+            id: generateId('candidate'),
+            revision: 1,
+            parentRevisions: [],
+          }
+        : {
+            id: lineage.candidateId,
+            revision: lineage.revision,
+            parentRevisions: lineage.parentRevisions,
+          }
+    return {
+      schemaVersion: 1 as const,
+      ...identity,
+      discoverySessionId: toolInput.discoverySessionId,
+      correlationId: toolInput.correlationId,
+      ...content,
+      createdAt,
+      source: { kind: 'AGENT' as const, role: 'DISCOVERY' as const },
+      redactionStatus: 'NOT_REQUIRED' as const,
+    }
+  })
+  const round = {
+    schemaVersion: 1 as const,
+    id: generateId('candidate_round'),
+    discoverySessionId: toolInput.discoverySessionId,
+    correlationId: toolInput.correlationId,
+    roundIndex: context.rounds.length + 1,
+    inputSnapshot: context.session.input,
+    appliedFeedbackIds: toolInput.appliedFeedbackIds,
+    candidates: [
+      ...toolInput.carriedCandidates,
+      ...candidates.map((candidate) => ({
+        candidateId: candidate.id,
+        revision: candidate.revision,
+      })),
+    ],
+    generationRationale: toolInput.generationRationale,
+    diversityCheck: toolInput.diversityCheck,
+    createdAt,
+    source: { kind: 'AGENT' as const, role: 'DISCOVERY' as const },
+    redactionStatus: 'NOT_REQUIRED' as const,
+  }
+  return options.application.executeAgent(
+    'DISCOVERY',
+    discoverySubmitCandidateRoundCommandSchema.parse({
+      schemaVersion: 1,
+      kind: 'DISCOVERY_SUBMIT_CANDIDATE_ROUND',
+      correlationId: toolInput.correlationId,
+      actor: { kind: 'AGENT', role: 'DISCOVERY' },
+      idempotencyKey: toolInput.idempotencyKey,
+      expectedSessionRevision: toolInput.expectedSessionRevision,
+      round,
+      candidates,
+    }),
+  )
 }
 
 export function createRoleBoundMcpServer(options: RoleBoundMcpServerOptions): McpServer {
@@ -162,7 +245,10 @@ export function createRoleBoundMcpServer(options: RoleBoundMcpServerOptions): Mc
         },
       },
       async (input) => {
-        const result = await options.application.executeAgent(options.role, input)
+        const result =
+          options.role === 'DISCOVERY' && tool.name === 'submit_candidate_round'
+            ? await submitCandidateRoundFromTool(options, input)
+            : await options.application.executeAgent(options.role, input)
         const payload = toJsonObject(result.success ? result.data : result.error)
         return {
           content: [{ type: 'text', text: JSON.stringify(payload) }],
