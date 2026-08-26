@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "learningSpec": {
+    "schemaVersion": 1,
+    "id": "learning_spec_00000000-0000-4000-8000-000000000301",
+    "projectId": "project_00000000-0000-4000-8000-000000000302",
+    "correlationId": "corr_00000000-0000-4000-8000-000000000304",
+    "revision": 1,
+    "selectedCandidate": {
+      "candidateId": "candidate_00000000-0000-4000-8000-000000000303",
+      "revision": 1
+    },
+    "productPurpose": "Move short-lived files between a public computer and a personal device.",
+    "targetUsers": ["people moving a file between their own devices"],
+    "primaryUsageMoment": "Immediately after creating a file on a shared computer.",
+    "successMoment": "A one-time link retrieves the file before it expires.",
+    "mvpFeatures": ["one-time link", "expiration cleanup", "permanent archive"],
+    "scope": [
+      {
+        "category": "LEARNER_FOCUS",
+        "title": "Expiration modeling",
+        "rationale": "The user learns how time changes resource validity.",
+        "conceptNames": ["expiration", "state transition"]
+      },
+      {
+        "category": "LEARNER_FOCUS",
+        "title": "Authentication flows",
+        "rationale": "Authentication is incorrectly forced into the learning target.",
+        "conceptNames": ["authentication"]
+      },
+      {
+        "category": "AGENT_SUPPORT",
+        "title": "QR presentation",
+        "rationale": "The Builder can render the link as a QR code.",
+        "conceptNames": ["QR encoding"]
+      },
+      {
+        "category": "EXCLUDED",
+        "title": "Permanent archive",
+        "rationale": "Long-term retention conflicts with the short-lived MVP.",
+        "conceptNames": ["retention"]
+      }
+    ],
+    "expectedDecisions": [
+      {
+        "category": "RETENTION_DELETION",
+        "description": "Choose the expiration behavior for downloaded and untouched files.",
+        "whyUserInputMatters": "The choice changes privacy and convenience."
+      }
+    ],
+    "runtimeConstraint": "TYPESCRIPT",
+    "deploymentConstraints": ["local reproducible run"],
+    "status": "DRAFT",
+    "createdAt": "2026-08-26T00:00:00.000Z",
+    "updatedAt": "2026-08-26T00:00:00.000Z",
+    "source": { "kind": "AGENT", "role": "DISCOVERY" },
+    "redactionStatus": "VERIFIED_REDACTED"
+  },
+  "scopeExpectation": {
+    "learnerFocusConcepts": ["expiration"],
+    "agentSupportConcepts": ["authentication"],
+    "excludedFeatureTerms": ["permanent archive"]
+  }
+}

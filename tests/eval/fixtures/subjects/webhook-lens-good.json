@@ -1,0 +1,144 @@
+{
+  "schemaVersion": 1,
+  "discovery": {
+    "round": {
+      "schemaVersion": 1,
+      "id": "candidate_round_00000000-0000-4000-8000-000000000203",
+      "discoverySessionId": "discovery_session_00000000-0000-4000-8000-000000000202",
+      "correlationId": "corr_00000000-0000-4000-8000-000000000207",
+      "roundIndex": 1,
+      "inputSnapshot": {
+        "learningGoal": "TypeScript discriminated union과 runtime validation을 배우고 싶다",
+        "currentLevel": "BEGINNER",
+        "interestAreas": ["developer tools", "API debugging"]
+      },
+      "candidates": [
+        { "candidateId": "candidate_00000000-0000-4000-8000-000000000204", "revision": 1 },
+        { "candidateId": "candidate_00000000-0000-4000-8000-000000000205", "revision": 1 },
+        { "candidateId": "candidate_00000000-0000-4000-8000-000000000206", "revision": 1 }
+      ],
+      "generationRationale": "The candidates use typed variants at different boundaries and interactions.",
+      "diversityCheck": {
+        "dimensionsReviewed": ["PROBLEM_DOMAIN", "TARGET_USER", "CORE_INTERACTION", "DATA_SHAPE", "USER_APPEAL"],
+        "modeCollapseDetected": false,
+        "rationale": "Replay, form simulation and contract change review have distinct users and data flows."
+      },
+      "createdAt": "2026-08-26T00:00:00.000Z",
+      "source": { "kind": "AGENT", "role": "DISCOVERY" },
+      "redactionStatus": "VERIFIED_REDACTED"
+    },
+    "candidates": [
+      {
+        "schemaVersion": 1,
+        "id": "candidate_00000000-0000-4000-8000-000000000204",
+        "discoverySessionId": "discovery_session_00000000-0000-4000-8000-000000000202",
+        "correlationId": "corr_00000000-0000-4000-8000-000000000207",
+        "revision": 1,
+        "parentRevisions": [],
+        "title": "Webhook Replay Microscope",
+        "summary": "Replay redacted webhook variants and inspect which typed branch handled each event.",
+        "targetUsers": ["developers integrating webhook providers"],
+        "coreInteraction": "Paste a redacted payload, choose a provider profile and step through variant narrowing.",
+        "usageMoment": "When an integration receives an unfamiliar or failing webhook.",
+        "appeal": "Turns opaque payload debugging into a visible event timeline.",
+        "technologyNecessity": "Every provider event requires runtime validation before a discriminated union can narrow it safely.",
+        "coreConcepts": ["discriminated union", "runtime validation", "exhaustive matching"],
+        "mvpFeatures": ["redacted payload input", "typed event timeline", "unknown variant report"],
+        "suggestedScope": {
+          "learnerFocus": ["event variants", "runtime schema boundary"],
+          "agentSupport": ["sample payload sanitization"],
+          "excluded": ["live provider credentials"]
+        },
+        "risks": ["Provider samples can drift"],
+        "generationTags": ["DISCOVER"],
+        "evaluation": [
+          { "criterion": "CONCEPT_NECESSITY", "assessment": "POSITIVE", "rationale": "Typed variants are the central debugger model." },
+          { "criterion": "PERSONAL_UTILITY", "assessment": "MIXED", "rationale": "No personal need was supplied, but the tool is reusable." },
+          { "criterion": "ADOPTION_FEASIBILITY", "assessment": "POSITIVE", "rationale": "It runs locally with redacted samples." },
+          { "criterion": "LEARNER_FIT", "assessment": "POSITIVE", "rationale": "Three provider variants are enough for a beginner MVP." },
+          { "criterion": "SCOPE_FEASIBILITY", "assessment": "POSITIVE", "rationale": "The MVP avoids live integrations." },
+          { "criterion": "ADJACENT_COMPLEXITY", "assessment": "MIXED", "rationale": "Schema errors need clear presentation." },
+          { "criterion": "DEPLOYABILITY", "assessment": "POSITIVE", "rationale": "A local TypeScript web app is sufficient." },
+          { "criterion": "DISTINCTIVENESS", "assessment": "POSITIVE", "rationale": "The step-through event model differs from forms and change review." }
+        ],
+        "createdAt": "2026-08-26T00:00:00.000Z",
+        "source": { "kind": "AGENT", "role": "DISCOVERY" },
+        "redactionStatus": "VERIFIED_REDACTED"
+      },
+      {
+        "schemaVersion": 1,
+        "id": "candidate_00000000-0000-4000-8000-000000000205",
+        "discoverySessionId": "discovery_session_00000000-0000-4000-8000-000000000202",
+        "correlationId": "corr_00000000-0000-4000-8000-000000000207",
+        "revision": 1,
+        "parentRevisions": [],
+        "title": "Form State Variant Lab",
+        "summary": "Model a multi-step form as explicit states and simulate valid and invalid transitions.",
+        "targetUsers": ["people designing complex application forms"],
+        "coreInteraction": "Move a form through editing, validating, submitting and rejected states on a state map.",
+        "usageMoment": "Before implementing a form with several async outcomes.",
+        "appeal": "Makes hidden UI state bugs tangible without writing a full product.",
+        "technologyNecessity": "A discriminant prevents impossible combinations of loading, success and error fields.",
+        "coreConcepts": ["discriminated union", "state transition", "exhaustive matching"],
+        "mvpFeatures": ["state-map editor", "transition simulator", "impossible-state warning"],
+        "suggestedScope": {
+          "learnerFocus": ["state variants", "exhaustive transition handling"],
+          "agentSupport": ["diagram rendering"],
+          "excluded": ["production form backend"]
+        },
+        "risks": ["A large state graph can become noisy"],
+        "generationTags": ["DISCOVER"],
+        "evaluation": [
+          { "criterion": "CONCEPT_NECESSITY", "assessment": "POSITIVE", "rationale": "The product visualizes union states directly." },
+          { "criterion": "PERSONAL_UTILITY", "assessment": "MIXED", "rationale": "It supports future projects rather than a stated need." },
+          { "criterion": "ADOPTION_FEASIBILITY", "assessment": "POSITIVE", "rationale": "No external users or approval are needed." },
+          { "criterion": "LEARNER_FIT", "assessment": "POSITIVE", "rationale": "A fixed state set keeps the MVP approachable." },
+          { "criterion": "SCOPE_FEASIBILITY", "assessment": "POSITIVE", "rationale": "Simulation avoids backend work." },
+          { "criterion": "ADJACENT_COMPLEXITY", "assessment": "MIXED", "rationale": "Diagram layout is delegated to Agent Support." },
+          { "criterion": "DEPLOYABILITY", "assessment": "POSITIVE", "rationale": "It can run as a static TypeScript app." },
+          { "criterion": "DISTINCTIVENESS", "assessment": "POSITIVE", "rationale": "Interactive transitions differ from payload replay." }
+        ],
+        "createdAt": "2026-08-26T00:00:00.000Z",
+        "source": { "kind": "AGENT", "role": "DISCOVERY" },
+        "redactionStatus": "VERIFIED_REDACTED"
+      },
+      {
+        "schemaVersion": 1,
+        "id": "candidate_00000000-0000-4000-8000-000000000206",
+        "discoverySessionId": "discovery_session_00000000-0000-4000-8000-000000000202",
+        "correlationId": "corr_00000000-0000-4000-8000-000000000207",
+        "revision": 1,
+        "parentRevisions": [],
+        "title": "API Contract Change Radar",
+        "summary": "Compare two response examples and classify compatible, added and breaking variants.",
+        "targetUsers": ["small teams reviewing API changes"],
+        "coreInteraction": "Drop before-and-after JSON examples into a comparison board and review typed change cards.",
+        "usageMoment": "Before updating a client against a changed API response.",
+        "appeal": "Provides a concrete answer to what a payload change can break.",
+        "technologyNecessity": "Runtime schemas establish the boundary and union variants classify change outcomes.",
+        "coreConcepts": ["runtime validation", "discriminated union", "compatibility"],
+        "mvpFeatures": ["two-sample comparison", "typed change cards", "breaking-change summary"],
+        "suggestedScope": {
+          "learnerFocus": ["schema comparison", "change variants"],
+          "agentSupport": ["JSON tree presentation"],
+          "excluded": ["automatic SDK generation"]
+        },
+        "risks": ["Examples cannot prove every production payload"],
+        "generationTags": ["DISCOVER"],
+        "evaluation": [
+          { "criterion": "CONCEPT_NECESSITY", "assessment": "POSITIVE", "rationale": "Typed change categories are the core output." },
+          { "criterion": "PERSONAL_UTILITY", "assessment": "MIXED", "rationale": "The input gave an interest, not a direct need." },
+          { "criterion": "ADOPTION_FEASIBILITY", "assessment": "POSITIVE", "rationale": "Redacted samples are enough to use it locally." },
+          { "criterion": "LEARNER_FIT", "assessment": "MIXED", "rationale": "Compatibility rules need a narrow initial set." },
+          { "criterion": "SCOPE_FEASIBILITY", "assessment": "POSITIVE", "rationale": "The MVP compares samples only." },
+          { "criterion": "ADJACENT_COMPLEXITY", "assessment": "MIXED", "rationale": "Deep JSON comparison needs careful limits." },
+          { "criterion": "DEPLOYABILITY", "assessment": "POSITIVE", "rationale": "It can run locally without accounts." },
+          { "criterion": "DISTINCTIVENESS", "assessment": "POSITIVE", "rationale": "Before-and-after review is distinct from replay and simulation." }
+        ],
+        "createdAt": "2026-08-26T00:00:00.000Z",
+        "source": { "kind": "AGENT", "role": "DISCOVERY" },
+        "redactionStatus": "VERIFIED_REDACTED"
+      }
+    ]
+  }
+}

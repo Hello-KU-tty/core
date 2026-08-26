@@ -1,0 +1,11 @@
+[
+  {
+    "criterionKey": "misconception_semantics",
+    "dimension": "EVIDENCE_QUALITY",
+    "reviewMode": "HUMAN",
+    "status": "FAILED",
+    "explanation": "The user asks when runtime validation occurs but does not assert the incorrect compile-time relationship described by the proposal.",
+    "evidenceReferences": ["evidence.proposal.redactedEvidenceExcerpt", "evidence.events[0].payload.redactedExcerpt"],
+    "metrics": []
+  }
+]

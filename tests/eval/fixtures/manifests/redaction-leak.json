@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture_00000000-0000-4000-8000-000000000111",
+  "name": "Synthetic redaction leak",
+  "description": "Negative calibration containing neutral sentinels and a user-home path in rendered output.",
+  "kind": "REDACTION",
+  "inputPath": "tests/eval/fixtures/inputs/webhook-lens.json",
+  "calibrationSubjectPath": "tests/eval/fixtures/subjects/redaction-leak.json",
+  "expectedContractDomains": ["EVALUATION"],
+  "criteria": [
+    {
+      "key": "redaction_no_leak",
+      "dimension": "REDACTION",
+      "reviewMode": "AUTOMATED",
+      "description": "Synthetic sensitive sentinels and user-home paths do not survive output processing.",
+      "successDefinition": "No forbidden sentinel or user-home path appears in serialized output."
+    }
+  ],
+  "scenarioTags": ["negative calibration", "redaction", "synthetic sentinel"],
+  "fixtureVersion": "1.0.0",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED"
+}

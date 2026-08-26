@@ -2,6 +2,7 @@ import type {
   AcceptedEvidence,
   ActivityEvent,
   AuditRecord,
+  BaselineResult,
   BuilderTask,
   CandidateRound,
   CanonicalConcept,
@@ -15,6 +16,7 @@ import type {
   Episode,
   EvidenceDecision,
   EvidenceProposal,
+  EvaluationRun,
   LearningSpecRevision,
   LiveProjectContext,
   MisconceptionIssue,
@@ -145,6 +147,8 @@ export interface PersistenceRepository {
   appendMisconceptionIssue(record: MisconceptionIssue): PersistenceWriteResult
   appendConceptLedger(record: ConceptLedgerEntry): PersistenceWriteResult
   appendAuditRecord(record: AuditRecord): PersistenceWriteResult
+  appendEvaluationRun(record: EvaluationRun): PersistenceWriteResult
+  appendBaselineResult(record: BaselineResult): PersistenceWriteResult
   appendIdempotencyReceipt(record: IdempotencyReceipt): PersistenceWriteResult
 
   recoverProject(projectId: string): ProjectRecoveryState | null
@@ -155,6 +159,8 @@ export interface PersistenceRepository {
   readCanonicalConceptById(conceptId: string): CanonicalConcept | null
   readCanonicalConceptByName(canonicalName: string): CanonicalConcept | null
   readIdempotencyReceipt(key: string): IdempotencyReceipt | null
+  readEvaluationRun(evaluationRunId: string): EvaluationRun | null
+  readBaselineResult(baselineResultId: string): BaselineResult | null
   readEvidenceTrace(conceptId: string): EvidenceTrace | null
   readEvidenceTracesForProject(projectId: string): readonly EvidenceTrace[]
 }

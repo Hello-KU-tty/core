@@ -7,6 +7,7 @@ import {
   acceptedEvidenceSchema,
   activityEventSchema,
   auditRecordSchema,
+  baselineResultSchema,
   builderTaskSchema,
   candidateRoundSchema,
   canonicalConceptSchema,
@@ -20,6 +21,7 @@ import {
   episodeSchema,
   evidenceDecisionSchema,
   evidenceProposalSchema,
+  evaluationRunSchema,
   learningSpecRevisionSchema,
   liveProjectContextSchema,
   misconceptionIssueSchema,
@@ -33,6 +35,7 @@ import {
   acceptedEvidenceFixture,
   activityEventFixture,
   auditRecordFixture,
+  baselineResultFixture,
   builderTaskFixture,
   candidateFixture,
   candidateRoundFixture,
@@ -47,6 +50,7 @@ import {
   draftLearningSpecFixture,
   episodeFixture,
   evidenceProposalFixture,
+  evaluationRunFixture,
   ids,
   liveContextFixture,
   projectFixture,
@@ -222,6 +226,45 @@ describe('SQLite persistence repository', () => {
       expect.objectContaining<Partial<PersistenceError>>({ code: 'REVISION_CONFLICT' }),
     )
     expect(storage.repository.recoverProject(ids.project)?.project).toEqual(records.project)
+    storage.close()
+  })
+
+  it('persists revisioned Evaluation runs and immutable baseline results', async () => {
+    const storage = await openInMemorySqliteStorage()
+    const pending = evaluationRunSchema.parse({
+      ...evaluationRunFixture,
+      status: 'PENDING',
+      completedAt: undefined,
+      results: [],
+    })
+    const completed = evaluationRunSchema.parse({ ...evaluationRunFixture, revision: 2 })
+    const baseline = baselineResultSchema.parse(baselineResultFixture)
+
+    expect(storage.repository.appendEvaluationRun(pending)).toEqual({
+      outcome: 'INSERTED',
+      recordId: pending.id,
+      revision: 1,
+    })
+    expect(storage.repository.appendEvaluationRun(completed)).toEqual({
+      outcome: 'INSERTED',
+      recordId: completed.id,
+      revision: 2,
+    })
+    expect(storage.repository.appendEvaluationRun(completed).outcome).toBe('NO_OP')
+    expect(storage.repository.appendBaselineResult(baseline).outcome).toBe('INSERTED')
+    expect(storage.repository.appendBaselineResult(baseline).outcome).toBe('NO_OP')
+    expect(storage.repository.readEvaluationRun(completed.id)).toEqual(completed)
+    expect(storage.repository.readBaselineResult(baseline.id)).toEqual(baseline)
+
+    expect(() =>
+      storage.repository.appendEvaluationRun({
+        ...completed,
+        evaluatorVersion: '1.0.1',
+      }),
+    ).toThrowError(
+      expect.objectContaining<Partial<PersistenceError>>({ code: 'REVISION_CONFLICT' }),
+    )
+    expect(storage.repository.readEvaluationRun(completed.id)).toEqual(completed)
     storage.close()
   })
 

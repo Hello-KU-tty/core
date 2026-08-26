@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture_00000000-0000-4000-8000-000000000103",
+  "name": "Unseen realtime rehearsal",
+  "description": "Unseen WebSocket goal with an optional personal need unrelated to Campus Drop.",
+  "kind": "UNSEEN_DISCOVERY",
+  "inputPath": "tests/eval/fixtures/inputs/realtime-rehearsal.json",
+  "expectedContractDomains": ["DISCOVERY", "LEARNING_SPEC"],
+  "criteria": [
+    {
+      "key": "semantic_diversity",
+      "dimension": "DISCOVERY_DIVERSITY",
+      "reviewMode": "HUMAN",
+      "description": "The round mixes need-related and independent exploration without file-sharing defaults.",
+      "successDefinition": "Candidates cover genuinely different realtime interactions and include independent options."
+    },
+    {
+      "key": "concept_necessity",
+      "dimension": "CONCEPT_NECESSITY",
+      "reviewMode": "HUMAN",
+      "description": "Realtime synchronization is central rather than decorative.",
+      "successDefinition": "Removing realtime updates materially changes the product's core use."
+    }
+  ],
+  "scenarioTags": ["unseen", "personal need", "websocket"],
+  "fixtureVersion": "1.0.0",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED"
+}

@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "liveContext": {
+    "schemaVersion": 1,
+    "id": "context_00000000-0000-4000-8000-000000000311",
+    "projectId": "project_00000000-0000-4000-8000-000000000312",
+    "taskId": "task_00000000-0000-4000-8000-000000000313",
+    "correlationId": "corr_00000000-0000-4000-8000-000000000314",
+    "contextVersion": 1,
+    "expectedPreviousVersion": 0,
+    "checkpoint": "TASK_STARTED",
+    "stage": "initial route",
+    "currentGoal": "Create the initial upload route.",
+    "recentChanges": ["Added a route skeleton"],
+    "activeDecisionIds": [],
+    "activeConceptNames": [],
+    "relatedFiles": [{ "kind": "CODE", "path": "src/upload.ts" }],
+    "nextActions": ["Add request parsing"],
+    "updatedAt": "2026-08-26T00:00:00.000Z",
+    "source": { "kind": "AGENT", "role": "BUILDER" },
+    "redactionStatus": "VERIFIED_REDACTED"
+  },
+  "contextExpectation": {
+    "latestContextVersion": 3,
+    "requiredActiveDecisionIds": ["decision_00000000-0000-4000-8000-000000000315"],
+    "requiredConceptNames": ["expiration"]
+  }
+}

@@ -2,7 +2,7 @@
 
 Vibe Helper는 코딩 초보자가 자기에게 실용적인 TypeScript 서비스를 고르고, Kiro Builder와 함께 실제로 만들며, 필요한 순간 Helper와 대화해 개념을 익히도록 돕는 build-first 개발 환경이다. 제품은 개발을 교육용 단계로 끊지 않고 실제 Decision, 작업 맥락과 사용자 행동에서 나온 Evidence를 다음 설명과 project 추천에 연결한다.
 
-현재 repository는 bootstrap 문서, T01 Kiro/Crew capability probe, T02 TypeScript workspace skeleton, T03 공유 contract/runtime validation, T04 deterministic domain reducer, T05 SQLite persistence와 T06 application/MCP 권한 경계를 포함한다. 다음 작업은 T07 평가 harness이며, `spikes/kiro-crew/`의 코드는 외부 기능 경계를 확인하기 위한 폐기 가능한 실험물이다.
+현재 repository는 bootstrap 문서, T01 Kiro/Crew capability probe, T02 TypeScript workspace skeleton, T03 공유 contract/runtime validation, T04 deterministic domain reducer, T05 SQLite persistence, T06 application/MCP 권한 경계와 T07 평가 harness를 포함한다. 다음 작업은 T08 Discovery Agent이며, `spikes/kiro-crew/`의 코드는 외부 기능 경계를 확인하기 위한 폐기 가능한 실험물이다.
 
 ## 문서 읽는 순서
 
@@ -32,7 +32,7 @@ MVP host는 Kiro/Crew이고 Agent 중심 Crew App을 primary surface로 삼는�
 
 ## 현재 착수점
 
-T00~T06이 완료됐고 현재 착수 작업은 T07 평가 harness와 기준 fixture 선구축이다. T01의 상세 계획과 결과는 `docs/spikes/KIRO_CREW_CAPABILITY_SPIKE.md`, `docs/spikes/KIRO_CREW_CAPABILITY_RESULTS.md`에 있다.
+T00~T07이 완료됐고 현재 착수 작업은 T08 Discovery Agent와 반복 Candidate loop다. T07의 실행법과 자동/사람 review 경계는 `tests/eval/README.md`, AC 추적표는 `tests/eval/TRACEABILITY.md`에 있다. T01의 상세 계획과 결과는 `docs/spikes/KIRO_CREW_CAPABILITY_SPIKE.md`, `docs/spikes/KIRO_CREW_CAPABILITY_RESULTS.md`에 있다.
 
 ## 로컬 개발
 
@@ -44,7 +44,7 @@ pnpm exec playwright install chromium
 pnpm check
 ```
 
-`pnpm check`는 formatting, lint, TypeScript build/typecheck, unit, SQLite integration, package-boundary 및 artifact smoke와 Chromium E2E를 실행한다. 개별 명령은 다음과 같다.
+`pnpm check`는 formatting, lint, TypeScript build/typecheck, unit, SQLite integration, evaluation calibration, package-boundary 및 artifact smoke와 Chromium E2E를 실행한다. 개별 명령은 다음과 같다.
 
 ```bash
 pnpm format:check
@@ -52,6 +52,7 @@ pnpm lint
 pnpm typecheck
 pnpm test:unit
 pnpm test:integration
+pnpm test:eval
 pnpm build
 pnpm test:smoke
 pnpm test:e2e
@@ -70,4 +71,4 @@ packages/kiro-adapter     Crew slot·polling·SSE transport 격리
 tests/eval                T07 평가 fixture 경계
 ```
 
-T02 package는 후속 작업의 위치와 dependency 방향을 고정했고 T03~T06은 versioned contract, deterministic reducer, durable SQLite repository, Agent/UI 공통 use case와 역할 고정 MCP catalog를 구현했다. T07은 이 경계의 Agent 품질을 구현 전에 측정할 평가 corpus를 만든다.
+T02 package는 후속 작업의 위치와 dependency 방향을 고정했고 T03~T06은 versioned contract, deterministic reducer, durable SQLite repository, Agent/UI 공통 use case와 역할 고정 MCP catalog를 구현했다. T07은 contract·revision·provenance 기반 자동 scorer와 기록된 사람 review, redacted fixture corpus, calibration baseline 및 Evaluation Run SQLite 이력을 추가했다.

@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture_00000000-0000-4000-8000-000000000104",
+  "name": "Unseen relational equipment",
+  "description": "Unseen relational data goal with friction context but no explicit personal need.",
+  "kind": "UNSEEN_DISCOVERY",
+  "inputPath": "tests/eval/fixtures/inputs/sql-equipment.json",
+  "expectedContractDomains": ["DISCOVERY", "LEARNING_SPEC"],
+  "criteria": [
+    {
+      "key": "semantic_diversity",
+      "dimension": "DISCOVERY_DIVERSITY",
+      "reviewMode": "HUMAN",
+      "description": "Candidates are not CRUD themes or Campus Drop variants.",
+      "successDefinition": "Different relationship models drive different product interactions."
+    },
+    {
+      "key": "concept_necessity",
+      "dimension": "CONCEPT_NECESSITY",
+      "reviewMode": "HUMAN",
+      "description": "Normalization and joins solve an actual data relationship problem.",
+      "successDefinition": "The core experience requires relationships that a single flat list cannot represent well."
+    }
+  ],
+  "scenarioTags": ["unseen", "no personal need", "relational data"],
+  "fixtureVersion": "1.0.0",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED"
+}

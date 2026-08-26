@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture_00000000-0000-4000-8000-000000000102",
+  "name": "Unseen webhook lens",
+  "description": "Unseen Discovery calibration with no personal need and structurally distinct candidates.",
+  "kind": "UNSEEN_DISCOVERY",
+  "inputPath": "tests/eval/fixtures/inputs/webhook-lens.json",
+  "calibrationSubjectPath": "tests/eval/fixtures/subjects/webhook-lens-good.json",
+  "calibrationReviewPath": "tests/eval/fixtures/reviews/webhook-lens-good.json",
+  "expectedContractDomains": ["DISCOVERY"],
+  "criteria": [
+    {
+      "key": "contract_valid",
+      "dimension": "CONTRACT_INTEGRITY",
+      "reviewMode": "AUTOMATED",
+      "description": "The Candidate Round and all Candidates satisfy strict contracts.",
+      "successDefinition": "Runtime validation and Candidate references succeed."
+    },
+    {
+      "key": "no_structural_mode_collapse",
+      "dimension": "DISCOVERY_DIVERSITY",
+      "reviewMode": "AUTOMATED",
+      "description": "Candidates do not repeat the same exact interaction and feature structure.",
+      "successDefinition": "Every normalized structural signature is distinct."
+    },
+    {
+      "key": "semantic_diversity",
+      "dimension": "DISCOVERY_DIVERSITY",
+      "reviewMode": "HUMAN",
+      "description": "Candidate product experiences are meaningfully different.",
+      "successDefinition": "A reviewer can identify distinct users, interactions, data shapes and appeal."
+    },
+    {
+      "key": "concept_necessity",
+      "dimension": "CONCEPT_NECESSITY",
+      "reviewMode": "HUMAN",
+      "description": "Discriminated unions and runtime validation are not decorative additions.",
+      "successDefinition": "The target concept is required by each candidate's central behavior."
+    }
+  ],
+  "scenarioTags": ["unseen", "no personal need", "developer tools"],
+  "fixtureVersion": "1.0.0",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED"
+}

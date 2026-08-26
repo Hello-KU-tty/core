@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "redaction": {
+    "output": {
+      "summary": "Processed PRIVATE_VALUE_ALPHA from /Users/example/private-project/src/input.ts"
+    },
+    "forbiddenSentinels": ["PRIVATE_VALUE_ALPHA"]
+  }
+}

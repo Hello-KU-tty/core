@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture_00000000-0000-4000-8000-000000000107",
+  "name": "Stale and incomplete Live Context",
+  "description": "Negative calibration with an older Context version missing the active Decision and Concept.",
+  "kind": "STALE_CONTEXT",
+  "inputPath": "tests/eval/fixtures/inputs/campus-drop.json",
+  "calibrationSubjectPath": "tests/eval/fixtures/subjects/stale-context.json",
+  "expectedContractDomains": ["BUILD"],
+  "criteria": [
+    {
+      "key": "contract_valid",
+      "dimension": "CONTRACT_INTEGRITY",
+      "reviewMode": "AUTOMATED",
+      "description": "The stale Context is still structurally valid.",
+      "successDefinition": "Strict Live Context validation succeeds."
+    },
+    {
+      "key": "context_fresh",
+      "dimension": "CONTEXT_COMPLETENESS",
+      "reviewMode": "AUTOMATED",
+      "description": "Context matches the fixture's latest version and required active records.",
+      "successDefinition": "Version is current and required Decisions and Concepts are present."
+    }
+  ],
+  "scenarioTags": ["negative calibration", "stale context"],
+  "fixtureVersion": "1.0.0",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED"
+}

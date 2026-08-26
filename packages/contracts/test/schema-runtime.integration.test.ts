@@ -18,6 +18,7 @@ import {
   discoverySessionSchema,
   episodeSchema,
   evaluationFixtureSchema,
+  evaluationCaseResultSchema,
   evaluationRunSchema,
   evidenceProposalBatchSchema,
   evidenceProposalSchema,
@@ -154,5 +155,63 @@ describe('contract serialization', () => {
     const wirePayload: unknown = JSON.parse(JSON.stringify(fixture))
 
     expect(schema.parse(wirePayload)).toEqual(fixture)
+  })
+})
+
+describe('Evaluation contract invariants', () => {
+  it('rejects orphan calibration reviews and duplicate baseline cases', () => {
+    expect(
+      evaluationFixtureSchema.safeParse({
+        ...evaluationFixture,
+        calibrationSubjectPath: undefined,
+      }).success,
+    ).toBe(false)
+    expect(
+      baselineResultSchema.safeParse({
+        ...baselineResultFixture,
+        results: [baselineResultFixture.results[0], baselineResultFixture.results[0]],
+      }).success,
+    ).toBe(false)
+  })
+
+  it('derives a case status from criterion results', () => {
+    expect(
+      evaluationCaseResultSchema.safeParse({
+        ...evaluationRunFixture.results[0],
+        status: 'PASSED',
+        criterionResults: [
+          { ...evaluationRunFixture.results[0].criterionResults[0], status: 'FAILED' },
+        ],
+      }).success,
+    ).toBe(false)
+  })
+
+  it('keeps a terminal run awaiting semantic review distinct from completion', () => {
+    const needsReviewResult = {
+      ...evaluationRunFixture.results[0],
+      status: 'NEEDS_REVIEW',
+      criterionResults: [
+        {
+          ...evaluationRunFixture.results[0].criterionResults[0],
+          reviewMode: 'HUMAN',
+          status: 'NEEDS_REVIEW',
+        },
+      ],
+    } as const
+
+    expect(
+      evaluationRunSchema.safeParse({
+        ...evaluationRunFixture,
+        status: 'NEEDS_REVIEW',
+        results: [needsReviewResult],
+      }).success,
+    ).toBe(true)
+    expect(
+      evaluationRunSchema.safeParse({
+        ...evaluationRunFixture,
+        status: 'COMPLETED',
+        results: [needsReviewResult],
+      }).success,
+    ).toBe(false)
   })
 })

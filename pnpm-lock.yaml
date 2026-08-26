@@ -129,6 +129,15 @@ importers:
         specifier: 0.31.10
         version: 0.31.10
 
+  tests/eval:
+    dependencies:
+      '@vibe-helper/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@vibe-helper/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+
 packages:
 
   '@biomejs/biome@2.5.10':

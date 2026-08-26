@@ -2,9 +2,9 @@
 
 ## 1. 상태
 
-- 상태: 사용자 승인 완료, T06 application/MCP 권한 경계 반영 및 T07 평가 harness 착수 가능
+- 상태: 사용자 승인 완료, T07 평가 harness·fixture·저장 경계 반영 및 T08 Discovery Agent 착수 가능
 - 기준 입력: [PROJECT_BRIEF.md](../PROJECT_BRIEF.md), [SPEC.md](SPEC.md)
-- T03 versioned contract와 Agent/UI runtime validation, T04 pure reducer와 Evidence policy v1.0.0, T05 SQLite schema/repository/migration, T06 application use case와 역할 고정 MCP server는 구현됐다.
+- T03 versioned contract와 Agent/UI runtime validation, T04 pure reducer와 Evidence policy v1.0.0, T05 SQLite schema/repository/migration, T06 application use case와 역할 고정 MCP server, T07 criterion 기반 evaluation contract와 harness는 구현됐다.
 - Kiro/Crew 세부 연결은 capability spike 결과에 따라 이 문서를 갱신한다.
 
 ## 2. 선택한 기술 스택과 선택 이유
@@ -318,7 +318,7 @@ CanonicalConcept 1 ── N MisconceptionIssue
 - source Agent 또는 user
 - redaction status
 
-정확한 DDL과 forward migration은 `packages/storage-sqlite/src/schema.ts`와 `packages/storage-sqlite/drizzle/`에 둔다. append row의 contract JSON은 stable key order와 SHA-256 hash로 검증하며 selected Candidate, active Task, Decision 상태, Live Context와 Concept Ledger head는 별도 projection으로 복구한다. `AnalysisJob`과 evaluation 결과 table은 각각 T13과 T07에서 contract가 확정된 뒤 forward migration으로 추가한다.
+정확한 DDL과 forward migration은 `packages/storage-sqlite/src/schema.ts`와 `packages/storage-sqlite/drizzle/`에 둔다. append row의 contract JSON은 stable key order와 SHA-256 hash로 검증하며 selected Candidate, active Task, Decision 상태, Live Context와 Concept Ledger head는 별도 projection으로 복구한다. T07은 revisioned `EvaluationRun`과 특정 run에 연결된 immutable `BaselineResult` table을 migration `0003`으로 추가했다. `AnalysisJob`은 T13에서 contract가 확정된 뒤 forward migration으로 추가한다.
 
 ## 6. API 및 외부 연동 계약
 
@@ -497,13 +497,13 @@ Crew App의 `permissions.api`는 T01에서 host SDK의 client-side path guard로
 
 ### 9.4 Agent fixture/eval
 
-- Discovery 다양성과 Concept Necessity
-- Agent-authored content의 Evidence 거절
-- 질문형 비유 claim 분리
-- DIRECTLY_LED 반복의 강도 제한
-- contradiction과 misconception 처리
-- independent transfer 판정
-- generic Kiro baseline과 비교
+- T07 자동 scorer: strict contract, 구조적 Candidate mode collapse, Spec scope 경계, Context freshness/completeness, production Evidence policy outcome, synthetic redaction leak
+- T07 사람 review: 의미적 Discovery 다양성, Concept Necessity, scope 적절성, Decision 필요성, false mastery/false misconception claim 의미
+- Campus Drop 회귀 입력과 서로 다른 unseen Learning Goal, Personal Need 유무를 함께 유지
+- 사람이 검토하지 않은 의미 criterion은 `NEEDS_REVIEW`이며 자동 통과로 바꾸지 않음
+- T07 calibration baseline은 harness의 good/bad 구별을 고정하며 제품 성능 baseline으로 해석하지 않음
+- DIRECTLY_LED 반복, contradiction/misconception, independent transfer와 실제 Agent output 평가는 T13 이후 fixture를 확장
+- generic Kiro/simple memory/ablation 비교는 T24에서 같은 `BaselineResult` 계약으로 기록
 
 ### 9.5 UI/E2E
 

@@ -1,0 +1,20 @@
+[
+  {
+    "criterionKey": "semantic_diversity",
+    "dimension": "DISCOVERY_DIVERSITY",
+    "reviewMode": "HUMAN",
+    "status": "PASSED",
+    "explanation": "Payload replay, form-state simulation and API change review have different users, interactions and data shapes.",
+    "evidenceReferences": ["discovery.candidates[0..2]"],
+    "metrics": []
+  },
+  {
+    "criterionKey": "concept_necessity",
+    "dimension": "CONCEPT_NECESSITY",
+    "reviewMode": "HUMAN",
+    "status": "PASSED",
+    "explanation": "Each candidate uses typed variants or executable validation as part of its central behavior rather than as decoration.",
+    "evidenceReferences": ["discovery.candidates[*].technologyNecessity"],
+    "metrics": []
+  }
+]

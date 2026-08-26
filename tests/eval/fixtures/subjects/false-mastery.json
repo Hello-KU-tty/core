@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "evidence": {
+    "proposal": {
+      "schemaVersion": 1,
+      "id": "evidence_proposal_00000000-0000-4000-8000-000000000401",
+      "projectId": "project_00000000-0000-4000-8000-000000000402",
+      "taskId": "task_00000000-0000-4000-8000-000000000403",
+      "episodeId": "episode_00000000-0000-4000-8000-000000000404",
+      "correlationId": "corr_00000000-0000-4000-8000-000000000405",
+      "concept": {
+        "canonicalConceptId": "concept_00000000-0000-4000-8000-000000000406",
+        "originalExpression": "the Agent explained runtime validation",
+        "proposedCanonicalName": "runtime validation"
+      },
+      "signal": "REPHRASE",
+      "strength": "MEDIUM",
+      "promptDependence": "LIGHT_HINT",
+      "userEvidenceSources": [
+        {
+          "kind": "AGENT_MESSAGE",
+          "conversationId": "conversation_00000000-0000-4000-8000-000000000407",
+          "messageId": "message_00000000-0000-4000-8000-000000000408"
+        }
+      ],
+      "contextSources": [],
+      "redactedEvidenceExcerpt": "The Agent explained that runtime validation checks unknown input.",
+      "rationale": "This incorrectly treats an Agent explanation as user understanding.",
+      "maximumSupportedState": "EXPLAINED",
+      "misconception": { "action": "NONE" },
+      "proposedAt": "2026-08-26T00:00:00.000Z",
+      "source": { "kind": "AGENT", "role": "EVIDENCE_ANALYST" },
+      "redactionStatus": "VERIFIED_REDACTED"
+    },
+    "episode": {
+      "schemaVersion": 1,
+      "id": "episode_00000000-0000-4000-8000-000000000404",
+      "projectId": "project_00000000-0000-4000-8000-000000000402",
+      "taskId": "task_00000000-0000-4000-8000-000000000403",
+      "conversationId": "conversation_00000000-0000-4000-8000-000000000407",
+      "correlationId": "corr_00000000-0000-4000-8000-000000000405",
+      "revision": 1,
+      "type": "HELPER_CONVERSATION",
+      "status": "PENDING_ANALYSIS",
+      "eventIds": ["event_00000000-0000-4000-8000-000000000409"],
+      "conceptCandidates": [
+        {
+          "conceptId": "concept_00000000-0000-4000-8000-000000000406",
+          "originalExpression": "runtime validation"
+        }
+      ],
+      "contextReferences": [],
+      "startedAt": "2026-08-26T00:00:00.000Z",
+      "endedAt": "2026-08-26T00:00:01.000Z",
+      "closeReason": "The Helper response completed.",
+      "source": { "kind": "CORE" },
+      "redactionStatus": "VERIFIED_REDACTED"
+    },
+    "episodeRevision": 1,
+    "events": [
+      {
+        "schemaVersion": 1,
+        "id": "event_00000000-0000-4000-8000-000000000409",
+        "projectId": "project_00000000-0000-4000-8000-000000000402",
+        "taskId": "task_00000000-0000-4000-8000-000000000403",
+        "conversationId": "conversation_00000000-0000-4000-8000-000000000407",
+        "correlationId": "corr_00000000-0000-4000-8000-000000000405",
+        "sequence": 1,
+        "actor": { "kind": "AGENT", "role": "HELPER" },
+        "occurredAt": "2026-08-26T00:00:00.000Z",
+        "payload": {
+          "type": "HELPER_RESPONSE",
+          "conversationId": "conversation_00000000-0000-4000-8000-000000000407",
+          "messageId": "message_00000000-0000-4000-8000-000000000408",
+          "summary": "Runtime validation checks unknown input against an executable schema."
+        },
+        "sourceReferences": [
+          {
+            "kind": "AGENT_MESSAGE",
+            "conversationId": "conversation_00000000-0000-4000-8000-000000000407",
+            "messageId": "message_00000000-0000-4000-8000-000000000408"
+          }
+        ],
+        "redactionStatus": "VERIFIED_REDACTED"
+      }
+    ],
+    "concept": {
+      "schemaVersion": 1,
+      "id": "concept_00000000-0000-4000-8000-000000000406",
+      "canonicalName": "runtime validation",
+      "description": "Checking unknown data against an executable schema at a boundary.",
+      "revision": 1,
+      "createdAt": "2026-08-26T00:00:00.000Z",
+      "updatedAt": "2026-08-26T00:00:00.000Z",
+      "source": { "kind": "CORE" }
+    },
+    "priorAcceptedEvidence": [],
+    "metadata": {
+      "proposalId": "evidence_proposal_00000000-0000-4000-8000-000000000401",
+      "decisionId": "evidence_decision_00000000-0000-4000-8000-000000000410",
+      "acceptedEvidenceId": "evidence_00000000-0000-4000-8000-000000000411",
+      "decidedAt": "2026-08-26T00:00:02.000Z",
+      "acceptedAt": "2026-08-26T00:00:02.000Z"
+    },
+    "expectedOutcome": "REJECTED",
+    "expectedReasonCode": "AGENT_AUTHORED_SOURCE"
+  }
+}

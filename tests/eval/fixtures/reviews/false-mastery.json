@@ -1,0 +1,11 @@
+[
+  {
+    "criterionKey": "evidence_semantics",
+    "dimension": "EVIDENCE_QUALITY",
+    "reviewMode": "HUMAN",
+    "status": "PASSED",
+    "explanation": "The only cited statement is authored by Helper, so the expected rejection correctly prevents false mastery.",
+    "evidenceReferences": ["evidence.proposal.userEvidenceSources", "evidence.events[0].actor"],
+    "metrics": []
+  }
+]

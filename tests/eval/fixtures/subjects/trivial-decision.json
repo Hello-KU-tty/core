@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "decision": {
+    "schemaVersion": 1,
+    "id": "decision_00000000-0000-4000-8000-000000000321",
+    "projectId": "project_00000000-0000-4000-8000-000000000322",
+    "taskId": "task_00000000-0000-4000-8000-000000000323",
+    "correlationId": "corr_00000000-0000-4000-8000-000000000324",
+    "contextVersion": 1,
+    "category": "ARCHITECTURE",
+    "question": "Should the parser file be named parser.ts or event-parser.ts?",
+    "reasonRequiredNow": "The Builder is about to create the file.",
+    "options": [
+      {
+        "id": "decision_option_00000000-0000-4000-8000-000000000325",
+        "label": "parser.ts",
+        "description": "Use a shorter filename.",
+        "impacts": ["Short import path"],
+        "tradeoffs": ["The name is less specific"]
+      },
+      {
+        "id": "decision_option_00000000-0000-4000-8000-000000000326",
+        "label": "event-parser.ts",
+        "description": "Use a more descriptive filename.",
+        "impacts": ["Clearer import name"],
+        "tradeoffs": ["The filename is longer"]
+      }
+    ],
+    "recommendedOptionId": "decision_option_00000000-0000-4000-8000-000000000326",
+    "recommendationRationale": "The longer name is slightly clearer.",
+    "relatedConceptNames": [],
+    "sourceReferences": [],
+    "independentWorkCanContinue": false,
+    "requestedAt": "2026-08-26T00:00:00.000Z",
+    "source": { "kind": "AGENT", "role": "BUILDER" },
+    "redactionStatus": "VERIFIED_REDACTED"
+  }
+}

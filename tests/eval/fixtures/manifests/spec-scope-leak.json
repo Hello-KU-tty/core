@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture_00000000-0000-4000-8000-000000000106",
+  "name": "Learning Spec scope leak",
+  "description": "Negative calibration with Agent Support in Learner Focus and an excluded feature in the MVP.",
+  "kind": "SPEC_SCOPE",
+  "inputPath": "tests/eval/fixtures/inputs/campus-drop.json",
+  "calibrationSubjectPath": "tests/eval/fixtures/subjects/spec-scope-leak.json",
+  "calibrationReviewPath": "tests/eval/fixtures/reviews/spec-scope-leak.json",
+  "expectedContractDomains": ["LEARNING_SPEC"],
+  "criteria": [
+    {
+      "key": "contract_valid",
+      "dimension": "CONTRACT_INTEGRITY",
+      "reviewMode": "AUTOMATED",
+      "description": "The malformed quality case remains structurally valid.",
+      "successDefinition": "Strict Learning Spec validation succeeds."
+    },
+    {
+      "key": "scope_boundaries",
+      "dimension": "SPEC_SCOPE",
+      "reviewMode": "AUTOMATED",
+      "description": "Fixture-declared learner, support and excluded boundaries are preserved.",
+      "successDefinition": "Expected concepts are in their categories and excluded features are absent from MVP."
+    },
+    {
+      "key": "scope_appropriateness",
+      "dimension": "SPEC_SCOPE",
+      "reviewMode": "HUMAN",
+      "description": "The scope supports the goal without forcing adjacent infrastructure learning.",
+      "successDefinition": "A reviewer finds the three categories pedagogically and product-wise appropriate."
+    }
+  ],
+  "scenarioTags": ["negative calibration", "scope leak"],
+  "fixtureVersion": "1.0.0",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED"
+}

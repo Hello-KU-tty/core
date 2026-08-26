@@ -1,0 +1,11 @@
+[
+  {
+    "criterionKey": "semantic_diversity",
+    "dimension": "DISCOVERY_DIVERSITY",
+    "reviewMode": "HUMAN",
+    "status": "FAILED",
+    "explanation": "All three candidates are the same CRUD dashboard with only book, music and meal themes changed.",
+    "evidenceReferences": ["discovery.candidates[*].coreInteraction", "discovery.candidates[*].mvpFeatures"],
+    "metrics": []
+  }
+]

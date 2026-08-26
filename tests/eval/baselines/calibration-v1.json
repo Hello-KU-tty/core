@@ -1,0 +1,319 @@
+{
+  "schemaVersion": 1,
+  "id": "baseline_result_00000000-0000-4000-8000-000000000702",
+  "evaluationRunId": "evaluation_run_00000000-0000-4000-8000-000000000701",
+  "correlationId": "corr_00000000-0000-4000-8000-000000000703",
+  "kind": "CALIBRATION",
+  "baselineName": "T07 scorer calibration",
+  "baselineVersion": "1.0.0",
+  "results": [
+    {
+      "fixtureId": "fixture_00000000-0000-4000-8000-000000000102",
+      "fixtureVersion": "1.0.0",
+      "status": "PASSED",
+      "criterionResults": [
+        {
+          "criterionKey": "contract_valid",
+          "dimension": "CONTRACT_INTEGRITY",
+          "reviewMode": "AUTOMATED",
+          "status": "PASSED",
+          "explanation": "All contract domains requested by the fixture passed strict runtime validation.",
+          "evidenceReferences": ["DISCOVERY"],
+          "metrics": []
+        },
+        {
+          "criterionKey": "no_structural_mode_collapse",
+          "dimension": "DISCOVERY_DIVERSITY",
+          "reviewMode": "AUTOMATED",
+          "status": "PASSED",
+          "explanation": "No exact structural Candidate signature was repeated.",
+          "evidenceReferences": ["discovery.candidates"],
+          "metrics": [
+            {
+              "name": "distinct structural signatures",
+              "value": 1,
+              "unit": "RATIO",
+              "interpretation": "Exact normalized target-user, core-interaction and MVP-feature signatures only; semantic diversity still requires human review."
+            }
+          ]
+        },
+        {
+          "criterionKey": "semantic_diversity",
+          "dimension": "DISCOVERY_DIVERSITY",
+          "reviewMode": "HUMAN",
+          "status": "PASSED",
+          "explanation": "Payload replay, form-state simulation and API change review have different users, interactions and data shapes.",
+          "evidenceReferences": ["discovery.candidates[0..2]"],
+          "metrics": []
+        },
+        {
+          "criterionKey": "concept_necessity",
+          "dimension": "CONCEPT_NECESSITY",
+          "reviewMode": "HUMAN",
+          "status": "PASSED",
+          "explanation": "Each candidate uses typed variants or executable validation as part of its central behavior rather than as decoration.",
+          "evidenceReferences": ["discovery.candidates[*].technologyNecessity"],
+          "metrics": []
+        }
+      ],
+      "metrics": [
+        {
+          "name": "distinct structural signatures",
+          "value": 1,
+          "unit": "RATIO",
+          "interpretation": "Exact normalized target-user, core-interaction and MVP-feature signatures only; semantic diversity still requires human review."
+        }
+      ],
+      "notes": []
+    },
+    {
+      "fixtureId": "fixture_00000000-0000-4000-8000-000000000105",
+      "fixtureVersion": "1.0.0",
+      "status": "FAILED",
+      "criterionResults": [
+        {
+          "criterionKey": "no_structural_mode_collapse",
+          "dimension": "DISCOVERY_DIVERSITY",
+          "reviewMode": "AUTOMATED",
+          "status": "FAILED",
+          "explanation": "At least two Candidates repeat the same target-user, interaction and feature structure.",
+          "evidenceReferences": ["discovery.candidates"],
+          "metrics": [
+            {
+              "name": "distinct structural signatures",
+              "value": 0.3333333333333333,
+              "unit": "RATIO",
+              "interpretation": "Exact normalized target-user, core-interaction and MVP-feature signatures only; semantic diversity still requires human review."
+            }
+          ]
+        },
+        {
+          "criterionKey": "semantic_diversity",
+          "dimension": "DISCOVERY_DIVERSITY",
+          "reviewMode": "HUMAN",
+          "status": "FAILED",
+          "explanation": "All three candidates are the same CRUD dashboard with only book, music and meal themes changed.",
+          "evidenceReferences": [
+            "discovery.candidates[*].coreInteraction",
+            "discovery.candidates[*].mvpFeatures"
+          ],
+          "metrics": []
+        }
+      ],
+      "metrics": [
+        {
+          "name": "distinct structural signatures",
+          "value": 0.3333333333333333,
+          "unit": "RATIO",
+          "interpretation": "Exact normalized target-user, core-interaction and MVP-feature signatures only; semantic diversity still requires human review."
+        }
+      ],
+      "notes": []
+    },
+    {
+      "fixtureId": "fixture_00000000-0000-4000-8000-000000000106",
+      "fixtureVersion": "1.0.0",
+      "status": "FAILED",
+      "criterionResults": [
+        {
+          "criterionKey": "contract_valid",
+          "dimension": "CONTRACT_INTEGRITY",
+          "reviewMode": "AUTOMATED",
+          "status": "PASSED",
+          "explanation": "All contract domains requested by the fixture passed strict runtime validation.",
+          "evidenceReferences": ["LEARNING_SPEC"],
+          "metrics": []
+        },
+        {
+          "criterionKey": "scope_boundaries",
+          "dimension": "SPEC_SCOPE",
+          "reviewMode": "AUTOMATED",
+          "status": "FAILED",
+          "explanation": "Scope boundary violations: missing AGENT_SUPPORT authentication; EXCLUDED feature included in MVP permanent archive.",
+          "evidenceReferences": ["learningSpec.scope", "learningSpec.mvpFeatures"],
+          "metrics": []
+        },
+        {
+          "criterionKey": "scope_appropriateness",
+          "dimension": "SPEC_SCOPE",
+          "reviewMode": "HUMAN",
+          "status": "FAILED",
+          "explanation": "Authentication is forced into Learner Focus and permanent archive contradicts the short-lived MVP boundary.",
+          "evidenceReferences": ["learningSpec.scope", "learningSpec.mvpFeatures"],
+          "metrics": []
+        }
+      ],
+      "metrics": [],
+      "notes": []
+    },
+    {
+      "fixtureId": "fixture_00000000-0000-4000-8000-000000000107",
+      "fixtureVersion": "1.0.0",
+      "status": "FAILED",
+      "criterionResults": [
+        {
+          "criterionKey": "contract_valid",
+          "dimension": "CONTRACT_INTEGRITY",
+          "reviewMode": "AUTOMATED",
+          "status": "PASSED",
+          "explanation": "All contract domains requested by the fixture passed strict runtime validation.",
+          "evidenceReferences": ["BUILD"],
+          "metrics": []
+        },
+        {
+          "criterionKey": "context_fresh",
+          "dimension": "CONTEXT_COMPLETENESS",
+          "reviewMode": "AUTOMATED",
+          "status": "FAILED",
+          "explanation": "Context is stale or incomplete: latest=3, actual=1, missing decisions=1, missing concepts=1.",
+          "evidenceReferences": [
+            "liveContext.contextVersion",
+            "liveContext.activeDecisionIds",
+            "liveContext.activeConceptNames"
+          ],
+          "metrics": []
+        }
+      ],
+      "metrics": [],
+      "notes": []
+    },
+    {
+      "fixtureId": "fixture_00000000-0000-4000-8000-000000000108",
+      "fixtureVersion": "1.0.0",
+      "status": "FAILED",
+      "criterionResults": [
+        {
+          "criterionKey": "contract_valid",
+          "dimension": "CONTRACT_INTEGRITY",
+          "reviewMode": "AUTOMATED",
+          "status": "PASSED",
+          "explanation": "All contract domains requested by the fixture passed strict runtime validation.",
+          "evidenceReferences": ["DECISION"],
+          "metrics": []
+        },
+        {
+          "criterionKey": "decision_necessity",
+          "dimension": "DECISION_NECESSITY",
+          "reviewMode": "HUMAN",
+          "status": "FAILED",
+          "explanation": "A filename is an easily reversible internal detail and does not justify interrupting the user.",
+          "evidenceReferences": ["decision.question", "decision.options"],
+          "metrics": []
+        }
+      ],
+      "metrics": [],
+      "notes": []
+    },
+    {
+      "fixtureId": "fixture_00000000-0000-4000-8000-000000000109",
+      "fixtureVersion": "1.0.0",
+      "status": "PASSED",
+      "criterionResults": [
+        {
+          "criterionKey": "evidence_policy",
+          "dimension": "EVIDENCE_QUALITY",
+          "reviewMode": "AUTOMATED",
+          "status": "PASSED",
+          "explanation": "Core reproduced REJECTED/AGENT_AUTHORED_SOURCE.",
+          "evidenceReferences": [
+            "evidence.proposal",
+            "evidence.episode",
+            "evidence.events"
+          ],
+          "metrics": []
+        },
+        {
+          "criterionKey": "evidence_semantics",
+          "dimension": "EVIDENCE_QUALITY",
+          "reviewMode": "HUMAN",
+          "status": "PASSED",
+          "explanation": "The only cited statement is authored by Helper, so the expected rejection correctly prevents false mastery.",
+          "evidenceReferences": [
+            "evidence.proposal.userEvidenceSources",
+            "evidence.events[0].actor"
+          ],
+          "metrics": []
+        }
+      ],
+      "metrics": [],
+      "notes": []
+    },
+    {
+      "fixtureId": "fixture_00000000-0000-4000-8000-000000000110",
+      "fixtureVersion": "1.0.0",
+      "status": "FAILED",
+      "criterionResults": [
+        {
+          "criterionKey": "contract_valid",
+          "dimension": "CONTRACT_INTEGRITY",
+          "reviewMode": "AUTOMATED",
+          "status": "PASSED",
+          "explanation": "All contract domains requested by the fixture passed strict runtime validation.",
+          "evidenceReferences": ["EVIDENCE"],
+          "metrics": []
+        },
+        {
+          "criterionKey": "evidence_policy",
+          "dimension": "EVIDENCE_QUALITY",
+          "reviewMode": "AUTOMATED",
+          "status": "PASSED",
+          "explanation": "Core reproduced ACCEPTED/VALID_USER_EVIDENCE.",
+          "evidenceReferences": [
+            "evidence.proposal",
+            "evidence.episode",
+            "evidence.events"
+          ],
+          "metrics": []
+        },
+        {
+          "criterionKey": "misconception_semantics",
+          "dimension": "EVIDENCE_QUALITY",
+          "reviewMode": "HUMAN",
+          "status": "FAILED",
+          "explanation": "The user asks when runtime validation occurs but does not assert the incorrect compile-time relationship described by the proposal.",
+          "evidenceReferences": [
+            "evidence.proposal.redactedEvidenceExcerpt",
+            "evidence.events[0].payload.redactedExcerpt"
+          ],
+          "metrics": []
+        }
+      ],
+      "metrics": [],
+      "notes": []
+    },
+    {
+      "fixtureId": "fixture_00000000-0000-4000-8000-000000000111",
+      "fixtureVersion": "1.0.0",
+      "status": "FAILED",
+      "criterionResults": [
+        {
+          "criterionKey": "redaction_no_leak",
+          "dimension": "REDACTION",
+          "reviewMode": "AUTOMATED",
+          "status": "FAILED",
+          "explanation": "Redaction output leaked 1 sentinel(s) or a user-home path.",
+          "evidenceReferences": ["redaction.output"],
+          "metrics": [
+            {
+              "name": "redaction leaks",
+              "value": 2,
+              "unit": "COUNT",
+              "interpretation": "Synthetic sentinel and user-home path occurrences in the output."
+            }
+          ]
+        }
+      ],
+      "metrics": [
+        {
+          "name": "redaction leaks",
+          "value": 2,
+          "unit": "COUNT",
+          "interpretation": "Synthetic sentinel and user-home path occurrences in the output."
+        }
+      ],
+      "notes": []
+    }
+  ],
+  "recordedAt": "2026-08-26T00:00:01.000Z",
+  "redactionStatus": "VERIFIED_REDACTED"
+}

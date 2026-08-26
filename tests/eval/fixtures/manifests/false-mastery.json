@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture_00000000-0000-4000-8000-000000000109",
+  "name": "Agent-authored false mastery",
+  "description": "Negative Evidence input that cites an Agent message as direct user understanding.",
+  "kind": "FALSE_MASTERY",
+  "inputPath": "tests/eval/fixtures/inputs/webhook-lens.json",
+  "calibrationSubjectPath": "tests/eval/fixtures/subjects/false-mastery.json",
+  "calibrationReviewPath": "tests/eval/fixtures/reviews/false-mastery.json",
+  "expectedContractDomains": ["EVALUATION"],
+  "criteria": [
+    {
+      "key": "evidence_policy",
+      "dimension": "EVIDENCE_QUALITY",
+      "reviewMode": "AUTOMATED",
+      "description": "Core rejects Agent-authored direct Evidence with an explicit reason.",
+      "successDefinition": "The outcome is REJECTED/AGENT_AUTHORED_SOURCE."
+    },
+    {
+      "key": "evidence_semantics",
+      "dimension": "EVIDENCE_QUALITY",
+      "reviewMode": "HUMAN",
+      "description": "A reviewer confirms the case contains no user-authored understanding.",
+      "successDefinition": "Agent wording, code or confirmation is not treated as mastery."
+    }
+  ],
+  "scenarioTags": ["negative input", "false mastery", "provenance"],
+  "fixtureVersion": "1.0.0",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED"
+}

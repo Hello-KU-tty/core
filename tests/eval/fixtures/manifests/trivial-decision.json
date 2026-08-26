@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture_00000000-0000-4000-8000-000000000108",
+  "name": "Trivial reversible Decision",
+  "description": "Negative semantic calibration that asks the user to choose a filename.",
+  "kind": "DECISION_QUALITY",
+  "inputPath": "tests/eval/fixtures/inputs/webhook-lens.json",
+  "calibrationSubjectPath": "tests/eval/fixtures/subjects/trivial-decision.json",
+  "calibrationReviewPath": "tests/eval/fixtures/reviews/trivial-decision.json",
+  "expectedContractDomains": ["DECISION"],
+  "criteria": [
+    {
+      "key": "contract_valid",
+      "dimension": "CONTRACT_INTEGRITY",
+      "reviewMode": "AUTOMATED",
+      "description": "A semantically bad Decision can still satisfy its DTO contract.",
+      "successDefinition": "Strict Decision validation succeeds."
+    },
+    {
+      "key": "decision_necessity",
+      "dimension": "DECISION_NECESSITY",
+      "reviewMode": "HUMAN",
+      "description": "The choice must materially affect product, security, data, cost or architecture.",
+      "successDefinition": "The Decision is not a filename, style or easily reversible implementation detail."
+    }
+  ],
+  "scenarioTags": ["negative calibration", "trivial decision"],
+  "fixtureVersion": "1.0.0",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED"
+}

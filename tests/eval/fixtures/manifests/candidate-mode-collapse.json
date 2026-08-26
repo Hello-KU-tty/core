@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture_00000000-0000-4000-8000-000000000105",
+  "name": "Candidate structural mode collapse",
+  "description": "Negative calibration in which titles change but the candidate structure is repeated.",
+  "kind": "CANDIDATE_MODE_COLLAPSE",
+  "inputPath": "tests/eval/fixtures/inputs/webhook-lens.json",
+  "calibrationSubjectPath": "tests/eval/fixtures/subjects/candidate-mode-collapse.json",
+  "calibrationReviewPath": "tests/eval/fixtures/reviews/candidate-mode-collapse.json",
+  "expectedContractDomains": ["EVALUATION"],
+  "criteria": [
+    {
+      "key": "no_structural_mode_collapse",
+      "dimension": "DISCOVERY_DIVERSITY",
+      "reviewMode": "AUTOMATED",
+      "description": "Exact candidate structures must not repeat under new themes.",
+      "successDefinition": "Every normalized structural signature is distinct."
+    },
+    {
+      "key": "semantic_diversity",
+      "dimension": "DISCOVERY_DIVERSITY",
+      "reviewMode": "HUMAN",
+      "description": "A reviewer checks semantic mode collapse beyond exact matching.",
+      "successDefinition": "Problem, user, interaction, data shape and appeal are meaningfully distinct."
+    }
+  ],
+  "scenarioTags": ["negative calibration", "mode collapse"],
+  "fixtureVersion": "1.0.0",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED"
+}

@@ -32,6 +32,7 @@ describe('artifact and local-data hygiene', () => {
       'packages/application/dist',
       'packages/storage-sqlite/dist',
       'packages/kiro-adapter/dist',
+      'tests/eval/dist',
     ]
     const files = (
       await Promise.all(

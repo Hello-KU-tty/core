@@ -541,8 +541,20 @@ export const evaluationFixture = {
   name: 'Unseen webhook learning goal',
   description: 'A redacted contract fixture outside the Campus Drop Golden Path.',
   kind: 'UNSEEN_DISCOVERY',
-  inputPath: 'tests/eval/fixtures/webhook-lens.json',
+  inputPath: 'tests/eval/fixtures/inputs/webhook-lens.json',
+  calibrationSubjectPath: 'tests/eval/fixtures/subjects/webhook-lens-good.json',
+  calibrationReviewPath: 'tests/eval/fixtures/reviews/webhook-lens-good.json',
   expectedContractDomains: ['DISCOVERY', 'LEARNING_SPEC'],
+  criteria: [
+    {
+      key: 'contract_valid',
+      dimension: 'CONTRACT_INTEGRITY',
+      reviewMode: 'AUTOMATED',
+      description: 'Representative output passes the strict runtime contract.',
+      successDefinition: 'No contract validation issue is produced.',
+    },
+  ],
+  scenarioTags: ['unseen', 'no personal need'],
   fixtureVersion: '1.0.0',
   containsPersonalData: false,
   redactionStatus: 'VERIFIED_REDACTED',
@@ -550,7 +562,19 @@ export const evaluationFixture = {
 
 export const evaluationResultFixture = {
   fixtureId: ids.fixture,
+  fixtureVersion: '1.0.0',
   status: 'PASSED',
+  criterionResults: [
+    {
+      criterionKey: 'contract_valid',
+      dimension: 'CONTRACT_INTEGRITY',
+      reviewMode: 'AUTOMATED',
+      status: 'PASSED',
+      explanation: 'All representative records passed runtime validation.',
+      evidenceReferences: ['candidateRound'],
+      metrics: [],
+    },
+  ],
   metrics: [
     {
       name: 'contract validation failures',
@@ -566,6 +590,7 @@ export const evaluationRunFixture = {
   schemaVersion: 1,
   id: ids.evaluationRun,
   correlationId: ids.correlation,
+  revision: 1,
   evaluatorVersion: '1.0.0',
   systemUnderTestVersion: '0.0.0',
   fixtureIds: [ids.fixture],
@@ -581,6 +606,7 @@ export const baselineResultFixture = {
   id: ids.baselineResult,
   evaluationRunId: ids.evaluationRun,
   correlationId: ids.correlation,
+  kind: 'CALIBRATION',
   baselineName: 'contract-only baseline',
   baselineVersion: '1.0.0',
   results: [evaluationResultFixture],

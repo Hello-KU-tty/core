@@ -13,6 +13,8 @@ import {
   acceptedEvidenceSchema,
   activityEventSchema,
   auditRecordSchema,
+  baselineResultIdSchema,
+  baselineResultSchema,
   builderTaskSchema,
   candidateRoundSchema,
   canonicalConceptSchema,
@@ -27,6 +29,8 @@ import {
   episodeSchema,
   evidenceDecisionSchema,
   evidenceProposalSchema,
+  evaluationRunIdSchema,
+  evaluationRunSchema,
   idempotencyKeySchema,
   learningSpecRevisionSchema,
   liveProjectContextSchema,
@@ -39,6 +43,7 @@ import {
   type AcceptedEvidence,
   type ActivityEvent,
   type AuditRecord,
+  type BaselineResult,
   type BuilderTask,
   type CandidateRound,
   type CanonicalConcept,
@@ -52,6 +57,7 @@ import {
   type Episode,
   type EvidenceDecision,
   type EvidenceProposal,
+  type EvaluationRun,
   type LearningSpecRevision,
   type LiveProjectContext,
   type MisconceptionIssue,
@@ -1198,6 +1204,100 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
     )
   }
 
+  appendEvaluationRun(input: EvaluationRun): PersistenceWriteResult {
+    const prepared = prepareRecord(evaluationRunSchema, input)
+    const record = prepared.record
+    const updatedAt = record.completedAt ?? record.startedAt
+    return this.#write(record.id, () =>
+      this.#appendVersioned({
+        recordId: record.id,
+        revision: record.revision,
+        prepared,
+        existingSql:
+          'SELECT payload_json, payload_hash FROM evaluation_run_revisions WHERE evaluation_run_id = ? AND revision = ?',
+        existingParams: [record.id, record.revision],
+        headSql: 'SELECT head_revision FROM evaluation_runs WHERE id = ?',
+        headParams: [record.id],
+        insertStable: () => {
+          this.#sqlite
+            .prepare(
+              'INSERT INTO evaluation_runs (id, head_revision, status, correlation_id, evaluator_version, system_under_test_version, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            )
+            .run(
+              record.id,
+              record.revision,
+              record.status,
+              record.correlationId,
+              record.evaluatorVersion,
+              record.systemUnderTestVersion,
+              updatedAt,
+            )
+        },
+        insertHistory: () => {
+          this.#sqlite
+            .prepare(
+              'INSERT INTO evaluation_run_revisions (evaluation_run_id, revision, status, correlation_id, started_at, completed_at, payload_json, payload_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            )
+            .run(
+              record.id,
+              record.revision,
+              record.status,
+              record.correlationId,
+              record.startedAt,
+              record.completedAt ?? null,
+              prepared.payloadJson,
+              prepared.payloadHash,
+            )
+        },
+        updateHead: () => {
+          this.#sqlite
+            .prepare(
+              'UPDATE evaluation_runs SET head_revision = ?, status = ?, correlation_id = ?, evaluator_version = ?, system_under_test_version = ?, updated_at = ? WHERE id = ?',
+            )
+            .run(
+              record.revision,
+              record.status,
+              record.correlationId,
+              record.evaluatorVersion,
+              record.systemUnderTestVersion,
+              updatedAt,
+              record.id,
+            )
+        },
+      }),
+    )
+  }
+
+  appendBaselineResult(input: BaselineResult): PersistenceWriteResult {
+    const prepared = prepareRecord(baselineResultSchema, input)
+    const record = prepared.record
+    return this.#write(record.id, () =>
+      this.#appendImmutable(
+        record.id,
+        prepared,
+        'SELECT payload_json, payload_hash FROM baseline_results WHERE id = ?',
+        [record.id],
+        () => {
+          this.#sqlite
+            .prepare(
+              'INSERT INTO baseline_results (id, evaluation_run_id, correlation_id, kind, baseline_name, baseline_version, recorded_at, payload_json, payload_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            )
+            .run(
+              record.id,
+              record.evaluationRunId,
+              record.correlationId,
+              record.kind,
+              record.baselineName,
+              record.baselineVersion,
+              record.recordedAt,
+              prepared.payloadJson,
+              prepared.payloadHash,
+            )
+        },
+      ),
+    )
+  }
+
   appendIdempotencyReceipt(input: IdempotencyReceipt): PersistenceWriteResult {
     if (
       !idempotencyKeySchema.safeParse(input.key).success ||
@@ -1511,6 +1611,37 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
       }
       return parsed
     })
+  }
+
+  readEvaluationRun(evaluationRunId: string): EvaluationRun | null {
+    if (!evaluationRunIdSchema.safeParse(evaluationRunId).success) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Evaluation Run ID is invalid')
+    }
+    return this.#read(() =>
+      this.#headRecord(
+        `SELECT revisions.payload_json, revisions.payload_hash
+         FROM evaluation_runs heads
+         JOIN evaluation_run_revisions revisions
+           ON revisions.evaluation_run_id = heads.id
+          AND revisions.revision = heads.head_revision
+         WHERE heads.id = ?`,
+        [evaluationRunId],
+        evaluationRunSchema,
+      ),
+    )
+  }
+
+  readBaselineResult(baselineResultId: string): BaselineResult | null {
+    if (!baselineResultIdSchema.safeParse(baselineResultId).success) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Baseline Result ID is invalid')
+    }
+    return this.#read(() =>
+      this.#headRecord(
+        'SELECT payload_json, payload_hash FROM baseline_results WHERE id = ?',
+        [baselineResultId],
+        baselineResultSchema,
+      ),
+    )
   }
 
   recoverProject(projectId: string): ProjectRecoveryState | null {

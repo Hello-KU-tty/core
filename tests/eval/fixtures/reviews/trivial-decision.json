@@ -1,0 +1,11 @@
+[
+  {
+    "criterionKey": "decision_necessity",
+    "dimension": "DECISION_NECESSITY",
+    "reviewMode": "HUMAN",
+    "status": "FAILED",
+    "explanation": "A filename is an easily reversible internal detail and does not justify interrupting the user.",
+    "evidenceReferences": ["decision.question", "decision.options"],
+    "metrics": []
+  }
+]

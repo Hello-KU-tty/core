@@ -1,0 +1,11 @@
+[
+  {
+    "criterionKey": "scope_appropriateness",
+    "dimension": "SPEC_SCOPE",
+    "reviewMode": "HUMAN",
+    "status": "FAILED",
+    "explanation": "Authentication is forced into Learner Focus and permanent archive contradicts the short-lived MVP boundary.",
+    "evidenceReferences": ["learningSpec.scope", "learningSpec.mvpFeatures"],
+    "metrics": []
+  }
+]

@@ -19,6 +19,7 @@ const packageLocations = [
   'packages/application',
   'packages/storage-sqlite',
   'packages/kiro-adapter',
+  'tests/eval',
 ] as const
 
 const dependencyRules: readonly DependencyRule[] = [
@@ -54,6 +55,10 @@ const dependencyRules: readonly DependencyRule[] = [
   {
     packageName: '@vibe-helper/kiro-adapter',
     allowedInternalDependencies: ['@vibe-helper/contracts', '@vibe-helper/application'],
+  },
+  {
+    packageName: '@vibe-helper/eval',
+    allowedInternalDependencies: ['@vibe-helper/contracts', '@vibe-helper/domain'],
   },
 ]
 

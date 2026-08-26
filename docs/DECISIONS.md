@@ -218,6 +218,14 @@
 - **검토한 대안:** 하나의 MCP catalog를 prompt로만 제한, payload actor를 caller identity로 신뢰, SDK 기본 10 MiB transport 제한만 사용, lexical path prefix만 검사, 결과를 저장하지 않는 in-memory idempotency, Discovery Agent가 user feedback source를 대신 주장, custom JSON-RPC test client 작성.
 - **tradeoff:** role별 process/config와 aggregate query가 늘어나지만 권한 누출과 session 간 상태 혼동을 줄인다. 2 MiB cap은 contract의 이론적 최대 조합보다 작을 수 있으므로 비정상적으로 긴 batch는 나눠 제출해야 한다. canonicalization은 filesystem 조회가 필요하지만 path-bearing mutation 전에만 수행하며 실제 Builder shell confinement는 T10에서 같은 policy에 연결한다. 공식 client test dependency 하나가 늘지만 실제 `tools/list`/`tools/call` protocol 회귀를 직접 검증할 수 있다.
 
+## 2026-08-26: T07 속성 기반 평가와 reviewer 경계
+
+- **상태:** 승인
+- **맥락:** T03의 evaluation contract는 fixture와 run의 기본 envelope만 제공하고 실제 scorer, reviewer 판정 단위와 baseline 의미는 정하지 않았다. T08 이후 Agent 출력을 고정 문구나 Campus Drop 전용 답과 비교하면 unseen input의 품질을 측정하지 못하고, 모든 의미 판정을 자동화하면 후보 다양성·Decision 필요성·claim 단위 Evidence 같은 항목에 가짜 정밀도가 생긴다. 반대로 모든 항목을 사람에게 맡기면 contract·provenance·reducer 회귀를 재현 가능하게 막을 수 없다.
+- **결정:** T07 평가는 고정 답안 대신 criterion별 허용·금지 속성을 사용한다. contract, revision, 필수 scope, stale version, provenance, reducer outcome과 redaction sentinel은 deterministic scorer가 판정하고, 의미적 다양성, Concept Necessity, scope 적합성, 실제 Decision 필요성과 Evidence claim 정확성은 근거와 rubric을 가진 human review로 남긴다. run은 criterion별 결과를 보존하며 `NEEDS_REVIEW`를 실패와 구분하고 가중 종합 점수나 confidence percentage를 만들지 않는다. Campus Drop과 personal need 유무가 다른 unseen corpus, 알려진 good/bad calibration output을 함께 둔다. T07 baseline은 harness가 알려진 차이를 검출하는 calibration baseline이며 일반 Kiro·memory baseline과 ablation은 T24까지 주장하지 않는다. fixture와 committed baseline은 개인정보가 없는 redacted JSON으로 유지하고 runtime evaluation run과 baseline은 같은 strict contract를 canonical JSON/hash와 함께 local SQLite에 저장한다. 외부 LLM judge와 새 평가 dependency는 추가하지 않는다.
+- **검토한 대안:** exact string golden answer, 하나의 weighted score, 모든 항목 자동 heuristic, 모든 항목 수동 review, T07에서 실제 Kiro baseline을 미리 주장, 평가 결과를 repository JSON에만 저장.
+- **tradeoff:** semantic 품질에는 reviewer 시간이 필요하고 T23 전에는 reviewer agreement를 주장할 수 없다. 대신 자동 검증의 재현성과 사람 판단의 정직한 경계가 분명해지고, prompt를 fixture 문구에 맞춰 과적합하는 위험과 false precision을 줄인다.
+
 ## 2026-08-24: 구현 세부 선택 위임
 
 - **상태:** 승인

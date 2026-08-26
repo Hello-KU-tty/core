@@ -1,0 +1,111 @@
+{
+  "schemaVersion": 1,
+  "evidence": {
+    "proposal": {
+      "schemaVersion": 1,
+      "id": "evidence_proposal_00000000-0000-4000-8000-000000000421",
+      "projectId": "project_00000000-0000-4000-8000-000000000422",
+      "taskId": "task_00000000-0000-4000-8000-000000000423",
+      "episodeId": "episode_00000000-0000-4000-8000-000000000424",
+      "correlationId": "corr_00000000-0000-4000-8000-000000000425",
+      "concept": {
+        "canonicalConceptId": "concept_00000000-0000-4000-8000-000000000426",
+        "originalExpression": "Does runtime validation happen after TypeScript compilation?",
+        "proposedCanonicalName": "runtime validation"
+      },
+      "signal": "CONTRADICTION",
+      "strength": "MEDIUM",
+      "promptDependence": "INDEPENDENT",
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_00000000-0000-4000-8000-000000000427",
+          "messageId": "message_00000000-0000-4000-8000-000000000428"
+        }
+      ],
+      "contextSources": [],
+      "redactedEvidenceExcerpt": "Does runtime validation happen after TypeScript compilation?",
+      "rationale": "The proposal incorrectly treats a clarification question as a conflicting belief.",
+      "maximumSupportedState": null,
+      "misconception": {
+        "action": "OPEN",
+        "summary": "The user may believe compile-time checking executes runtime validation."
+      },
+      "proposedAt": "2026-08-26T00:00:00.000Z",
+      "source": { "kind": "AGENT", "role": "EVIDENCE_ANALYST" },
+      "redactionStatus": "VERIFIED_REDACTED"
+    },
+    "episode": {
+      "schemaVersion": 1,
+      "id": "episode_00000000-0000-4000-8000-000000000424",
+      "projectId": "project_00000000-0000-4000-8000-000000000422",
+      "taskId": "task_00000000-0000-4000-8000-000000000423",
+      "conversationId": "conversation_00000000-0000-4000-8000-000000000427",
+      "correlationId": "corr_00000000-0000-4000-8000-000000000425",
+      "revision": 1,
+      "type": "HELPER_CONVERSATION",
+      "status": "PENDING_ANALYSIS",
+      "eventIds": ["event_00000000-0000-4000-8000-000000000429"],
+      "conceptCandidates": [
+        {
+          "conceptId": "concept_00000000-0000-4000-8000-000000000426",
+          "originalExpression": "runtime validation"
+        }
+      ],
+      "contextReferences": [],
+      "startedAt": "2026-08-26T00:00:00.000Z",
+      "endedAt": "2026-08-26T00:00:01.000Z",
+      "closeReason": "The user asked a clarification question.",
+      "source": { "kind": "CORE" },
+      "redactionStatus": "VERIFIED_REDACTED"
+    },
+    "episodeRevision": 1,
+    "events": [
+      {
+        "schemaVersion": 1,
+        "id": "event_00000000-0000-4000-8000-000000000429",
+        "projectId": "project_00000000-0000-4000-8000-000000000422",
+        "taskId": "task_00000000-0000-4000-8000-000000000423",
+        "conversationId": "conversation_00000000-0000-4000-8000-000000000427",
+        "correlationId": "corr_00000000-0000-4000-8000-000000000425",
+        "sequence": 1,
+        "actor": { "kind": "USER" },
+        "occurredAt": "2026-08-26T00:00:00.000Z",
+        "payload": {
+          "type": "USER_MESSAGE",
+          "conversationId": "conversation_00000000-0000-4000-8000-000000000427",
+          "messageId": "message_00000000-0000-4000-8000-000000000428",
+          "redactedExcerpt": "Does runtime validation happen after TypeScript compilation?"
+        },
+        "sourceReferences": [
+          {
+            "kind": "USER_MESSAGE",
+            "conversationId": "conversation_00000000-0000-4000-8000-000000000427",
+            "messageId": "message_00000000-0000-4000-8000-000000000428"
+          }
+        ],
+        "redactionStatus": "VERIFIED_REDACTED"
+      }
+    ],
+    "concept": {
+      "schemaVersion": 1,
+      "id": "concept_00000000-0000-4000-8000-000000000426",
+      "canonicalName": "runtime validation",
+      "description": "Checking unknown data against an executable schema at a boundary.",
+      "revision": 1,
+      "createdAt": "2026-08-26T00:00:00.000Z",
+      "updatedAt": "2026-08-26T00:00:00.000Z",
+      "source": { "kind": "CORE" }
+    },
+    "priorAcceptedEvidence": [],
+    "metadata": {
+      "proposalId": "evidence_proposal_00000000-0000-4000-8000-000000000421",
+      "decisionId": "evidence_decision_00000000-0000-4000-8000-000000000430",
+      "acceptedEvidenceId": "evidence_00000000-0000-4000-8000-000000000431",
+      "decidedAt": "2026-08-26T00:00:02.000Z",
+      "acceptedAt": "2026-08-26T00:00:02.000Z"
+    },
+    "expectedOutcome": "ACCEPTED",
+    "expectedReasonCode": "VALID_USER_EVIDENCE"
+  }
+}

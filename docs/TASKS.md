@@ -229,7 +229,16 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - Builder도 생성 workspace 바깥 path에 접근할 수 없다.
 - 임의 SQL, 임의 file read/write와 문서에 없는 범용 tool이 노출되지 않는다.
 
-### [>] T07. 평가 harness와 기준 fixture 선구축
+### [x] T07. 평가 harness와 기준 fixture 선구축
+
+**검증 기록**
+
+- 2026-08-26 Node.js 24.19.0과 pnpm 11.12.0에서 format, lint, typecheck, Drizzle schema, unit 2개, package/app integration 104개, eval 5개, build와 smoke 4개가 통과했다.
+- macOS sandbox의 Chromium Mach port 제한을 분리한 승인된 외부 실행에서 Playwright E2E 1개가 통과했다.
+- Campus Drop과 unseen goal 3개, Personal Need 유무, good/bad calibration 8개로 contract, mode collapse, scope leak, stale Context, trivial Decision, false mastery/misconception과 redaction leak을 재현했다.
+- 사람 의미 review 누락은 `NEEDS_REVIEW`로 보존하고, calibration baseline 재생 결과가 committed JSON과 일치함을 검증했다.
+- revisioned Evaluation Run과 immutable Baseline Result의 migration, idempotent 저장, revision conflict와 복구를 SQLite integration test로 검증했다.
+- `tests/eval/TRACEABILITY.md`에 AC-MVP-001~014의 현재 test/eval 근거와 최종 검증 작업을 연결했다.
 
 **범위**
 
@@ -253,7 +262,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - Campus Drop만 통과하도록 특화된 구현은 unseen fixture에서 드러난다.
 - 각 MVP acceptance criterion이 어떤 test/eval로 검증되는지 추적표가 있다.
 
-### [ ] T08. Discovery Agent와 반복 Candidate loop
+### [>] T08. Discovery Agent와 반복 Candidate loop
 
 **범위**
 

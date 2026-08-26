@@ -881,6 +881,69 @@ export const auditRecords = sqliteTable(
   ],
 )
 
+export const evaluationRuns = sqliteTable(
+  'evaluation_runs',
+  {
+    id: text('id').primaryKey(),
+    headRevision: integer('head_revision').notNull(),
+    status: text('status').notNull(),
+    correlationId: text('correlation_id').notNull(),
+    evaluatorVersion: text('evaluator_version').notNull(),
+    systemUnderTestVersion: text('system_under_test_version').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    revisionCheck('evaluation_runs_head_revision_positive', table.headRevision),
+    index('evaluation_runs_status_idx').on(table.status),
+    index('evaluation_runs_correlation_idx').on(table.correlationId),
+  ],
+)
+
+export const evaluationRunRevisions = sqliteTable(
+  'evaluation_run_revisions',
+  {
+    evaluationRunId: text('evaluation_run_id')
+      .notNull()
+      .references(() => evaluationRuns.id, { onDelete: 'restrict' }),
+    revision: integer('revision').notNull(),
+    status: text('status').notNull(),
+    correlationId: text('correlation_id').notNull(),
+    startedAt: text('started_at').notNull(),
+    completedAt: text('completed_at'),
+    ...payloadColumns(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.evaluationRunId, table.revision] }),
+    revisionCheck('evaluation_run_revisions_revision_positive', table.revision),
+    check('evaluation_run_revisions_payload_json_valid', sql`json_valid(${table.payloadJson})`),
+  ],
+)
+
+export const baselineResults = sqliteTable(
+  'baseline_results',
+  {
+    id: text('id').primaryKey(),
+    evaluationRunId: text('evaluation_run_id')
+      .notNull()
+      .references(() => evaluationRuns.id, { onDelete: 'restrict' }),
+    correlationId: text('correlation_id').notNull(),
+    kind: text('kind').notNull(),
+    baselineName: text('baseline_name').notNull(),
+    baselineVersion: text('baseline_version').notNull(),
+    recordedAt: text('recorded_at').notNull(),
+    ...payloadColumns(),
+  },
+  (table) => [
+    check('baseline_results_payload_json_valid', sql`json_valid(${table.payloadJson})`),
+    uniqueIndex('baseline_results_identity_unique').on(
+      table.kind,
+      table.baselineName,
+      table.baselineVersion,
+    ),
+    index('baseline_results_evaluation_run_idx').on(table.evaluationRunId),
+  ],
+)
+
 export const idempotencyReceipts = sqliteTable(
   'idempotency_receipts',
   {

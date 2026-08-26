@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture_00000000-0000-4000-8000-000000000101",
+  "name": "Campus Drop golden seed",
+  "description": "Fixed regression seed for the approved Campus Drop scenario; it is not a recommendation template.",
+  "kind": "GOLDEN_PATH",
+  "inputPath": "tests/eval/fixtures/inputs/campus-drop.json",
+  "expectedContractDomains": ["DISCOVERY", "LEARNING_SPEC", "BUILD", "DECISION", "EVIDENCE"],
+  "criteria": [
+    {
+      "key": "semantic_diversity",
+      "dimension": "DISCOVERY_DIVERSITY",
+      "reviewMode": "HUMAN",
+      "description": "Candidates differ in problem, user, interaction, data shape and appeal.",
+      "successDefinition": "The round is not a list of file-sharing or CRUD theme variants."
+    },
+    {
+      "key": "concept_necessity",
+      "dimension": "CONCEPT_NECESSITY",
+      "reviewMode": "HUMAN",
+      "description": "The target TypeScript concepts are necessary for the core experience.",
+      "successDefinition": "Removing the target concept materially weakens the core interaction."
+    }
+  ],
+  "scenarioTags": ["golden path", "personal need", "file transfer"],
+  "fixtureVersion": "1.0.0",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED"
+}

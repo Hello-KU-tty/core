@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture_00000000-0000-4000-8000-000000000110",
+  "name": "Question misread as misconception",
+  "description": "Semantic negative calibration where a clarification question is labeled as a contradiction.",
+  "kind": "FALSE_MISCONCEPTION",
+  "inputPath": "tests/eval/fixtures/inputs/webhook-lens.json",
+  "calibrationSubjectPath": "tests/eval/fixtures/subjects/false-misconception.json",
+  "calibrationReviewPath": "tests/eval/fixtures/reviews/false-misconception.json",
+  "expectedContractDomains": ["EVIDENCE"],
+  "criteria": [
+    {
+      "key": "contract_valid",
+      "dimension": "CONTRACT_INTEGRITY",
+      "reviewMode": "AUTOMATED",
+      "description": "The semantically wrong proposal remains structurally valid.",
+      "successDefinition": "Strict Evidence Proposal validation succeeds."
+    },
+    {
+      "key": "evidence_policy",
+      "dimension": "EVIDENCE_QUALITY",
+      "reviewMode": "AUTOMATED",
+      "description": "The deterministic Core outcome remains reproducible for the submitted proposal.",
+      "successDefinition": "Core reproduces the fixture-declared acceptance outcome."
+    },
+    {
+      "key": "misconception_semantics",
+      "dimension": "EVIDENCE_QUALITY",
+      "reviewMode": "HUMAN",
+      "description": "A reviewer checks whether the cited user claim actually contradicts the Concept.",
+      "successDefinition": "A clarification question alone does not open a misconception issue."
+    }
+  ],
+  "scenarioTags": ["negative calibration", "false misconception", "semantic review"],
+  "fixtureVersion": "1.0.0",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED"
+}
