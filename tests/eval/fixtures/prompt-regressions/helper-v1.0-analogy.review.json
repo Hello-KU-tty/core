@@ -1,0 +1,29 @@
+[
+  {
+    "criterionKey": "helper_relevance",
+    "dimension": "CONTEXT_COMPLETENESS",
+    "reviewMode": "HUMAN",
+    "status": "PASSED",
+    "explanation": "The first answer compares the actual unknown-field behavior, includes the Builder recommendation and its product-specific limit, and avoids unrelated curriculum content.",
+    "evidenceReferences": ["decision", "helperInteraction.firstAnswer"],
+    "metrics": []
+  },
+  {
+    "criterionKey": "analogy_claims",
+    "dimension": "EVIDENCE_QUALITY",
+    "reviewMode": "HUMAN",
+    "status": "PASSED",
+    "explanation": "The answer first accepts the row-to-record correspondence, then distinguishes a model from a field/column and states where database constraints and relations break the spreadsheet analogy.",
+    "evidenceReferences": ["helperInteraction.analogyQuestion", "helperInteraction.analogyAnswer"],
+    "metrics": []
+  },
+  {
+    "criterionKey": "helper_non_coercive",
+    "dimension": "EVIDENCE_QUALITY",
+    "reviewMode": "HUMAN",
+    "status": "PASSED",
+    "explanation": "The DEMONSTRATED state leaves Helper available, offers optional detail, and does not require a quiz, repeat-back, Decision resolution or state change. Quick actions are explanation modes only.",
+    "evidenceReferences": ["helperInteraction.conceptState", "helperInteraction.quickActions", "helperInteraction.highStateAnswer"],
+    "metrics": []
+  }
+]

@@ -38,6 +38,7 @@ export const auditRecordSchema = z.strictObject({
       'LEARNING_SPEC',
       'BUILDER_TASK',
       'LIVE_CONTEXT',
+      'CONTEXT_REFRESH_REQUEST',
       'DECISION',
       'EVENT',
       'EPISODE',

@@ -290,3 +290,48 @@ describe('T11 Builder prompt regression', () => {
     )
   })
 })
+
+describe('T12 Helper prompt regression', () => {
+  it('keeps current Decision help concise, claim-level and available at a high Concept State', async () => {
+    const fixture = evaluationFixtureSchema.parse(
+      await loadInput('tests/eval/fixtures/prompt-regressions/helper-v1.0-analogy.manifest.json'),
+    )
+    const subject = parseEvaluationSubject(
+      await loadInput('tests/eval/fixtures/prompt-regressions/helper-v1.0-analogy.json'),
+    )
+    const reviews = evaluationCriterionResultSchema
+      .array()
+      .parse(
+        await loadInput('tests/eval/fixtures/prompt-regressions/helper-v1.0-analogy.review.json'),
+      )
+    const result = evaluateCalibrationCase({
+      fixture,
+      subject,
+      humanReviews: new Map(reviews.map((review) => [review.criterionKey, review])),
+    })
+    const decision = decisionRequestSchema.parse(subject.decision)
+    const interaction = subject.helperInteraction
+
+    expect(decision.relatedConceptNames).toEqual(['runtime validation'])
+    expect(interaction).toMatchObject({
+      freshness: 'CURRENT',
+      conceptState: 'DEMONSTRATED',
+      quickActions: ['더 쉽게', '더 자세히', '현재 코드로 예시', '선택지 비교'],
+    })
+    expect(interaction?.analogyAnswer).toContain('행에 대응시킨 부분은 맞아요')
+    expect(interaction?.analogyAnswer).toContain('각 필드가 열에 더 가깝습니다')
+    expect(`${interaction?.firstAnswer} ${interaction?.highStateAnswer}`).not.toMatch(
+      /(?:반드시|퀴즈|다시 말해|정답을 제출)/u,
+    )
+    expect(result.status).toBe('PASSED')
+    expect(result.criterionResults).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ criterionKey: 'contract_valid', status: 'PASSED' }),
+        expect.objectContaining({ criterionKey: 'redaction_no_leak', status: 'PASSED' }),
+        expect.objectContaining({ criterionKey: 'helper_relevance', status: 'PASSED' }),
+        expect.objectContaining({ criterionKey: 'analogy_claims', status: 'PASSED' }),
+        expect.objectContaining({ criterionKey: 'helper_non_coercive', status: 'PASSED' }),
+      ]),
+    )
+  })
+})

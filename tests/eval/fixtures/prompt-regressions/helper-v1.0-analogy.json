@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "decision": {
+    "schemaVersion": 1,
+    "id": "decision_21000000-0000-4000-8000-000000000201",
+    "projectId": "project_21000000-0000-4000-8000-000000000202",
+    "taskId": "task_21000000-0000-4000-8000-000000000203",
+    "correlationId": "corr_21000000-0000-4000-8000-000000000204",
+    "contextVersion": 3,
+    "category": "PRODUCT_BEHAVIOR",
+    "question": "Should the local webhook viewer reject or preserve unknown fields?",
+    "reasonRequiredNow": "The parser result and visible debugging behavior depend on this choice.",
+    "options": [
+      {
+        "id": "decision_option_21000000-0000-4000-8000-000000000205",
+        "label": "Reject unknown fields",
+        "description": "Fail validation when a recognized event has undeclared fields.",
+        "impacts": ["Typos and provider drift fail at the input boundary."],
+        "tradeoffs": ["Additive provider changes can fail until the schema is updated."]
+      },
+      {
+        "id": "decision_option_21000000-0000-4000-8000-000000000206",
+        "label": "Preserve unknown fields",
+        "description": "Validate required fields and show additional redacted fields.",
+        "impacts": ["New provider fields remain visible for local inspection."],
+        "tradeoffs": ["The accepted object is less strictly closed."]
+      }
+    ],
+    "recommendedOptionId": "decision_option_21000000-0000-4000-8000-000000000206",
+    "recommendationRationale": "A local inspection tool benefits from showing additive changes while still validating required fields.",
+    "relatedConceptNames": ["runtime validation"],
+    "sourceReferences": [{ "kind": "CODE", "path": "src/events.ts", "lineRange": { "start": 1, "end": 18 } }],
+    "independentWorkCanContinue": false,
+    "requestedAt": "2026-09-01T10:00:00.000Z",
+    "source": { "kind": "AGENT", "role": "BUILDER" },
+    "redactionStatus": "VERIFIED_REDACTED"
+  },
+  "helperInteraction": {
+    "freshness": "CURRENT",
+    "conceptState": "DEMONSTRATED",
+    "quickActions": ["더 쉽게", "더 자세히", "현재 코드로 예시", "선택지 비교"],
+    "firstAnswer": "지금 선택은 검증 성공 뒤 남는 데이터가 달라지는 문제예요. 거절하면 오타와 계약 변경을 빨리 잡고, 보존하면 새 필드를 화면에서 확인할 수 있습니다. Builder 추천은 로컬 디버깅 목적 때문에 보존 쪽이지만, 엄격한 계약 감지가 더 중요하면 거절도 타당합니다.",
+    "analogyQuestion": "DB 모델 추가가 엑셀 열 추가이고 실제 데이터가 행 추가인 거네?",
+    "analogyAnswer": "데이터 한 건을 행에 대응시킨 부분은 맞아요. 다만 모델 자체는 보통 표 전체의 구조에 가깝고, 모델의 각 필드가 열에 더 가깝습니다. 또 DB 모델은 타입·제약·관계까지 표현해서 엑셀 열보다 역할이 넓어요.",
+    "highStateAnswer": "이전에 runtime validation을 직접 적용했더라도 지금 질문할 수 있어요. 이번에는 검증 통과 뒤 unknown field를 버릴지 보존할지가 제품 동작의 차이입니다. 원하면 현재 excerpt 기준으로 두 분기를 더 자세히 비교해 드릴게요."
+  },
+  "redaction": {
+    "output": {
+      "codeExcerpt": "const token = [REDACTED];",
+      "answers": [
+        "지금 선택은 검증 성공 뒤 남는 데이터가 달라지는 문제예요.",
+        "데이터 한 건을 행에 대응시킨 부분은 맞아요."
+      ]
+    },
+    "forbiddenSentinels": ["synthetic-helper-secret-123", "synthetic-helper-bearer-456"]
+  }
+}

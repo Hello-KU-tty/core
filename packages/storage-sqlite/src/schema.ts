@@ -428,6 +428,65 @@ export const liveContextVersions = sqliteTable(
   ],
 )
 
+export const contextRefreshRequests = sqliteTable(
+  'context_refresh_requests',
+  {
+    id: text('id').primaryKey(),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'restrict' }),
+    taskId: text('task_id')
+      .notNull()
+      .references(() => tasks.id, { onDelete: 'restrict' }),
+    headRevision: integer('head_revision').notNull(),
+    status: text('status').notNull(),
+    correlationId: text('correlation_id').notNull(),
+    requestedAt: text('requested_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    revisionCheck('context_refresh_requests_head_revision_positive', table.headRevision),
+    check(
+      'context_refresh_requests_status_valid',
+      sql`${table.status} IN ('PENDING', 'FULFILLED')`,
+    ),
+    index('context_refresh_requests_task_status_idx').on(table.taskId, table.status),
+  ],
+)
+
+export const contextRefreshRequestRevisions = sqliteTable(
+  'context_refresh_request_revisions',
+  {
+    requestId: text('request_id')
+      .notNull()
+      .references(() => contextRefreshRequests.id, { onDelete: 'restrict' }),
+    revision: integer('revision').notNull(),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'restrict' }),
+    taskId: text('task_id')
+      .notNull()
+      .references(() => tasks.id, { onDelete: 'restrict' }),
+    status: text('status').notNull(),
+    correlationId: text('correlation_id').notNull(),
+    requestedAt: text('requested_at').notNull(),
+    fulfilledAt: text('fulfilled_at'),
+    ...payloadColumns(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.requestId, table.revision] }),
+    revisionCheck('context_refresh_request_revisions_revision_positive', table.revision),
+    check(
+      'context_refresh_request_revisions_status_valid',
+      sql`${table.status} IN ('PENDING', 'FULFILLED')`,
+    ),
+    check(
+      'context_refresh_request_revisions_payload_json_valid',
+      sql`json_valid(${table.payloadJson})`,
+    ),
+  ],
+)
+
 export const decisionRequests = sqliteTable(
   'decision_requests',
   {

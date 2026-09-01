@@ -6,6 +6,7 @@ import { learningSpecDraftContentSchema } from './learning-spec.js'
 import {
   conceptIdSchema,
   correlationIdSchema,
+  decisionIdSchema,
   entityRevisionSchema,
   idempotencyKeySchema,
   discoverySessionIdSchema,
@@ -100,6 +101,7 @@ export const uiOpenHelperQuerySchema = z.strictObject({
   kind: z.literal('UI_OPEN_HELPER'),
   projectId: projectIdSchema,
   taskId: taskIdSchema.optional(),
+  decisionId: decisionIdSchema.optional(),
   question: nonEmptyTextSchema.optional(),
 })
 

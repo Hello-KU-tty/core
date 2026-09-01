@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture_00000000-0000-4000-8000-000000000116",
+  "name": "Helper Agent v1.0.0 bounded analogy regression",
+  "description": "Redacted Helper regression for current Decision relevance, concise progressive explanation, claim-level analogy correction, high-state availability and no forced quiz.",
+  "kind": "GOLDEN_PATH",
+  "inputPath": "tests/eval/fixtures/inputs/webhook-lens.json",
+  "expectedContractDomains": ["DECISION"],
+  "criteria": [
+    {
+      "key": "contract_valid",
+      "dimension": "CONTRACT_INTEGRITY",
+      "reviewMode": "AUTOMATED",
+      "description": "The focused Decision satisfies the strict runtime contract.",
+      "successDefinition": "The current Helper Decision context passes validation."
+    },
+    {
+      "key": "redaction_no_leak",
+      "dimension": "REDACTION",
+      "reviewMode": "AUTOMATED",
+      "description": "The bounded Helper output contains no credential sentinel or host user path.",
+      "successDefinition": "No forbidden sentinel or user-home path remains."
+    },
+    {
+      "key": "helper_relevance",
+      "dimension": "CONTEXT_COMPLETENESS",
+      "reviewMode": "HUMAN",
+      "description": "The first answer stays concise and explains the current Decision impacts and recommendation limits.",
+      "successDefinition": "A reviewer can connect the answer to the focused Decision without unrelated teaching."
+    },
+    {
+      "key": "analogy_claims",
+      "dimension": "EVIDENCE_QUALITY",
+      "reviewMode": "HUMAN",
+      "description": "The Helper recognizes the correct row mapping and separately corrects the model-to-column mismatch and analogy limit.",
+      "successDefinition": "The compound analogy is neither accepted nor rejected as a whole."
+    },
+    {
+      "key": "helper_non_coercive",
+      "dimension": "EVIDENCE_QUALITY",
+      "reviewMode": "HUMAN",
+      "description": "Quick actions change explanation mode without becoming Evidence, and a high Concept State does not hide Helper or force a quiz.",
+      "successDefinition": "The response remains available, offers optional depth and contains no mandatory test or repeat-back demand."
+    }
+  ],
+  "scenarioTags": ["prompt regression", "helper", "bounded context", "analogy", "high concept state", "no forced quiz", "redaction"],
+  "fixtureVersion": "1.0.0",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED"
+}

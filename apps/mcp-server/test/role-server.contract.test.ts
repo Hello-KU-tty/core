@@ -238,6 +238,53 @@ describe('role-bound MCP server', () => {
     }
   })
 
+  it('records a durable Helper refresh request without mutating Builder Context', async () => {
+    const harness = await connectRole('HELPER', { seedBuilder: true })
+    try {
+      const context = await harness.client.callTool({
+        name: 'get_helper_context',
+        arguments: {
+          schemaVersion: 1,
+          kind: 'HELPER_GET_CONTEXT',
+          correlationId: ids.correlation,
+          actor: { kind: 'AGENT', role: 'HELPER' },
+          projectId: ids.project,
+          taskId: ids.task,
+          question: 'What is the Builder doing now?',
+          relatedConceptNames: [],
+        },
+      })
+      expect(context).toMatchObject({
+        structuredContent: { freshness: { status: 'MISSING', refreshRequired: true } },
+      })
+
+      const refresh = await harness.client.callTool({
+        name: 'request_builder_context_refresh',
+        arguments: {
+          schemaVersion: 1,
+          kind: 'HELPER_REQUEST_CONTEXT_REFRESH',
+          correlationId: ids.correlation,
+          actor: { kind: 'AGENT', role: 'HELPER' },
+          idempotencyKey: 'idem_00000000-0000-4000-8000-000000000241',
+          projectId: ids.project,
+          taskId: ids.task,
+          reason: 'Live Context is missing.',
+        },
+      })
+      expect(refresh).toMatchObject({
+        structuredContent: { accepted: true, resourceRevision: 1 },
+      })
+      expect(
+        harness.storage.repository.readBuilderTaskAggregate(ids.project, ids.task),
+      ).toMatchObject({
+        liveContext: null,
+        contextRefreshRequests: [{ status: 'PENDING', revision: 1 }],
+      })
+    } finally {
+      await harness.close()
+    }
+  })
+
   it('expands a concise Discovery proposal with trusted metadata before application', async () => {
     const generatedCandidateId = 'candidate_00000000-0000-4000-8000-000000000071'
     const generatedRoundId = 'candidate_round_00000000-0000-4000-8000-000000000072'

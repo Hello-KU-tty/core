@@ -259,6 +259,14 @@
 - **검토한 대안:** Decision과 Context를 순차 저장, Task를 항상 ACTIVE로 유지, resolution만으로 적용 완료 처리, Builder가 stable metadata를 생성, 의미적 필요성을 filename keyword 같은 heuristic으로 자동 판정, T11에서 Helper 대화·Decision UI·Episode assembler까지 함께 구현.
 - **tradeoff:** request와 application command가 Context version을 함께 다뤄 contract와 transaction test가 늘어난다. 대신 stale retry와 재시작에서도 pending gate가 재현되고 사용자의 선택, Builder 적용, Task 재개가 구분된다. Decision 필요성 자체는 LLM prompt와 기록된 human review가 담당하므로 사소한 질문을 완벽히 자동 차단하지는 않지만, Core가 의미 판단을 가장하거나 fixture 문구에 과적합하지 않는다.
 
+## 2026-09-01: T12 bounded Helper context와 durable refresh 경계
+
+- **상태:** 승인
+- **맥락:** T06의 Helper scaffold는 Live Context, active Decision과 최대 5개 Ledger를 읽고 refresh 요청을 audit에만 남긴다. 하지만 활성 Task가 없는 완료 Project에서는 Helper를 열 수 없고, missing Context가 current처럼 보이며, 관련 Concept 이름이 비어 있으면 무관한 Ledger 앞 5개가 반환된다. code·diff·Builder 대화 reference도 실제 내용의 가용성을 구분하지 않아 Helper가 현재 코드를 추측할 위험이 있다.
+- **결정:** Helper는 active Task가 없으면 마지막 current Task로 fallback하고 freshness를 `CURRENT`, `STALE`, `MISSING`으로 명시한다. Context package는 Live Context→Task/Spec→지정 또는 active Decision→질문·Context·Decision 관련 Concept 최대 5개→관련 과거 Episode→bounded source 순으로 조립한다. 무관한 Ledger fallback은 만들지 않는다. Builder가 이미 제출한 workspace-contained code reference만 질문 시점에 최대 3개, excerpt당 최대 8 KiB로 읽고 redaction한 뒤 응답하며 DB에는 복제하지 않는다. diff와 Builder transcript 원문은 장기 저장하지 않고 reference/availability만 전달한다. refresh는 versioned `ContextRefreshRequest`로 저장해 Builder가 pending 요청을 읽을 수 있게 하고, 더 새로운 Builder Context가 같은 transaction에서 이를 fulfilled로 닫는다. Helper는 Context, Decision, Evidence와 Builder Progress를 직접 변경하지 않는다. Prompt 원문은 `docs/agent-prompts/helper.md` version 1.0.0으로 고정하고, quick action은 답변 mode일 뿐 T13 Event/Evidence source가 아니다.
+- **검토한 대안:** 완료 Project에서 Helper를 닫음, missing을 stale boolean 하나로 표현, 질문과 무관한 Ledger를 채워 반환, Helper에 전체 workspace `fs_read`나 shell 허용, 전체 repository·diff·Builder transcript를 매 질문 저장·주입, refresh를 audit summary로만 보존.
+- **tradeoff:** Context response와 SQLite migration, bounded file read와 refresh lifecycle test가 늘어난다. 대신 AC-MVP-005의 현재성·최소성·복구 가능성을 재시작 뒤에도 검증할 수 있고, Helper가 넓은 file 권한이나 raw transcript 저장 없이 현재 코드에 근거한 답을 할 수 있다. 실제 Helper conversation Event와 Episode 조립은 T13, quick card UI는 T16에 남긴다.
+
 ## 2026-08-24: 구현 세부 선택 위임
 
 - **상태:** 승인

@@ -44,6 +44,15 @@ export interface EvaluationSubject {
     readonly output: unknown
     readonly forbiddenSentinels: readonly string[]
   }
+  readonly helperInteraction?: {
+    readonly freshness: 'CURRENT' | 'STALE' | 'MISSING'
+    readonly conceptState: 'OBSERVED' | 'EXPLAINED' | 'DEMONSTRATED' | 'TRANSFERRED'
+    readonly quickActions: readonly string[]
+    readonly firstAnswer: string
+    readonly analogyQuestion: string
+    readonly analogyAnswer: string
+    readonly highStateAnswer: string
+  }
 }
 
 export interface EvaluationScorerContext {

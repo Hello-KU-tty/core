@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { activityEventSchema, episodeSchema } from './activity.js'
 import {
   builderTaskSchema,
+  contextRefreshRequestSchema,
   decisionContextDraftSchema,
   decisionApplicationSchema,
   decisionRequestDraftSchema,
@@ -33,8 +34,9 @@ import {
   projectIdSchema,
   schemaVersionSchema,
   taskIdSchema,
+  utcTimestampSchema,
 } from './primitives.js'
-import { contextualSourceReferenceSchema } from './references.js'
+import { codeReferenceSchema, contextualSourceReferenceSchema } from './references.js'
 
 const discoveryQueryMetadata = {
   schemaVersion: schemaVersionSchema,
@@ -87,6 +89,7 @@ export const helperGetContextQuerySchema = z.strictObject({
   kind: z.literal('HELPER_GET_CONTEXT'),
   projectId: projectIdSchema,
   taskId: taskIdSchema.optional(),
+  decisionId: decisionIdSchema.optional(),
   question: nonEmptyTextSchema,
   relatedConceptNames: z.array(labelSchema).max(5),
   observedContextVersion: entityRevisionSchema.optional(),
@@ -343,6 +346,30 @@ export const builderTaskContextSchema = z.strictObject({
   decisionRequests: z.array(decisionRequestSchema).max(50),
   decisionResolutions: z.array(decisionResolutionSchema).max(50),
   decisionApplications: z.array(decisionApplicationSchema).max(50),
+  pendingContextRefreshRequests: z.array(contextRefreshRequestSchema).max(20),
+})
+
+export const helperEpisodeSummarySchema = z.strictObject({
+  episodeId: episodeIdSchema,
+  type: z.enum(['BUILD_TASK', 'DECISION', 'HELPER_CONVERSATION', 'FINAL_UPGRADE']),
+  endedAt: utcTimestampSchema,
+  conceptNames: z.array(labelSchema).max(20),
+  redactedUserExcerpts: z.array(nonEmptyTextSchema).max(5),
+  helperResponseSummaries: z.array(nonEmptyTextSchema).max(5),
+  contextReferences: z.array(contextualSourceReferenceSchema).max(10),
+})
+
+export const helperSourceExcerptSchema = z.strictObject({
+  reference: codeReferenceSchema,
+  redactedExcerpt: z.string().trim().min(1).max(8_192),
+  truncated: z.boolean(),
+  redactionStatus: z.literal('VERIFIED_REDACTED'),
+})
+
+export const helperReferenceDetailSchema = z.strictObject({
+  reference: contextualSourceReferenceSchema,
+  availability: z.enum(['EXCERPT_INCLUDED', 'REFERENCE_ONLY', 'UNAVAILABLE']),
+  reason: z.string().trim().min(1).max(240).optional(),
 })
 
 export const helperContextSchema = z.strictObject({
@@ -353,11 +380,19 @@ export const helperContextSchema = z.strictObject({
   task: builderTaskSchema,
   liveContext: liveProjectContextSchema.nullable(),
   activeDecisions: z.array(decisionRequestSchema).max(10),
+  focusedDecision: decisionRequestSchema.nullable(),
   relevantLedgerEntries: z.array(conceptLedgerEntrySchema).max(5),
+  recentEpisodes: z.array(helperEpisodeSummarySchema).max(5),
   contextReferences: z.array(contextualSourceReferenceSchema).max(30),
+  referenceDetails: z.array(helperReferenceDetailSchema).max(30),
+  sourceExcerpts: z.array(helperSourceExcerptSchema).max(3),
+  pendingContextRefreshRequests: z.array(contextRefreshRequestSchema).max(20),
   freshness: z.strictObject({
     currentContextVersion: entityRevisionSchema.nullable(),
+    observedContextVersion: entityRevisionSchema.nullable(),
+    status: z.enum(['CURRENT', 'STALE', 'MISSING']),
     stale: z.boolean(),
+    refreshRequired: z.boolean(),
   }),
 })
 
@@ -400,6 +435,9 @@ export type EvidenceAnalystRequest = z.infer<typeof evidenceAnalystRequestSchema
 export type DiscoveryContext = z.infer<typeof discoveryContextSchema>
 export type BuilderTaskContext = z.infer<typeof builderTaskContextSchema>
 export type HelperContext = z.infer<typeof helperContextSchema>
+export type HelperEpisodeSummary = z.infer<typeof helperEpisodeSummarySchema>
+export type HelperSourceExcerpt = z.infer<typeof helperSourceExcerptSchema>
+export type HelperReferenceDetail = z.infer<typeof helperReferenceDetailSchema>
 export type EpisodeContext = z.infer<typeof episodeContextSchema>
 export type DecisionResult = z.infer<typeof decisionResultSchema>
 export type DecisionCommandReceipt = z.infer<typeof decisionCommandReceiptSchema>

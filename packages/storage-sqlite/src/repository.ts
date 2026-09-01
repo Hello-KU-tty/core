@@ -20,6 +20,7 @@ import {
   canonicalConceptSchema,
   conceptAliasProposalSchema,
   conceptLedgerEntrySchema,
+  contextRefreshRequestSchema,
   correlationIdSchema,
   decisionApplicationSchema,
   decisionRequestSchema,
@@ -49,6 +50,7 @@ import {
   type CanonicalConcept,
   type ConceptAliasProposal,
   type ConceptLedgerEntry,
+  type ContextRefreshRequest,
   type DecisionApplication,
   type DecisionRequest,
   type DecisionResolution,
@@ -609,6 +611,65 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
       }
       return inserted(record.id, record.contextVersion)
     })
+  }
+
+  appendContextRefreshRequest(input: ContextRefreshRequest): PersistenceWriteResult {
+    const prepared = prepareRecord(contextRefreshRequestSchema, input)
+    const record = prepared.record
+    const updatedAt = record.fulfilledAt ?? record.requestedAt
+    return this.#write(record.id, () =>
+      this.#appendVersioned({
+        recordId: record.id,
+        revision: record.revision,
+        prepared,
+        existingSql:
+          'SELECT payload_json, payload_hash FROM context_refresh_request_revisions WHERE request_id = ? AND revision = ?',
+        existingParams: [record.id, record.revision],
+        headSql: 'SELECT head_revision FROM context_refresh_requests WHERE id = ?',
+        headParams: [record.id],
+        insertStable: () => {
+          this.#sqlite
+            .prepare(
+              'INSERT INTO context_refresh_requests (id, project_id, task_id, head_revision, status, correlation_id, requested_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            )
+            .run(
+              record.id,
+              record.projectId,
+              record.taskId,
+              record.revision,
+              record.status,
+              record.correlationId,
+              record.requestedAt,
+              updatedAt,
+            )
+        },
+        insertHistory: () => {
+          this.#sqlite
+            .prepare(
+              'INSERT INTO context_refresh_request_revisions (request_id, revision, project_id, task_id, status, correlation_id, requested_at, fulfilled_at, payload_json, payload_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            )
+            .run(
+              record.id,
+              record.revision,
+              record.projectId,
+              record.taskId,
+              record.status,
+              record.correlationId,
+              record.requestedAt,
+              record.fulfilledAt ?? null,
+              prepared.payloadJson,
+              prepared.payloadHash,
+            )
+        },
+        updateHead: () => {
+          this.#sqlite
+            .prepare(
+              'UPDATE context_refresh_requests SET head_revision = ?, status = ?, correlation_id = ?, updated_at = ? WHERE id = ?',
+            )
+            .run(record.revision, record.status, record.correlationId, updatedAt, record.id)
+        },
+      }),
+    )
   }
 
   appendDecisionRequest(input: DecisionRequest): PersistenceWriteResult {
@@ -1493,6 +1554,16 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
         [projectId, taskId],
         decisionApplicationSchema,
       )
+      const contextRefreshRequests = this.#recordList(
+        `SELECT revisions.payload_json, revisions.payload_hash
+         FROM context_refresh_requests heads
+         JOIN context_refresh_request_revisions revisions
+           ON revisions.request_id = heads.id AND revisions.revision = heads.head_revision
+         WHERE heads.project_id = ? AND heads.task_id = ?
+         ORDER BY heads.requested_at ASC`,
+        [projectId, taskId],
+        contextRefreshRequestSchema,
+      )
       const completionReport = this.#headRecord(
         'SELECT payload_json, payload_hash FROM completion_reports WHERE project_id = ? AND task_id = ? ORDER BY completed_at DESC LIMIT 1',
         [projectId, taskId],
@@ -1506,6 +1577,7 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
         decisionRequests,
         decisionResolutions,
         decisionApplications,
+        contextRefreshRequests,
         completionReport,
       }
     })
@@ -1560,6 +1632,49 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
         evidenceProposalSchema,
       )
       return { episode, events, relevantLedgerEntries, evidenceProposals }
+    })
+  }
+
+  readLatestTaskForProject(projectId: string): BuilderTask | null {
+    if (!projectSchema.shape.id.safeParse(projectId).success) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Project ID is invalid')
+    }
+    return this.#read(() =>
+      this.#headRecord(
+        `SELECT revisions.payload_json, revisions.payload_hash
+         FROM tasks heads
+         JOIN task_revisions revisions
+           ON revisions.task_id = heads.id AND revisions.revision = heads.head_revision
+         WHERE heads.project_id = ?
+         ORDER BY heads.sequence DESC LIMIT 1`,
+        [projectId],
+        builderTaskSchema,
+      ),
+    )
+  }
+
+  readRecentEpisodeAggregatesForProject(
+    projectId: string,
+    limit: number,
+  ): readonly EpisodeAggregate[] {
+    if (!projectSchema.shape.id.safeParse(projectId).success || !Number.isInteger(limit)) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Recent Episode query is invalid')
+    }
+    if (limit < 1 || limit > 50) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Recent Episode limit must be 1 through 50')
+    }
+    return this.#read(() => {
+      const rows = this.#sqlite
+        .prepare<[string, number], { readonly id: string }>(
+          `SELECT id FROM episodes
+           WHERE project_id = ? AND status != 'OPEN'
+           ORDER BY updated_at DESC LIMIT ?`,
+        )
+        .all(projectId, limit)
+      return rows.flatMap((row) => {
+        const aggregate = this.readEpisodeAggregate(projectId, row.id)
+        return aggregate === null ? [] : [aggregate]
+      })
     })
   }
 

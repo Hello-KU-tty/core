@@ -85,6 +85,7 @@ describe('Builder Agent adapter', () => {
               decisionRequests: [],
               decisionResolutions: [],
               decisionApplications: [],
+              pendingContextRefreshRequests: [],
             },
           }
         }

@@ -1,3 +1,5 @@
+import { redactSensitiveText } from '@vibe-helper/application'
+
 export type BuilderStreamKind =
   | 'MESSAGE'
   | 'TOOL_CALL'
@@ -14,17 +16,8 @@ export interface BuilderStreamEvent {
   readonly redactionStatus: 'VERIFIED_REDACTED'
 }
 
-const SECRET_ASSIGNMENT =
-  /\b(api[_-]?key|access[_-]?token|auth[_-]?token|password|secret)\b\s*[:=]\s*["']?[^\s,"']+/gi
-const BEARER_TOKEN = /\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi
-const USER_PATH = /\/Users\/[^/\s"']+(?:\/[^\s"']*)?/g
-
 export function redactBuilderStreamText(text: string, workspaceRoot?: string): string {
-  let redacted = text
-    .replace(SECRET_ASSIGNMENT, '$1=[REDACTED]')
-    .replace(BEARER_TOKEN, 'Bearer [REDACTED]')
-  if (workspaceRoot !== undefined) redacted = redacted.split(workspaceRoot).join('[WORKSPACE]')
-  return redacted.replace(USER_PATH, '[REDACTED_PATH]')
+  return redactSensitiveText(text, workspaceRoot)
 }
 
 function classify(value: unknown): BuilderStreamKind {

@@ -4,6 +4,7 @@ import {
   acceptedEvidenceSchema,
   activityEventSchema,
   conceptStateSchema,
+  contextRefreshRequestSchema,
   decisionRequestSchema,
   discoveryInputSchema,
   episodeSchema,
@@ -19,6 +20,7 @@ import {
   activityEventFixture,
   candidateFixture,
   confirmedLearningSpecFixture,
+  contextRefreshRequestFixture,
   decisionRequestFixture,
   discoveryInputFixture,
   episodeFixture,
@@ -118,6 +120,27 @@ describe('Build, Event, and Evidence provenance invariants', () => {
     expect(
       liveProjectContextSchema.safeParse({ ...liveContextFixture, contextVersion: 3 }).success,
     ).toBe(false)
+  })
+
+  it('requires complete Context refresh fulfillment metadata', () => {
+    expect(
+      contextRefreshRequestSchema.safeParse({
+        ...contextRefreshRequestFixture,
+        revision: 1,
+        status: 'FULFILLED',
+        fulfilledAt: contextRefreshRequestFixture.requestedAt,
+        fulfilledByContextVersion: 2,
+      }).success,
+    ).toBe(false)
+    expect(
+      contextRefreshRequestSchema.safeParse({
+        ...contextRefreshRequestFixture,
+        revision: 2,
+        status: 'FULFILLED',
+        fulfilledAt: contextRefreshRequestFixture.requestedAt,
+        fulfilledByContextVersion: 2,
+      }).success,
+    ).toBe(true)
   })
 
   it('requires closed Episode boundaries', () => {

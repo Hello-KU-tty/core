@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import {
   completionReportIdSchema,
+  contextRefreshRequestIdSchema,
   correlationIdSchema,
   decisionApplicationIdSchema,
   decisionCategorySchema,
@@ -103,6 +104,76 @@ export const liveProjectContextSchema = z
   .refine((context) => context.contextVersion === context.expectedPreviousVersion + 1, {
     path: ['contextVersion'],
     message: 'Live Context version must immediately follow expectedPreviousVersion',
+  })
+
+export const contextRefreshRequestStatusSchema = z.enum(['PENDING', 'FULFILLED'])
+
+export const contextRefreshRequestSchema = z
+  .strictObject({
+    schemaVersion: schemaVersionSchema,
+    id: contextRefreshRequestIdSchema,
+    projectId: projectIdSchema,
+    taskId: taskIdSchema,
+    correlationId: correlationIdSchema,
+    revision: entityRevisionSchema,
+    observedContextVersion: entityRevisionSchema.optional(),
+    reason: nonEmptyTextSchema,
+    status: contextRefreshRequestStatusSchema,
+    requestedAt: utcTimestampSchema,
+    fulfilledAt: utcTimestampSchema.optional(),
+    fulfilledByContextVersion: entityRevisionSchema.optional(),
+    source: z.strictObject({ kind: z.literal('AGENT'), role: z.literal('HELPER') }),
+    redactionStatus: redactionStatusSchema,
+  })
+  .superRefine((request, context) => {
+    if (
+      (request.revision === 1 && request.status !== 'PENDING') ||
+      (request.status === 'FULFILLED' && request.revision < 2)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['revision'],
+        message: 'Context refresh must begin pending at revision 1 before fulfillment',
+      })
+    }
+    const hasFulfillment =
+      request.fulfilledAt !== undefined || request.fulfilledByContextVersion !== undefined
+    if (request.status === 'PENDING' && hasFulfillment) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Pending Context refresh request must not contain fulfillment fields',
+      })
+    }
+    if (
+      request.status === 'FULFILLED' &&
+      (request.fulfilledAt === undefined || request.fulfilledByContextVersion === undefined)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Fulfilled Context refresh request requires fulfillment fields',
+      })
+    }
+    if (
+      request.fulfilledAt !== undefined &&
+      Date.parse(request.fulfilledAt) < Date.parse(request.requestedAt)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['fulfilledAt'],
+        message: 'Context refresh request cannot be fulfilled before it was requested',
+      })
+    }
+    if (
+      request.fulfilledByContextVersion !== undefined &&
+      request.observedContextVersion !== undefined &&
+      request.fulfilledByContextVersion <= request.observedContextVersion
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['fulfilledByContextVersion'],
+        message: 'Fulfillment must reference a newer Context version',
+      })
+    }
   })
 
 export const builderUpdateLiveContextToolInputSchema = z.strictObject({
@@ -375,6 +446,7 @@ export const builderCompleteTaskToolInputSchema = z.strictObject({
 
 export type BuilderTask = z.infer<typeof builderTaskSchema>
 export type LiveProjectContext = z.infer<typeof liveProjectContextSchema>
+export type ContextRefreshRequest = z.infer<typeof contextRefreshRequestSchema>
 export type DecisionOption = z.infer<typeof decisionOptionSchema>
 export type DecisionOptionDraft = z.infer<typeof decisionOptionDraftSchema>
 export type DecisionRequestDraft = z.infer<typeof decisionRequestDraftSchema>

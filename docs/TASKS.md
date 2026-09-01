@@ -401,7 +401,20 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - 억지 교육용 질문이나 파일명·코드 스타일 같은 되돌리기 쉬운 선택이 Decision으로 노출되지 않는다.
 - 이유 없는 추천 수락이 이해 Evidence로 기록되지 않는다.
 
-### [>] T12. Helper의 최소 맥락 조회와 대화
+### [x] T12. Helper의 최소 맥락 조회와 대화
+
+**승인 기록**
+
+- 2026-09-01 사용자가 T12의 bounded context, durable refresh, read-only Helper prompt/adapter, 의미 회귀와 실제 Kiro 검증 계획을 승인했다.
+- Helper conversation Event/Episode 생성은 T13, 실제 quick action과 자유 입력 UI는 T16 범위로 유지한다.
+
+**검증 기록**
+
+- 2026-09-01 Node.js 24.19.0과 pnpm 11.12.0에서 format 118 files, lint 118 files, typecheck, Drizzle schema, unit 2개, package/app integration 147개, eval 9개, build와 smoke 4개가 통과했다. macOS sandbox의 Chromium Mach port 제한을 분리한 승인된 외부 실행에서 Playwright E2E 1개도 통과했다.
+- Helper Context는 CURRENT/STALE/MISSING을 구분하고, active Task가 없으면 가장 최근 완료 Task로 fallback한다. 질문·Live Context·focused Decision과 연결된 Ledger 최대 5개, 닫힌 Episode 최대 5개, reference 최대 30개와 workspace-contained code excerpt 최대 3개만 반환하며 무관한 Ledger fallback과 raw diff/Builder transcript 저장은 만들지 않는다.
+- missing/stale refresh는 versioned `ContextRefreshRequest`로 SQLite에 저장되고 Builder의 다음 Context가 같은 transaction에서 이를 `FULFILLED`로 닫는다. Helper role에는 Core MCP 2개만 있고 file, shell, Decision 해결과 Evidence/State 변경 권한이 없다.
+- Helper prompt v1.0.0의 `helper-v1.0-analogy` fixture는 현재 Decision에 연결된 짧은 첫 답변, DB/Excel 복합 비유의 claim 단위 인정·정정, `DEMONSTRATED` 상태의 지속 접근성과 강제 퀴즈 금지를 strict contract와 기록된 사람 review로 통과했다.
+- 로그인된 Kiro CLI 2.20.2 Agent Engine v2와 `claude-haiku-4.5` live runner에서 Helper가 current Context tool을 정확히 1회 호출하고 refresh는 요청하지 않았다. Decision 비교, 비유 한계, 선택적 quick action을 답했으며 Context version 1과 Builder-owned state는 불변, source excerpt의 synthetic secret은 미노출이었다.
 
 **범위**
 
@@ -425,7 +438,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - `DEMONSTRATED` 이상에서도 Helper 진입과 질문 제안이 유지된다.
 - 카드는 접근성을 높이지만 클릭 자체가 Evidence가 되지 않고 자유 입력을 가리지 않는다.
 
-### [ ] T13. Event 정규화, Episode assembler와 Evidence Analyst
+### [>] T13. Event 정규화, Episode assembler와 Evidence Analyst
 
 **범위**
 

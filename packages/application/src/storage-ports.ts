@@ -8,6 +8,7 @@ import type {
   CanonicalConcept,
   ConceptAliasProposal,
   ConceptLedgerEntry,
+  ContextRefreshRequest,
   DecisionApplication,
   DecisionRequest,
   DecisionResolution,
@@ -90,6 +91,7 @@ export interface BuilderTaskAggregate {
   readonly decisionRequests: readonly DecisionRequest[]
   readonly decisionResolutions: readonly DecisionResolution[]
   readonly decisionApplications: readonly DecisionApplication[]
+  readonly contextRefreshRequests: readonly ContextRefreshRequest[]
   readonly completionReport: TaskCompletionReport | null
 }
 
@@ -132,6 +134,7 @@ export interface PersistenceRepository {
 
   appendTask(record: BuilderTask): PersistenceWriteResult
   appendLiveContext(record: LiveProjectContext): PersistenceWriteResult
+  appendContextRefreshRequest(record: ContextRefreshRequest): PersistenceWriteResult
   appendDecisionRequest(record: DecisionRequest): PersistenceWriteResult
   appendDecisionResolution(record: DecisionResolution): PersistenceWriteResult
   appendDecisionApplication(record: DecisionApplication): PersistenceWriteResult
@@ -156,7 +159,12 @@ export interface PersistenceRepository {
   readDiscoveryAggregate(projectId: string, discoverySessionId?: string): DiscoveryAggregate | null
   readDiscoveryAggregateBySession(discoverySessionId: string): DiscoveryAggregate | null
   readBuilderTaskAggregate(projectId: string, taskId: string): BuilderTaskAggregate | null
+  readLatestTaskForProject(projectId: string): BuilderTask | null
   readEpisodeAggregate(projectId: string, episodeId: string): EpisodeAggregate | null
+  readRecentEpisodeAggregatesForProject(
+    projectId: string,
+    limit: number,
+  ): readonly EpisodeAggregate[]
   readCanonicalConceptById(conceptId: string): CanonicalConcept | null
   readCanonicalConceptByName(canonicalName: string): CanonicalConcept | null
   readIdempotencyReceipt(key: string): IdempotencyReceipt | null

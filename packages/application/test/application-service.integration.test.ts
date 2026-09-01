@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, stat, symlink } from 'node:fs/promises'
+import { mkdir, mkdtemp, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -278,6 +278,203 @@ describe('ApplicationService boundary', () => {
       success: false,
       error: { kind: 'OPERATION_ERROR', code: 'PAYLOAD_TOO_LARGE' },
     })
+  })
+
+  it('persists a missing Context refresh request and fulfills it on the next Builder Context', async () => {
+    const { service, storage } = await createHarness()
+    seedBuilderGraph(storage)
+
+    await expect(
+      service.executeAgent('HELPER', {
+        schemaVersion: 1,
+        kind: 'HELPER_GET_CONTEXT',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'HELPER' },
+        projectId: ids.project,
+        taskId: ids.task,
+        question: 'What is happening now?',
+        relatedConceptNames: [],
+      }),
+    ).resolves.toMatchObject({
+      success: true,
+      data: {
+        relevantLedgerEntries: [],
+        freshness: {
+          currentContextVersion: null,
+          status: 'MISSING',
+          stale: true,
+          refreshRequired: true,
+        },
+      },
+    })
+
+    const refreshCommand = {
+      schemaVersion: 1,
+      kind: 'HELPER_REQUEST_CONTEXT_REFRESH',
+      correlationId: ids.correlation,
+      actor: { kind: 'AGENT', role: 'HELPER' },
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000201',
+      projectId: ids.project,
+      taskId: ids.task,
+      reason: 'Context is missing; apiKey=do-not-store from /Users/example/private.',
+    } as const
+    const firstRefresh = await service.executeAgent('HELPER', refreshCommand)
+    expect(await service.executeAgent('HELPER', refreshCommand)).toEqual(firstRefresh)
+    expect(firstRefresh).toMatchObject({ success: true, data: { resourceRevision: 1 } })
+
+    const pending = storage.repository.readBuilderTaskAggregate(ids.project, ids.task)
+      ?.contextRefreshRequests[0]
+    expect(pending).toMatchObject({ status: 'PENDING', revision: 1 })
+    expect(pending?.reason).toContain('[REDACTED]')
+    expect(pending?.reason).not.toContain('do-not-store')
+    expect(pending?.reason).not.toContain('/Users/example')
+    await expect(
+      service.executeAgent('BUILDER', {
+        schemaVersion: 1,
+        kind: 'BUILDER_GET_TASK',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'BUILDER' },
+        projectId: ids.project,
+        taskId: ids.task,
+      }),
+    ).resolves.toMatchObject({
+      success: true,
+      data: { pendingContextRefreshRequests: [{ status: 'PENDING' }] },
+    })
+
+    const firstContext = {
+      ...liveContextFixture,
+      checkpoint: 'TASK_STARTED' as const,
+      activeDecisionIds: [],
+      blockingReason: undefined,
+    }
+    await expect(
+      service.executeAgent('BUILDER', {
+        schemaVersion: 1,
+        kind: 'BUILDER_UPDATE_LIVE_CONTEXT',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'BUILDER' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000202',
+        context: firstContext,
+      }),
+    ).resolves.toMatchObject({ success: true })
+
+    expect(
+      storage.repository.readBuilderTaskAggregate(ids.project, ids.task)?.contextRefreshRequests,
+    ).toEqual([
+      expect.objectContaining({
+        id: pending?.id,
+        revision: 2,
+        status: 'FULFILLED',
+        fulfilledByContextVersion: 1,
+      }),
+    ])
+  })
+
+  it('assembles focused, redacted Helper context and remains available after Task completion', async () => {
+    const { service, storage, workspaceRoot } = await createHarness()
+    seedBuilderGraph(storage)
+    const sourceDirectory = join(
+      workspaceRoot,
+      ...projectFixture.generatedWorkspacePath.split('/'),
+      'src',
+    )
+    await mkdir(sourceDirectory, { recursive: true })
+    await writeFile(
+      join(sourceDirectory, 'events.ts'),
+      'const apiKey = "do-not-expose";\nexport const config = { "clientSecret": "do-not-expose-json" };\nexport const rejectUnknown = true;\n',
+      'utf8',
+    )
+    storage.transaction((repository) => {
+      repository.appendLiveContext(liveContextFixture)
+      repository.appendDecisionRequest(decisionRequestSchema.parse(decisionRequestFixture))
+      repository.appendActivityEvent(activityEventSchema.parse(activityEventFixture))
+      repository.appendEpisode(episodeSchema.parse(episodeFixture))
+      repository.appendCanonicalConcept(canonicalConceptSchema.parse(canonicalConceptFixture))
+    })
+    await expect(
+      service.executeAgent('EVIDENCE_ANALYST', {
+        schemaVersion: 1,
+        kind: 'ANALYST_SUBMIT_EVIDENCE_PROPOSALS',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'EVIDENCE_ANALYST' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000203',
+        batch: evidenceProposalBatchFixture,
+      }),
+    ).resolves.toMatchObject({ success: true })
+
+    await expect(
+      service.executeAgent('HELPER', {
+        schemaVersion: 1,
+        kind: 'HELPER_GET_CONTEXT',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'HELPER' },
+        projectId: ids.project,
+        taskId: ids.task,
+        decisionId: ids.decision,
+        question: 'How does runtime validation affect this Decision?',
+        relatedConceptNames: ['runtime validation'],
+        observedContextVersion: 1,
+      }),
+    ).resolves.toMatchObject({
+      success: true,
+      data: {
+        focusedDecision: { id: ids.decision },
+        relevantLedgerEntries: [{ state: { state: 'DEMONSTRATED' } }],
+        recentEpisodes: [
+          {
+            episodeId: ids.episode,
+            redactedUserExcerpts: ['Rejecting unknown fields should catch typos at the boundary.'],
+          },
+        ],
+        sourceExcerpts: [
+          {
+            reference: { kind: 'CODE', path: 'src/events.ts' },
+            redactionStatus: 'VERIFIED_REDACTED',
+          },
+        ],
+        referenceDetails: [{ availability: 'EXCERPT_INCLUDED' }],
+        freshness: { status: 'CURRENT', refreshRequired: false },
+      },
+    })
+    const helper = await service.executeAgent('HELPER', {
+      schemaVersion: 1,
+      kind: 'HELPER_GET_CONTEXT',
+      correlationId: ids.correlation,
+      actor: { kind: 'AGENT', role: 'HELPER' },
+      projectId: ids.project,
+      taskId: ids.task,
+      question: 'Show the current code.',
+      relatedConceptNames: [],
+    })
+    expect(helper.success && helper.data).toMatchObject({
+      sourceExcerpts: [
+        expect.objectContaining({ redactedExcerpt: expect.stringContaining('[REDACTED]') }),
+      ],
+    })
+    expect(JSON.stringify(helper)).not.toContain('do-not-expose')
+    expect(JSON.stringify(helper)).not.toContain('do-not-expose-json')
+
+    storage.transaction((repository) => {
+      repository.appendTask(
+        builderTaskSchema.parse({
+          ...builderTaskFixture,
+          revision: 2,
+          status: 'COMPLETED',
+        }),
+      )
+    })
+    await expect(
+      service.executeAgent('HELPER', {
+        schemaVersion: 1,
+        kind: 'HELPER_GET_CONTEXT',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'HELPER' },
+        projectId: ids.project,
+        question: 'Can I still ask about the completed Task?',
+        relatedConceptNames: ['runtime validation'],
+      }),
+    ).resolves.toMatchObject({ success: true, data: { task: { status: 'COMPLETED' } } })
   })
 
   it('applies Analyst proposals through deterministic Evidence reducers and replays the result', async () => {

@@ -13,6 +13,7 @@ import {
   canonicalConceptSchema,
   conceptAliasProposalSchema,
   conceptLedgerEntrySchema,
+  contextRefreshRequestSchema,
   decisionApplicationSchema,
   decisionRequestSchema,
   decisionResolutionSchema,
@@ -41,6 +42,7 @@ import {
   candidateRoundFixture,
   canonicalConceptFixture,
   conceptLedgerFixture,
+  contextRefreshRequestFixture,
   confirmedLearningSpecFixture,
   decisionApplicationFixture,
   decisionRequestFixture,
@@ -104,6 +106,7 @@ const records = {
   confirmedSpec: learningSpecRevisionSchema.parse(confirmedLearningSpecFixture),
   task: builderTaskSchema.parse(builderTaskFixture),
   context: liveProjectContextSchema.parse(liveContextFixture),
+  contextRefresh: contextRefreshRequestSchema.parse(contextRefreshRequestFixture),
   decision: decisionRequestSchema.parse(decisionRequestFixture),
   event: activityEventSchema.parse(activityEventFixture),
   episode: episodeSchema.parse(episodeFixture),
@@ -130,6 +133,7 @@ const appendRecoveryGraph = (repository: ReturnType<typeof repositoryOf>): void 
   repository.appendLearningSpec(records.confirmedSpec)
   repository.appendTask(records.task)
   repository.appendLiveContext(records.context)
+  repository.appendContextRefreshRequest(records.contextRefresh)
   repository.appendDecisionRequest(records.decision)
   repository.appendActivityEvent(records.event)
   repository.appendEpisode(records.episode)
@@ -201,6 +205,7 @@ describe('SQLite persistence repository', () => {
       decisionRequests: [records.decision],
       decisionResolutions: [],
       decisionApplications: [],
+      contextRefreshRequests: [records.contextRefresh],
       completionReport: null,
     })
     expect(reopened.repository.readEpisodeAggregate(ids.project, ids.episode)).toEqual({

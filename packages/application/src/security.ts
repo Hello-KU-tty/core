@@ -1,12 +1,35 @@
 import { createHash } from 'node:crypto'
-import { mkdir, realpath } from 'node:fs/promises'
+import { mkdir, readFile, realpath, stat } from 'node:fs/promises'
 import { basename, dirname, isAbsolute, join, parse, relative, resolve, sep } from 'node:path'
 
-import type { Project } from '@vibe-helper/contracts'
+import type { CodeReference, Project } from '@vibe-helper/contracts'
 
 import { ApplicationError, createOperationError } from './errors.js'
 
 export const MAX_APPLICATION_PAYLOAD_BYTES = 2 * 1024 * 1024
+export const MAX_HELPER_CODE_EXCERPT_CHARS = 8_192
+const MAX_HELPER_SOURCE_FILE_BYTES = 512 * 1024
+
+const SECRET_ASSIGNMENT =
+  /["']?\b(api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|private[_-]?key|password|secret|token)\b["']?\s*[:=]\s*(?:"[^"\r\n]*"|'[^'\r\n]*'|`[^`\r\n]*`|[^\s,;]+)/gi
+const BEARER_TOKEN = /\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi
+const WELL_KNOWN_TOKEN =
+  /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9_-]{20,}|AKIA[A-Z0-9]{16})\b/g
+const USER_PATH = /\/Users\/[^/\s"']+(?:\/[^\s"']*)?/g
+
+export function redactSensitiveText(text: string, workspaceRoot?: string): string {
+  let redacted = text
+    .replace(SECRET_ASSIGNMENT, '$1=[REDACTED]')
+    .replace(BEARER_TOKEN, 'Bearer [REDACTED]')
+    .replace(WELL_KNOWN_TOKEN, '[REDACTED_TOKEN]')
+  if (workspaceRoot !== undefined) redacted = redacted.split(workspaceRoot).join('[WORKSPACE]')
+  return redacted.replace(USER_PATH, '[REDACTED_PATH]')
+}
+
+export interface BoundedCodeExcerpt {
+  readonly redactedExcerpt: string
+  readonly truncated: boolean
+}
 
 function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalize)
@@ -157,6 +180,45 @@ export class WorkspacePathPolicy {
           'A referenced path escapes the generated project workspace.',
         )
       }
+    }
+  }
+
+  async readCodeExcerpt(
+    project: Project,
+    reference: CodeReference,
+    correlationId: string,
+  ): Promise<BoundedCodeExcerpt | null> {
+    const workspace = await this.resolveProjectWorkspace(project, correlationId)
+    const lexicalTarget = resolve(workspace, ...reference.path.split('/'))
+    const canonicalTarget = await canonicalizeExistingOrNearest(lexicalTarget)
+    if (!isWithin(workspace, canonicalTarget, true)) {
+      throw this.#permissionError(
+        correlationId,
+        'WORKSPACE_PATH_ESCAPE',
+        'A referenced path escapes the generated project workspace.',
+      )
+    }
+    try {
+      const metadata = await stat(canonicalTarget)
+      if (!metadata.isFile() || metadata.size > MAX_HELPER_SOURCE_FILE_BYTES) return null
+      const contents = await readFile(canonicalTarget, 'utf8')
+      if (contents.includes('\0')) return null
+      const lines = contents.split(/\r?\n/)
+      const selected =
+        reference.lineRange === undefined
+          ? lines.join('\n')
+          : lines.slice(reference.lineRange.start - 1, reference.lineRange.end).join('\n')
+      if (selected.trim().length === 0) return null
+      const redacted = redactSensitiveText(selected, workspace)
+      return {
+        redactedExcerpt: redacted.slice(0, MAX_HELPER_CODE_EXCERPT_CHARS),
+        truncated: redacted.length > MAX_HELPER_CODE_EXCERPT_CHARS,
+      }
+    } catch (error) {
+      const code =
+        typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined
+      if (code === 'ENOENT' || code === 'EISDIR') return null
+      throw error
     }
   }
 

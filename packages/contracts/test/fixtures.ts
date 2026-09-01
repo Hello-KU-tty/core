@@ -32,6 +32,7 @@ export const ids = {
   baselineResult: 'baseline_result_00000000-0000-4000-8000-000000000030',
   correlation: 'corr_00000000-0000-4000-8000-000000000031',
   idempotency: 'idem_00000000-0000-4000-8000-000000000032',
+  contextRefresh: 'context_refresh_00000000-0000-4000-8000-000000000033',
 } as const
 
 export const timestamp = '2026-08-25T03:00:00.000Z'
@@ -269,6 +270,21 @@ export const liveContextFixture = {
   nextActions: ['Apply the user decision', 'Run parser tests'],
   updatedAt: timestamp,
   source: { kind: 'AGENT', role: 'BUILDER' },
+  redactionStatus: 'VERIFIED_REDACTED',
+} as const
+
+export const contextRefreshRequestFixture = {
+  schemaVersion: 1,
+  id: ids.contextRefresh,
+  projectId: ids.project,
+  taskId: ids.task,
+  correlationId: ids.correlation,
+  revision: 1,
+  observedContextVersion: 1,
+  reason: 'The current Context no longer explains the Builder direction.',
+  status: 'PENDING',
+  requestedAt: timestamp,
+  source: { kind: 'AGENT', role: 'HELPER' },
   redactionStatus: 'VERIFIED_REDACTED',
 } as const
 

@@ -13,6 +13,7 @@ import {
   type CommandReceipt,
   commandReceiptSchema,
   type ContractError,
+  contextRefreshRequestSchema,
   correlationIdSchema,
   type DecisionCommandReceipt,
   decisionCommandReceiptSchema,
@@ -33,6 +34,7 @@ import {
   type HelperContext,
   helperContextSchema,
   type LearningSpecRevision,
+  type LiveProjectContext,
   type OperationError,
   type Project,
   type ProjectCandidateRevision,
@@ -65,6 +67,7 @@ import {
   canonicalJson,
   MAX_APPLICATION_PAYLOAD_BYTES,
   payloadBytes,
+  redactSensitiveText,
   sha256,
   type WorkspacePathPolicy,
 } from './security.js'
@@ -103,6 +106,7 @@ type IdPrefix =
   | 'decision'
   | 'decision_option'
   | 'decision_application'
+  | 'context_refresh'
   | 'audit'
   | 'concept'
   | 'evidence_decision'
@@ -1181,6 +1185,7 @@ export class ApplicationService {
             }
           }
           repository.appendLiveContext(request.context)
+          this.#fulfillContextRefreshRequests(repository, current, request.context)
           this.#appendAudit(repository, {
             correlationId: request.correlationId,
             actor: request.actor,
@@ -1337,6 +1342,7 @@ export class ApplicationService {
             nextTask = taskResult.value
           }
           repository.appendLiveContext(contextResult.value)
+          this.#fulfillContextRefreshRequests(repository, current, contextResult.value)
           repository.appendDecisionRequest(decision)
           if (nextTask.revision !== current.task.revision) repository.appendTask(nextTask)
           this.#appendAudit(repository, {
@@ -1631,6 +1637,7 @@ export class ApplicationService {
           }
           repository.appendDecisionApplication(application)
           repository.appendLiveContext(contextResult.value)
+          this.#fulfillContextRefreshRequests(repository, current, contextResult.value)
           this.#appendAudit(repository, {
             correlationId: request.correlationId,
             actor: request.actor,
@@ -1781,24 +1788,155 @@ export class ApplicationService {
     const traces = this.#storage.transaction((repository) =>
       repository.readEvidenceTracesForProject(request.projectId),
     )
-    const requestedNames = new Set(request.relatedConceptNames.map((name) => name.toLowerCase()))
-    const activeNames = new Set(
-      (aggregate.liveContext?.activeConceptNames ?? []).map((name) => name.toLowerCase()),
-    )
-    const relevantLedgerEntries = traces
-      .flatMap((trace) => (trace.ledger === null ? [] : [trace.ledger]))
-      .filter(
-        (entry) =>
-          requestedNames.size === 0 ||
-          requestedNames.has(entry.concept.canonicalName.toLowerCase()) ||
-          entry.acceptedAliases.some((alias) => requestedNames.has(alias.toLowerCase())) ||
-          activeNames.has(entry.concept.canonicalName.toLowerCase()),
-      )
-      .slice(0, 5)
     const currentVersion = aggregate.liveContext?.contextVersion ?? null
+    if (
+      currentVersion !== null &&
+      request.observedContextVersion !== undefined &&
+      request.observedContextVersion > currentVersion
+    ) {
+      throw this.#validationError(
+        request.correlationId,
+        'LIVE_CONTEXT_VERSION_INVALID',
+        'Observed Live Context version is ahead of Core state.',
+      )
+    }
     const activeDecisions = aggregate.decisionRequests.filter(
       (decision) =>
         !aggregate.decisionResolutions.some((resolution) => resolution.decisionId === decision.id),
+    )
+    const focusedDecision =
+      request.decisionId === undefined
+        ? (activeDecisions[0] ?? null)
+        : (aggregate.decisionRequests.find((decision) => decision.id === request.decisionId) ??
+          null)
+    if (request.decisionId !== undefined && focusedDecision === null) {
+      throw this.#notFound(request.correlationId, 'DECISION_NOT_FOUND')
+    }
+    const question = request.question.toLocaleLowerCase('en-US')
+    const relevanceNames = unique([
+      ...request.relatedConceptNames,
+      ...(aggregate.liveContext?.activeConceptNames ?? []),
+      ...(focusedDecision?.relatedConceptNames ?? []),
+      ...activeDecisions.flatMap((decision) => decision.relatedConceptNames),
+      ...traces.flatMap((trace) => {
+        const names = [trace.concept.canonicalName, ...(trace.ledger?.acceptedAliases ?? [])]
+        return names.some((name) => question.includes(name.toLocaleLowerCase('en-US')))
+          ? [trace.concept.canonicalName]
+          : []
+      }),
+    ]).map((name) => name.toLocaleLowerCase('en-US'))
+    const relevantLedgerEntries = relevanceNames
+      .flatMap((name) => {
+        const trace = traces.find(
+          (candidate) =>
+            candidate.concept.canonicalName.toLocaleLowerCase('en-US') === name ||
+            (candidate.ledger?.acceptedAliases ?? []).some(
+              (alias) => alias.toLocaleLowerCase('en-US') === name,
+            ),
+        )
+        return trace?.ledger === null || trace?.ledger === undefined ? [] : [trace.ledger]
+      })
+      .filter(
+        (entry, index, entries) =>
+          entries.findIndex((candidate) => candidate.id === entry.id) === index,
+      )
+      .slice(0, 5)
+    const recentEpisodeAggregates = this.#storage.transaction((repository) =>
+      repository.readRecentEpisodeAggregatesForProject(request.projectId, 20),
+    )
+    const relevantNameSet = new Set(relevanceNames)
+    const recentEpisodes = recentEpisodeAggregates
+      .filter((candidate) => {
+        const sameTask = candidate.episode.taskId === aggregate.task.id
+        const relatedConcept = candidate.episode.conceptCandidates.some((concept) =>
+          relevantNameSet.has(concept.originalExpression.toLocaleLowerCase('en-US')),
+        )
+        return sameTask || relatedConcept
+      })
+      .slice(0, 5)
+      .map((candidate) => ({
+        episodeId: candidate.episode.id,
+        type: candidate.episode.type,
+        endedAt: candidate.episode.endedAt,
+        conceptNames: candidate.episode.conceptCandidates.map(
+          (concept) => concept.originalExpression,
+        ),
+        redactedUserExcerpts: candidate.events
+          .flatMap((event) =>
+            event.payload.type === 'USER_MESSAGE' ? [event.payload.redactedExcerpt] : [],
+          )
+          .slice(0, 5),
+        helperResponseSummaries: candidate.events
+          .flatMap((event) =>
+            event.payload.type === 'HELPER_RESPONSE' ? [event.payload.summary] : [],
+          )
+          .slice(0, 5),
+        contextReferences: candidate.episode.contextReferences.slice(0, 10),
+      }))
+    const rawReferences = [
+      ...(aggregate.liveContext?.relatedFiles ?? []),
+      ...(focusedDecision?.sourceReferences ?? []),
+      ...activeDecisions.flatMap((decision) => decision.sourceReferences),
+      ...(aggregate.completionReport?.codeReferences ?? []),
+      ...(aggregate.completionReport?.diffReferences ?? []),
+      ...recentEpisodes.flatMap((episode) => episode.contextReferences),
+    ]
+    const contextReferences = rawReferences
+      .filter(
+        (reference, index, references) =>
+          references.findIndex(
+            (candidate) => canonicalJson(candidate) === canonicalJson(reference),
+          ) === index,
+      )
+      .slice(0, 30)
+    const sourceExcerpts = []
+    const referenceDetails = []
+    for (const reference of contextReferences) {
+      if (reference.kind !== 'CODE') {
+        referenceDetails.push({
+          reference,
+          availability: 'REFERENCE_ONLY' as const,
+          reason: 'Raw diff and conversation content is not persisted in Helper context.',
+        })
+        continue
+      }
+      if (sourceExcerpts.length >= 3) {
+        referenceDetails.push({
+          reference,
+          availability: 'REFERENCE_ONLY' as const,
+          reason: 'Bounded Helper context includes at most three code excerpts.',
+        })
+        continue
+      }
+      const excerpt = await this.#workspacePolicy.readCodeExcerpt(
+        aggregate.project,
+        reference,
+        request.correlationId,
+      )
+      if (excerpt === null) {
+        referenceDetails.push({
+          reference,
+          availability: 'UNAVAILABLE' as const,
+          reason: 'Referenced code is missing, empty, non-text, or exceeds the read limit.',
+        })
+        continue
+      }
+      sourceExcerpts.push({
+        reference,
+        ...excerpt,
+        redactionStatus: 'VERIFIED_REDACTED' as const,
+      })
+      referenceDetails.push({ reference, availability: 'EXCERPT_INCLUDED' as const })
+    }
+    const freshnessStatus =
+      currentVersion === null
+        ? ('MISSING' as const)
+        : request.observedContextVersion !== undefined &&
+            request.observedContextVersion !== currentVersion
+          ? ('STALE' as const)
+          : ('CURRENT' as const)
+    const pendingContextRefreshRequests = aggregate.contextRefreshRequests.filter(
+      (refresh) => refresh.status === 'PENDING',
     )
     const response = helperContextSchema.parse({
       schemaVersion: 1,
@@ -1808,16 +1946,19 @@ export class ApplicationService {
       task: aggregate.task,
       liveContext: aggregate.liveContext,
       activeDecisions: activeDecisions.slice(0, 10),
+      focusedDecision,
       relevantLedgerEntries,
-      contextReferences: unique([
-        ...(aggregate.liveContext?.relatedFiles ?? []),
-        ...activeDecisions.flatMap((decision) => decision.sourceReferences),
-      ]).slice(0, 30),
+      recentEpisodes,
+      contextReferences,
+      referenceDetails,
+      sourceExcerpts,
+      pendingContextRefreshRequests,
       freshness: {
         currentContextVersion: currentVersion,
-        stale:
-          request.observedContextVersion !== undefined &&
-          request.observedContextVersion !== currentVersion,
+        observedContextVersion: request.observedContextVersion ?? null,
+        status: freshnessStatus,
+        stale: freshnessStatus !== 'CURRENT',
+        refreshRequired: freshnessStatus !== 'CURRENT',
       },
     })
     await this.#workspacePolicy.validateReferences(
@@ -1856,27 +1997,41 @@ export class ApplicationService {
               'Observed Live Context version is ahead of Core state.',
             )
           }
+          const refresh = contextRefreshRequestSchema.parse({
+            schemaVersion: 1,
+            id: this.#generateId('context_refresh'),
+            projectId: request.projectId,
+            taskId: request.taskId,
+            correlationId: request.correlationId,
+            revision: 1,
+            ...(request.observedContextVersion === undefined
+              ? {}
+              : { observedContextVersion: request.observedContextVersion }),
+            reason: redactSensitiveText(request.reason),
+            status: 'PENDING',
+            requestedAt,
+            source: request.actor,
+            redactionStatus: 'VERIFIED_REDACTED',
+          })
+          repository.appendContextRefreshRequest(refresh)
           this.#appendAudit(repository, {
             correlationId: request.correlationId,
             actor: request.actor,
             action: 'SUBMITTED',
-            resource:
-              aggregate.liveContext === null
-                ? { type: 'BUILDER_TASK', id: aggregate.task.id, revision: aggregate.task.revision }
-                : {
-                    type: 'LIVE_CONTEXT',
-                    id: aggregate.liveContext.id,
-                    revision: aggregate.liveContext.contextVersion,
-                  },
+            resource: {
+              type: 'CONTEXT_REFRESH_REQUEST',
+              id: refresh.id,
+              revision: refresh.revision,
+            },
             summary: 'Recorded a read-only Helper request for Builder context refresh.',
             changedFields: [],
             occurredAt: requestedAt,
           })
-          const response = this.#receipt(request.correlationId, Math.max(currentVersion, 1))
+          const response = this.#receipt(request.correlationId, refresh.revision)
           return {
             response,
-            resourceId: aggregate.task.id,
-            resourceRevision: Math.max(currentVersion, 1),
+            resourceId: refresh.id,
+            resourceRevision: refresh.revision,
           }
         },
       ),
@@ -1893,6 +2048,7 @@ export class ApplicationService {
       actor: { kind: 'AGENT', role: 'HELPER' },
       projectId: request.projectId,
       ...(request.taskId === undefined ? {} : { taskId: request.taskId }),
+      ...(request.decisionId === undefined ? {} : { decisionId: request.decisionId }),
       question: request.question ?? 'Explain the current project context.',
       relatedConceptNames: [],
     })
@@ -2405,7 +2561,12 @@ export class ApplicationService {
     correlationId: string,
   ): BuilderTaskAggregate {
     return this.#storage.transaction((repository) => {
-      const resolvedTaskId = taskId ?? repository.recoverProject(projectId)?.activeTask?.id
+      const recovery = repository.recoverProject(projectId)
+      const resolvedTaskId =
+        taskId ??
+        recovery?.activeTask?.id ??
+        recovery?.currentTask?.id ??
+        repository.readLatestTaskForProject(projectId)?.id
       if (resolvedTaskId === undefined) {
         throw this.#notFound(correlationId, 'ACTIVE_TASK_NOT_FOUND')
       }
@@ -2424,7 +2585,45 @@ export class ApplicationService {
       decisionRequests: aggregate.decisionRequests,
       decisionResolutions: aggregate.decisionResolutions,
       decisionApplications: aggregate.decisionApplications,
+      pendingContextRefreshRequests: aggregate.contextRefreshRequests.filter(
+        (request) => request.status === 'PENDING',
+      ),
     })
+  }
+
+  #fulfillContextRefreshRequests(
+    repository: PersistenceRepository,
+    aggregate: BuilderTaskAggregate,
+    context: LiveProjectContext,
+  ): void {
+    for (const refresh of aggregate.contextRefreshRequests.filter(
+      (candidate) =>
+        candidate.status === 'PENDING' &&
+        context.contextVersion > (candidate.observedContextVersion ?? 0),
+    )) {
+      repository.appendContextRefreshRequest(
+        contextRefreshRequestSchema.parse({
+          ...refresh,
+          revision: refresh.revision + 1,
+          status: 'FULFILLED',
+          fulfilledAt: context.updatedAt,
+          fulfilledByContextVersion: context.contextVersion,
+        }),
+      )
+      this.#appendAudit(repository, {
+        correlationId: context.correlationId,
+        actor: { kind: 'AGENT', role: 'BUILDER' },
+        action: 'RESOLVED',
+        resource: {
+          type: 'CONTEXT_REFRESH_REQUEST',
+          id: refresh.id,
+          revision: refresh.revision + 1,
+        },
+        summary: 'Fulfilled a pending Helper Context refresh request.',
+        changedFields: ['status', 'revision', 'fulfilledByContextVersion'],
+        occurredAt: context.updatedAt,
+      })
+    }
   }
 
   #resolveConcept(
