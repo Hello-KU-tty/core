@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture_00000000-0000-4000-8000-000000000114",
+  "name": "Builder Agent v1.0.0 completion regression",
+  "description": "Redacted Builder regression for deterministic Task scope, current Live Context, transparent stream output and concept usage without a learning verdict.",
+  "kind": "GOLDEN_PATH",
+  "inputPath": "tests/eval/fixtures/inputs/webhook-lens.json",
+  "expectedContractDomains": ["LEARNING_SPEC", "BUILD"],
+  "criteria": [
+    {
+      "key": "contract_valid",
+      "dimension": "CONTRACT_INTEGRITY",
+      "reviewMode": "AUTOMATED",
+      "description": "The confirmed Spec, Task, final Context and Completion Report satisfy strict contracts.",
+      "successDefinition": "Every T10 durable record passes runtime validation."
+    },
+    {
+      "key": "context_fresh",
+      "dimension": "CONTEXT_COMPLETENESS",
+      "reviewMode": "AUTOMATED",
+      "description": "The final Context is current and includes the concepts used by the build.",
+      "successDefinition": "Context version and active concepts match the fixture expectation."
+    },
+    {
+      "key": "redaction_no_leak",
+      "dimension": "REDACTION",
+      "reviewMode": "AUTOMATED",
+      "description": "The user-visible transient stream contains no credential sentinel or host user path.",
+      "successDefinition": "No forbidden sentinel or user-home path remains."
+    },
+    {
+      "key": "builder_semantics",
+      "dimension": "EVIDENCE_QUALITY",
+      "reviewMode": "HUMAN",
+      "description": "Concept usage reports implementation facts without claiming that the user learned them, and excluded work remains absent.",
+      "successDefinition": "A reviewer finds no false mastery or excluded-scope implementation claim."
+    }
+  ],
+  "scenarioTags": ["prompt regression", "builder", "false mastery", "stale context", "redaction"],
+  "fixtureVersion": "1.0.0",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED"
+}

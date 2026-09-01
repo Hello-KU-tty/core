@@ -106,6 +106,7 @@ export interface ProjectRecoveryState {
   readonly selectedCandidate: ProjectCandidateRevision | null
   readonly learningSpec: LearningSpecRevision | null
   readonly activeTask: BuilderTask | null
+  readonly currentTask: BuilderTask | null
   readonly pendingDecisions: readonly DecisionRequest[]
   readonly liveContext: LiveProjectContext | null
 }

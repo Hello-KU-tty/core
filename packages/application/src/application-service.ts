@@ -32,6 +32,8 @@ import {
   type OperationError,
   type Project,
   type ProjectCandidateRevision,
+  type PreparedBuilderTaskDescriptor,
+  preparedBuilderTaskDescriptorSchema,
   type UiRequest,
   uiRequestSchema,
   validateAgentRequest,
@@ -45,8 +47,10 @@ import {
   reduceCandidateRevision,
   reduceConceptState,
   resolveDecision,
+  planBuilderTask,
   transitionBuilderTask,
   supersedeLearningSpec,
+  updateLiveContext as reduceLiveContext,
   writeLearningSpecDraft,
 } from '@vibe-helper/domain'
 
@@ -82,11 +86,13 @@ export type UiApplicationResponse =
   | HelperContext
   | EvidenceTrace
   | readonly EvidenceTrace[]
+  | PreparedBuilderTaskDescriptor
   | GeneratedResultDescriptor
 
 type IdPrefix =
   | 'discovery_session'
   | 'learning_spec'
+  | 'task'
   | 'audit'
   | 'concept'
   | 'evidence_decision'
@@ -265,6 +271,8 @@ export class ApplicationService {
         return this.#updateLearningSpec(request)
       case 'UI_CONFIRM_LEARNING_SPEC':
         return this.#confirmLearningSpec(request)
+      case 'UI_PREPARE_BUILDER_TASK':
+        return this.#prepareBuilderTask(request)
       case 'UI_RETURN_TO_DISCOVERY':
         return this.#returnToDiscovery(request)
       case 'UI_RESOLVE_DECISION':
@@ -811,6 +819,158 @@ export class ApplicationService {
     )
   }
 
+  async #prepareBuilderTask(
+    request: Extract<UiRequest, { kind: 'UI_PREPARE_BUILDER_TASK' }>,
+  ): Promise<PreparedBuilderTaskDescriptor> {
+    const preparedAt = this.#timestamp()
+    const taskId = this.#generateId('task')
+    const workspacePath = this.#workspacePolicy.projectWorkspacePath(request.projectId)
+    const existingReceipt = this.#storage.transaction((repository) =>
+      repository.readIdempotencyReceipt(request.idempotencyKey),
+    )
+    if (
+      existingReceipt !== null &&
+      (existingReceipt.operation !== 'ui.prepare_builder_task' ||
+        existingReceipt.correlationId !== request.correlationId ||
+        existingReceipt.requestHash !== sha256(canonicalJson(request)))
+    ) {
+      throw this.#validationError(
+        request.correlationId,
+        'IDEMPOTENCY_KEY_REUSE',
+        'Idempotency key was already used for a different request.',
+      )
+    }
+    if (existingReceipt === null) {
+      this.#storage.transaction((repository) => {
+        const scoped = this.#readDiscoveryByProject(
+          repository,
+          request.projectId,
+          request.correlationId,
+        )
+        const current = latestByRevision(
+          scoped.learningSpecs.filter((spec) => spec.id === request.learningSpecId),
+        )
+        this.#assertRevision(
+          request.expectedSpecRevision,
+          current?.revision ?? 0,
+          request.correlationId,
+          'LEARNING_SPEC_STALE',
+        )
+        if (current === null) {
+          throw this.#notFound(request.correlationId, 'LEARNING_SPEC_NOT_FOUND')
+        }
+        if (
+          current.status !== 'CONFIRMED' ||
+          current.correlationId !== request.correlationId ||
+          scoped.project.correlationId !== request.correlationId ||
+          scoped.project.status !== 'SPEC_REVIEW'
+        ) {
+          throw this.#validationError(
+            request.correlationId,
+            'BUILDER_TASK_CONFIRMED_SPEC_REQUIRED',
+            'Builder Task preparation requires the current confirmed Learning Spec.',
+          )
+        }
+      })
+    }
+    await this.#workspacePolicy.provisionProjectWorkspace(workspacePath, request.correlationId)
+
+    return this.#storage.transaction((repository) =>
+      this.#idempotent(
+        repository,
+        request,
+        'ui.prepare_builder_task',
+        preparedBuilderTaskDescriptorSchema,
+        () => {
+          const scoped = this.#readDiscoveryByProject(
+            repository,
+            request.projectId,
+            request.correlationId,
+          )
+          const current = latestByRevision(
+            scoped.learningSpecs.filter((spec) => spec.id === request.learningSpecId),
+          )
+          this.#assertRevision(
+            request.expectedSpecRevision,
+            current?.revision ?? 0,
+            request.correlationId,
+            'LEARNING_SPEC_STALE',
+          )
+          if (current === null) {
+            throw this.#notFound(request.correlationId, 'LEARNING_SPEC_NOT_FOUND')
+          }
+          if (
+            current.correlationId !== request.correlationId ||
+            scoped.project.correlationId !== request.correlationId
+          ) {
+            throw this.#validationError(
+              request.correlationId,
+              'BUILDER_TASK_CORRELATION_MISMATCH',
+              'Builder Task preparation must stay in the confirmed Spec correlation.',
+            )
+          }
+          const recovery = repository.recoverProject(request.projectId)
+          if (recovery?.currentTask !== null && recovery?.currentTask !== undefined) {
+            throw this.#validationError(
+              request.correlationId,
+              'BUILDER_TASK_ALREADY_PREPARED',
+              'Project already has a pending or running Builder Task.',
+            )
+          }
+          if (
+            scoped.project.generatedWorkspacePath !== undefined &&
+            scoped.project.generatedWorkspacePath !== workspacePath
+          ) {
+            throw this.#validationError(
+              request.correlationId,
+              'WORKSPACE_ASSIGNMENT_CONFLICT',
+              'Project already has a different generated workspace assignment.',
+            )
+          }
+
+          const planned = planBuilderTask({
+            project: scoped.project,
+            spec: current,
+            taskId,
+            sequence: 1,
+            now: preparedAt,
+          })
+          if (planned.outcome === 'REJECTED') {
+            throw this.#domainError(request.correlationId, planned.reasonCode)
+          }
+          const task = planned.value
+          const project: Project = {
+            ...scoped.project,
+            revision: scoped.project.revision + 1,
+            generatedWorkspacePath: workspacePath,
+            updatedAt: preparedAt,
+            source: { kind: 'CORE' },
+          }
+          repository.appendProject(project)
+          repository.appendTask(task)
+          this.#appendAudit(repository, {
+            correlationId: request.correlationId,
+            actor: { kind: 'CORE' },
+            action: 'CREATED',
+            resource: { type: 'BUILDER_TASK', id: task.id, revision: task.revision },
+            summary: 'Prepared a Builder Task and assigned its generated workspace.',
+            changedFields: ['status', 'generatedWorkspacePath'],
+            occurredAt: preparedAt,
+          })
+          const response = preparedBuilderTaskDescriptorSchema.parse({
+            schemaVersion: 1,
+            correlationId: request.correlationId,
+            projectId: request.projectId,
+            workspacePath,
+            task,
+            status: 'READY',
+          })
+          return { response, resourceId: task.id, resourceRevision: task.revision }
+        },
+      ),
+    )
+  }
+
   #returnToDiscovery(
     request: Extract<UiRequest, { kind: 'UI_RETURN_TO_DISCOVERY' }>,
   ): CommandReceipt {
@@ -992,26 +1152,21 @@ export class ApplicationService {
             request.context.taskId,
             request.correlationId,
           )
-          if (!['ACTIVE', 'BLOCKED'].includes(current.task.status)) {
-            throw this.#validationError(
-              request.correlationId,
-              'BUILDER_TASK_NOT_ACTIVE',
-              'Live Context can be updated only for an active Builder Task.',
-            )
+          const reduced = reduceLiveContext({
+            task: current.task,
+            ...(current.liveContext === null ? {} : { current: current.liveContext }),
+            proposed: request.context,
+          })
+          if (reduced.outcome === 'REJECTED') {
+            throw this.#domainError(request.correlationId, reduced.reasonCode)
           }
-          const currentVersion = current.liveContext?.contextVersion ?? 0
-          this.#assertRevision(
-            request.context.expectedPreviousVersion,
-            currentVersion,
-            request.correlationId,
-            'LIVE_CONTEXT_STALE',
-          )
-          if (current.liveContext !== null && current.liveContext.id !== request.context.id) {
-            throw this.#validationError(
-              request.correlationId,
-              'LIVE_CONTEXT_ID_MISMATCH',
-              'Live Context ID cannot change within a Task.',
-            )
+          if (reduced.outcome === 'NO_OP') {
+            const response = this.#receipt(request.correlationId, request.context.contextVersion)
+            return {
+              response,
+              resourceId: request.context.id,
+              resourceRevision: request.context.contextVersion,
+            }
           }
           repository.appendLiveContext(request.context)
           this.#appendAudit(repository, {
@@ -1220,6 +1375,39 @@ export class ApplicationService {
           request.report.taskId,
           request.correlationId,
         )
+        if (
+          current.liveContext?.checkpoint !== 'TASK_COMPLETED' ||
+          current.liveContext.updatedAt > request.report.completedAt
+        ) {
+          throw this.#validationError(
+            request.correlationId,
+            'TASK_COMPLETED_CONTEXT_REQUIRED',
+            'A current TASK_COMPLETED Live Context is required before Task completion.',
+          )
+        }
+        const scopeByConcept = new Map<string, string>()
+        for (const item of current.learningSpec.scope) {
+          for (const conceptName of item.conceptNames) {
+            scopeByConcept.set(conceptName.toLocaleLowerCase('en-US'), item.category)
+          }
+        }
+        for (const usage of request.report.conceptUsage) {
+          const expectedScope = scopeByConcept.get(usage.conceptName.toLocaleLowerCase('en-US'))
+          if (expectedScope === undefined || expectedScope !== usage.scope) {
+            throw this.#validationError(
+              request.correlationId,
+              'TASK_CONCEPT_SCOPE_MISMATCH',
+              'Completion concept usage must match the confirmed Learning Spec scope.',
+            )
+          }
+          if (usage.scope === 'EXCLUDED') {
+            throw this.#validationError(
+              request.correlationId,
+              'TASK_EXCLUDED_CONCEPT_REPORTED',
+              'Completion cannot report excluded concepts as implemented usage.',
+            )
+          }
+        }
         const appliedDecisionIds = new Set(
           current.decisionApplications.map((application) => application.decisionId),
         )

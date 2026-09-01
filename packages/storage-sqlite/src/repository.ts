@@ -1703,6 +1703,16 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
         [projectId],
         builderTaskSchema,
       )
+      const currentTask = this.#headRecord(
+        `SELECT revisions.payload_json, revisions.payload_hash
+         FROM tasks heads
+         JOIN task_revisions revisions
+           ON revisions.task_id = heads.id AND revisions.revision = heads.head_revision
+         WHERE heads.project_id = ? AND heads.status IN ('PENDING', 'ACTIVE', 'BLOCKED')
+         ORDER BY heads.sequence DESC LIMIT 1`,
+        [projectId],
+        builderTaskSchema,
+      )
       const pendingDecisions = this.#recordList(
         `SELECT requests.payload_json, requests.payload_hash FROM decision_states states
          JOIN decision_requests requests ON requests.id = states.decision_id
@@ -1729,6 +1739,7 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
         selectedCandidate,
         learningSpec,
         activeTask,
+        currentTask,
         pendingDecisions,
         liveContext,
       }

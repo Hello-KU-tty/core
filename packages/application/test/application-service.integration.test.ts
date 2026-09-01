@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, symlink } from 'node:fs/promises'
+import { mkdir, mkdtemp, stat, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -19,6 +19,7 @@ import {
   learningSpecRevisionSchema,
   projectCandidateRevisionSchema,
   projectSchema,
+  preparedBuilderTaskDescriptorSchema,
 } from '@vibe-helper/contracts'
 import { describe, expect, it } from 'vitest'
 
@@ -642,6 +643,272 @@ describe('T09 Learning Spec application flow', () => {
     expect(storage.repository.readDiscoveryAggregateBySession(newSessionId)).toMatchObject({
       project: { status: 'DISCOVERY' },
       session: { revision: 1, status: 'ACTIVE', input: discoveryInputFixture },
+    })
+  })
+})
+
+describe('T10 Builder Task and Live Context application flow', () => {
+  it('prepares only a confirmed Spec, recovers pending work, and completes through current Context', async () => {
+    let generatedSequence = 100
+    const { service, storage, workspaceRoot } = await createHarness({
+      generateId: (prefix) => {
+        if (prefix === 'task') return ids.task
+        generatedSequence += 1
+        return `${prefix}_00000000-0000-4000-8000-${String(generatedSequence).padStart(12, '0')}`
+      },
+    })
+    seedSpecReview(storage, true)
+
+    const unconfirmed = await service.executeUi({
+      schemaVersion: 1,
+      kind: 'UI_PREPARE_BUILDER_TASK',
+      correlationId: ids.correlation,
+      actor: { kind: 'UI' },
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000101',
+      projectId: ids.project,
+      learningSpecId: ids.learningSpec,
+      expectedSpecRevision: 1,
+    })
+    expect(unconfirmed).toMatchObject({
+      success: false,
+      error: { code: 'BUILDER_TASK_CONFIRMED_SPEC_REQUIRED' },
+    })
+
+    const confirmed = await service.executeUi({
+      schemaVersion: 1,
+      kind: 'UI_CONFIRM_LEARNING_SPEC',
+      correlationId: ids.correlation,
+      actor: { kind: 'UI' },
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000102',
+      projectId: ids.project,
+      learningSpecId: ids.learningSpec,
+      expectedSpecRevision: 1,
+    })
+    expect(confirmed).toMatchObject({ success: true, data: { resourceRevision: 2 } })
+
+    const prepareRequest = {
+      schemaVersion: 1,
+      kind: 'UI_PREPARE_BUILDER_TASK',
+      correlationId: ids.correlation,
+      actor: { kind: 'UI' },
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000103',
+      projectId: ids.project,
+      learningSpecId: ids.learningSpec,
+      expectedSpecRevision: 2,
+    } as const
+    const prepared = await service.executeUi(prepareRequest)
+    const replayed = await service.executeUi(prepareRequest)
+    expect(replayed).toEqual(prepared)
+    expect(prepared.success).toBe(true)
+    if (!prepared.success) return
+    const descriptor = preparedBuilderTaskDescriptorSchema.parse(prepared.data)
+    expect(descriptor.workspacePath).toBe(`projects/${ids.project}`)
+    expect(descriptor.task).toMatchObject({
+      id: ids.task,
+      status: 'PENDING',
+      expectedConcepts: ['discriminated union'],
+      excludedWork: ['Hosted sample storage'],
+    })
+    expect(descriptor.task.requirements).toContain(
+      'Agent-supported implementation scope: Local application shell',
+    )
+    expect(descriptor.task.acceptanceCriteria.map((criterion) => criterion.key)).toEqual([
+      'feature_01',
+      'feature_02',
+      'local_result',
+      'tests_pass',
+    ])
+    expect((await stat(join(workspaceRoot, descriptor.workspacePath))).isDirectory()).toBe(true)
+    expect(storage.repository.recoverProject(ids.project)).toMatchObject({
+      activeTask: null,
+      currentTask: { id: ids.task, status: 'PENDING' },
+    })
+
+    const duplicate = await service.executeUi({
+      ...prepareRequest,
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000104',
+    })
+    expect(duplicate).toMatchObject({
+      success: false,
+      error: { code: 'BUILDER_TASK_ALREADY_PREPARED' },
+    })
+
+    const started = await service.executeAgent('BUILDER', {
+      schemaVersion: 1,
+      kind: 'BUILDER_START_TASK',
+      correlationId: ids.correlation,
+      actor: { kind: 'AGENT', role: 'BUILDER' },
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000105',
+      projectId: ids.project,
+      taskId: ids.task,
+      expectedTaskRevision: 1,
+    })
+    expect(started).toMatchObject({ success: true, data: { resourceRevision: 2 } })
+
+    const contextBase = {
+      ...liveContextFixture,
+      activeDecisionIds: [],
+      relatedFiles: [],
+      nextActions: ['Implement the validated MVP features.'],
+    }
+    const wrongFirst = await service.executeAgent('BUILDER', {
+      schemaVersion: 1,
+      kind: 'BUILDER_UPDATE_LIVE_CONTEXT',
+      correlationId: ids.correlation,
+      actor: { kind: 'AGENT', role: 'BUILDER' },
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000106',
+      context: { ...contextBase, checkpoint: 'VALIDATION_STARTED' },
+    })
+    expect(wrongFirst).toMatchObject({
+      success: false,
+      error: { code: 'LIVE_CONTEXT_INITIAL_INVALID' },
+    })
+
+    const firstContext = { ...contextBase, checkpoint: 'TASK_STARTED' as const }
+    expect(
+      await service.executeAgent('BUILDER', {
+        schemaVersion: 1,
+        kind: 'BUILDER_UPDATE_LIVE_CONTEXT',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'BUILDER' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000107',
+        context: firstContext,
+      }),
+    ).toMatchObject({ success: true, data: { resourceRevision: 1 } })
+
+    const stale = await service.executeAgent('BUILDER', {
+      schemaVersion: 1,
+      kind: 'BUILDER_UPDATE_LIVE_CONTEXT',
+      correlationId: ids.correlation,
+      actor: { kind: 'AGENT', role: 'BUILDER' },
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000108',
+      context: { ...firstContext, stage: 'Stale overwrite' },
+    })
+    expect(stale).toMatchObject({
+      success: false,
+      error: { category: 'STALE_CONTEXT', code: 'LIVE_CONTEXT_STALE' },
+    })
+
+    const validationContext = {
+      ...firstContext,
+      contextVersion: 2,
+      expectedPreviousVersion: 1,
+      checkpoint: 'VALIDATION_STARTED' as const,
+      stage: 'Running tests',
+    }
+    expect(
+      await service.executeAgent('BUILDER', {
+        schemaVersion: 1,
+        kind: 'BUILDER_UPDATE_LIVE_CONTEXT',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'BUILDER' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000109',
+        context: validationContext,
+      }),
+    ).toMatchObject({ success: true, data: { resourceRevision: 2 } })
+    expect(
+      await service.executeAgent('HELPER', {
+        schemaVersion: 1,
+        kind: 'HELPER_GET_CONTEXT',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'HELPER' },
+        projectId: ids.project,
+        taskId: ids.task,
+        question: 'What is happening now?',
+        relatedConceptNames: [],
+        observedContextVersion: 1,
+      }),
+    ).toMatchObject({
+      success: true,
+      data: {
+        liveContext: { contextVersion: 2, stage: 'Running tests' },
+        freshness: { currentContextVersion: 2, stale: true },
+      },
+    })
+
+    const report = {
+      schemaVersion: 1 as const,
+      id: ids.completionReport,
+      projectId: ids.project,
+      taskId: ids.task,
+      correlationId: ids.correlation,
+      expectedTaskRevision: 2,
+      implementedFeatures: ['Validated and rendered event variants.'],
+      acceptanceResults: descriptor.task.acceptanceCriteria.map((criterion) => ({
+        criterionKey: criterion.key,
+        status: 'PASSED' as const,
+        evidence: [],
+      })),
+      validationResults: [
+        {
+          name: 'generated project tests',
+          status: 'PASSED' as const,
+          summary: 'All tests passed.',
+        },
+      ],
+      conceptUsage: [
+        {
+          conceptName: 'discriminated union',
+          scope: 'LEARNER_FOCUS' as const,
+          importance: 'CORE' as const,
+          usageReason: 'The implementation narrows variants by a discriminant.',
+          codeReferences: [],
+        },
+      ],
+      appliedDecisionIds: [],
+      codeReferences: [],
+      diffReferences: [],
+      specDeviations: [],
+      remainingIssues: [],
+      limitations: [],
+      completedAt: timestamp,
+      source: { kind: 'AGENT' as const, role: 'BUILDER' as const },
+      redactionStatus: 'VERIFIED_REDACTED' as const,
+    }
+    expect(
+      await service.executeAgent('BUILDER', {
+        schemaVersion: 1,
+        kind: 'BUILDER_COMPLETE_TASK',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'BUILDER' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000110',
+        report,
+      }),
+    ).toMatchObject({ success: false, error: { code: 'TASK_COMPLETED_CONTEXT_REQUIRED' } })
+
+    const completedContext = {
+      ...validationContext,
+      contextVersion: 3,
+      expectedPreviousVersion: 2,
+      checkpoint: 'TASK_COMPLETED' as const,
+      stage: 'Completed',
+      nextActions: ['Open the generated result.'],
+    }
+    expect(
+      await service.executeAgent('BUILDER', {
+        schemaVersion: 1,
+        kind: 'BUILDER_UPDATE_LIVE_CONTEXT',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'BUILDER' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000111',
+        context: completedContext,
+      }),
+    ).toMatchObject({ success: true, data: { resourceRevision: 3 } })
+    expect(
+      await service.executeAgent('BUILDER', {
+        schemaVersion: 1,
+        kind: 'BUILDER_COMPLETE_TASK',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'BUILDER' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000112',
+        report,
+      }),
+    ).toMatchObject({ success: true, data: { resourceRevision: 3 } })
+    expect(storage.repository.recoverProject(ids.project)).toMatchObject({
+      project: { status: 'BUILDING' },
+      activeTask: null,
+      currentTask: null,
+      liveContext: null,
     })
   })
 })

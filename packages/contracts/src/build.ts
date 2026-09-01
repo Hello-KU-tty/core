@@ -10,6 +10,7 @@ import {
   decisionResolutionIdSchema,
   entityRevisionSchema,
   expectedRevisionSchema,
+  idempotencyKeySchema,
   labelSchema,
   learningScopeCategorySchema,
   learningSpecIdSchema,
@@ -103,6 +104,25 @@ export const liveProjectContextSchema = z
     path: ['contextVersion'],
     message: 'Live Context version must immediately follow expectedPreviousVersion',
   })
+
+export const builderUpdateLiveContextToolInputSchema = z.strictObject({
+  __tool_use_purpose: nonEmptyTextSchema.optional(),
+  schemaVersion: schemaVersionSchema,
+  projectId: projectIdSchema,
+  taskId: taskIdSchema,
+  correlationId: correlationIdSchema,
+  idempotencyKey: idempotencyKeySchema,
+  expectedPreviousVersion: expectedRevisionSchema,
+  checkpoint: buildCheckpointSchema,
+  stage: labelSchema,
+  currentGoal: nonEmptyTextSchema,
+  recentChanges: z.array(shortTextSchema).max(30),
+  activeDecisionIds: z.array(decisionIdSchema).max(10),
+  activeConceptNames: z.array(labelSchema).max(20),
+  relatedFiles: z.array(codeReferenceSchema).max(30),
+  nextActions: z.array(shortTextSchema).max(20),
+  blockingReason: nonEmptyTextSchema.optional(),
+})
 
 export const decisionOptionSchema = z.strictObject({
   id: decisionOptionIdSchema,
@@ -247,6 +267,27 @@ export const taskCompletionReportSchema = z.strictObject({
   redactionStatus: redactionStatusSchema,
 })
 
+export const builderCompleteTaskToolInputSchema = z.strictObject({
+  __tool_use_purpose: nonEmptyTextSchema.optional(),
+  schemaVersion: schemaVersionSchema,
+  projectId: projectIdSchema,
+  taskId: taskIdSchema,
+  correlationId: correlationIdSchema,
+  idempotencyKey: idempotencyKeySchema,
+  expectedTaskRevision: entityRevisionSchema,
+  report: taskCompletionReportSchema.omit({
+    schemaVersion: true,
+    id: true,
+    projectId: true,
+    taskId: true,
+    correlationId: true,
+    expectedTaskRevision: true,
+    completedAt: true,
+    source: true,
+    redactionStatus: true,
+  }),
+})
+
 export type BuilderTask = z.infer<typeof builderTaskSchema>
 export type LiveProjectContext = z.infer<typeof liveProjectContextSchema>
 export type DecisionOption = z.infer<typeof decisionOptionSchema>
@@ -254,3 +295,7 @@ export type DecisionRequest = z.infer<typeof decisionRequestSchema>
 export type DecisionResolution = z.infer<typeof decisionResolutionSchema>
 export type DecisionApplication = z.infer<typeof decisionApplicationSchema>
 export type TaskCompletionReport = z.infer<typeof taskCompletionReportSchema>
+export type BuilderUpdateLiveContextToolInput = z.infer<
+  typeof builderUpdateLiveContextToolInputSchema
+>
+export type BuilderCompleteTaskToolInput = z.infer<typeof builderCompleteTaskToolInputSchema>

@@ -1,15 +1,18 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 
 import { McpServer, type JSONObject } from '@modelcontextprotocol/server'
 import type { ApplicationService } from '@vibe-helper/application'
 import {
   analystGetEpisodeContextQuerySchema,
   analystSubmitEvidenceProposalsCommandSchema,
+  builderCompleteTaskToolInputSchema,
   builderCompleteTaskCommandSchema,
   builderGetDecisionResultQuerySchema,
   builderGetTaskQuerySchema,
   builderRequestDecisionCommandSchema,
   builderStartTaskCommandSchema,
+  builderTaskContextSchema,
+  builderUpdateLiveContextToolInputSchema,
   builderUpdateLiveContextCommandSchema,
   discoveryGetContextQuerySchema,
   discoveryContextSchema,
@@ -75,7 +78,7 @@ export const ROLE_TOOL_CATALOG: Readonly<Record<AgentRole, readonly RoleToolDefi
       name: 'update_build_context',
       title: 'Update build context',
       description: 'Store a workspace-contained Live Project Context snapshot.',
-      inputSchema: builderUpdateLiveContextCommandSchema,
+      inputSchema: builderUpdateLiveContextToolInputSchema,
       readOnly: false,
     },
     {
@@ -96,7 +99,7 @@ export const ROLE_TOOL_CATALOG: Readonly<Record<AgentRole, readonly RoleToolDefi
       name: 'complete_task',
       title: 'Complete Builder Task',
       description: 'Complete a Task with a validated acceptance report.',
-      inputSchema: builderCompleteTaskCommandSchema,
+      inputSchema: builderCompleteTaskToolInputSchema,
       readOnly: false,
     },
   ],
@@ -138,7 +141,9 @@ export interface RoleBoundMcpServerOptions {
   readonly role: AgentRole
   readonly application: ApplicationService
   readonly now?: () => Date
-  readonly generateId?: (prefix: 'candidate' | 'candidate_round' | 'learning_spec') => string
+  readonly generateId?: (
+    prefix: 'candidate' | 'candidate_round' | 'learning_spec' | 'context' | 'completion_report',
+  ) => string
 }
 
 function toJsonObject(value: unknown): JSONObject {
@@ -147,6 +152,12 @@ function toJsonObject(value: unknown): JSONObject {
     throw new TypeError('MCP application response must be a JSON object')
   }
   return parsed as JSONObject
+}
+
+function deterministicId(prefix: 'context' | 'completion_report', idempotencyKey: string): string {
+  const hex = createHash('sha256').update(`${prefix}:${idempotencyKey}`).digest('hex').slice(0, 32)
+  const uuid = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20)}`
+  return `${prefix}_${uuid}`
 }
 
 async function submitCandidateRoundFromTool(options: RoleBoundMcpServerOptions, input: unknown) {
@@ -164,7 +175,9 @@ async function submitCandidateRoundFromTool(options: RoleBoundMcpServerOptions, 
   const createdAt = (options.now ?? (() => new Date()))().toISOString()
   const generateId =
     options.generateId ??
-    ((prefix: 'candidate' | 'candidate_round' | 'learning_spec') => `${prefix}_${randomUUID()}`)
+    ((
+      prefix: 'candidate' | 'candidate_round' | 'learning_spec' | 'context' | 'completion_report',
+    ) => `${prefix}_${randomUUID()}`)
   const candidates = toolInput.candidates.map((draft) => {
     const { lineage, ...content } = draft
     const identity =
@@ -255,7 +268,9 @@ async function submitLearningSpecFromTool(options: RoleBoundMcpServerOptions, in
   const now = (options.now ?? (() => new Date()))().toISOString()
   const generateId =
     options.generateId ??
-    ((prefix: 'candidate' | 'candidate_round' | 'learning_spec') => `${prefix}_${randomUUID()}`)
+    ((
+      prefix: 'candidate' | 'candidate_round' | 'learning_spec' | 'context' | 'completion_report',
+    ) => `${prefix}_${randomUUID()}`)
   const current = context.learningSpec
   const learningSpec = {
     schemaVersion: 1 as const,
@@ -287,6 +302,112 @@ async function submitLearningSpecFromTool(options: RoleBoundMcpServerOptions, in
   )
 }
 
+async function updateLiveContextFromTool(options: RoleBoundMcpServerOptions, input: unknown) {
+  const toolInput = builderUpdateLiveContextToolInputSchema.parse(input)
+  const contextResult = await options.application.executeAgent('BUILDER', {
+    schemaVersion: 1,
+    kind: 'BUILDER_GET_TASK',
+    correlationId: toolInput.correlationId,
+    actor: { kind: 'AGENT', role: 'BUILDER' },
+    projectId: toolInput.projectId,
+    taskId: toolInput.taskId,
+  })
+  if (!contextResult.success) return contextResult
+  const taskContext = builderTaskContextSchema.parse(contextResult.data)
+  const generateId =
+    options.generateId ??
+    ((
+      prefix: 'candidate' | 'candidate_round' | 'learning_spec' | 'context' | 'completion_report',
+    ) => `${prefix}_${randomUUID()}`)
+  const context = {
+    schemaVersion: 1 as const,
+    id:
+      taskContext.liveContext?.id ??
+      (options.generateId === undefined
+        ? deterministicId('context', toolInput.idempotencyKey)
+        : generateId('context')),
+    projectId: toolInput.projectId,
+    taskId: toolInput.taskId,
+    correlationId: toolInput.correlationId,
+    contextVersion: toolInput.expectedPreviousVersion + 1,
+    expectedPreviousVersion: toolInput.expectedPreviousVersion,
+    checkpoint: toolInput.checkpoint,
+    stage: toolInput.stage,
+    currentGoal: toolInput.currentGoal,
+    recentChanges: toolInput.recentChanges,
+    activeDecisionIds: toolInput.activeDecisionIds,
+    activeConceptNames: toolInput.activeConceptNames,
+    relatedFiles: toolInput.relatedFiles,
+    nextActions: toolInput.nextActions,
+    ...(toolInput.blockingReason === undefined ? {} : { blockingReason: toolInput.blockingReason }),
+    updatedAt:
+      taskContext.liveContext?.contextVersion === toolInput.expectedPreviousVersion + 1
+        ? taskContext.liveContext.updatedAt
+        : (options.now ?? (() => new Date()))().toISOString(),
+    source: { kind: 'AGENT' as const, role: 'BUILDER' as const },
+    redactionStatus: 'VERIFIED_REDACTED' as const,
+  }
+  return options.application.executeAgent(
+    'BUILDER',
+    builderUpdateLiveContextCommandSchema.parse({
+      schemaVersion: 1,
+      kind: 'BUILDER_UPDATE_LIVE_CONTEXT',
+      correlationId: toolInput.correlationId,
+      actor: { kind: 'AGENT', role: 'BUILDER' },
+      idempotencyKey: toolInput.idempotencyKey,
+      context,
+    }),
+  )
+}
+
+async function completeTaskFromTool(options: RoleBoundMcpServerOptions, input: unknown) {
+  const toolInput = builderCompleteTaskToolInputSchema.parse(input)
+  const contextResult = await options.application.executeAgent('BUILDER', {
+    schemaVersion: 1,
+    kind: 'BUILDER_GET_TASK',
+    correlationId: toolInput.correlationId,
+    actor: { kind: 'AGENT', role: 'BUILDER' },
+    projectId: toolInput.projectId,
+    taskId: toolInput.taskId,
+  })
+  if (!contextResult.success) return contextResult
+  const taskContext = builderTaskContextSchema.parse(contextResult.data)
+  const generateId =
+    options.generateId ??
+    ((
+      prefix: 'candidate' | 'candidate_round' | 'learning_spec' | 'context' | 'completion_report',
+    ) => `${prefix}_${randomUUID()}`)
+  const report = {
+    schemaVersion: 1 as const,
+    id:
+      options.generateId === undefined
+        ? deterministicId('completion_report', toolInput.idempotencyKey)
+        : generateId('completion_report'),
+    projectId: toolInput.projectId,
+    taskId: toolInput.taskId,
+    correlationId: toolInput.correlationId,
+    expectedTaskRevision: toolInput.expectedTaskRevision,
+    ...toolInput.report,
+    completedAt:
+      taskContext.liveContext?.checkpoint === 'TASK_COMPLETED'
+        ? taskContext.liveContext.updatedAt
+        : (options.now ?? (() => new Date()))().toISOString(),
+    source: { kind: 'AGENT' as const, role: 'BUILDER' as const },
+    redactionStatus: 'VERIFIED_REDACTED' as const,
+  }
+  return options.application.executeAgent(
+    'BUILDER',
+    builderCompleteTaskCommandSchema.parse({
+      schemaVersion: 1,
+      kind: 'BUILDER_COMPLETE_TASK',
+      correlationId: toolInput.correlationId,
+      actor: { kind: 'AGENT', role: 'BUILDER' },
+      idempotencyKey: toolInput.idempotencyKey,
+      report,
+    }),
+  )
+}
+
 export function createRoleBoundMcpServer(options: RoleBoundMcpServerOptions): McpServer {
   const server = new McpServer({
     name: `vibe-helper-${options.role.toLowerCase().replace('_', '-')}`,
@@ -313,7 +434,11 @@ export function createRoleBoundMcpServer(options: RoleBoundMcpServerOptions): Mc
             ? await submitCandidateRoundFromTool(options, input)
             : options.role === 'DISCOVERY' && tool.name === 'submit_learning_spec'
               ? await submitLearningSpecFromTool(options, input)
-              : await options.application.executeAgent(options.role, input)
+              : options.role === 'BUILDER' && tool.name === 'update_build_context'
+                ? await updateLiveContextFromTool(options, input)
+                : options.role === 'BUILDER' && tool.name === 'complete_task'
+                  ? await completeTaskFromTool(options, input)
+                  : await options.application.executeAgent(options.role, input)
         const payload = toJsonObject(result.success ? result.data : result.error)
         return {
           content: [{ type: 'text', text: JSON.stringify(payload) }],

@@ -21,6 +21,7 @@
     "test:eval": "pnpm preflight && vitest run tests/eval",
     "test:eval:live-discovery": "pnpm preflight && pnpm build && node ./scripts/run-live-discovery-eval.mjs",
     "test:eval:live-spec": "pnpm preflight && pnpm build && node ./scripts/run-live-spec-eval.mjs",
+    "test:eval:live-builder": "pnpm preflight && pnpm build && node ./scripts/run-live-builder-eval.mjs",
     "test:smoke": "pnpm preflight && vitest run tests/smoke",
     "test:e2e": "pnpm preflight && playwright test",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm db:check && pnpm test:unit && pnpm test:integration && pnpm test:eval && pnpm build && pnpm test:smoke && pnpm test:e2e"

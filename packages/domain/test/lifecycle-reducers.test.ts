@@ -5,10 +5,12 @@ import {
   closeEpisode,
   confirmLearningSpec,
   openDecision,
+  planBuilderTask,
   reduceCandidateRevision,
   requiredEvidenceConceptNames,
   resolveDecision,
   transitionBuilderTask,
+  updateLiveContext,
   supersedeLearningSpec,
   writeLearningSpecDraft,
 } from '../src/index.ts'
@@ -26,6 +28,7 @@ import {
   episodeFixture,
   ids,
   liveContextFixture,
+  projectFixture,
   timestamp,
 } from '../../contracts/test/fixtures.js'
 
@@ -222,6 +225,82 @@ describe('Task and Decision reducers', () => {
     revision: 2,
     status: 'COMPLETED',
   } as const
+
+  it('plans deterministic Task scope only from a confirmed Spec', () => {
+    const planned = planBuilderTask({
+      project: { ...projectFixture, status: 'SPEC_REVIEW', generatedWorkspacePath: undefined },
+      spec: confirmedLearningSpecFixture,
+      taskId: ids.task,
+      sequence: 1,
+      now: timestamp,
+    })
+    expect(planned.outcome).toBe('APPLIED')
+    if (planned.outcome !== 'APPLIED') return
+    expect(planned.value).toMatchObject({
+      status: 'PENDING',
+      expectedConcepts: ['discriminated union'],
+      excludedWork: ['Hosted sample storage'],
+      expectedDecisionCategories: ['DATA_MODEL'],
+    })
+    expect(planned.value.requirements).toContain(
+      'Agent-supported implementation scope: Local application shell',
+    )
+    expect(planned.value.acceptanceCriteria.map((criterion) => criterion.key)).toEqual([
+      'feature_01',
+      'feature_02',
+      'local_result',
+      'tests_pass',
+    ])
+    expect(
+      planBuilderTask({
+        project: { ...projectFixture, status: 'SPEC_REVIEW', generatedWorkspacePath: undefined },
+        spec: draftLearningSpecFixture,
+        taskId: ids.task,
+        sequence: 1,
+        now: timestamp,
+      }).trace.reasonCode,
+    ).toBe('BUILDER_TASK_CONFIRMED_SPEC_REQUIRED')
+  })
+
+  it('requires a started first Context and rejects stale or post-completion updates', () => {
+    const first = { ...liveContextFixture, checkpoint: 'TASK_STARTED' as const }
+    expect(updateLiveContext({ task: builderTaskFixture, proposed: first }).outcome).toBe('APPLIED')
+    expect(
+      updateLiveContext({ task: builderTaskFixture, proposed: liveContextFixture }).trace
+        .reasonCode,
+    ).toBe('LIVE_CONTEXT_INITIAL_INVALID')
+
+    const stale = {
+      ...first,
+      stage: 'A stale direction',
+    }
+    expect(
+      updateLiveContext({ task: builderTaskFixture, current: first, proposed: stale }).trace
+        .reasonCode,
+    ).toBe('LIVE_CONTEXT_STALE')
+
+    const completed = {
+      ...first,
+      contextVersion: 2,
+      expectedPreviousVersion: 1,
+      checkpoint: 'TASK_COMPLETED' as const,
+    }
+    expect(
+      updateLiveContext({ task: builderTaskFixture, current: first, proposed: completed }).outcome,
+    ).toBe('APPLIED')
+    expect(
+      updateLiveContext({
+        task: builderTaskFixture,
+        current: completed,
+        proposed: {
+          ...completed,
+          contextVersion: 3,
+          expectedPreviousVersion: 2,
+          checkpoint: 'VALIDATION_STARTED',
+        },
+      }).trace.reasonCode,
+    ).toBe('LIVE_CONTEXT_ALREADY_COMPLETED')
+  })
 
   it('completes a Task only with complete passing acceptance evidence', () => {
     const result = transitionBuilderTask({

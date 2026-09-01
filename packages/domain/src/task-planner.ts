@@ -1,0 +1,157 @@
+import {
+  type BuilderTask,
+  builderTaskSchema,
+  type LearningSpecRevision,
+  type Project,
+} from '@vibe-helper/contracts'
+
+import { applied, type DomainResult, rejected } from './result.js'
+
+const OPERATION = 'BUILDER_TASK_PLAN'
+const MAX_LONG_TEXT = 4_000
+const MAX_SHORT_TEXT = 240
+
+export interface PlanBuilderTaskInput {
+  readonly project: Project
+  readonly spec: LearningSpecRevision
+  readonly taskId: string
+  readonly sequence: number
+  readonly now: string
+}
+
+function uniqueNormalized(values: readonly string[]): string[] {
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const value of values) {
+    const key = value.trim().toLocaleLowerCase('en-US')
+    if (!seen.has(key)) {
+      seen.add(key)
+      result.push(value.trim())
+    }
+  }
+  return result
+}
+
+function pack(values: readonly string[], prefix: string, limit: number): string[] {
+  const chunks: string[] = []
+  let current = prefix
+  for (const value of values) {
+    const separator = current === prefix ? '' : '; '
+    if (`${current}${separator}${value}`.length > limit) {
+      if (current !== prefix) chunks.push(current)
+      current = `${prefix}${value}`
+    } else {
+      current = `${current}${separator}${value}`
+    }
+  }
+  if (current !== prefix) chunks.push(current)
+  return chunks
+}
+
+export function planBuilderTask(input: PlanBuilderTaskInput): DomainResult<BuilderTask> {
+  const entityIds = [input.project.id, input.spec.id]
+  if (
+    input.spec.status !== 'CONFIRMED' ||
+    input.spec.projectId !== input.project.id ||
+    input.spec.correlationId !== input.project.correlationId ||
+    input.project.status !== 'SPEC_REVIEW'
+  ) {
+    return rejected({
+      operation: OPERATION,
+      reasonCode: 'BUILDER_TASK_CONFIRMED_SPEC_REQUIRED',
+      entityIds,
+    })
+  }
+
+  const expectedConcepts = uniqueNormalized(
+    input.spec.scope
+      .filter((item) => item.category === 'LEARNER_FOCUS')
+      .flatMap((item) => item.conceptNames),
+  )
+  if (expectedConcepts.length > 20) {
+    return rejected({
+      operation: OPERATION,
+      reasonCode: 'BUILDER_TASK_EXPECTED_CONCEPT_LIMIT_EXCEEDED',
+      entityIds,
+    })
+  }
+
+  const agentSupport = uniqueNormalized(
+    input.spec.scope.filter((item) => item.category === 'AGENT_SUPPORT').map((item) => item.title),
+  )
+  const excludedWork = pack(
+    uniqueNormalized(
+      input.spec.scope.filter((item) => item.category === 'EXCLUDED').map((item) => item.title),
+    ),
+    '',
+    MAX_SHORT_TEXT,
+  )
+  if (excludedWork.length > 30) {
+    return rejected({
+      operation: OPERATION,
+      reasonCode: 'BUILDER_TASK_EXCLUDED_WORK_LIMIT_EXCEEDED',
+      entityIds,
+    })
+  }
+
+  const requirements = [
+    ...input.spec.mvpFeatures,
+    'Use TypeScript for the generated project runtime.',
+    ...pack(agentSupport, 'Agent-supported implementation scope: ', MAX_LONG_TEXT),
+    ...pack(input.spec.deploymentConstraints, 'Deployment constraints: ', MAX_LONG_TEXT),
+  ]
+  const acceptanceCriteria = [
+    ...input.spec.mvpFeatures.map((feature, index) => ({
+      key: `feature_${String(index + 1).padStart(2, '0')}`,
+      description: `Implement and verify this MVP feature: ${feature}`,
+    })),
+    {
+      key: 'local_result',
+      description: 'The generated TypeScript project runs locally with a documented command.',
+    },
+    {
+      key: 'tests_pass',
+      description: 'The generated project automated tests pass without hiding failures.',
+    },
+  ]
+
+  const parsed = builderTaskSchema.safeParse({
+    schemaVersion: 1,
+    id: input.taskId,
+    projectId: input.project.id,
+    learningSpecId: input.spec.id,
+    learningSpecRevision: input.spec.revision,
+    correlationId: input.spec.correlationId,
+    revision: 1,
+    title: input.project.title,
+    productGoal: input.spec.productPurpose,
+    requirements,
+    acceptanceCriteria,
+    expectedConcepts,
+    excludedWork,
+    prerequisiteTaskIds: [],
+    expectedDecisionCategories: uniqueNormalized(
+      input.spec.expectedDecisions.map((decision) => decision.category),
+    ),
+    sequence: input.sequence,
+    status: 'PENDING',
+    createdAt: input.now,
+    updatedAt: input.now,
+    source: { kind: 'CORE' },
+    redactionStatus: input.spec.redactionStatus,
+  })
+  if (!parsed.success) {
+    return rejected({
+      operation: OPERATION,
+      reasonCode: 'BUILDER_TASK_PLAN_INVALID',
+      entityIds,
+    })
+  }
+
+  return applied(parsed.data, {
+    operation: OPERATION,
+    reasonCode: 'BUILDER_TASK_PLANNED',
+    entityIds: [...entityIds, parsed.data.id],
+    after: parsed.data.status,
+  })
+}

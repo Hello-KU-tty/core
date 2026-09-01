@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import {
   agentRequestSchema,
   analystSubmitEvidenceProposalsCommandSchema,
+  builderCompleteTaskToolInputSchema,
+  builderUpdateLiveContextToolInputSchema,
   builderUpdateLiveContextCommandSchema,
   discoverySubmitCandidateRoundCommandSchema,
   discoverySubmitLearningSpecCommandSchema,
@@ -163,6 +165,63 @@ describe('Agent-specific request contracts', () => {
         draft: learningSpecDraftContentFixture,
         learningSpecId: ids.learningSpec,
         source: { kind: 'AGENT', role: 'DISCOVERY' },
+      }).success,
+    ).toBe(false)
+  })
+
+  it('keeps Builder record identity, timestamps, provenance, and learning verdicts out of semantic tools', () => {
+    const contextInput = {
+      schemaVersion: 1,
+      projectId: ids.project,
+      taskId: ids.task,
+      correlationId: ids.correlation,
+      idempotencyKey: ids.idempotency,
+      expectedPreviousVersion: 0,
+      checkpoint: 'TASK_STARTED',
+      stage: 'Starting',
+      currentGoal: 'Implement the confirmed MVP.',
+      recentChanges: [],
+      activeDecisionIds: [],
+      activeConceptNames: ['discriminated union'],
+      relatedFiles: [],
+      nextActions: ['Run the initial test.'],
+    } as const
+    expect(builderUpdateLiveContextToolInputSchema.safeParse(contextInput).success).toBe(true)
+    expect(
+      builderUpdateLiveContextToolInputSchema.safeParse({
+        ...contextInput,
+        id: ids.context,
+        contextVersion: 1,
+        updatedAt: '2026-08-25T03:00:00.000Z',
+        source: { kind: 'AGENT', role: 'BUILDER' },
+      }).success,
+    ).toBe(false)
+
+    const completionInput = {
+      schemaVersion: 1,
+      projectId: ids.project,
+      taskId: ids.task,
+      correlationId: ids.correlation,
+      idempotencyKey: ids.idempotency,
+      expectedTaskRevision: 1,
+      report: {
+        implementedFeatures: ['Rendered one event variant.'],
+        acceptanceResults: [{ criterionKey: 'valid_event', status: 'PASSED', evidence: [] }],
+        validationResults: [],
+        conceptUsage: [],
+        appliedDecisionIds: [],
+        codeReferences: [],
+        diffReferences: [],
+        specDeviations: [],
+        remainingIssues: [],
+        limitations: [],
+      },
+    } as const
+    expect(builderCompleteTaskToolInputSchema.safeParse(completionInput).success).toBe(true)
+    expect(
+      builderCompleteTaskToolInputSchema.safeParse({
+        ...completionInput,
+        report: { ...completionInput.report, userUnderstandsConcepts: true },
       }).success,
     ).toBe(false)
   })

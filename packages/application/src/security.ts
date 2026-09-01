@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { realpath } from 'node:fs/promises'
+import { mkdir, realpath } from 'node:fs/promises'
 import { basename, dirname, isAbsolute, join, parse, relative, resolve, sep } from 'node:path'
 
 import type { Project } from '@vibe-helper/contracts'
@@ -87,6 +87,32 @@ export class WorkspacePathPolicy {
       throw new TypeError('Generated workspace root must be an explicit non-root absolute path')
     }
     return new WorkspacePathPolicy(await realpath(normalized))
+  }
+
+  projectWorkspacePath(projectId: string): string {
+    return `projects/${projectId}`
+  }
+
+  async provisionProjectWorkspace(relativePath: string, correlationId: string): Promise<string> {
+    const lexicalWorkspace = resolve(this.generatedWorkspaceRoot, ...relativePath.split('/'))
+    const canonicalBeforeCreate = await canonicalizeExistingOrNearest(lexicalWorkspace)
+    if (!isWithin(this.generatedWorkspaceRoot, canonicalBeforeCreate, false)) {
+      throw this.#permissionError(
+        correlationId,
+        'WORKSPACE_PATH_OUTSIDE_ROOT',
+        'Project workspace is outside the configured generated workspace root.',
+      )
+    }
+    await mkdir(lexicalWorkspace, { recursive: true })
+    const canonicalWorkspace = await realpath(lexicalWorkspace)
+    if (!isWithin(this.generatedWorkspaceRoot, canonicalWorkspace, false)) {
+      throw this.#permissionError(
+        correlationId,
+        'WORKSPACE_PATH_OUTSIDE_ROOT',
+        'Project workspace is outside the configured generated workspace root.',
+      )
+    }
+    return canonicalWorkspace
   }
 
   async resolveProjectWorkspace(project: Project, correlationId: string): Promise<string> {

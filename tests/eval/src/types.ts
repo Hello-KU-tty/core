@@ -11,7 +11,9 @@ export interface EvaluationSubject {
     readonly candidates: readonly unknown[]
   }
   readonly learningSpec?: unknown
+  readonly builderTask?: unknown
   readonly liveContext?: unknown
+  readonly completionReport?: unknown
   readonly decision?: unknown
   readonly activityEvent?: unknown
   readonly episode?: unknown

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { decisionResolutionSchema } from './build.js'
+import { builderTaskSchema, decisionResolutionSchema } from './build.js'
 import { discoveryFeedbackSchema, discoveryInputSchema } from './discovery.js'
 import { learningSpecDraftContentSchema } from './learning-spec.js'
 import {
@@ -47,6 +47,15 @@ export const uiRecordDiscoveryFeedbackCommandSchema = z
 export const uiConfirmLearningSpecCommandSchema = z.strictObject({
   ...uiRequestMetadata,
   kind: z.literal('UI_CONFIRM_LEARNING_SPEC'),
+  idempotencyKey: idempotencyKeySchema,
+  projectId: projectIdSchema,
+  learningSpecId: learningSpecIdSchema,
+  expectedSpecRevision: entityRevisionSchema,
+})
+
+export const uiPrepareBuilderTaskCommandSchema = z.strictObject({
+  ...uiRequestMetadata,
+  kind: z.literal('UI_PREPARE_BUILDER_TASK'),
   idempotencyKey: idempotencyKeySchema,
   projectId: projectIdSchema,
   learningSpecId: learningSpecIdSchema,
@@ -116,11 +125,21 @@ export const generatedResultDescriptorSchema = z.strictObject({
   status: z.literal('READY'),
 })
 
+export const preparedBuilderTaskDescriptorSchema = z.strictObject({
+  schemaVersion: schemaVersionSchema,
+  correlationId: correlationIdSchema,
+  projectId: projectIdSchema,
+  workspacePath: relativePosixPathSchema,
+  task: builderTaskSchema,
+  status: z.literal('READY'),
+})
+
 export const uiRequestSchema = z.discriminatedUnion('kind', [
   uiStartDiscoveryCommandSchema,
   uiRecordDiscoveryFeedbackCommandSchema,
   uiUpdateLearningSpecCommandSchema,
   uiConfirmLearningSpecCommandSchema,
+  uiPrepareBuilderTaskCommandSchema,
   uiReturnToDiscoveryCommandSchema,
   uiResolveDecisionCommandSchema,
   uiOpenHelperQuerySchema,
@@ -130,3 +149,4 @@ export const uiRequestSchema = z.discriminatedUnion('kind', [
 
 export type UiRequest = z.infer<typeof uiRequestSchema>
 export type GeneratedResultDescriptor = z.infer<typeof generatedResultDescriptorSchema>
+export type PreparedBuilderTaskDescriptor = z.infer<typeof preparedBuilderTaskDescriptorSchema>

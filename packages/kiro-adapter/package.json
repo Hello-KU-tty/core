@@ -13,6 +13,14 @@
     "./prompt-node": {
       "types": "./dist/discovery-prompt-node.d.ts",
       "import": "./dist/discovery-prompt-node.js"
+    },
+    "./builder-prompt-node": {
+      "types": "./dist/builder-prompt-node.d.ts",
+      "import": "./dist/builder-prompt-node.js"
+    },
+    "./builder-tool-guard-node": {
+      "types": "./dist/builder-tool-guard-node.d.ts",
+      "import": "./dist/builder-tool-guard-node.js"
     }
   },
   "dependencies": {

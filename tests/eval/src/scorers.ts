@@ -2,6 +2,7 @@ import {
   acceptedEvidenceSchema,
   activityEventSchema,
   auditRecordSchema,
+  builderTaskSchema,
   candidateRoundSchema,
   canonicalConceptSchema,
   conceptLedgerEntrySchema,
@@ -11,6 +12,7 @@ import {
   evidenceProposalSchema,
   learningSpecRevisionSchema,
   liveProjectContextSchema,
+  taskCompletionReportSchema,
   projectCandidateRevisionSchema,
   type EvaluationCriterionResult,
   type EvaluationDimension,
@@ -88,11 +90,22 @@ function scoreContractIntegrity(context: EvaluationScorerContext): EvaluationCri
       !learningSpecRevisionSchema.safeParse(subject.learningSpec).success
     ) {
       return contractFailure(context, domain)
-    } else if (
-      domain === 'BUILD' &&
-      !liveProjectContextSchema.safeParse(subject.liveContext).success
-    ) {
-      return contractFailure(context, domain)
+    } else if (domain === 'BUILD') {
+      if (!liveProjectContextSchema.safeParse(subject.liveContext).success) {
+        return contractFailure(context, domain)
+      }
+      if (
+        subject.builderTask !== undefined &&
+        !builderTaskSchema.safeParse(subject.builderTask).success
+      ) {
+        return contractFailure(context, domain)
+      }
+      if (
+        subject.completionReport !== undefined &&
+        !taskCompletionReportSchema.safeParse(subject.completionReport).success
+      ) {
+        return contractFailure(context, domain)
+      }
     } else if (
       domain === 'DECISION' &&
       !decisionRequestSchema.safeParse(subject.decision).success

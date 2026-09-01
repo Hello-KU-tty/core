@@ -6,9 +6,11 @@ import { Client } from '@modelcontextprotocol/client'
 import { InMemoryTransport, type McpServer } from '@modelcontextprotocol/server'
 import { ApplicationService, WorkspacePathPolicy } from '@vibe-helper/application'
 import {
+  builderTaskSchema,
   candidateRoundSchema,
   discoveryFeedbackSchema,
   discoverySessionSchema,
+  learningSpecRevisionSchema,
   projectCandidateRevisionSchema,
   projectSchema,
   type AgentRole,
@@ -17,10 +19,13 @@ import { describe, expect, it } from 'vitest'
 
 import { openInMemorySqliteStorage } from '../../../packages/storage-sqlite/src/index.js'
 import {
+  builderTaskFixture,
   candidateFixture,
   candidateRoundFixture,
+  confirmedLearningSpecFixture,
   discoveryFeedbackFixture,
   discoverySessionFixture,
+  draftLearningSpecFixture,
   ids,
   learningSpecDraftContentFixture,
   projectFixture,
@@ -38,8 +43,11 @@ interface ConnectedHarness {
 interface ConnectRoleOptions {
   readonly seedDiscovery?: boolean
   readonly seedSpecReview?: boolean
+  readonly seedBuilder?: boolean
   readonly now?: () => Date
-  readonly generateId?: (prefix: 'candidate' | 'candidate_round' | 'learning_spec') => string
+  readonly generateId?: (
+    prefix: 'candidate' | 'candidate_round' | 'learning_spec' | 'context' | 'completion_report',
+  ) => string
 }
 
 const connectRole = async (
@@ -89,6 +97,18 @@ const connectRole = async (
           generatedWorkspacePath: undefined,
         }),
       )
+    })
+  }
+  if (options.seedBuilder) {
+    storage.transaction((repository) => {
+      repository.appendProject(projectSchema.parse(projectFixture))
+      repository.appendDiscoverySession(discoverySessionSchema.parse(discoverySessionFixture))
+      repository.appendCandidate(projectCandidateRevisionSchema.parse(candidateFixture))
+      repository.appendCandidateRound(candidateRoundSchema.parse(candidateRoundFixture))
+      repository.appendDiscoveryFeedback(discoveryFeedbackSchema.parse(discoveryFeedbackFixture))
+      repository.appendLearningSpec(learningSpecRevisionSchema.parse(draftLearningSpecFixture))
+      repository.appendLearningSpec(learningSpecRevisionSchema.parse(confirmedLearningSpecFixture))
+      repository.appendTask(builderTaskSchema.parse(builderTaskFixture))
     })
   }
   const application = new ApplicationService({
@@ -347,6 +367,125 @@ describe('role-bound MCP server', () => {
             source: { kind: 'AGENT', role: 'DISCOVERY' },
           },
         ],
+      })
+    } finally {
+      await harness.close()
+    }
+  })
+
+  it('expands semantic Builder checkpoints and completion with Core-owned metadata', async () => {
+    const harness = await connectRole('BUILDER', {
+      seedBuilder: true,
+      now: () => new Date(timestamp),
+      generateId: (prefix) =>
+        prefix === 'context'
+          ? ids.context
+          : prefix === 'completion_report'
+            ? ids.completionReport
+            : `${prefix}_00000000-0000-4000-8000-000000000076`,
+    })
+    try {
+      const contextBase = {
+        schemaVersion: 1,
+        projectId: ids.project,
+        taskId: ids.task,
+        correlationId: ids.correlation,
+        expectedPreviousVersion: 0,
+        checkpoint: 'TASK_STARTED',
+        stage: 'Starting implementation',
+        currentGoal: 'Implement the confirmed MVP.',
+        recentChanges: [],
+        activeDecisionIds: [],
+        activeConceptNames: ['discriminated union'],
+        relatedFiles: [],
+        nextActions: ['Run the initial test.'],
+      } as const
+      const startedContext = await harness.client.callTool({
+        name: 'update_build_context',
+        arguments: {
+          ...contextBase,
+          idempotencyKey: 'idem_00000000-0000-4000-8000-000000000076',
+        },
+      })
+      expect(startedContext).toMatchObject({
+        structuredContent: { accepted: true, resourceRevision: 1 },
+      })
+      expect(harness.storage.repository.recoverProject(ids.project)?.liveContext).toMatchObject({
+        id: ids.context,
+        contextVersion: 1,
+        updatedAt: timestamp,
+        source: { kind: 'AGENT', role: 'BUILDER' },
+        redactionStatus: 'VERIFIED_REDACTED',
+      })
+
+      const completedContext = await harness.client.callTool({
+        name: 'update_build_context',
+        arguments: {
+          ...contextBase,
+          idempotencyKey: 'idem_00000000-0000-4000-8000-000000000077',
+          expectedPreviousVersion: 1,
+          checkpoint: 'TASK_COMPLETED',
+          stage: 'Completed',
+          recentChanges: ['Implemented and validated the event renderer.'],
+          nextActions: ['Open the generated result.'],
+        },
+      })
+      expect(completedContext).toMatchObject({
+        structuredContent: { accepted: true, resourceRevision: 2 },
+      })
+
+      const completionArguments = {
+        schemaVersion: 1,
+        projectId: ids.project,
+        taskId: ids.task,
+        correlationId: ids.correlation,
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000078',
+        expectedTaskRevision: 1,
+        report: {
+          implementedFeatures: ['Validated and rendered event variants.'],
+          acceptanceResults: [{ criterionKey: 'valid_event', status: 'PASSED', evidence: [] }],
+          validationResults: [
+            { name: 'event parser tests', status: 'PASSED', summary: 'All tests passed.' },
+          ],
+          conceptUsage: [
+            {
+              conceptName: 'discriminated union',
+              scope: 'LEARNER_FOCUS',
+              importance: 'CORE',
+              usageReason: 'The renderer narrows each event by its type field.',
+              codeReferences: [],
+            },
+          ],
+          appliedDecisionIds: [],
+          codeReferences: [],
+          diffReferences: [],
+          specDeviations: [],
+          remainingIssues: [],
+          limitations: [],
+        },
+      }
+      const completed = await harness.client.callTool({
+        name: 'complete_task',
+        arguments: completionArguments,
+      })
+      const replayed = await harness.client.callTool({
+        name: 'complete_task',
+        arguments: completionArguments,
+      })
+      expect(completed).toMatchObject({
+        structuredContent: { accepted: true, resourceRevision: 2 },
+      })
+      expect(replayed).toEqual(completed)
+      expect(
+        harness.storage.repository.readBuilderTaskAggregate(ids.project, ids.task),
+      ).toMatchObject({
+        task: { status: 'COMPLETED', revision: 2 },
+        completionReport: {
+          id: ids.completionReport,
+          completedAt: timestamp,
+          source: { kind: 'AGENT', role: 'BUILDER' },
+          redactionStatus: 'VERIFIED_REDACTED',
+        },
       })
     } finally {
       await harness.close()

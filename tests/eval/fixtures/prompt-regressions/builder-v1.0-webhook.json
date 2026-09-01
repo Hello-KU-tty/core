@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 1,
+  "learningSpec": {
+    "schemaVersion": 1,
+    "id": "learning_spec_20000000-0000-4000-8000-000000000201",
+    "projectId": "project_20000000-0000-4000-8000-000000000202",
+    "correlationId": "corr_20000000-0000-4000-8000-000000000203",
+    "revision": 2,
+    "parentRevision": 1,
+    "selectedCandidate": { "candidateId": "candidate_20000000-0000-4000-8000-000000000204", "revision": 1 },
+    "productPurpose": "Compare redacted webhook payloads with safe TypeScript event contracts locally.",
+    "targetUsers": ["TypeScript developers learning external event contracts"],
+    "primaryUsageMoment": "Before implementing a webhook handler for an unfamiliar provider.",
+    "successMoment": "A pasted payload matches one typed variant and explains rejected fields.",
+    "mvpFeatures": ["Paste one redacted payload", "Match a discriminated event variant", "Explain runtime validation failures"],
+    "scope": [
+      { "category": "LEARNER_FOCUS", "title": "Typed event variant matching", "rationale": "The core interaction requires safe narrowing.", "conceptNames": ["discriminated union", "runtime validation"] },
+      { "category": "AGENT_SUPPORT", "title": "Local UI shell", "rationale": "The interface supports the interaction.", "conceptNames": ["local UI shell"] },
+      { "category": "EXCLUDED", "title": "Live provider credentials and hosted payload storage", "rationale": "They cross the MVP security boundary.", "conceptNames": [] }
+    ],
+    "expectedDecisions": [{ "category": "PRODUCT_BEHAVIOR", "description": "Choose strict rejection or debugging visibility for unknown fields.", "whyUserInputMatters": "The choice changes product behavior." }],
+    "runtimeConstraint": "TYPESCRIPT",
+    "deploymentConstraints": ["Local reproducible execution only"],
+    "status": "CONFIRMED",
+    "confirmation": { "confirmedAt": "2026-08-27T00:00:01.000Z", "confirmedBy": { "kind": "USER" } },
+    "createdAt": "2026-08-27T00:00:00.000Z",
+    "updatedAt": "2026-08-27T00:00:01.000Z",
+    "source": { "kind": "USER" },
+    "redactionStatus": "VERIFIED_REDACTED"
+  },
+  "builderTask": {
+    "schemaVersion": 1,
+    "id": "task_20000000-0000-4000-8000-000000000205",
+    "projectId": "project_20000000-0000-4000-8000-000000000202",
+    "learningSpecId": "learning_spec_20000000-0000-4000-8000-000000000201",
+    "learningSpecRevision": 2,
+    "correlationId": "corr_20000000-0000-4000-8000-000000000203",
+    "revision": 2,
+    "title": "Webhook Lens",
+    "productGoal": "Compare redacted webhook payloads with safe TypeScript event contracts locally.",
+    "requirements": ["Paste one redacted payload", "Match a discriminated event variant", "Explain runtime validation failures", "Use TypeScript for the generated project runtime.", "Agent-supported implementation scope: Local UI shell", "Deployment constraints: Local reproducible execution only"],
+    "acceptanceCriteria": [
+      { "key": "feature_01", "description": "Implement and verify pasting one redacted payload." },
+      { "key": "feature_02", "description": "Implement and verify discriminated event matching." },
+      { "key": "feature_03", "description": "Implement and verify runtime validation failure explanations." },
+      { "key": "local_result", "description": "The generated TypeScript project runs locally with a documented command." },
+      { "key": "tests_pass", "description": "The generated project automated tests pass without hiding failures." }
+    ],
+    "expectedConcepts": ["discriminated union", "runtime validation"],
+    "excludedWork": ["Live provider credentials and hosted payload storage"],
+    "prerequisiteTaskIds": [],
+    "expectedDecisionCategories": ["PRODUCT_BEHAVIOR"],
+    "sequence": 1,
+    "status": "ACTIVE",
+    "createdAt": "2026-08-27T00:00:02.000Z",
+    "updatedAt": "2026-08-27T00:00:03.000Z",
+    "source": { "kind": "CORE" },
+    "redactionStatus": "VERIFIED_REDACTED"
+  },
+  "liveContext": {
+    "schemaVersion": 1,
+    "id": "context_20000000-0000-4000-8000-000000000206",
+    "projectId": "project_20000000-0000-4000-8000-000000000202",
+    "taskId": "task_20000000-0000-4000-8000-000000000205",
+    "correlationId": "corr_20000000-0000-4000-8000-000000000203",
+    "contextVersion": 3,
+    "expectedPreviousVersion": 2,
+    "checkpoint": "TASK_COMPLETED",
+    "stage": "Completed local validation",
+    "currentGoal": "Deliver the tested local webhook viewer.",
+    "recentChanges": ["Implemented variant matching", "Added runtime validation failure messages", "Passed automated tests"],
+    "activeDecisionIds": [],
+    "activeConceptNames": ["discriminated union", "runtime validation", "local UI shell"],
+    "relatedFiles": [{ "kind": "CODE", "path": "src/events.ts" }, { "kind": "CODE", "path": "test/events.test.ts" }],
+    "nextActions": ["Open the generated result"],
+    "updatedAt": "2026-08-27T00:00:06.000Z",
+    "source": { "kind": "AGENT", "role": "BUILDER" },
+    "redactionStatus": "VERIFIED_REDACTED"
+  },
+  "completionReport": {
+    "schemaVersion": 1,
+    "id": "completion_report_20000000-0000-4000-8000-000000000207",
+    "projectId": "project_20000000-0000-4000-8000-000000000202",
+    "taskId": "task_20000000-0000-4000-8000-000000000205",
+    "correlationId": "corr_20000000-0000-4000-8000-000000000203",
+    "expectedTaskRevision": 2,
+    "implementedFeatures": ["Local payload input", "Typed event matching", "Validation failure explanations"],
+    "acceptanceResults": [
+      { "criterionKey": "feature_01", "status": "PASSED", "evidence": [] },
+      { "criterionKey": "feature_02", "status": "PASSED", "evidence": [] },
+      { "criterionKey": "feature_03", "status": "PASSED", "evidence": [] },
+      { "criterionKey": "local_result", "status": "PASSED", "evidence": [] },
+      { "criterionKey": "tests_pass", "status": "PASSED", "evidence": [] }
+    ],
+    "validationResults": [{ "name": "generated project tests", "status": "PASSED", "summary": "All event variant tests passed." }],
+    "conceptUsage": [
+      { "conceptName": "discriminated union", "scope": "LEARNER_FOCUS", "importance": "CORE", "usageReason": "Event handlers narrow on the type field.", "codeReferences": [{ "kind": "CODE", "path": "src/events.ts" }] },
+      { "conceptName": "runtime validation", "scope": "LEARNER_FOCUS", "importance": "CORE", "usageReason": "Unknown payloads are checked before rendering.", "codeReferences": [{ "kind": "CODE", "path": "src/events.ts" }] },
+      { "conceptName": "local UI shell", "scope": "AGENT_SUPPORT", "importance": "SUPPORTING", "usageReason": "The local form presents the matching flow.", "codeReferences": [{ "kind": "CODE", "path": "src/main.ts" }] }
+    ],
+    "appliedDecisionIds": [],
+    "codeReferences": [{ "kind": "CODE", "path": "src/events.ts" }, { "kind": "CODE", "path": "src/main.ts" }],
+    "diffReferences": [],
+    "specDeviations": [],
+    "remainingIssues": [],
+    "limitations": ["Only synthetic redacted samples are supported."],
+    "completedAt": "2026-08-27T00:00:07.000Z",
+    "source": { "kind": "AGENT", "role": "BUILDER" },
+    "redactionStatus": "VERIFIED_REDACTED"
+  },
+  "contextExpectation": {
+    "latestContextVersion": 3,
+    "requiredActiveDecisionIds": [],
+    "requiredConceptNames": ["discriminated union", "runtime validation", "local UI shell"]
+  },
+  "redaction": {
+    "output": [
+      { "kind": "MESSAGE", "summary": "Starting the confirmed local TypeScript task." },
+      { "kind": "TOOL_CALL", "summary": "Reading [WORKSPACE]/src/events.ts" },
+      { "kind": "TEST_RESULT", "summary": "The initial test failed, then passed after the parser fix." }
+    ],
+    "forbiddenSentinels": ["synthetic-live-secret-123", "synthetic-bearer-456"]
+  }
+}

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   uiRequestSchema,
+  uiPrepareBuilderTaskCommandSchema,
   uiResolveDecisionCommandSchema,
   uiReturnToDiscoveryCommandSchema,
   uiStartDiscoveryCommandSchema,
@@ -86,5 +87,24 @@ describe('UI external input contracts', () => {
     expect(uiReturnToDiscoveryCommandSchema.parse(returned)).toEqual(returned)
     expect(uiRequestSchema.safeParse(update).success).toBe(true)
     expect(uiRequestSchema.safeParse(returned).success).toBe(true)
+  })
+
+  it('accepts a separate retryable Builder Task preparation command', () => {
+    const prepare = {
+      schemaVersion: 1,
+      kind: 'UI_PREPARE_BUILDER_TASK',
+      correlationId: ids.correlation,
+      actor: { kind: 'UI' },
+      idempotencyKey: ids.idempotency,
+      projectId: ids.project,
+      learningSpecId: ids.learningSpec,
+      expectedSpecRevision: 2,
+    } as const
+    expect(uiPrepareBuilderTaskCommandSchema.parse(prepare)).toEqual(prepare)
+    expect(uiRequestSchema.safeParse(prepare).success).toBe(true)
+    expect(
+      uiPrepareBuilderTaskCommandSchema.safeParse({ ...prepare, workspacePath: '/tmp/owned-by-ui' })
+        .success,
+    ).toBe(false)
   })
 })

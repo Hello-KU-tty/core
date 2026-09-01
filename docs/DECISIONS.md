@@ -243,6 +243,14 @@
 - **검토한 대안:** Agent가 stable metadata를 계속 생성, 기존 selected Session 재개, Spec 수정을 confirmation payload에 함께 포함, Spec feedback 전용 table 추가, 세 scope의 모든 concept을 Builder/Evidence 목표로 사용.
 - **tradeoff:** 새 session 때문에 Project의 Discovery history가 하나 늘고 Spec 조정에 revision이 추가되지만 T08 terminal invariant와 provenance를 보존한다. 별도 Spec feedback entity를 만들지 않아 자연어 요청 원문은 Crew conversation 경계에 남지만 저장된 draft의 author와 revision은 명확하다. 직접 편집과 Agent 재작성은 같은 domain policy를 공유해 UI 선택권과 deterministic validation을 함께 유지한다.
 
+## 2026-08-27: T10 Builder Task 준비와 native workspace 실행 경계
+
+- **상태:** 승인
+- **맥락:** T09은 user-confirmed Learning Spec까지 보존하지만 Task 생성, generated workspace assignment와 Builder runtime은 아직 연결하지 않았다. Crew 0.3.0은 slot의 project directory를 첫 message 전에 지정할 수 있고 Kiro CLI 2.19.2 Agent Engine v2는 tool별 path 설정, shell `denyByDefault`와 pre-tool hook을 제공한다. 다만 host user 권한으로 실행되는 native file/shell tool은 Core MCP catalog 분리만으로 filesystem boundary가 되지 않으며, raw stream 전체를 durable storage에 넣으면 secret과 민감 경로가 섞일 수 있다.
+- **결정:** Spec confirmation과 retry 가능한 `UI_PREPARE_BUILDER_TASK`를 분리한다. Core가 confirmed Spec을 deterministic Task로 변환하고 `projects/<projectId>` 상대 workspace를 발급한다. `LEARNER_FOCUS`는 expected Concept, `AGENT_SUPPORT`는 구현 지원 requirement, `EXCLUDED`는 excluded work로만 매핑한다. Builder는 기존 Kiro CLI 2.19.2 Agent Engine v2와 Crew 0.3.0을 유지하고 fresh slot을 canonical project workspace에 첫 message 전에 연결한다. native read/write/shell은 Kiro의 deny-by-default 설정과 Core workspace policy를 재사용하는 pre-tool guard를 모두 통과해야 하며 web, subagent, global MCP는 허용하지 않는다. runtime escape probe가 이 경계를 증명하지 못하면 임의 fallback이나 CLI 3 migration을 하지 않고 새 결정을 요청한다. Builder stream은 redaction 뒤 사용자에게 transient하게 보이고 raw transcript는 저장하지 않으며, durable state에는 versioned Live Context, Completion Report와 구조화된 source reference만 남긴다. 첫 Context는 `TASK_STARTED`, 완료 직전 마지막 Context는 `TASK_COMPLETED`로 강제한다. Completion Report의 Concept usage는 구현에서 사용됐다는 관찰이며 사용자 이해 판정이 아니다.
+- **검토한 대안:** Spec 확정 transaction에서 즉시 Task와 workspace 생성, Agent가 Task acceptance criteria와 workspace path를 결정, Core MCP에 범용 file/shell tool 추가, Crew slot cwd만 믿고 별도 guard 생략, raw Builder transcript 전체 저장, Kiro CLI 3으로 즉시 migration.
+- **tradeoff:** Task 준비 command와 runtime guard가 추가되고 허용 shell command가 보수적이어서 새로운 debug command는 명시적으로 확장해야 한다. 대신 confirmation retry 실패가 Spec lineage를 바꾸지 않고, Agent 작성 의미와 Core-owned state, filesystem 경계, 사용자에게 보이는 진행과 durable 최소 기록을 분리할 수 있다.
+
 ## 2026-08-24: 구현 세부 선택 위임
 
 - **상태:** 승인

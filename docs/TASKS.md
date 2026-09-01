@@ -330,7 +330,16 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - `AGENT_SUPPORT`와 `EXCLUDED` 항목이 Evidence 목표로 잘못 계산되지 않는다.
 - 초기 진입은 확인 중심이되 Spec의 실질적 제어권은 사용자에게 남는다.
 
-### [>] T10. Builder Task, workspace와 Live Context
+### [x] T10. Builder Task, workspace와 Live Context
+
+**검증 기록**
+
+- Node.js 24.19.0과 pnpm 11.12.0에서 format, lint, typecheck, Drizzle schema, unit 2개, package/app integration 132개, eval 8개, build와 smoke 4개가 통과했다.
+- macOS sandbox에서 Chromium Mach port 등록만 거절된 뒤 승인된 외부 실행에서 기존 Playwright E2E 1개가 통과했다.
+- confirmed-before-prepare, Spec scope→Task mapping, pending Task 재시작 복구, 첫 `TASK_STARTED`, stale/idempotent Context, mid-task Helper freshness, 마지막 `TASK_COMPLETED`, Completion Report scope와 false-mastery 금지를 application/MCP integration과 Builder prompt v1.0.0 regression fixture로 검증했다.
+- native file/shell guard는 상대 traversal, symlink escape, `.kiro` 보호 경로와 허용되지 않은 command를 거절하며, transient stream redaction은 credential sentinel과 user-home path를 제거함을 검증했다. Crew slot은 첫 message 전에 canonical project directory를 `/api/chat/slots/{slot}/project`에 연결하지 않으면 dispatch할 수 없다.
+- 로그인된 Kiro CLI 2.20.0 Agent Engine v2와 `claude-haiku-4.5`로 bounded live Builder runner를 실행했다. Agent가 role-bound MCP로 Task를 시작하고 Context version 1~3을 저장한 뒤 TypeScript discriminated union을 구현해 초기 실패 test를 통과시켰으며, Task revision 3의 durable Completion Report와 같은 version 3의 Helper Context를 복원했다.
+- runtime boundary probe의 workspace 밖 sentinel은 변경되지 않았고 독립 `node --test`는 exit code 0이었다. raw stream은 저장하지 않았으며 redaction된 transient stream에서 message, tool call, file change, test result, status와 차단된 boundary probe error를 확인했다. macOS sandbox 안의 Kiro v2 ACP 초기화 실패는 같은 최소 채팅과 권한 확장 실행을 비교해 host 격리 제한으로 분리했다.
 
 **범위**
 
@@ -355,7 +364,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - 작업 도중 Helper가 최신 Context로 현재 목표·변경·다음 작업을 설명할 수 있다.
 - stream을 숨기지 않고 Live Progress가 현재 위치를 보조한다.
 
-### [ ] T11. 실제 Decision과 Builder 재개 흐름
+### [>] T11. 실제 Decision과 Builder 재개 흐름
 
 **범위**
 

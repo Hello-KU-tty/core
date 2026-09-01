@@ -3,12 +3,15 @@ import path from 'node:path'
 
 import {
   baselineResultSchema,
+  builderTaskSchema,
   candidateRoundSchema,
   discoveryInputSchema,
   evaluationCriterionResultSchema,
   evaluationFixtureSchema,
   learningSpecRevisionSchema,
+  liveProjectContextSchema,
   projectCandidateRevisionSchema,
+  taskCompletionReportSchema,
   type EvaluationCaseResult,
 } from '@vibe-helper/contracts'
 import { requiredEvidenceConceptNames } from '@vibe-helper/domain'
@@ -227,6 +230,49 @@ describe('T09 Learning Spec prompt regression', () => {
         expect.objectContaining({ criterionKey: 'contract_valid', status: 'PASSED' }),
         expect.objectContaining({ criterionKey: 'scope_boundaries', status: 'PASSED' }),
         expect.objectContaining({ criterionKey: 'scope_appropriateness', status: 'PASSED' }),
+      ]),
+    )
+  })
+})
+
+describe('T10 Builder prompt regression', () => {
+  it('keeps Task scope, current completion Context, redaction, and no false mastery claim', async () => {
+    const fixture = evaluationFixtureSchema.parse(
+      await loadInput('tests/eval/fixtures/prompt-regressions/builder-v1.0-webhook.manifest.json'),
+    )
+    const subject = parseEvaluationSubject(
+      await loadInput('tests/eval/fixtures/prompt-regressions/builder-v1.0-webhook.json'),
+    )
+    const reviews = evaluationCriterionResultSchema
+      .array()
+      .parse(
+        await loadInput('tests/eval/fixtures/prompt-regressions/builder-v1.0-webhook.review.json'),
+      )
+    const result = evaluateCalibrationCase({
+      fixture,
+      subject,
+      humanReviews: new Map(reviews.map((review) => [review.criterionKey, review])),
+    })
+    const task = builderTaskSchema.parse(subject.builderTask)
+    const context = liveProjectContextSchema.parse(subject.liveContext)
+    const report = taskCompletionReportSchema.parse(subject.completionReport)
+
+    expect(task.expectedConcepts).toEqual(['discriminated union', 'runtime validation'])
+    expect(task.excludedWork).toEqual(['Live provider credentials and hosted payload storage'])
+    expect(context).toMatchObject({ checkpoint: 'TASK_COMPLETED', contextVersion: 3 })
+    expect(report.conceptUsage.map((usage) => usage.scope)).toEqual([
+      'LEARNER_FOCUS',
+      'LEARNER_FOCUS',
+      'AGENT_SUPPORT',
+    ])
+    expect(JSON.stringify(report)).not.toMatch(/user.*(?:learned|understands|mastered)/iu)
+    expect(result.status).toBe('PASSED')
+    expect(result.criterionResults).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ criterionKey: 'contract_valid', status: 'PASSED' }),
+        expect.objectContaining({ criterionKey: 'context_fresh', status: 'PASSED' }),
+        expect.objectContaining({ criterionKey: 'redaction_no_leak', status: 'PASSED' }),
+        expect.objectContaining({ criterionKey: 'builder_semantics', status: 'PASSED' }),
       ]),
     )
   })

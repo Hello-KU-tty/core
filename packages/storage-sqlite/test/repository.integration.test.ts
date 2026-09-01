@@ -170,6 +170,7 @@ describe('SQLite persistence repository', () => {
       selectedCandidate: records.candidate,
       learningSpec: records.confirmedSpec,
       activeTask: records.task,
+      currentTask: records.task,
       pendingDecisions: [records.decision],
       liveContext: records.context,
     })
