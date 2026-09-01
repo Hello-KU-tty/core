@@ -5,11 +5,14 @@ import type { ApplicationService } from '@vibe-helper/application'
 import {
   analystGetEpisodeContextQuerySchema,
   analystSubmitEvidenceProposalsCommandSchema,
+  builderApplyDecisionCommandSchema,
+  builderApplyDecisionToolInputSchema,
   builderCompleteTaskToolInputSchema,
   builderCompleteTaskCommandSchema,
   builderGetDecisionResultQuerySchema,
   builderGetTaskQuerySchema,
   builderRequestDecisionCommandSchema,
+  builderRequestDecisionToolInputSchema,
   builderStartTaskCommandSchema,
   builderTaskContextSchema,
   builderUpdateLiveContextToolInputSchema,
@@ -85,7 +88,7 @@ export const ROLE_TOOL_CATALOG: Readonly<Record<AgentRole, readonly RoleToolDefi
       name: 'request_user_decision',
       title: 'Request user Decision',
       description: 'Open a validated Decision without resolving it for the user.',
-      inputSchema: builderRequestDecisionCommandSchema,
+      inputSchema: builderRequestDecisionToolInputSchema,
       readOnly: false,
     },
     {
@@ -94,6 +97,13 @@ export const ROLE_TOOL_CATALOG: Readonly<Record<AgentRole, readonly RoleToolDefi
       description: 'Read the current resolution and application status of a Decision.',
       inputSchema: builderGetDecisionResultQuerySchema,
       readOnly: true,
+    },
+    {
+      name: 'apply_decision_result',
+      title: 'Apply Decision result',
+      description: 'Record how the resolved user Decision was applied and resume Context.',
+      inputSchema: builderApplyDecisionToolInputSchema,
+      readOnly: false,
     },
     {
       name: 'complete_task',
@@ -360,6 +370,48 @@ async function updateLiveContextFromTool(options: RoleBoundMcpServerOptions, inp
   )
 }
 
+async function requestDecisionFromTool(options: RoleBoundMcpServerOptions, input: unknown) {
+  const toolInput = builderRequestDecisionToolInputSchema.parse(input)
+  return options.application.executeAgent(
+    'BUILDER',
+    builderRequestDecisionCommandSchema.parse({
+      schemaVersion: 1,
+      kind: 'BUILDER_REQUEST_DECISION',
+      correlationId: toolInput.correlationId,
+      actor: { kind: 'AGENT', role: 'BUILDER' },
+      idempotencyKey: toolInput.idempotencyKey,
+      projectId: toolInput.projectId,
+      taskId: toolInput.taskId,
+      expectedTaskRevision: toolInput.expectedTaskRevision,
+      expectedContextVersion: toolInput.expectedContextVersion,
+      decision: toolInput.decision,
+      context: toolInput.context,
+    }),
+  )
+}
+
+async function applyDecisionFromTool(options: RoleBoundMcpServerOptions, input: unknown) {
+  const toolInput = builderApplyDecisionToolInputSchema.parse(input)
+  return options.application.executeAgent(
+    'BUILDER',
+    builderApplyDecisionCommandSchema.parse({
+      schemaVersion: 1,
+      kind: 'BUILDER_APPLY_DECISION',
+      correlationId: toolInput.correlationId,
+      actor: { kind: 'AGENT', role: 'BUILDER' },
+      idempotencyKey: toolInput.idempotencyKey,
+      projectId: toolInput.projectId,
+      taskId: toolInput.taskId,
+      decisionId: toolInput.decisionId,
+      expectedTaskRevision: toolInput.expectedTaskRevision,
+      expectedContextVersion: toolInput.expectedContextVersion,
+      appliedResult: toolInput.appliedResult,
+      sourceReferences: toolInput.sourceReferences,
+      context: toolInput.context,
+    }),
+  )
+}
+
 async function completeTaskFromTool(options: RoleBoundMcpServerOptions, input: unknown) {
   const toolInput = builderCompleteTaskToolInputSchema.parse(input)
   const contextResult = await options.application.executeAgent('BUILDER', {
@@ -436,9 +488,13 @@ export function createRoleBoundMcpServer(options: RoleBoundMcpServerOptions): Mc
               ? await submitLearningSpecFromTool(options, input)
               : options.role === 'BUILDER' && tool.name === 'update_build_context'
                 ? await updateLiveContextFromTool(options, input)
-                : options.role === 'BUILDER' && tool.name === 'complete_task'
-                  ? await completeTaskFromTool(options, input)
-                  : await options.application.executeAgent(options.role, input)
+                : options.role === 'BUILDER' && tool.name === 'request_user_decision'
+                  ? await requestDecisionFromTool(options, input)
+                  : options.role === 'BUILDER' && tool.name === 'apply_decision_result'
+                    ? await applyDecisionFromTool(options, input)
+                    : options.role === 'BUILDER' && tool.name === 'complete_task'
+                      ? await completeTaskFromTool(options, input)
+                      : await options.application.executeAgent(options.role, input)
         const payload = toJsonObject(result.success ? result.data : result.error)
         return {
           content: [{ type: 'text', text: JSON.stringify(payload) }],

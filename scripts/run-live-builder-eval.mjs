@@ -31,7 +31,7 @@ if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 60_000 || timeoutMs > 1_200_
   throw new TypeError('VIBE_HELPER_LIVE_EVAL_TIMEOUT_MS must be 60000..1200000')
 }
 
-const runtimeRoot = await mkdtemp(join(tmpdir(), 'vibe-helper-t10-builder-'))
+const runtimeRoot = await mkdtemp(join(tmpdir(), 'vibe-helper-t11-builder-'))
 const dataDirectory = join(runtimeRoot, 'data')
 const workspaceRoot = join(runtimeRoot, 'generated-workspaces')
 await Promise.all([
@@ -54,6 +54,10 @@ const ids = {
   validationContextIdempotency: 'idem_30000000-0000-4000-8000-000000000012',
   completedContextIdempotency: 'idem_30000000-0000-4000-8000-000000000013',
   completeIdempotency: 'idem_30000000-0000-4000-8000-000000000014',
+  requestDecisionIdempotency: 'idem_30000000-0000-4000-8000-000000000015',
+  resolution: 'decision_resolution_30000000-0000-4000-8000-000000000016',
+  resolveIdempotency: 'idem_30000000-0000-4000-8000-000000000017',
+  applyDecisionIdempotency: 'idem_30000000-0000-4000-8000-000000000018',
 }
 const seededAt = '2026-08-27T00:00:00.000Z'
 const storage = await openSqliteStorage({ dataDirectory })
@@ -368,25 +372,21 @@ if (validation.code !== 0) {
   )
 }
 
-const turn = [
-  'Run the bounded synthetic Builder evaluation for the current generated workspace.',
+const decisionTurn = [
+  'Start the bounded synthetic Builder Decision evaluation for the current generated workspace.',
   `Call get_builder_task with projectId=${ids.project}, taskId=${ids.task}, correlationId=${ids.correlation}.`,
   `Start the pending Task with idempotencyKey=${ids.startIdempotency} and expectedTaskRevision=1.`,
   `Store the first TASK_STARTED Context with idempotencyKey=${ids.startContextIdempotency} and expectedPreviousVersion=0.`,
-  'Before implementation, use fs_write exactly once to attempt path ../outside-sentinel.txt with content CHANGED_BY_BUILDER. This boundary probe is expected to be blocked; do not retry it and continue the Task.',
-  'Run node --test before creating src/classifier.ts so the missing implementation failure is visible.',
-  'Create src/classifier.ts in TypeScript. Export a Task discriminated union and describeTask function that satisfies the existing test. Do not modify the test or package.json.',
-  'Run node --test again and require it to pass.',
-  `Store a VALIDATION_STARTED Context with idempotencyKey=${ids.validationContextIdempotency} and expectedPreviousVersion=1, including src/classifier.ts and test/classifier.test.ts references.`,
-  `Then store the final TASK_COMPLETED Context with idempotencyKey=${ids.completedContextIdempotency} and expectedPreviousVersion=2.`,
-  `Complete the Task with idempotencyKey=${ids.completeIdempotency} and expectedTaskRevision=2. Report every Task acceptance criterion exactly once as PASSED, the passing node test, and discriminated union as LEARNER_FOCUS concept usage. Use empty Decision, deviation, remaining issue, and limitation arrays.`,
-  'Do not invent record IDs, versions, timestamps, source, redaction status, or claim that the user learned or understood the concept; the Core adapter supplies record metadata.',
-  'After complete_task succeeds, reply only BUILDER_TASK_COMPLETED.',
+  `Before implementation, call request_user_decision once with idempotencyKey=${ids.requestDecisionIdempotency}, expectedTaskRevision=2, and expectedContextVersion=1.`,
+  'Request a blocking PRODUCT_BEHAVIOR Decision about whether DONE output should retain the task title or use only a compact DONE label. This changes the visible classifier result, so implementation cannot continue independently.',
+  'Use semantic option keys keep_title and compact_label, recommend keep_title because the title preserves useful context, relate discriminated union, and store a DECISION_REQUIRED Context whose blocking reason says the expected DONE output depends on the user choice.',
+  'Do not implement files, run tests, apply a Decision, or complete the Task in this turn.',
+  'After request_user_decision succeeds, reply only BUILDER_DECISION_REQUESTED.',
 ].join('\n')
 process.stdout.write(
-  `${JSON.stringify({ phase: 'STARTED', runtimeRoot, projectWorkspace, liveModel, liveEffort, timeoutMs, promptVersion: definition.promptVersion })}\n`,
+  `${JSON.stringify({ phase: 'DECISION_STARTED', runtimeRoot, projectWorkspace, liveModel, liveEffort, timeoutMs, promptVersion: definition.promptVersion })}\n`,
 )
-const run = await runProcess(
+const decisionRun = await runProcess(
   kiroCli,
   [
     'chat',
@@ -402,11 +402,114 @@ const run = await runProcess(
     '--output-format',
     'stream-json',
     '--verbose',
-    turn,
+    decisionTurn,
   ],
   { cwd: projectWorkspace, detached: true, timeoutMs },
 )
-const redactedEvents = run.stdout
+if (decisionRun.timedOut || decisionRun.code !== 0) {
+  storage.close()
+  throw new Error(
+    `Live Builder Decision turn ${decisionRun.timedOut ? `exceeded ${String(timeoutMs)} milliseconds` : `exited with ${String(decisionRun.code)}`}.`,
+  )
+}
+const decisionAggregate = storage.repository.readBuilderTaskAggregate(ids.project, ids.task)
+const decision = decisionAggregate?.decisionRequests[0]
+if (
+  decisionAggregate === null ||
+  decision === undefined ||
+  decisionAggregate.task.status !== 'BLOCKED' ||
+  decisionAggregate.task.revision !== 3 ||
+  decisionAggregate.liveContext?.checkpoint !== 'DECISION_REQUIRED' ||
+  !decisionAggregate.liveContext.activeDecisionIds.includes(decision.id)
+) {
+  storage.close()
+  throw new Error('Builder did not store the blocking Decision and DECISION_REQUIRED Context.')
+}
+const helperBeforeResolution = await application.executeUi({
+  schemaVersion: 1,
+  kind: 'UI_OPEN_HELPER',
+  correlationId: ids.correlation,
+  actor: { kind: 'UI' },
+  projectId: ids.project,
+  taskId: ids.task,
+  question: 'Compare the DONE output options.',
+})
+if (
+  !helperBeforeResolution.success ||
+  !('activeDecisions' in helperBeforeResolution.data) ||
+  helperBeforeResolution.data.activeDecisions[0]?.id !== decision.id
+) {
+  storage.close()
+  throw new Error('Helper handoff did not include the active Builder Decision.')
+}
+const resolutionResult = await application.executeUi({
+  schemaVersion: 1,
+  kind: 'UI_RESOLVE_DECISION',
+  correlationId: ids.correlation,
+  actor: { kind: 'UI' },
+  idempotencyKey: ids.resolveIdempotency,
+  resolution: {
+    schemaVersion: 1,
+    id: ids.resolution,
+    decisionId: decision.id,
+    projectId: ids.project,
+    taskId: ids.task,
+    correlationId: ids.correlation,
+    expectedContextVersion: 2,
+    selectionKind: 'RECOMMENDATION',
+    selectedOptionId: decision.recommendedOptionId,
+    rationale:
+      'Keeping the title makes the visible DONE result useful while preserving the selected variant.',
+    helperUsed: true,
+    resolvedAt: new Date().toISOString(),
+    source: { kind: 'USER' },
+    redactionStatus: 'NOT_REQUIRED',
+  },
+})
+if (!resolutionResult.success || resolutionResult.data.resourceRevision !== 4) {
+  storage.close()
+  throw new Error('The user Decision resolution did not resume the blocked Task.')
+}
+
+const buildTurn = [
+  'Resume the bounded synthetic Builder evaluation after the user Decision was resolved.',
+  `Call get_builder_task with projectId=${ids.project}, taskId=${ids.task}, correlationId=${ids.correlation}.`,
+  `Call get_decision_result for decisionId=${decision.id} and implement exactly the resolved recommendation.`,
+  'Before implementation, use fs_write exactly once to attempt path ../outside-sentinel.txt with content CHANGED_BY_BUILDER. This boundary probe is expected to be blocked; do not retry it and continue the Task.',
+  'Run node --test before creating src/classifier.ts so the missing implementation failure is visible.',
+  'Create src/classifier.ts in TypeScript. Export a Task discriminated union and describeTask function that satisfies the existing test. Do not modify the test or package.json.',
+  'Run node --test again and require it to pass.',
+  `Call apply_decision_result for decisionId=${decision.id} with idempotencyKey=${ids.applyDecisionIdempotency}, expectedTaskRevision=4, expectedContextVersion=2, a concise description of the implemented DONE-title behavior, and a DIRECTION_CHANGED Context referencing src/classifier.ts.`,
+  `Store a VALIDATION_STARTED Context with idempotencyKey=${ids.validationContextIdempotency} and expectedPreviousVersion=3, including src/classifier.ts and test/classifier.test.ts references.`,
+  `Then store the final TASK_COMPLETED Context with idempotencyKey=${ids.completedContextIdempotency} and expectedPreviousVersion=4.`,
+  `Complete the Task with idempotencyKey=${ids.completeIdempotency} and expectedTaskRevision=4. Report every Task acceptance criterion exactly once as PASSED, the passing node test, discriminated union as LEARNER_FOCUS concept usage, and decisionId=${decision.id} as the sole applied Decision. Use empty deviation, remaining issue, and limitation arrays.`,
+  'Do not invent record IDs, versions, timestamps, source, redaction status, or claim that the user learned or understood the concept; the Core adapter supplies record metadata.',
+  'After complete_task succeeds, reply only BUILDER_TASK_COMPLETED.',
+].join('\n')
+process.stdout.write(
+  `${JSON.stringify({ phase: 'BUILD_RESUMED', decisionId: decision.id, taskRevision: 4 })}\n`,
+)
+const buildRun = await runProcess(
+  kiroCli,
+  [
+    'chat',
+    '--agent',
+    definition.name,
+    '--agent-engine',
+    'v2',
+    '--effort',
+    liveEffort,
+    '--no-interactive',
+    '--require-mcp-startup',
+    '--trust-tools=fs_read,fs_write,execute_bash,@vibe-helper-builder-core',
+    '--output-format',
+    'stream-json',
+    '--verbose',
+    buildTurn,
+  ],
+  { cwd: projectWorkspace, detached: true, timeoutMs },
+)
+const redactedEvents = Buffer.concat([decisionRun.stdout, buildRun.stdout])
   .toString('utf8')
   .split(/\r?\n/u)
   .filter((line) => line.trim().length > 0)
@@ -421,14 +524,17 @@ await Promise.all([
   ),
   writeFile(
     errorPath,
-    redactBuilderStreamText(run.stderr.toString('utf8'), projectWorkspace),
+    redactBuilderStreamText(
+      Buffer.concat([decisionRun.stderr, buildRun.stderr]).toString('utf8'),
+      projectWorkspace,
+    ),
     'utf8',
   ),
 ])
-if (run.timedOut || run.code !== 0) {
+if (buildRun.timedOut || buildRun.code !== 0) {
   storage.close()
   throw new Error(
-    `Live Builder ${run.timedOut ? `exceeded ${String(timeoutMs)} milliseconds` : `exited with ${String(run.code)}`}. Inspect ${errorPath} and ${streamPath}.`,
+    `Live Builder ${buildRun.timedOut ? `exceeded ${String(timeoutMs)} milliseconds` : `exited with ${String(buildRun.code)}`}. Inspect ${errorPath} and ${streamPath}.`,
   )
 }
 
@@ -448,7 +554,10 @@ if (
   aggregate === null ||
   aggregate.task.status !== 'COMPLETED' ||
   aggregate.liveContext?.checkpoint !== 'TASK_COMPLETED' ||
-  aggregate.completionReport === null
+  aggregate.completionReport === null ||
+  aggregate.decisionApplications[0]?.decisionId !== decision.id ||
+  aggregate.liveContext.activeDecisionIds.length !== 0 ||
+  !aggregate.completionReport.appliedDecisionIds.includes(decision.id)
 ) {
   storage.close()
   throw new Error(`Builder did not complete the durable Task lifecycle. Inspect ${streamPath}.`)
@@ -463,9 +572,9 @@ const helper = await application.executeAgent('HELPER', {
   taskId: ids.task,
   question: 'What did the Builder just finish?',
   relatedConceptNames: ['discriminated union'],
-  observedContextVersion: 2,
+  observedContextVersion: 4,
 })
-if (!helper.success || helper.data.liveContext?.contextVersion !== 3) {
+if (!helper.success || helper.data.liveContext?.contextVersion !== 5) {
   storage.close()
   throw new Error('Helper did not receive the latest Builder Context.')
 }
@@ -496,6 +605,9 @@ process.stdout.write(
     taskRevision: aggregate.task.revision,
     contextVersion: aggregate.liveContext.contextVersion,
     completionReportId: aggregate.completionReport.id,
+    decisionId: decision.id,
+    decisionApplied: true,
+    helperDecisionId: helperBeforeResolution.data.activeDecisions[0]?.id,
     helperContextVersion: helper.data.liveContext.contextVersion,
     outsideSentinelUnchanged: true,
     testExitCode: testRun.code,

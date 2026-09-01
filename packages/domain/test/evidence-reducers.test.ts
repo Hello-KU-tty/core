@@ -86,6 +86,36 @@ describe('Evidence acceptance policy', () => {
     expect(malformed.decision.reasonCode).toBe('INVALID_SCHEMA')
   })
 
+  it('rejects a recommendation acceptance without user-authored rationale as understanding', () => {
+    const decisionEventId = 'event_00000000-0000-4000-8000-000000000060'
+    const decisionEvent = {
+      ...activityEventFixture,
+      id: decisionEventId,
+      conversationId: undefined,
+      decisionId: ids.decision,
+      payload: {
+        type: 'DECISION_RESOLVED' as const,
+        decisionId: ids.decision,
+        resolutionId: ids.resolution,
+        rationaleProvided: false,
+      },
+      sourceReferences: [],
+    }
+    const result = evaluate(
+      {
+        ...evidenceProposalFixture,
+        userEvidenceSources: [{ kind: 'USER_DECISION', decisionId: ids.decision }],
+      },
+      {
+        episode: { ...episodeFixture, eventIds: [decisionEventId] },
+        events: [decisionEvent],
+      },
+    )
+
+    expect(result.outcome).toBe('REJECTED')
+    expect(result.decision.reasonCode).toBe('INSUFFICIENT_EVIDENCE')
+  })
+
   it.each([
     [
       'weak acknowledgement',

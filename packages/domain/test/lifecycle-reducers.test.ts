@@ -398,6 +398,39 @@ describe('Task and Decision reducers', () => {
       }).trace.reasonCode,
     ).toBe('DECISION_RECOMMENDATION_MISMATCH')
   })
+
+  it('accepts a user-authored custom proposal without substituting an option ID', () => {
+    const { selectedOptionId: _selectedOptionId, ...resolution } = decisionResolutionFixture
+    expect(
+      resolveDecision({
+        aggregate: { request: decisionRequestFixture },
+        task: builderTaskFixture,
+        resolution: {
+          ...resolution,
+          selectionKind: 'CUSTOM',
+          customProposal: 'Reject unknown fields but retain their names in a local debug summary.',
+        },
+        currentContextVersion: 1,
+      }).outcome,
+    ).toBe('APPLIED')
+  })
+
+  it('requires a coherent DECISION_REQUIRED Context and blocking reason', () => {
+    expect(
+      openDecision({
+        task: builderTaskFixture,
+        liveContext: { ...liveContextFixture, checkpoint: 'DIRECTION_CHANGED' },
+        request: decisionRequestFixture,
+      }).trace.reasonCode,
+    ).toBe('DECISION_REQUEST_CONTEXT_MISMATCH')
+    expect(
+      openDecision({
+        task: builderTaskFixture,
+        liveContext: liveContextFixture,
+        request: { ...decisionRequestFixture, independentWorkCanContinue: false },
+      }).trace.reasonCode,
+    ).toBe('DECISION_REQUEST_CONTEXT_MISMATCH')
+  })
 })
 
 describe('Episode close reducer', () => {

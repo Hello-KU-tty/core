@@ -47,7 +47,8 @@ describe('Builder Agent adapter', () => {
     expect(definition.tools).not.toContain('use_subagent')
     expect(definition.prompt).toContain('TASK_STARTED')
     expect(definition.prompt).toContain('TASK_COMPLETED')
-    expect(BUILDER_CORE_TOOL_NAMES).toHaveLength(6)
+    expect(definition.prompt).toContain('apply_decision_result')
+    expect(BUILDER_CORE_TOOL_NAMES).toHaveLength(7)
   })
 
   it('rejects prompt drift and a missing path guard', () => {
@@ -59,7 +60,7 @@ describe('Builder Agent adapter', () => {
       expect.objectContaining<Partial<BuilderAgentAdapterError>>({ code: 'INVALID_PROMPT' }),
     )
     expect(() =>
-      createBuilderAgentDefinition('# Builder\n\n> Prompt version: `1.0.0`', {
+      createBuilderAgentDefinition('# Builder\n\n> Prompt version: `1.1.0`', {
         guardCommand: ' ',
       }),
     ).toThrowError(
@@ -83,6 +84,18 @@ describe('Builder Agent adapter', () => {
               liveContext: null,
               decisionRequests: [],
               decisionResolutions: [],
+              decisionApplications: [],
+            },
+          }
+        }
+        if (name === 'request_user_decision' || name === 'apply_decision_result') {
+          return {
+            structuredContent: {
+              schemaVersion: 1,
+              correlationId: ids.correlation,
+              accepted: true,
+              resourceRevision: 1,
+              decisionId: ids.decision,
             },
           }
         }
@@ -124,7 +137,80 @@ describe('Builder Agent adapter', () => {
         nextActions: ['Run the initial test.'],
       }),
     ).toMatchObject({ accepted: true })
-    expect(calls).toEqual(['get_builder_task', 'update_build_context'])
+    expect(
+      await adapter.requestDecision({
+        schemaVersion: 1,
+        projectId: ids.project,
+        taskId: ids.task,
+        correlationId: ids.correlation,
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000241',
+        expectedTaskRevision: 1,
+        expectedContextVersion: 1,
+        decision: {
+          category: 'DATA_MODEL',
+          question: 'Should unknown fields be rejected or retained?',
+          reasonRequiredNow: 'The parser result depends on this choice.',
+          options: [
+            {
+              key: 'reject',
+              label: 'Reject',
+              description: 'Reject unknown fields.',
+              impacts: ['Typos fail early.'],
+              tradeoffs: [],
+            },
+            {
+              key: 'retain',
+              label: 'Retain',
+              description: 'Keep unknown fields.',
+              impacts: ['New fields remain visible.'],
+              tradeoffs: [],
+            },
+          ],
+          recommendedOptionKey: 'reject',
+          recommendationRationale: 'Strict parsing catches mistakes early.',
+          relatedConceptNames: ['runtime validation'],
+          sourceReferences: [],
+          independentWorkCanContinue: false,
+        },
+        context: {
+          stage: 'Waiting for parser behavior',
+          currentGoal: 'Choose the parser behavior.',
+          recentChanges: [],
+          activeConceptNames: ['runtime validation'],
+          relatedFiles: [],
+          nextActions: ['Apply the user choice.'],
+          blockingReason: 'The parser branch depends on this choice.',
+        },
+      }),
+    ).toMatchObject({ accepted: true, decisionId: ids.decision })
+    expect(
+      await adapter.applyDecision({
+        schemaVersion: 1,
+        projectId: ids.project,
+        taskId: ids.task,
+        decisionId: ids.decision,
+        correlationId: ids.correlation,
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000242',
+        expectedTaskRevision: 2,
+        expectedContextVersion: 2,
+        appliedResult: 'Implemented strict parser rejection.',
+        sourceReferences: [],
+        context: {
+          stage: 'Applied parser behavior',
+          currentGoal: 'Validate the selected parser behavior.',
+          recentChanges: ['Implemented strict parsing.'],
+          activeConceptNames: ['runtime validation'],
+          relatedFiles: [],
+          nextActions: ['Run tests.'],
+        },
+      }),
+    ).toMatchObject({ accepted: true, decisionId: ids.decision })
+    expect(calls).toEqual([
+      'get_builder_task',
+      'update_build_context',
+      'request_user_decision',
+      'apply_decision_result',
+    ])
   })
 
   it('fails closed when the Core response is malformed', async () => {

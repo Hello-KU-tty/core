@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest'
 import {
   agentRequestSchema,
   analystSubmitEvidenceProposalsCommandSchema,
+  builderApplyDecisionToolInputSchema,
   builderCompleteTaskToolInputSchema,
+  builderRequestDecisionToolInputSchema,
   builderUpdateLiveContextToolInputSchema,
   builderUpdateLiveContextCommandSchema,
   discoverySubmitCandidateRoundCommandSchema,
@@ -196,6 +198,83 @@ describe('Agent-specific request contracts', () => {
         source: { kind: 'AGENT', role: 'BUILDER' },
       }).success,
     ).toBe(false)
+
+    const decisionInput = {
+      schemaVersion: 1,
+      projectId: ids.project,
+      taskId: ids.task,
+      correlationId: ids.correlation,
+      idempotencyKey: ids.idempotency,
+      expectedTaskRevision: 1,
+      expectedContextVersion: 1,
+      decision: {
+        category: 'DATA_MODEL',
+        question: 'Should unknown fields be rejected or retained?',
+        reasonRequiredNow: 'The parser result depends on this choice.',
+        options: [
+          {
+            key: 'reject',
+            label: 'Reject',
+            description: 'Reject unknown fields.',
+            impacts: ['Typos fail early.'],
+            tradeoffs: [],
+          },
+          {
+            key: 'retain',
+            label: 'Retain',
+            description: 'Retain unknown fields.',
+            impacts: ['New fields stay visible.'],
+            tradeoffs: [],
+          },
+        ],
+        recommendedOptionKey: 'reject',
+        recommendationRationale: 'Strict parsing catches mistakes early.',
+        relatedConceptNames: ['runtime validation'],
+        sourceReferences: [],
+        independentWorkCanContinue: false,
+      },
+      context: {
+        stage: 'Waiting on parser behavior',
+        currentGoal: 'Choose the parser behavior.',
+        recentChanges: [],
+        activeConceptNames: ['runtime validation'],
+        relatedFiles: [],
+        nextActions: ['Apply the user choice.'],
+        blockingReason: 'The parser branch depends on this choice.',
+      },
+    } as const
+    expect(builderRequestDecisionToolInputSchema.safeParse(decisionInput).success).toBe(true)
+    expect(
+      builderRequestDecisionToolInputSchema.safeParse({
+        ...decisionInput,
+        decisionId: ids.decision,
+        requestedAt: '2026-08-25T03:00:00.000Z',
+        source: { kind: 'AGENT', role: 'BUILDER' },
+      }).success,
+    ).toBe(false)
+
+    expect(
+      builderApplyDecisionToolInputSchema.safeParse({
+        schemaVersion: 1,
+        projectId: ids.project,
+        taskId: ids.task,
+        decisionId: ids.decision,
+        correlationId: ids.correlation,
+        idempotencyKey: ids.idempotency,
+        expectedTaskRevision: 2,
+        expectedContextVersion: 2,
+        appliedResult: 'Implemented strict parsing.',
+        sourceReferences: [],
+        context: {
+          stage: 'Applied parser behavior',
+          currentGoal: 'Validate the selected behavior.',
+          recentChanges: ['Implemented strict parsing.'],
+          activeConceptNames: ['runtime validation'],
+          relatedFiles: [],
+          nextActions: ['Run tests.'],
+        },
+      }).success,
+    ).toBe(true)
 
     const completionInput = {
       schemaVersion: 1,

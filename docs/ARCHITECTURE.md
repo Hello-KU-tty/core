@@ -2,9 +2,9 @@
 
 ## 1. 상태
 
-- 상태: 사용자 승인 완료, T10 Builder Task·workspace·Live Context와 Kiro CLI 2.20.0 native live 회귀 완료, T11 실제 Decision·Builder 재개 흐름 착수 가능
+- 상태: 사용자 승인 완료, T11 실제 Decision·Builder 재개·적용과 Kiro CLI 2.20.2 native live 회귀 완료, T12 Helper 대화 착수 가능
 - 기준 입력: [PROJECT_BRIEF.md](../PROJECT_BRIEF.md), [SPEC.md](SPEC.md)
-- T03 versioned contract와 Agent/UI runtime validation, T04 pure reducer와 Evidence policy v1.0.0, T05 SQLite schema/repository/migration, T06 application use case와 역할 고정 MCP server, T07 criterion 기반 evaluation contract와 harness, T08 Candidate loop, T09 Discovery Agent prompt v1.1.0과 Learning Spec revision flow, T10 Builder prompt v1.0.0과 native workspace lifecycle은 구현됐다.
+- T03 versioned contract와 Agent/UI runtime validation, T04 pure reducer와 Evidence policy v1.0.0, T05 SQLite schema/repository/migration, T06 application use case와 역할 고정 MCP server, T07 criterion 기반 evaluation contract와 harness, T08 Candidate loop, T09 Discovery Agent prompt v1.1.0과 Learning Spec revision flow, T10 native workspace lifecycle, T11 Builder prompt v1.1.0과 Decision gate는 구현됐다.
 - Kiro/Crew 세부 연결은 capability spike 결과에 따라 이 문서를 갱신한다.
 
 ## 2. 선택한 기술 스택과 선택 이유
@@ -109,6 +109,9 @@ Agent Prompt / Skill
 Builder checkpoint
 → update_build_context
 → Live Project Context version N
+→ request_user_decision과 DECISION_REQUIRED Context atomic write
+→ user resolution과 blocking Task resume
+→ apply_decision_result와 DIRECTION_CHANGED Context atomic write
 → Helper get_helper_context
 → 관련 Task/Decision/Concept/코드 package
 → Helper answer
@@ -192,7 +195,7 @@ Domain은 Kiro SDK, React와 SQLite library에 의존하지 않는다.
 
 Application transaction은 SQLite repository interface를 통해 상태를 변경한다.
 
-T06의 application handler는 Agent와 UI transport가 공유하는 검증·transaction 경계다. T08은 현재 round의 latest Candidate에만 user feedback을 허용하고, SELECT가 아닌 미적용 feedback 전체를 다음 Candidate Round의 `appliedFeedbackIds`로 연결한다. Application은 pin/reject/merge/revise/shrink/expand/regenerate별 다음 revision과 정확한 round 구성, stale selection과 SELECT 이후 terminal 상태를 transaction 안에서 검증한다. T09은 selected Candidate에 대한 current Spec draft만 연속 revision으로 조정하고, user confirmation에서 내용 변경을 금지한다. 직접 UI 수정과 Discovery Agent 재작성은 같은 domain policy를 사용하며, 주제 복귀는 기존 selected Session을 재활성화하지 않고 draft를 `SUPERSEDED`로 만든 뒤 새 Discovery Session을 연다. T10은 확정과 Task 준비를 분리한 `UI_PREPARE_BUILDER_TASK` command에서 Spec을 deterministic acceptance criteria로 변환하고, Core가 `projects/<projectId>` 상대 workspace를 발급한다. Helper 대화 정책과 Episode dispatch/retry는 T12~T13에서 연결한다.
+T06의 application handler는 Agent와 UI transport가 공유하는 검증·transaction 경계다. T08은 현재 round의 latest Candidate에만 user feedback을 허용하고, SELECT가 아닌 미적용 feedback 전체를 다음 Candidate Round의 `appliedFeedbackIds`로 연결한다. Application은 pin/reject/merge/revise/shrink/expand/regenerate별 다음 revision과 정확한 round 구성, stale selection과 SELECT 이후 terminal 상태를 transaction 안에서 검증한다. T09은 selected Candidate에 대한 current Spec draft만 연속 revision으로 조정하고, user confirmation에서 내용 변경을 금지한다. 직접 UI 수정과 Discovery Agent 재작성은 같은 domain policy를 사용하며, 주제 복귀는 기존 selected Session을 재활성화하지 않고 draft를 `SUPERSEDED`로 만든 뒤 새 Discovery Session을 연다. T10은 확정과 Task 준비를 분리한 `UI_PREPARE_BUILDER_TASK` command에서 Spec을 deterministic acceptance criteria로 변환하고, Core가 `projects/<projectId>` 상대 workspace를 발급한다. T11은 semantic Decision draft를 stable metadata가 있는 Request로 만들면서 다음 `DECISION_REQUIRED` Context를 같은 transaction에 저장한다. blocking Request는 Task를 `BLOCKED`로 만들고 마지막 blocking Resolution 뒤 Core가 `ACTIVE`로 재개한다. Builder application은 DecisionApplication과 해당 ID를 제거한 `DIRECTION_CHANGED` Context를 함께 저장하며, 요청된 모든 Decision을 적용하기 전에는 completion을 거절한다. Helper 대화 정책과 Episode dispatch/retry는 T12~T13에서 연결한다.
 
 ### 4.5 storage-sqlite
 
@@ -219,6 +222,8 @@ T06 MCP process는 시작 시 하나의 Agent role에 고정하고 그 role의 t
 
 T08의 Discovery `submit_candidate_round` 외부 schema는 의미 후보 draft, lineage, 적용 feedback과 carried Candidate reference만 받는다. role-bound adapter가 검증된 최신 Discovery context를 조회해 Candidate/Round ID, revision, timestamp, source, input snapshot과 redaction 상태를 채운 뒤 공통 Application command를 호출한다. Kiro가 tool input에 주입하는 `__tool_use_purpose`는 이 transport 경계에서만 허용하고 Application payload에는 전달하지 않는다.
 
+T11의 Builder `request_user_decision`과 `apply_decision_result` 외부 schema도 의미 draft, current Task/Context revision과 source reference만 받는다. role-bound adapter는 Kiro 전용 `__tool_use_purpose`를 버리고 Application이 Decision/option/Application ID, timestamp, provenance와 redaction 상태를 채운다. `get_decision_result`는 Resolution과 Application을 분리해 반환하므로 Helper가 해결한 선택과 Builder가 실제 코드에 반영한 결과를 같은 것으로 취급하지 않는다.
+
 ### 4.7 kiro-adapter
 
 - Crew chat slot/session 생성과 복구
@@ -231,7 +236,7 @@ T08의 Discovery `submit_candidate_round` 외부 schema는 의미 후보 draft, 
 
 Discovery prompt 원문은 `docs/agent-prompts/discovery.md` 하나이며 T09 버전은 1.1.0이다. Node adapter는 원문을 읽고 version marker를 검증해 Kiro Agent definition과 tool allowlist를 만든다. Prompt는 Core context를 먼저 읽고 다음 round에 pending feedback을 적용하며 selected Candidate 뒤에는 current Learning Spec을 기준으로 권장 draft를 생성·조정하도록 지시한다. Candidate/Round/Spec ID, revision, timestamp와 source 같은 Core-owned 메타데이터를 생성하지 않고 명시적 SELECT, Spec confirmation 또는 Session 재개도 수행하지 않는다. 구조화된 설명과 rationale은 판단에 필요한 길이로 제한해 장시간 단일 tool input 생성을 줄인다.
 
-Builder prompt 원문은 `docs/agent-prompts/builder.md` 하나이며 T10 버전은 1.0.0이다. Builder adapter는 Core MCP tool과 생성 workspace에 한정한 read/write/shell만 구성하고 web, subagent, global MCP를 허용하지 않는다. Crew slot은 첫 message 전에 Core가 발급한 canonical workspace에 연결하고, Kiro CLI 2 Agent Engine v2의 `denyByDefault` shell 설정과 pre-tool path guard를 함께 사용한다. Kiro CLI 2.20.0 live 회귀에서 workspace escape probe 차단, 초기 test 실패와 수정 뒤 통과, final Context와 Completion Report 복원을 확인했다. 이 경계가 이후 runtime escape probe를 막지 못하면 안전하지 않은 fallback으로 실행하지 않고 별도 결정을 받는다. 사용자에게 보이는 message/tool/file/test/error stream은 transient runtime data로 다루며, durable Core에는 redaction된 checkpoint와 source reference만 저장한다.
+Builder prompt 원문은 `docs/agent-prompts/builder.md` 하나이며 T11 버전은 1.1.0이다. Builder adapter는 7개 Core MCP tool과 생성 workspace에 한정한 read/write/shell만 구성하고 web, subagent, global MCP를 허용하지 않는다. Prompt는 되돌리기 쉬운 내부 세부사항을 자율 처리하고, 사용자 가시 제품 동작·데이터·보안·비용·주요 아키텍처나 학습 Concept에 영향을 주는 선택만 semantic Decision으로 요청한다. Crew slot은 첫 message 전에 Core가 발급한 canonical workspace에 연결하고, Kiro CLI 2 Agent Engine v2의 `denyByDefault` shell 설정과 pre-tool path guard를 함께 사용한다. Kiro CLI 2.20.2 live 회귀에서 blocking Decision request, Helper handoff, user recommendation resolution, Builder application/resume, workspace escape probe 차단, 초기 test 실패와 수정 뒤 통과, final Context와 Completion Report 복원을 확인했다. 이 경계가 이후 runtime escape probe를 막지 못하면 안전하지 않은 fallback으로 실행하지 않고 별도 결정을 받는다. 사용자에게 보이는 message/tool/file/test/error stream은 transient runtime data로 다루며, durable Core에는 redaction된 checkpoint와 source reference만 저장한다.
 
 Crew 0.3.0의 App event bridge는 실제 stream을 App DOM event로 전달하지 않고, generic App API client는 `/api/chat` SSE를 JSON으로 파싱한다. 따라서 event는 MVP primary 경로에서 제외한다. raw fetch는 same-origin `POST /api/chat` 하나와 고정 payload로 제한하고, slot 생성·history/result 조회는 permission-checked App API를 사용한다. 이 세부사항은 UI나 Core가 아니라 이 adapter에만 존재한다. 참고: <https://kiro.dev/docs/crew/apps/sdk/>
 
@@ -290,13 +295,16 @@ Project 1 ── N BuilderTask
 BuilderTask 1 ── N LiveContextVersion
 BuilderTask 1 ── N DecisionRequest
 DecisionRequest 1 ── 0..1 DecisionResolution
+DecisionResolution 1 ── 0..1 DecisionApplication
 BuilderTask 1 ── 0..1 CompletionReport
 ```
 
 주요 invariant:
 
 - 완료 Task에는 acceptance result와 Completion Report가 필요하다.
-- Decision은 resolution 전까지 적용 완료로 표시하지 않는다.
+- Decision Request와 `DECISION_REQUIRED` Context는 atomic write이고, 독립 작업이 불가능한 미해결 Decision은 Task를 `BLOCKED`로 유지한다.
+- Resolution은 사용자 선택이고 Application은 Builder 구현 결과다. 둘을 별도 record로 보존하며 모든 Request가 적용되기 전에는 Task를 완료하지 않는다.
+- Decision Application과 active Decision ID를 제거한 `DIRECTION_CHANGED` Context는 atomic write다.
 - Live Context version은 project/task 안에서 단조 증가한다.
 
 ### 5.3 Evidence
@@ -351,6 +359,7 @@ Builder Agent:
 - `update_build_context`
 - `request_user_decision`
 - `get_decision_result`
+- `apply_decision_result`
 - `complete_task`
 
 Helper Agent:
@@ -375,6 +384,8 @@ Evidence Analyst:
 `submit_learning_spec`의 Agent-facing schema는 semantic draft, project/session scope와 expected revision만 받는다. role-bound adapter가 current selected Candidate와 Spec을 조회해 stable metadata를 채운 뒤 Application command로 변환한다. UI는 current draft 직접 수정, 내용 불변 확정과 새 Session을 여는 Discovery 복귀 command를 사용한다.
 
 `UI_PREPARE_BUILDER_TASK`는 confirmed Spec을 바꾸지 않고 별도 retry 가능한 transaction으로 Task와 workspace assignment를 만든다. `LEARNER_FOCUS`만 `expectedConcepts`, `AGENT_SUPPORT`는 구현 지원 requirement, `EXCLUDED`는 `excludedWork`로 매핑한다. MVP feature별 criterion에 local execution과 automated test criterion을 더하고, Completion Report의 Concept usage는 Builder가 실제 사용한 사실만 뜻하며 사용자 이해 판정으로 사용하지 않는다.
+
+blocking Decision request는 Task/Context optimistic revision을 모두 검증하고 Request·Context·Task 전이를 한 transaction에서 처리한다. UI Resolution은 recommendation, option과 custom proposal을 user-authored record로 보존하고 마지막 blocking Decision이 해결되면 Task를 재개한다. Builder는 resolution 조회 뒤 구현 결과를 별도 적용하며 Completion Report의 `appliedDecisionIds`는 durable DecisionApplication 집합과 정확히 같아야 한다. `DECISION_RESOLVED` Activity의 `rationaleProvided`는 원문을 복제하지 않고 이유 존재 여부만 보존하며, `false`인 recommendation 선택은 사용자 이해 Evidence로 수용하지 않는다.
 
 ### 6.2 UI command/query
 

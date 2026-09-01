@@ -31,6 +31,7 @@ import {
   confirmedLearningSpecFixture,
   canonicalConceptFixture,
   decisionRequestFixture,
+  decisionResolutionFixture,
   discoveryFeedbackFixture,
   discoveryInputFixture,
   discoverySessionFixture,
@@ -910,5 +911,357 @@ describe('T10 Builder Task and Live Context application flow', () => {
       currentTask: null,
       liveContext: null,
     })
+  })
+})
+
+describe('T11 Decision gate and Builder resume application flow', () => {
+  const initialContext = {
+    ...liveContextFixture,
+    checkpoint: 'TASK_STARTED' as const,
+    stage: 'Starting implementation',
+    currentGoal: 'Implement the validated event parser.',
+    recentChanges: [],
+    activeDecisionIds: [],
+    nextActions: ['Choose the unknown-field behavior when the parser reaches that boundary.'],
+  }
+
+  it('atomically blocks, hands off, resolves, resumes, applies, and completes a real Decision', async () => {
+    let optionSequence = 0
+    let generatedSequence = 200
+    const { service, storage } = await createHarness({
+      generateId: (prefix) => {
+        if (prefix === 'decision') return ids.decision
+        if (prefix === 'decision_option') {
+          optionSequence += 1
+          return optionSequence === 1 ? ids.optionA : ids.optionB
+        }
+        if (prefix === 'decision_application') return ids.decisionApplication
+        generatedSequence += 1
+        return `${prefix}_00000000-0000-4000-8000-${String(generatedSequence).padStart(12, '0')}`
+      },
+    })
+    seedBuilderGraph(storage)
+    storage.repository.appendLiveContext(initialContext)
+
+    const requestDecision = {
+      schemaVersion: 1,
+      kind: 'BUILDER_REQUEST_DECISION',
+      correlationId: ids.correlation,
+      actor: { kind: 'AGENT', role: 'BUILDER' },
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000201',
+      projectId: ids.project,
+      taskId: ids.task,
+      expectedTaskRevision: 1,
+      expectedContextVersion: 1,
+      decision: {
+        category: 'DATA_MODEL',
+        question: 'Should unknown fields be rejected or retained for inspection?',
+        reasonRequiredNow: 'The parser result and UI behavior depend on this choice.',
+        options: [
+          {
+            key: 'reject',
+            label: 'Reject unknown fields',
+            description: 'Keep the parser strict.',
+            impacts: ['Typos fail at the input boundary.'],
+            tradeoffs: ['Provider additions require a schema update.'],
+          },
+          {
+            key: 'retain',
+            label: 'Retain unknown fields',
+            description: 'Expose unmodeled fields for inspection.',
+            impacts: ['New provider fields remain visible.'],
+            tradeoffs: ['Typos can be less obvious.'],
+          },
+        ],
+        recommendedOptionKey: 'reject',
+        recommendationRationale: 'Strict parsing catches invalid payloads at the boundary.',
+        relatedConceptNames: ['runtime validation'],
+        sourceReferences: [liveContextFixture.relatedFiles[0]],
+        independentWorkCanContinue: false,
+      },
+      context: {
+        stage: 'Waiting on parser behavior',
+        currentGoal: 'Choose unknown-field behavior before implementing the parser branch.',
+        recentChanges: ['Defined the known event variants.'],
+        activeConceptNames: ['runtime validation'],
+        relatedFiles: [liveContextFixture.relatedFiles[0]],
+        nextActions: ['Apply the selected parser behavior.', 'Run parser tests.'],
+        blockingReason: 'The parser branch depends on the user choice.',
+      },
+    } as const
+
+    const requested = await service.executeAgent('BUILDER', requestDecision)
+    const replayed = await service.executeAgent('BUILDER', requestDecision)
+    expect(requested).toEqual(replayed)
+    expect(requested).toMatchObject({
+      success: true,
+      data: { decisionId: ids.decision, resourceRevision: 2 },
+    })
+    expect(storage.repository.readBuilderTaskAggregate(ids.project, ids.task)).toMatchObject({
+      task: { status: 'BLOCKED', revision: 2 },
+      liveContext: {
+        checkpoint: 'DECISION_REQUIRED',
+        contextVersion: 2,
+        activeDecisionIds: [ids.decision],
+      },
+      decisionRequests: [
+        {
+          id: ids.decision,
+          recommendedOptionId: ids.optionA,
+          source: { kind: 'AGENT', role: 'BUILDER' },
+        },
+      ],
+    })
+
+    expect(
+      await service.executeUi({
+        schemaVersion: 1,
+        kind: 'UI_OPEN_HELPER',
+        correlationId: ids.correlation,
+        actor: { kind: 'UI' },
+        projectId: ids.project,
+        taskId: ids.task,
+        question: 'Compare the parser options.',
+      }),
+    ).toMatchObject({
+      success: true,
+      data: { activeDecisions: [{ id: ids.decision }] },
+    })
+
+    const resolution = {
+      ...decisionResolutionFixture,
+      expectedContextVersion: 2,
+    }
+    expect(
+      await service.executeUi({
+        schemaVersion: 1,
+        kind: 'UI_RESOLVE_DECISION',
+        correlationId: ids.correlation,
+        actor: { kind: 'UI' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000202',
+        resolution,
+      }),
+    ).toMatchObject({ success: true, data: { resourceRevision: 3 } })
+    expect(storage.repository.recoverProject(ids.project)).toMatchObject({
+      activeTask: { status: 'ACTIVE', revision: 3 },
+      pendingDecisions: [],
+    })
+    expect(
+      await service.executeAgent('BUILDER', {
+        schemaVersion: 1,
+        kind: 'BUILDER_GET_DECISION_RESULT',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'BUILDER' },
+        projectId: ids.project,
+        taskId: ids.task,
+        decisionId: ids.decision,
+      }),
+    ).toMatchObject({
+      success: true,
+      data: { resolution: { id: ids.resolution, helperUsed: true }, application: null },
+    })
+
+    const report = {
+      schemaVersion: 1 as const,
+      id: ids.completionReport,
+      projectId: ids.project,
+      taskId: ids.task,
+      correlationId: ids.correlation,
+      expectedTaskRevision: 3,
+      implementedFeatures: ['Validated webhook variants with the selected strict behavior.'],
+      acceptanceResults: [{ criterionKey: 'valid_event', status: 'PASSED' as const, evidence: [] }],
+      validationResults: [
+        { name: 'parser tests', status: 'PASSED' as const, summary: 'All tests passed.' },
+      ],
+      conceptUsage: [
+        {
+          conceptName: 'discriminated union',
+          scope: 'LEARNER_FOCUS' as const,
+          importance: 'CORE' as const,
+          usageReason: 'The parser narrows each validated event variant.',
+          codeReferences: [],
+        },
+      ],
+      appliedDecisionIds: [ids.decision],
+      codeReferences: [],
+      diffReferences: [],
+      specDeviations: [],
+      remainingIssues: [],
+      limitations: [],
+      completedAt: timestamp,
+      source: { kind: 'AGENT' as const, role: 'BUILDER' as const },
+      redactionStatus: 'VERIFIED_REDACTED' as const,
+    }
+    expect(
+      await service.executeAgent('BUILDER', {
+        schemaVersion: 1,
+        kind: 'BUILDER_COMPLETE_TASK',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'BUILDER' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000203',
+        report,
+      }),
+    ).toMatchObject({ success: false, error: { code: 'TASK_DECISION_NOT_APPLIED' } })
+
+    expect(
+      await service.executeAgent('BUILDER', {
+        schemaVersion: 1,
+        kind: 'BUILDER_APPLY_DECISION',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'BUILDER' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000204',
+        projectId: ids.project,
+        taskId: ids.task,
+        decisionId: ids.decision,
+        expectedTaskRevision: 3,
+        expectedContextVersion: 2,
+        appliedResult: 'Rejected unknown fields at the parser boundary and added a failing case.',
+        sourceReferences: [liveContextFixture.relatedFiles[0]],
+        context: {
+          stage: 'Applied strict parser behavior',
+          currentGoal: 'Validate the selected behavior.',
+          recentChanges: ['Implemented strict unknown-field rejection.'],
+          activeConceptNames: ['runtime validation'],
+          relatedFiles: [liveContextFixture.relatedFiles[0]],
+          nextActions: ['Run parser tests.'],
+        },
+      }),
+    ).toMatchObject({
+      success: true,
+      data: { decisionId: ids.decision, resourceRevision: 3 },
+    })
+    expect(storage.repository.readBuilderTaskAggregate(ids.project, ids.task)).toMatchObject({
+      decisionApplications: [{ id: ids.decisionApplication, decisionId: ids.decision }],
+      liveContext: { contextVersion: 3, activeDecisionIds: [] },
+    })
+
+    const completedContext = {
+      ...initialContext,
+      contextVersion: 4,
+      expectedPreviousVersion: 3,
+      checkpoint: 'TASK_COMPLETED' as const,
+      stage: 'Completed',
+      activeDecisionIds: [],
+      recentChanges: ['Implemented and validated strict unknown-field rejection.'],
+      nextActions: ['Open the generated result.'],
+    }
+    expect(
+      await service.executeAgent('BUILDER', {
+        schemaVersion: 1,
+        kind: 'BUILDER_UPDATE_LIVE_CONTEXT',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'BUILDER' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000205',
+        context: completedContext,
+      }),
+    ).toMatchObject({ success: true })
+    expect(
+      await service.executeAgent('BUILDER', {
+        schemaVersion: 1,
+        kind: 'BUILDER_COMPLETE_TASK',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'BUILDER' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000207',
+        report: { ...report, appliedDecisionIds: [ids.decision, ids.decision] },
+      }),
+    ).toMatchObject({ success: false, error: { code: 'TASK_DECISION_NOT_APPLIED' } })
+    expect(
+      await service.executeAgent('BUILDER', {
+        schemaVersion: 1,
+        kind: 'BUILDER_COMPLETE_TASK',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'BUILDER' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000206',
+        report,
+      }),
+    ).toMatchObject({ success: true, data: { resourceRevision: 4 } })
+  })
+
+  it('keeps the Task active when independent work can continue', async () => {
+    let optionSequence = 0
+    let generatedSequence = 220
+    const { service, storage } = await createHarness({
+      generateId: (prefix) => {
+        if (prefix === 'decision') return ids.decision
+        if (prefix === 'decision_option') {
+          optionSequence += 1
+          return optionSequence === 1 ? ids.optionA : ids.optionB
+        }
+        generatedSequence += 1
+        return `${prefix}_00000000-0000-4000-8000-${String(generatedSequence).padStart(12, '0')}`
+      },
+    })
+    seedBuilderGraph(storage)
+    storage.repository.appendLiveContext(initialContext)
+
+    expect(
+      await service.executeAgent('BUILDER', {
+        schemaVersion: 1,
+        kind: 'BUILDER_REQUEST_DECISION',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'BUILDER' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000221',
+        projectId: ids.project,
+        taskId: ids.task,
+        expectedTaskRevision: 1,
+        expectedContextVersion: 1,
+        decision: {
+          category: 'PRODUCT_BEHAVIOR',
+          question: 'Should invalid examples remain visible after a successful parse?',
+          reasonRequiredNow: 'The result presentation depends on this behavior.',
+          options: [
+            {
+              key: 'hide',
+              label: 'Hide invalid examples',
+              description: 'Show only the latest valid result.',
+              impacts: ['The result stays concise.'],
+              tradeoffs: ['Debugging history is unavailable.'],
+            },
+            {
+              key: 'retain',
+              label: 'Retain invalid examples',
+              description: 'Keep a local debugging history.',
+              impacts: ['Users can compare failures.'],
+              tradeoffs: ['The result view is denser.'],
+            },
+          ],
+          recommendedOptionKey: 'retain',
+          recommendationRationale: 'Visible failures support the local debugging goal.',
+          relatedConceptNames: ['result state'],
+          sourceReferences: [],
+          independentWorkCanContinue: true,
+        },
+        context: {
+          stage: 'Continuing independent parser work',
+          currentGoal: 'Finish parser validation while result behavior is pending.',
+          recentChanges: ['Identified a presentation Decision.'],
+          activeConceptNames: ['result state'],
+          relatedFiles: [],
+          nextActions: ['Finish parser tests independently.'],
+        },
+      }),
+    ).toMatchObject({ success: true, data: { resourceRevision: 1 } })
+    expect(storage.repository.recoverProject(ids.project)).toMatchObject({
+      activeTask: { status: 'ACTIVE', revision: 1 },
+      pendingDecisions: [{ id: ids.decision, independentWorkCanContinue: true }],
+    })
+    expect(
+      await service.executeAgent('BUILDER', {
+        schemaVersion: 1,
+        kind: 'BUILDER_UPDATE_LIVE_CONTEXT',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'BUILDER' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000222',
+        context: {
+          ...initialContext,
+          contextVersion: 3,
+          expectedPreviousVersion: 2,
+          checkpoint: 'CONCEPT_INTRODUCED',
+          stage: 'Testing independent parser work',
+          activeDecisionIds: [ids.decision],
+          nextActions: ['Run parser tests while result behavior remains pending.'],
+        },
+      }),
+    ).toMatchObject({ success: true, data: { resourceRevision: 3 } })
   })
 })

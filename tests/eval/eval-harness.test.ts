@@ -5,6 +5,7 @@ import {
   baselineResultSchema,
   builderTaskSchema,
   candidateRoundSchema,
+  decisionRequestSchema,
   discoveryInputSchema,
   evaluationCriterionResultSchema,
   evaluationFixtureSchema,
@@ -235,18 +236,22 @@ describe('T09 Learning Spec prompt regression', () => {
   })
 })
 
-describe('T10 Builder prompt regression', () => {
-  it('keeps Task scope, current completion Context, redaction, and no false mastery claim', async () => {
+describe('T11 Builder prompt regression', () => {
+  it('keeps a material Decision in the durable apply lifecycle without a false mastery claim', async () => {
     const fixture = evaluationFixtureSchema.parse(
-      await loadInput('tests/eval/fixtures/prompt-regressions/builder-v1.0-webhook.manifest.json'),
+      await loadInput(
+        'tests/eval/fixtures/prompt-regressions/builder-v1.1-decision-webhook.manifest.json',
+      ),
     )
     const subject = parseEvaluationSubject(
-      await loadInput('tests/eval/fixtures/prompt-regressions/builder-v1.0-webhook.json'),
+      await loadInput('tests/eval/fixtures/prompt-regressions/builder-v1.1-decision-webhook.json'),
     )
     const reviews = evaluationCriterionResultSchema
       .array()
       .parse(
-        await loadInput('tests/eval/fixtures/prompt-regressions/builder-v1.0-webhook.review.json'),
+        await loadInput(
+          'tests/eval/fixtures/prompt-regressions/builder-v1.1-decision-webhook.review.json',
+        ),
       )
     const result = evaluateCalibrationCase({
       fixture,
@@ -256,10 +261,17 @@ describe('T10 Builder prompt regression', () => {
     const task = builderTaskSchema.parse(subject.builderTask)
     const context = liveProjectContextSchema.parse(subject.liveContext)
     const report = taskCompletionReportSchema.parse(subject.completionReport)
+    const decision = decisionRequestSchema.parse(subject.decision)
 
     expect(task.expectedConcepts).toEqual(['discriminated union', 'runtime validation'])
     expect(task.excludedWork).toEqual(['Live provider credentials and hosted payload storage'])
-    expect(context).toMatchObject({ checkpoint: 'TASK_COMPLETED', contextVersion: 3 })
+    expect(decision).toMatchObject({
+      category: 'PRODUCT_BEHAVIOR',
+      independentWorkCanContinue: false,
+    })
+    expect(context).toMatchObject({ checkpoint: 'TASK_COMPLETED', contextVersion: 5 })
+    expect(context.activeDecisionIds).toEqual([])
+    expect(report.appliedDecisionIds).toEqual([decision.id])
     expect(report.conceptUsage.map((usage) => usage.scope)).toEqual([
       'LEARNER_FOCUS',
       'LEARNER_FOCUS',
@@ -273,6 +285,7 @@ describe('T10 Builder prompt regression', () => {
         expect.objectContaining({ criterionKey: 'context_fresh', status: 'PASSED' }),
         expect.objectContaining({ criterionKey: 'redaction_no_leak', status: 'PASSED' }),
         expect.objectContaining({ criterionKey: 'builder_semantics', status: 'PASSED' }),
+        expect.objectContaining({ criterionKey: 'decision_necessity', status: 'PASSED' }),
       ]),
     )
   })

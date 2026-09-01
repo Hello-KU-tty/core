@@ -289,6 +289,19 @@ export function evaluateEvidenceProposal(
       'A direct user Evidence source is not present in the Episode.',
     )
   }
+  if (
+    proposal.userEvidenceSources.some((source) => {
+      if (source.kind !== 'USER_DECISION') return false
+      const event = findSourceEvent(source, episodeEvents)
+      return event?.payload.type === 'DECISION_RESOLVED' && !event.payload.rationaleProvided
+    })
+  ) {
+    return rejectEvidence(
+      input,
+      'INSUFFICIENT_EVIDENCE',
+      'A Decision accepted without user-authored rationale cannot support understanding.',
+    )
+  }
 
   if (proposal.signal === 'CONTRADICTION') {
     if (proposal.maximumSupportedState !== null) {

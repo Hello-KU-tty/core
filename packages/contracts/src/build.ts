@@ -132,6 +132,76 @@ export const decisionOptionSchema = z.strictObject({
   tradeoffs: z.array(shortTextSchema).max(12),
 })
 
+export const decisionOptionDraftSchema = z.strictObject({
+  key: z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/),
+  label: labelSchema,
+  description: nonEmptyTextSchema,
+  impacts: z.array(shortTextSchema).min(1).max(12),
+  tradeoffs: z.array(shortTextSchema).max(12),
+})
+
+export const decisionRequestDraftSchema = z
+  .strictObject({
+    category: decisionCategorySchema,
+    question: nonEmptyTextSchema,
+    reasonRequiredNow: nonEmptyTextSchema,
+    options: z.array(decisionOptionDraftSchema).min(2).max(6),
+    recommendedOptionKey: z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/),
+    recommendationRationale: nonEmptyTextSchema,
+    relatedConceptNames: z.array(labelSchema).max(12),
+    sourceReferences: z.array(contextualSourceReferenceSchema).max(30),
+    independentWorkCanContinue: z.boolean(),
+  })
+  .superRefine((request, context) => {
+    const optionKeys = new Set(request.options.map((option) => option.key))
+    if (optionKeys.size !== request.options.length) {
+      context.addIssue({
+        code: 'custom',
+        path: ['options'],
+        message: 'Decision option keys must be unique',
+      })
+    }
+    if (!optionKeys.has(request.recommendedOptionKey)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['recommendedOptionKey'],
+        message: 'Recommended option key must reference one of the Decision options',
+      })
+    }
+  })
+
+export const decisionContextDraftSchema = z.strictObject({
+  stage: labelSchema,
+  currentGoal: nonEmptyTextSchema,
+  recentChanges: z.array(shortTextSchema).max(30),
+  activeConceptNames: z.array(labelSchema).max(20),
+  relatedFiles: z.array(codeReferenceSchema).max(30),
+  nextActions: z.array(shortTextSchema).max(20),
+  blockingReason: nonEmptyTextSchema.optional(),
+})
+
+export const builderRequestDecisionToolInputSchema = z
+  .strictObject({
+    __tool_use_purpose: nonEmptyTextSchema.optional(),
+    schemaVersion: schemaVersionSchema,
+    projectId: projectIdSchema,
+    taskId: taskIdSchema,
+    correlationId: correlationIdSchema,
+    idempotencyKey: idempotencyKeySchema,
+    expectedTaskRevision: entityRevisionSchema,
+    expectedContextVersion: entityRevisionSchema,
+    decision: decisionRequestDraftSchema,
+    context: decisionContextDraftSchema,
+  })
+  .refine(
+    (input) =>
+      input.decision.independentWorkCanContinue || input.context.blockingReason !== undefined,
+    {
+      path: ['context', 'blockingReason'],
+      message: 'A blocking Decision requires a blocking reason',
+    },
+  )
+
 export const decisionRequestSchema = z
   .strictObject({
     schemaVersion: schemaVersionSchema,
@@ -224,6 +294,21 @@ export const decisionApplicationSchema = z.strictObject({
   redactionStatus: redactionStatusSchema,
 })
 
+export const builderApplyDecisionToolInputSchema = z.strictObject({
+  __tool_use_purpose: nonEmptyTextSchema.optional(),
+  schemaVersion: schemaVersionSchema,
+  projectId: projectIdSchema,
+  taskId: taskIdSchema,
+  decisionId: decisionIdSchema,
+  correlationId: correlationIdSchema,
+  idempotencyKey: idempotencyKeySchema,
+  expectedTaskRevision: entityRevisionSchema,
+  expectedContextVersion: entityRevisionSchema,
+  appliedResult: nonEmptyTextSchema,
+  sourceReferences: z.array(contextualSourceReferenceSchema).max(30),
+  context: decisionContextDraftSchema.omit({ blockingReason: true }),
+})
+
 export const validationResultSchema = z.strictObject({
   name: labelSchema,
   status: z.enum(['PASSED', 'FAILED', 'NOT_RUN']),
@@ -291,6 +376,8 @@ export const builderCompleteTaskToolInputSchema = z.strictObject({
 export type BuilderTask = z.infer<typeof builderTaskSchema>
 export type LiveProjectContext = z.infer<typeof liveProjectContextSchema>
 export type DecisionOption = z.infer<typeof decisionOptionSchema>
+export type DecisionOptionDraft = z.infer<typeof decisionOptionDraftSchema>
+export type DecisionRequestDraft = z.infer<typeof decisionRequestDraftSchema>
 export type DecisionRequest = z.infer<typeof decisionRequestSchema>
 export type DecisionResolution = z.infer<typeof decisionResolutionSchema>
 export type DecisionApplication = z.infer<typeof decisionApplicationSchema>
@@ -298,4 +385,6 @@ export type TaskCompletionReport = z.infer<typeof taskCompletionReportSchema>
 export type BuilderUpdateLiveContextToolInput = z.infer<
   typeof builderUpdateLiveContextToolInputSchema
 >
+export type BuilderRequestDecisionToolInput = z.infer<typeof builderRequestDecisionToolInputSchema>
+export type BuilderApplyDecisionToolInput = z.infer<typeof builderApplyDecisionToolInputSchema>
 export type BuilderCompleteTaskToolInput = z.infer<typeof builderCompleteTaskToolInputSchema>

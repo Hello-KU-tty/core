@@ -59,6 +59,7 @@ export const activityPayloadSchema = z.discriminatedUnion('type', [
     type: z.literal('DECISION_RESOLVED'),
     decisionId: decisionIdSchema,
     resolutionId: decisionResolutionIdSchema,
+    rationaleProvided: z.boolean(),
   }),
   z.strictObject({
     type: z.literal('CONCEPT_REPORTED'),

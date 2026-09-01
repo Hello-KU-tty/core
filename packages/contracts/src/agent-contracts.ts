@@ -3,7 +3,9 @@ import { z } from 'zod'
 import { activityEventSchema, episodeSchema } from './activity.js'
 import {
   builderTaskSchema,
+  decisionContextDraftSchema,
   decisionApplicationSchema,
+  decisionRequestDraftSchema,
   decisionRequestSchema,
   decisionResolutionSchema,
   liveProjectContextSchema,
@@ -212,13 +214,35 @@ export const builderRequestDecisionCommandSchema = z
     ...builderQueryMetadata,
     kind: z.literal('BUILDER_REQUEST_DECISION'),
     idempotencyKey: idempotencyKeySchema,
+    projectId: projectIdSchema,
+    taskId: taskIdSchema,
     expectedTaskRevision: expectedRevisionSchema,
-    decision: decisionRequestSchema,
+    expectedContextVersion: entityRevisionSchema,
+    decision: decisionRequestDraftSchema,
+    context: decisionContextDraftSchema,
   })
-  .refine((command) => command.decision.correlationId === command.correlationId, {
-    path: ['decision', 'correlationId'],
-    message: 'Decision correlation ID must match its command',
-  })
+  .refine(
+    (command) =>
+      command.decision.independentWorkCanContinue || command.context.blockingReason !== undefined,
+    {
+      path: ['context', 'blockingReason'],
+      message: 'A blocking Decision requires a blocking reason',
+    },
+  )
+
+export const builderApplyDecisionCommandSchema = z.strictObject({
+  ...builderQueryMetadata,
+  kind: z.literal('BUILDER_APPLY_DECISION'),
+  idempotencyKey: idempotencyKeySchema,
+  projectId: projectIdSchema,
+  taskId: taskIdSchema,
+  decisionId: decisionIdSchema,
+  expectedTaskRevision: expectedRevisionSchema,
+  expectedContextVersion: entityRevisionSchema,
+  appliedResult: nonEmptyTextSchema,
+  sourceReferences: z.array(contextualSourceReferenceSchema).max(30),
+  context: decisionContextDraftSchema.omit({ blockingReason: true }),
+})
 
 export const builderCompleteTaskCommandSchema = z
   .strictObject({
@@ -266,6 +290,7 @@ export const builderAgentRequestSchema = z.discriminatedUnion('kind', [
   builderStartTaskCommandSchema,
   builderUpdateLiveContextCommandSchema,
   builderRequestDecisionCommandSchema,
+  builderApplyDecisionCommandSchema,
   builderCompleteTaskCommandSchema,
 ])
 
@@ -288,6 +313,7 @@ export const agentRequestSchema = z.discriminatedUnion('kind', [
   builderStartTaskCommandSchema,
   builderUpdateLiveContextCommandSchema,
   builderRequestDecisionCommandSchema,
+  builderApplyDecisionCommandSchema,
   builderCompleteTaskCommandSchema,
   helperGetContextQuerySchema,
   helperRequestContextRefreshCommandSchema,
@@ -316,6 +342,7 @@ export const builderTaskContextSchema = z.strictObject({
   liveContext: liveProjectContextSchema.nullable(),
   decisionRequests: z.array(decisionRequestSchema).max(50),
   decisionResolutions: z.array(decisionResolutionSchema).max(50),
+  decisionApplications: z.array(decisionApplicationSchema).max(50),
 })
 
 export const helperContextSchema = z.strictObject({
@@ -350,6 +377,14 @@ export const decisionResultSchema = z.strictObject({
   application: decisionApplicationSchema.nullable(),
 })
 
+export const decisionCommandReceiptSchema = z.strictObject({
+  schemaVersion: schemaVersionSchema,
+  correlationId: correlationIdSchema,
+  accepted: z.literal(true),
+  resourceRevision: entityRevisionSchema,
+  decisionId: decisionIdSchema,
+})
+
 export const commandReceiptSchema = z.strictObject({
   schemaVersion: schemaVersionSchema,
   correlationId: correlationIdSchema,
@@ -367,4 +402,5 @@ export type BuilderTaskContext = z.infer<typeof builderTaskContextSchema>
 export type HelperContext = z.infer<typeof helperContextSchema>
 export type EpisodeContext = z.infer<typeof episodeContextSchema>
 export type DecisionResult = z.infer<typeof decisionResultSchema>
+export type DecisionCommandReceipt = z.infer<typeof decisionCommandReceiptSchema>
 export type CommandReceipt = z.infer<typeof commandReceiptSchema>

@@ -364,7 +364,20 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - 작업 도중 Helper가 최신 Context로 현재 목표·변경·다음 작업을 설명할 수 있다.
 - stream을 숨기지 않고 Live Progress가 현재 위치를 보조한다.
 
-### [>] T11. 실제 Decision과 Builder 재개 흐름
+### [x] T11. 실제 Decision과 Builder 재개 흐름
+
+**승인 기록**
+
+- 2026-09-01 사용자가 의미 기반 Decision 요청, blocking 여부에 따른 Task gate, Helper context handoff, 사용자 해결, Builder 적용·재개와 이유 없는 추천 수락의 Evidence 차단 계획을 승인했다.
+- 실제 Helper 대화 품질은 T12, Decision UI는 T16, Activity/Episode 조립은 T13 범위로 유지한다.
+
+**검증 기록**
+
+- 2026-09-01 Node.js 24.19.0과 pnpm 11.12.0에서 format 113 files, lint 113 files, typecheck, Drizzle schema, unit 2개, package/app integration 138개, eval 8개, build와 smoke 4개가 통과했다. macOS sandbox의 Chromium Mach port 제한을 분리한 승인된 외부 실행에서 Playwright E2E 1개도 통과했다.
+- semantic-only Decision request와 apply tool, Core-owned ID·timestamp·provenance, Request/`DECISION_REQUIRED` Context atomic write, blocking Task의 `BLOCKED`→`ACTIVE` 재개, independent continuation, option·recommendation·custom Resolution 계약, apply-before-complete와 duplicate applied ID 거절을 domain/Application/공식 MCP client integration으로 검증했다.
+- Builder prompt v1.1.0의 `builder-v1.1-decision-webhook`은 user-visible unknown-field 동작 Decision과 최종 application을 strict contract 및 기록된 사람의 Decision Necessity review로 통과했다. 기존 파일명 선택 음성 fixture는 계속 거절됐다.
+- 로그인된 Kiro CLI 2.20.2 Agent Engine v2와 `claude-haiku-4.5`의 두 turn live runner가 blocking Decision request, Helper handoff, user recommendation Resolution, Builder resume/application, Context version 5와 Task revision 5 완료를 통과했다. workspace 밖 sentinel은 변경되지 않았고 독립 `node --test` exit code는 0이었다.
+- `DECISION_RESOLVED.rationaleProvided=false`인 추천 수락을 사용자 이해 Evidence로 수용하지 않는 deterministic policy 회귀를 통과했다. 실제 Helper 대화, Decision Card와 Episode 조립은 각각 T12, T16, T13에 남겼다.
 
 **범위**
 
@@ -388,7 +401,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - 억지 교육용 질문이나 파일명·코드 스타일 같은 되돌리기 쉬운 선택이 Decision으로 노출되지 않는다.
 - 이유 없는 추천 수락이 이해 Evidence로 기록되지 않는다.
 
-### [ ] T12. Helper의 최소 맥락 조회와 대화
+### [>] T12. Helper의 최소 맥락 조회와 대화
 
 **범위**
 

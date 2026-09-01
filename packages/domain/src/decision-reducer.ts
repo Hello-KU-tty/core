@@ -58,7 +58,10 @@ export function openDecision(input: OpenDecisionInput): DomainResult<DecisionAgg
     input.liveContext.projectId !== request.projectId ||
     input.liveContext.taskId !== request.taskId ||
     input.liveContext.correlationId !== request.correlationId ||
-    input.liveContext.contextVersion !== request.contextVersion
+    input.liveContext.contextVersion !== request.contextVersion ||
+    input.liveContext.checkpoint !== 'DECISION_REQUIRED' ||
+    !input.liveContext.activeDecisionIds.includes(request.id) ||
+    (!request.independentWorkCanContinue && input.liveContext.blockingReason === undefined)
   ) {
     return rejected({ operation, reasonCode: 'DECISION_REQUEST_CONTEXT_MISMATCH', entityIds })
   }

@@ -36,6 +36,7 @@ import { createRoleBoundMcpServer, ROLE_TOOL_CATALOG } from '../src/role-server.
 interface ConnectedHarness {
   readonly client: Client
   readonly server: McpServer
+  readonly application: ApplicationService
   readonly storage: Awaited<ReturnType<typeof openInMemorySqliteStorage>>
   close(): Promise<void>
 }
@@ -128,6 +129,7 @@ const connectRole = async (
   return {
     client,
     server,
+    application,
     storage,
     close: async () => {
       await client.close()
@@ -145,6 +147,7 @@ const expectedCatalog: Readonly<Record<AgentRole, readonly string[]>> = {
     'update_build_context',
     'request_user_decision',
     'get_decision_result',
+    'apply_decision_result',
     'complete_task',
   ],
   HELPER: ['get_helper_context', 'request_builder_context_refresh'],
@@ -486,6 +489,194 @@ describe('role-bound MCP server', () => {
           source: { kind: 'AGENT', role: 'BUILDER' },
           redactionStatus: 'VERIFIED_REDACTED',
         },
+      })
+    } finally {
+      await harness.close()
+    }
+  })
+
+  it('expands semantic Decision tools and resumes from a user-authored resolution', async () => {
+    const harness = await connectRole('BUILDER', { seedBuilder: true })
+    try {
+      await harness.client.callTool({
+        name: 'update_build_context',
+        arguments: {
+          schemaVersion: 1,
+          projectId: ids.project,
+          taskId: ids.task,
+          correlationId: ids.correlation,
+          idempotencyKey: 'idem_00000000-0000-4000-8000-000000000231',
+          expectedPreviousVersion: 0,
+          checkpoint: 'TASK_STARTED',
+          stage: 'Starting implementation',
+          currentGoal: 'Implement the parser.',
+          recentChanges: [],
+          activeDecisionIds: [],
+          activeConceptNames: ['runtime validation'],
+          relatedFiles: [],
+          nextActions: ['Reach the unknown-field behavior boundary.'],
+        },
+      })
+
+      const requested = await harness.client.callTool({
+        name: 'request_user_decision',
+        arguments: {
+          schemaVersion: 1,
+          projectId: ids.project,
+          taskId: ids.task,
+          correlationId: ids.correlation,
+          idempotencyKey: 'idem_00000000-0000-4000-8000-000000000232',
+          expectedTaskRevision: 1,
+          expectedContextVersion: 1,
+          decision: {
+            category: 'DATA_MODEL',
+            question: 'Should unknown fields be rejected or retained?',
+            reasonRequiredNow: 'The parser result type depends on this behavior.',
+            options: [
+              {
+                key: 'reject',
+                label: 'Reject unknown fields',
+                description: 'Keep parsing strict.',
+                impacts: ['Typos fail early.'],
+                tradeoffs: ['New provider fields require schema changes.'],
+              },
+              {
+                key: 'retain',
+                label: 'Retain unknown fields',
+                description: 'Keep extra fields for inspection.',
+                impacts: ['New fields remain visible.'],
+                tradeoffs: ['Typos can be less obvious.'],
+              },
+            ],
+            recommendedOptionKey: 'reject',
+            recommendationRationale: 'Strict input validation catches mistakes at the boundary.',
+            relatedConceptNames: ['runtime validation'],
+            sourceReferences: [],
+            independentWorkCanContinue: false,
+          },
+          context: {
+            stage: 'Waiting on parser behavior',
+            currentGoal: 'Choose the parser behavior.',
+            recentChanges: ['Defined the known event variants.'],
+            activeConceptNames: ['runtime validation'],
+            relatedFiles: [],
+            nextActions: ['Apply the user choice.', 'Run parser tests.'],
+            blockingReason: 'The parser branch depends on this Decision.',
+          },
+        },
+      })
+      const decisionId = String(requested.structuredContent?.decisionId)
+      const aggregate = harness.storage.repository.readBuilderTaskAggregate(ids.project, ids.task)
+      const decision = aggregate?.decisionRequests[0]
+      expect(requested).toMatchObject({
+        structuredContent: { accepted: true, decisionId, resourceRevision: 2 },
+      })
+      expect(decision).toMatchObject({
+        id: decisionId,
+        contextVersion: 2,
+        source: { kind: 'AGENT', role: 'BUILDER' },
+        redactionStatus: 'VERIFIED_REDACTED',
+      })
+      expect(aggregate).toMatchObject({
+        task: { status: 'BLOCKED', revision: 2 },
+        liveContext: { checkpoint: 'DECISION_REQUIRED', activeDecisionIds: [decisionId] },
+      })
+
+      expect(
+        await harness.application.executeUi({
+          schemaVersion: 1,
+          kind: 'UI_OPEN_HELPER',
+          correlationId: ids.correlation,
+          actor: { kind: 'UI' },
+          projectId: ids.project,
+          taskId: ids.task,
+          question: 'Compare these parser options.',
+        }),
+      ).toMatchObject({ success: true, data: { activeDecisions: [{ id: decisionId }] } })
+
+      const selectedOptionId = decision?.recommendedOptionId
+      expect(selectedOptionId).toBeDefined()
+      const resolvedAt = new Date().toISOString()
+      expect(
+        await harness.application.executeUi({
+          schemaVersion: 1,
+          kind: 'UI_RESOLVE_DECISION',
+          correlationId: ids.correlation,
+          actor: { kind: 'UI' },
+          idempotencyKey: 'idem_00000000-0000-4000-8000-000000000233',
+          resolution: {
+            schemaVersion: 1,
+            id: ids.resolution,
+            decisionId,
+            projectId: ids.project,
+            taskId: ids.task,
+            correlationId: ids.correlation,
+            expectedContextVersion: 2,
+            selectionKind: 'RECOMMENDATION',
+            selectedOptionId,
+            rationale: 'I want invalid payloads to fail at the input boundary.',
+            helperUsed: true,
+            resolvedAt,
+            source: { kind: 'USER' },
+            redactionStatus: 'VERIFIED_REDACTED',
+          },
+        }),
+      ).toMatchObject({ success: true, data: { resourceRevision: 3 } })
+
+      expect(
+        await harness.client.callTool({
+          name: 'get_decision_result',
+          arguments: {
+            schemaVersion: 1,
+            kind: 'BUILDER_GET_DECISION_RESULT',
+            correlationId: ids.correlation,
+            actor: { kind: 'AGENT', role: 'BUILDER' },
+            projectId: ids.project,
+            taskId: ids.task,
+            decisionId,
+          },
+        }),
+      ).toMatchObject({ structuredContent: { resolution: { id: ids.resolution } } })
+
+      expect(
+        await harness.client.callTool({
+          name: 'apply_decision_result',
+          arguments: {
+            schemaVersion: 1,
+            projectId: ids.project,
+            taskId: ids.task,
+            decisionId,
+            correlationId: ids.correlation,
+            idempotencyKey: 'idem_00000000-0000-4000-8000-000000000234',
+            expectedTaskRevision: 3,
+            expectedContextVersion: 2,
+            appliedResult: 'Implemented strict rejection at the parser boundary.',
+            sourceReferences: [],
+            context: {
+              stage: 'Applied strict parser behavior',
+              currentGoal: 'Validate the selected parser behavior.',
+              recentChanges: ['Implemented unknown-field rejection.'],
+              activeConceptNames: ['runtime validation'],
+              relatedFiles: [],
+              nextActions: ['Run parser tests.'],
+            },
+          },
+        }),
+      ).toMatchObject({
+        structuredContent: { accepted: true, decisionId, resourceRevision: 3 },
+      })
+      expect(
+        harness.storage.repository.readBuilderTaskAggregate(ids.project, ids.task),
+      ).toMatchObject({
+        task: { status: 'ACTIVE', revision: 3 },
+        liveContext: { contextVersion: 3, activeDecisionIds: [] },
+        decisionApplications: [
+          {
+            decisionId,
+            source: { kind: 'AGENT', role: 'BUILDER' },
+            redactionStatus: 'VERIFIED_REDACTED',
+          },
+        ],
       })
     } finally {
       await harness.close()

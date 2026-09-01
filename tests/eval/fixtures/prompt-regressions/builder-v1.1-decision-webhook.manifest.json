@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture_00000000-0000-4000-8000-000000000115",
+  "name": "Builder Agent v1.1.0 Decision lifecycle regression",
+  "description": "Redacted Builder regression for a material product Decision, deterministic apply-before-complete lifecycle, current Live Context, transparent stream output and concept usage without a learning verdict.",
+  "kind": "GOLDEN_PATH",
+  "inputPath": "tests/eval/fixtures/inputs/webhook-lens.json",
+  "expectedContractDomains": ["LEARNING_SPEC", "BUILD", "DECISION"],
+  "criteria": [
+    {
+      "key": "contract_valid",
+      "dimension": "CONTRACT_INTEGRITY",
+      "reviewMode": "AUTOMATED",
+      "description": "The confirmed Spec, Task, final Context and Completion Report satisfy strict contracts.",
+      "successDefinition": "Every T11 durable record passes runtime validation."
+    },
+    {
+      "key": "context_fresh",
+      "dimension": "CONTEXT_COMPLETENESS",
+      "reviewMode": "AUTOMATED",
+      "description": "The final Context is current and includes the concepts used by the build.",
+      "successDefinition": "Context version and active concepts match the fixture expectation."
+    },
+    {
+      "key": "redaction_no_leak",
+      "dimension": "REDACTION",
+      "reviewMode": "AUTOMATED",
+      "description": "The user-visible transient stream contains no credential sentinel or host user path.",
+      "successDefinition": "No forbidden sentinel or user-home path remains."
+    },
+    {
+      "key": "builder_semantics",
+      "dimension": "EVIDENCE_QUALITY",
+      "reviewMode": "HUMAN",
+      "description": "Concept usage reports implementation facts without claiming that the user learned them, and excluded work remains absent.",
+      "successDefinition": "A reviewer finds no false mastery or excluded-scope implementation claim."
+    },
+    {
+      "key": "decision_necessity",
+      "dimension": "DECISION_NECESSITY",
+      "reviewMode": "HUMAN",
+      "description": "The Builder interrupts only for a material product behavior choice and carries the applied Decision into completion.",
+      "successDefinition": "The Decision changes user-visible validation behavior, is not a reversible internal detail, and appears in appliedDecisionIds."
+    }
+  ],
+  "scenarioTags": ["prompt regression", "builder", "decision gate", "false mastery", "stale context", "redaction"],
+  "fixtureVersion": "1.1.0",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED"
+}

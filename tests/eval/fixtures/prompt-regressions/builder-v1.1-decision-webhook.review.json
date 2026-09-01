@@ -1,0 +1,31 @@
+[
+  {
+    "criterionKey": "builder_semantics",
+    "dimension": "EVIDENCE_QUALITY",
+    "reviewMode": "HUMAN",
+    "status": "PASSED",
+    "explanation": "The Builder reports only where each concept was used and why. It makes no claim about user understanding, keeps live credentials and hosted storage out of implemented work, exposes a failed-then-passing test sequence, and preserves the final current Context.",
+    "evidenceReferences": [
+      "builderTask.excludedWork",
+      "liveContext.checkpoint",
+      "completionReport.conceptUsage",
+      "redaction.output"
+    ],
+    "metrics": []
+  },
+  {
+    "criterionKey": "decision_necessity",
+    "dimension": "DECISION_NECESSITY",
+    "reviewMode": "HUMAN",
+    "status": "PASSED",
+    "explanation": "Unknown-field handling changes visible runtime validation behavior and forward-compatibility, so it warrants the user-facing Decision. The final Context clears the active Decision and the Completion Report references its durable application.",
+    "evidenceReferences": [
+      "decision.question",
+      "decision.reasonRequiredNow",
+      "decision.options",
+      "liveContext.activeDecisionIds",
+      "completionReport.appliedDecisionIds"
+    ],
+    "metrics": []
+  }
+]

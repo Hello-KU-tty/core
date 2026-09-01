@@ -251,6 +251,14 @@
 - **검토한 대안:** Spec 확정 transaction에서 즉시 Task와 workspace 생성, Agent가 Task acceptance criteria와 workspace path를 결정, Core MCP에 범용 file/shell tool 추가, Crew slot cwd만 믿고 별도 guard 생략, raw Builder transcript 전체 저장, Kiro CLI 3으로 즉시 migration.
 - **tradeoff:** Task 준비 command와 runtime guard가 추가되고 허용 shell command가 보수적이어서 새로운 debug command는 명시적으로 확장해야 한다. 대신 confirmation retry 실패가 Spec lineage를 바꾸지 않고, Agent 작성 의미와 Core-owned state, filesystem 경계, 사용자에게 보이는 진행과 durable 최소 기록을 분리할 수 있다.
 
+## 2026-09-01: T11 Decision gate와 Builder 재개·적용 경계
+
+- **상태:** 승인
+- **맥락:** T03~T06은 Decision Request, user Resolution과 Builder Application record 및 reducer·SQLite 골격을 만들었지만, T10 Builder runtime에는 실제 적용 command가 없고 Decision 요청과 `DECISION_REQUIRED` Live Context가 별도 write라 부분 실패 시 정합성이 깨질 수 있다. 또한 `independentWorkCanContinue`가 Task 상태를 바꾸지 않으며 이유 없는 추천 수락을 이후 이해 Evidence에서 배제할 deterministic 근거가 없다.
+- **결정:** Builder-facing Decision tool은 category, 질문, 필요 이유, 선택지, 추천, 관련 Concept·source reference와 독립 작업 가능 여부만 받고 role-bound adapter가 Kiro transport metadata를 제거한 뒤 Application이 stable Decision/option ID, current Context version, timestamp, provenance와 redaction 상태를 채운다. Application은 Decision Request와 다음 `DECISION_REQUIRED` Context를 한 transaction에서 저장하고, 독립 작업이 불가능하면 Task를 `BLOCKED`로 전이한다. UI의 user-authored Resolution은 추천 수락, 직접 option 선택과 custom proposal을 보존하며, 해결되지 않은 다른 blocking Decision이 없으면 Core가 Task를 `ACTIVE`로 재개한다. Builder는 별도 `apply_decision_result` tool로 구현 결과와 source reference를 제출하고 DecisionApplication record와 active Decision ID를 제거한 다음 Live Context를 한 transaction에서 저장한다. 모든 요청된 Decision이 적용되기 전에는 Task completion을 거절한다. Helper에는 pending Decision context만 handoff하고 실제 Helper prompt·대화는 T12에 둔다. `DECISION_RESOLVED` Activity에는 사용자 rationale 원문 대신 rationale 존재 여부만 남겨, 이유 없는 수락을 이해 Evidence source로 수용하지 않는다.
+- **검토한 대안:** Decision과 Context를 순차 저장, Task를 항상 ACTIVE로 유지, resolution만으로 적용 완료 처리, Builder가 stable metadata를 생성, 의미적 필요성을 filename keyword 같은 heuristic으로 자동 판정, T11에서 Helper 대화·Decision UI·Episode assembler까지 함께 구현.
+- **tradeoff:** request와 application command가 Context version을 함께 다뤄 contract와 transaction test가 늘어난다. 대신 stale retry와 재시작에서도 pending gate가 재현되고 사용자의 선택, Builder 적용, Task 재개가 구분된다. Decision 필요성 자체는 LLM prompt와 기록된 human review가 담당하므로 사소한 질문을 완벽히 자동 차단하지는 않지만, Core가 의미 판단을 가장하거나 fixture 문구에 과적합하지 않는다.
+
 ## 2026-08-24: 구현 세부 선택 위임
 
 - **상태:** 승인

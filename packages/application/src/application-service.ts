@@ -14,6 +14,10 @@ import {
   commandReceiptSchema,
   type ContractError,
   correlationIdSchema,
+  type DecisionCommandReceipt,
+  decisionCommandReceiptSchema,
+  decisionApplicationSchema,
+  decisionRequestSchema,
   type DecisionResult,
   decisionResultSchema,
   type DiscoveryContext,
@@ -34,12 +38,14 @@ import {
   type ProjectCandidateRevision,
   type PreparedBuilderTaskDescriptor,
   preparedBuilderTaskDescriptorSchema,
+  liveProjectContextSchema,
   type UiRequest,
   uiRequestSchema,
   validateAgentRequest,
   validateContract,
 } from '@vibe-helper/contracts'
 import {
+  applyDecision,
   applyMisconceptionProposal,
   confirmLearningSpec,
   evaluateEvidenceProposal,
@@ -76,6 +82,7 @@ export type AgentApplicationResponse =
   | DiscoveryContext
   | BuilderTaskContext
   | DecisionResult
+  | DecisionCommandReceipt
   | HelperContext
   | EpisodeContext
   | CommandReceipt
@@ -93,6 +100,9 @@ type IdPrefix =
   | 'discovery_session'
   | 'learning_spec'
   | 'task'
+  | 'decision'
+  | 'decision_option'
+  | 'decision_application'
   | 'audit'
   | 'concept'
   | 'evidence_decision'
@@ -248,6 +258,8 @@ export class ApplicationService {
         return this.#updateLiveContext(request)
       case 'BUILDER_REQUEST_DECISION':
         return this.#requestDecision(request)
+      case 'BUILDER_APPLY_DECISION':
+        return this.#applyDecision(request)
       case 'BUILDER_COMPLETE_TASK':
         return this.#completeTask(request)
       case 'HELPER_GET_CONTEXT':
@@ -1195,14 +1207,14 @@ export class ApplicationService {
 
   async #requestDecision(
     request: Extract<AgentRequest, { kind: 'BUILDER_REQUEST_DECISION' }>,
-  ): Promise<CommandReceipt> {
+  ): Promise<DecisionCommandReceipt> {
     const aggregate = this.#storage.transaction((repository) =>
-      repository.readBuilderTaskAggregate(request.decision.projectId, request.decision.taskId),
+      repository.readBuilderTaskAggregate(request.projectId, request.taskId),
     )
     if (aggregate === null) throw this.#notFound(request.correlationId, 'BUILDER_TASK_NOT_FOUND')
     await this.#workspacePolicy.validateReferences(
       aggregate.project,
-      request.decision,
+      request,
       request.correlationId,
     )
     return this.#storage.transaction((repository) =>
@@ -1210,12 +1222,12 @@ export class ApplicationService {
         repository,
         request,
         'builder.request_decision',
-        commandReceiptSchema,
+        decisionCommandReceiptSchema,
         () => {
           const current = this.#requireBuilderAggregate(
             repository,
-            request.decision.projectId,
-            request.decision.taskId,
+            request.projectId,
+            request.taskId,
             request.correlationId,
           )
           this.#assertRevision(
@@ -1231,49 +1243,147 @@ export class ApplicationService {
               'A current Live Context is required before requesting a Decision.',
             )
           }
-          const existingRequest = current.decisionRequests.find(
-            (decision) => decision.id === request.decision.id,
+          this.#assertRevision(
+            request.expectedContextVersion,
+            current.liveContext.contextVersion,
+            request.correlationId,
+            'LIVE_CONTEXT_STALE',
           )
-          const existingResolution = current.decisionResolutions.find(
-            (resolution) => resolution.decisionId === existingRequest?.id,
+          const requestedAt = this.#timestamp()
+          const decisionId = this.#generateId('decision')
+          const optionIds = new Map(
+            request.decision.options.map((option) => [
+              option.key,
+              this.#generateId('decision_option'),
+            ]),
           )
-          const existingApplication = current.decisionApplications.find(
-            (application) => application.decisionId === existingRequest?.id,
-          )
-          const existing =
-            existingRequest === undefined
-              ? undefined
-              : {
-                  request: existingRequest,
-                  ...(existingResolution === undefined ? {} : { resolution: existingResolution }),
-                  ...(existingApplication === undefined
-                    ? {}
-                    : { application: existingApplication }),
-                }
+          const decision = decisionRequestSchema.parse({
+            schemaVersion: 1,
+            id: decisionId,
+            projectId: request.projectId,
+            taskId: request.taskId,
+            correlationId: request.correlationId,
+            contextVersion: current.liveContext.contextVersion + 1,
+            category: request.decision.category,
+            question: request.decision.question,
+            reasonRequiredNow: request.decision.reasonRequiredNow,
+            options: request.decision.options.map(({ key, ...option }) => ({
+              id: optionIds.get(key),
+              ...option,
+            })),
+            recommendedOptionId: optionIds.get(request.decision.recommendedOptionKey),
+            recommendationRationale: request.decision.recommendationRationale,
+            relatedConceptNames: request.decision.relatedConceptNames,
+            sourceReferences: request.decision.sourceReferences,
+            independentWorkCanContinue: request.decision.independentWorkCanContinue,
+            requestedAt,
+            source: { kind: 'AGENT', role: 'BUILDER' },
+            redactionStatus: 'VERIFIED_REDACTED',
+          })
+          const context = liveProjectContextSchema.parse({
+            schemaVersion: 1,
+            id: current.liveContext.id,
+            projectId: request.projectId,
+            taskId: request.taskId,
+            correlationId: request.correlationId,
+            contextVersion: current.liveContext.contextVersion + 1,
+            expectedPreviousVersion: current.liveContext.contextVersion,
+            checkpoint: 'DECISION_REQUIRED',
+            stage: request.context.stage,
+            currentGoal: request.context.currentGoal,
+            recentChanges: request.context.recentChanges,
+            activeDecisionIds: unique([...current.liveContext.activeDecisionIds, decisionId]),
+            activeConceptNames: request.context.activeConceptNames,
+            relatedFiles: request.context.relatedFiles,
+            nextActions: request.context.nextActions,
+            ...(request.context.blockingReason === undefined
+              ? {}
+              : { blockingReason: request.context.blockingReason }),
+            updatedAt: requestedAt,
+            source: { kind: 'AGENT', role: 'BUILDER' },
+            redactionStatus: 'VERIFIED_REDACTED',
+          })
+          const contextResult = reduceLiveContext({
+            task: current.task,
+            current: current.liveContext,
+            proposed: context,
+          })
+          if (contextResult.outcome === 'REJECTED') {
+            throw this.#domainError(request.correlationId, contextResult.reasonCode)
+          }
           const reduced = openDecision({
             task: current.task,
-            liveContext: current.liveContext,
-            request: request.decision,
-            ...(existing === undefined ? {} : { existing }),
+            liveContext: contextResult.value,
+            request: decision,
           })
           if (reduced.outcome === 'REJECTED') {
             throw this.#domainError(request.correlationId, reduced.reasonCode)
           }
-          repository.appendDecisionRequest(request.decision)
+          let nextTask = current.task
+          if (!decision.independentWorkCanContinue) {
+            const proposedTask = {
+              ...current.task,
+              revision: current.task.revision + 1,
+              status: 'BLOCKED' as const,
+              updatedAt: decision.requestedAt,
+            }
+            const taskResult = transitionBuilderTask({
+              current: current.task,
+              proposed: proposedTask,
+            })
+            if (taskResult.outcome === 'REJECTED') {
+              throw this.#domainError(request.correlationId, taskResult.reasonCode)
+            }
+            nextTask = taskResult.value
+          }
+          repository.appendLiveContext(contextResult.value)
+          repository.appendDecisionRequest(decision)
+          if (nextTask.revision !== current.task.revision) repository.appendTask(nextTask)
+          this.#appendAudit(repository, {
+            correlationId: request.correlationId,
+            actor: request.actor,
+            action: 'UPDATED',
+            resource: {
+              type: 'LIVE_CONTEXT',
+              id: contextResult.value.id,
+              revision: contextResult.value.contextVersion,
+            },
+            summary: 'Stored the Decision gate Live Context snapshot.',
+            changedFields: ['checkpoint', 'activeDecisionIds', 'contextVersion'],
+            occurredAt: contextResult.value.updatedAt,
+          })
           this.#appendAudit(repository, {
             correlationId: request.correlationId,
             actor: request.actor,
             action: 'SUBMITTED',
-            resource: { type: 'DECISION', id: request.decision.id },
+            resource: { type: 'DECISION', id: decision.id },
             summary: 'Opened a validated Builder Decision request.',
             changedFields: ['status'],
-            occurredAt: request.decision.requestedAt,
+            occurredAt: decision.requestedAt,
           })
-          const response = this.#receipt(request.correlationId, current.task.revision)
+          if (nextTask.status === 'BLOCKED') {
+            this.#appendAudit(repository, {
+              correlationId: request.correlationId,
+              actor: { kind: 'CORE' },
+              action: 'UPDATED',
+              resource: {
+                type: 'BUILDER_TASK',
+                id: nextTask.id,
+                revision: nextTask.revision,
+              },
+              summary: 'Blocked the Task at a Decision gate with no independent work.',
+              changedFields: ['status', 'revision'],
+              occurredAt: nextTask.updatedAt,
+            })
+          }
+          const response = decisionCommandReceiptSchema.parse({
+            ...this.#receipt(request.correlationId, nextTask.revision),
+            decisionId: decision.id,
+          })
           return {
             response,
-            resourceId: request.decision.id,
-            resourceRevision: current.task.revision,
+            resourceId: decision.id,
+            resourceRevision: nextTask.revision,
           }
         },
       ),
@@ -1336,6 +1446,35 @@ export class ApplicationService {
           throw this.#domainError(request.correlationId, reduced.reasonCode)
         }
         repository.appendDecisionResolution(request.resolution)
+        const resolvedDecisionIds = new Set([
+          ...aggregate.decisionResolutions.map((resolution) => resolution.decisionId),
+          request.resolution.decisionId,
+        ])
+        const hasUnresolvedBlockingDecision = aggregate.decisionRequests.some(
+          (item) => !item.independentWorkCanContinue && !resolvedDecisionIds.has(item.id),
+        )
+        let nextTask = aggregate.task
+        if (
+          aggregate.task.status === 'BLOCKED' &&
+          !decision.independentWorkCanContinue &&
+          !hasUnresolvedBlockingDecision
+        ) {
+          const proposedTask = {
+            ...aggregate.task,
+            revision: aggregate.task.revision + 1,
+            status: 'ACTIVE' as const,
+            updatedAt: request.resolution.resolvedAt,
+          }
+          const taskResult = transitionBuilderTask({
+            current: aggregate.task,
+            proposed: proposedTask,
+          })
+          if (taskResult.outcome === 'REJECTED') {
+            throw this.#domainError(request.correlationId, taskResult.reasonCode)
+          }
+          nextTask = taskResult.value
+          repository.appendTask(nextTask)
+        }
         this.#appendAudit(repository, {
           correlationId: request.correlationId,
           actor: { kind: 'USER' },
@@ -1345,13 +1484,186 @@ export class ApplicationService {
           changedFields: ['status'],
           occurredAt: request.resolution.resolvedAt,
         })
-        const response = this.#receipt(request.correlationId, aggregate.task.revision)
+        if (nextTask.revision !== aggregate.task.revision) {
+          this.#appendAudit(repository, {
+            correlationId: request.correlationId,
+            actor: { kind: 'CORE' },
+            action: 'UPDATED',
+            resource: {
+              type: 'BUILDER_TASK',
+              id: nextTask.id,
+              revision: nextTask.revision,
+            },
+            summary: 'Resumed the Task after its blocking Decision was resolved.',
+            changedFields: ['status', 'revision'],
+            occurredAt: nextTask.updatedAt,
+          })
+        }
+        const response = this.#receipt(request.correlationId, nextTask.revision)
         return {
           response,
           resourceId: decision.id,
-          resourceRevision: aggregate.task.revision,
+          resourceRevision: nextTask.revision,
         }
       }),
+    )
+  }
+
+  async #applyDecision(
+    request: Extract<AgentRequest, { kind: 'BUILDER_APPLY_DECISION' }>,
+  ): Promise<DecisionCommandReceipt> {
+    const aggregate = this.#storage.transaction((repository) =>
+      repository.readBuilderTaskAggregate(request.projectId, request.taskId),
+    )
+    if (aggregate === null) throw this.#notFound(request.correlationId, 'BUILDER_TASK_NOT_FOUND')
+    await this.#workspacePolicy.validateReferences(
+      aggregate.project,
+      request,
+      request.correlationId,
+    )
+    return this.#storage.transaction((repository) =>
+      this.#idempotent(
+        repository,
+        request,
+        'builder.apply_decision',
+        decisionCommandReceiptSchema,
+        () => {
+          const current = this.#requireBuilderAggregate(
+            repository,
+            request.projectId,
+            request.taskId,
+            request.correlationId,
+          )
+          this.#assertRevision(
+            request.expectedTaskRevision,
+            current.task.revision,
+            request.correlationId,
+            'BUILDER_TASK_STALE',
+          )
+          if (current.liveContext === null) {
+            throw this.#validationError(
+              request.correlationId,
+              'LIVE_CONTEXT_REQUIRED',
+              'A current Live Context is required before applying a Decision.',
+            )
+          }
+          this.#assertRevision(
+            request.expectedContextVersion,
+            current.liveContext.contextVersion,
+            request.correlationId,
+            'LIVE_CONTEXT_STALE',
+          )
+          const decision = current.decisionRequests.find((item) => item.id === request.decisionId)
+          if (decision === undefined)
+            throw this.#notFound(request.correlationId, 'DECISION_NOT_FOUND')
+          const resolution = current.decisionResolutions.find(
+            (item) => item.decisionId === decision.id,
+          )
+          if (resolution === undefined) {
+            throw this.#domainError(request.correlationId, 'DECISION_NOT_RESOLVED')
+          }
+          const existingApplication = current.decisionApplications.find(
+            (item) => item.decisionId === decision.id,
+          )
+          const appliedAt = this.#timestamp()
+          const application = decisionApplicationSchema.parse({
+            schemaVersion: 1,
+            id: this.#generateId('decision_application'),
+            decisionId: decision.id,
+            resolutionId: resolution.id,
+            projectId: request.projectId,
+            taskId: request.taskId,
+            correlationId: request.correlationId,
+            appliedResult: request.appliedResult,
+            sourceReferences: request.sourceReferences,
+            appliedAt,
+            source: { kind: 'AGENT', role: 'BUILDER' },
+            redactionStatus: 'VERIFIED_REDACTED',
+          })
+          const decisionResult = applyDecision({
+            aggregate: {
+              request: decision,
+              ...(resolution === undefined ? {} : { resolution }),
+              ...(existingApplication === undefined ? {} : { application: existingApplication }),
+            },
+            task: current.task,
+            application,
+          })
+          if (decisionResult.outcome === 'REJECTED') {
+            throw this.#domainError(request.correlationId, decisionResult.reasonCode)
+          }
+          if (!current.liveContext.activeDecisionIds.includes(decision.id)) {
+            throw this.#validationError(
+              request.correlationId,
+              'DECISION_APPLICATION_CONTEXT_INVALID',
+              'The current Context must contain the Decision being applied.',
+            )
+          }
+          const context = liveProjectContextSchema.parse({
+            schemaVersion: 1,
+            id: current.liveContext.id,
+            projectId: request.projectId,
+            taskId: request.taskId,
+            correlationId: request.correlationId,
+            contextVersion: current.liveContext.contextVersion + 1,
+            expectedPreviousVersion: current.liveContext.contextVersion,
+            checkpoint: 'DIRECTION_CHANGED',
+            stage: request.context.stage,
+            currentGoal: request.context.currentGoal,
+            recentChanges: request.context.recentChanges,
+            activeDecisionIds: current.liveContext.activeDecisionIds.filter(
+              (decisionId) => decisionId !== decision.id,
+            ),
+            activeConceptNames: request.context.activeConceptNames,
+            relatedFiles: request.context.relatedFiles,
+            nextActions: request.context.nextActions,
+            updatedAt: appliedAt,
+            source: { kind: 'AGENT', role: 'BUILDER' },
+            redactionStatus: 'VERIFIED_REDACTED',
+          })
+          const contextResult = reduceLiveContext({
+            task: current.task,
+            current: current.liveContext,
+            proposed: context,
+          })
+          if (contextResult.outcome === 'REJECTED') {
+            throw this.#domainError(request.correlationId, contextResult.reasonCode)
+          }
+          repository.appendDecisionApplication(application)
+          repository.appendLiveContext(contextResult.value)
+          this.#appendAudit(repository, {
+            correlationId: request.correlationId,
+            actor: request.actor,
+            action: 'UPDATED',
+            resource: { type: 'DECISION', id: decision.id },
+            summary: 'Recorded the Builder application of the user Decision.',
+            changedFields: ['status'],
+            occurredAt: application.appliedAt,
+          })
+          this.#appendAudit(repository, {
+            correlationId: request.correlationId,
+            actor: request.actor,
+            action: 'UPDATED',
+            resource: {
+              type: 'LIVE_CONTEXT',
+              id: contextResult.value.id,
+              revision: contextResult.value.contextVersion,
+            },
+            summary: 'Stored the post-Decision Builder resume Context.',
+            changedFields: ['checkpoint', 'activeDecisionIds', 'contextVersion'],
+            occurredAt: contextResult.value.updatedAt,
+          })
+          const response = decisionCommandReceiptSchema.parse({
+            ...this.#receipt(request.correlationId, current.task.revision),
+            decisionId: decision.id,
+          })
+          return {
+            response,
+            resourceId: decision.id,
+            resourceRevision: current.task.revision,
+          }
+        },
+      ),
     )
   }
 
@@ -1375,6 +1687,25 @@ export class ApplicationService {
           request.report.taskId,
           request.correlationId,
         )
+        const requestedDecisionIds = new Set(
+          current.decisionRequests.map((decision) => decision.id),
+        )
+        const appliedDecisionIds = new Set(
+          current.decisionApplications.map((application) => application.decisionId),
+        )
+        if (
+          !sameStringSet(requestedDecisionIds, appliedDecisionIds) ||
+          !sameStringSet(new Set(request.report.appliedDecisionIds), appliedDecisionIds) ||
+          request.report.appliedDecisionIds.length !==
+            new Set(request.report.appliedDecisionIds).size ||
+          (current.liveContext?.activeDecisionIds.length ?? 0) > 0
+        ) {
+          throw this.#validationError(
+            request.correlationId,
+            'TASK_DECISION_NOT_APPLIED',
+            'Every requested Decision must be applied and cleared before Task completion.',
+          )
+        }
         if (
           current.liveContext?.checkpoint !== 'TASK_COMPLETED' ||
           current.liveContext.updatedAt > request.report.completedAt
@@ -1407,16 +1738,6 @@ export class ApplicationService {
               'Completion cannot report excluded concepts as implemented usage.',
             )
           }
-        }
-        const appliedDecisionIds = new Set(
-          current.decisionApplications.map((application) => application.decisionId),
-        )
-        if (request.report.appliedDecisionIds.some((id) => !appliedDecisionIds.has(id))) {
-          throw this.#validationError(
-            request.correlationId,
-            'TASK_DECISION_NOT_APPLIED',
-            'Completion Report references a Decision that was not applied.',
-          )
         }
         const proposed = {
           ...current.task,
@@ -2102,6 +2423,7 @@ export class ApplicationService {
       liveContext: aggregate.liveContext,
       decisionRequests: aggregate.decisionRequests,
       decisionResolutions: aggregate.decisionResolutions,
+      decisionApplications: aggregate.decisionApplications,
     })
   }
 

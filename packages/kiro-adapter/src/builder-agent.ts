@@ -1,21 +1,26 @@
 import {
+  type BuilderApplyDecisionToolInput,
+  builderApplyDecisionToolInputSchema,
   type BuilderCompleteTaskToolInput,
   builderCompleteTaskToolInputSchema,
   type BuilderTaskContext,
   builderTaskContextSchema,
   builderGetDecisionResultQuerySchema,
   builderGetTaskQuerySchema,
-  builderRequestDecisionCommandSchema,
+  type BuilderRequestDecisionToolInput,
+  builderRequestDecisionToolInputSchema,
   builderStartTaskCommandSchema,
   type BuilderUpdateLiveContextToolInput,
   builderUpdateLiveContextToolInputSchema,
   type CommandReceipt,
   commandReceiptSchema,
+  type DecisionCommandReceipt,
+  decisionCommandReceiptSchema,
   type DecisionResult,
   decisionResultSchema,
 } from '@vibe-helper/contracts'
 
-export const BUILDER_PROMPT_VERSION = '1.0.0' as const
+export const BUILDER_PROMPT_VERSION = '1.1.0' as const
 export const BUILDER_PROMPT_SOURCE = 'docs/agent-prompts/builder.md' as const
 export const BUILDER_AGENT_NAME = 'vibe-helper-builder' as const
 export const BUILDER_MCP_SERVER_NAME = 'vibe-helper-builder-core' as const
@@ -25,6 +30,7 @@ export const BUILDER_CORE_TOOL_NAMES = [
   'update_build_context',
   'request_user_decision',
   'get_decision_result',
+  'apply_decision_result',
   'complete_task',
 ] as const
 export const BUILDER_NATIVE_TOOL_NAMES = ['fs_read', 'fs_write', 'execute_bash'] as const
@@ -197,11 +203,19 @@ export class BuilderAgentToolAdapter {
     )
   }
 
-  async requestDecision(input: unknown): Promise<CommandReceipt> {
-    const request = builderRequestDecisionCommandSchema.parse(input)
+  async requestDecision(input: BuilderRequestDecisionToolInput): Promise<DecisionCommandReceipt> {
+    const request = builderRequestDecisionToolInputSchema.parse(input)
     return parseToolResponse(
       await this.#caller.callTool('request_user_decision', request),
-      commandReceiptSchema,
+      decisionCommandReceiptSchema,
+    )
+  }
+
+  async applyDecision(input: BuilderApplyDecisionToolInput): Promise<DecisionCommandReceipt> {
+    const request = builderApplyDecisionToolInputSchema.parse(input)
+    return parseToolResponse(
+      await this.#caller.callTool('apply_decision_result', request),
+      decisionCommandReceiptSchema,
     )
   }
 
