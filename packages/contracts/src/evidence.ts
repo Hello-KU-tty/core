@@ -140,13 +140,76 @@ export const evidenceProposalSchema = z
     }
   })
 
-export const evidenceProposalBatchSchema = z
+export const evidenceProposalDraftSchema = z
+  .strictObject({
+    concept: z.strictObject({
+      canonicalConceptId: conceptIdSchema.optional(),
+      originalExpression: labelSchema,
+      proposedCanonicalName: labelSchema,
+    }),
+    signal: evidenceSignalSchema,
+    strength: evidenceStrengthSchema,
+    promptDependence: promptDependenceSchema,
+    userEvidenceSources: z.array(userEvidenceSourceReferenceSchema).min(1).max(20),
+    contextSources: z.array(contextualSourceReferenceSchema).max(30),
+    redactedEvidenceExcerpt: nonEmptyTextSchema,
+    rationale: nonEmptyTextSchema,
+    uncertainty: nonEmptyTextSchema.optional(),
+    maximumSupportedState: userUnderstandingStateSchema.nullable(),
+    misconception: misconceptionProposalSchema,
+  })
+  .superRefine((proposal, context) => {
+    if (proposal.strength === 'NONE' && proposal.maximumSupportedState !== null) {
+      context.addIssue({
+        code: 'custom',
+        path: ['maximumSupportedState'],
+        message: 'NONE Evidence cannot support a Concept State',
+      })
+    }
+    if (proposal.promptDependence === 'DIRECTLY_LED' && proposal.strength === 'STRONG') {
+      context.addIssue({
+        code: 'custom',
+        path: ['strength'],
+        message: 'Directly led Evidence cannot be STRONG',
+      })
+    }
+  })
+
+export const analystSemanticResultSchema = z
   .strictObject({
     schemaVersion: schemaVersionSchema,
     episodeId: episodeIdSchema,
+    episodeRevision: entityRevisionSchema,
+    correlationId: correlationIdSchema,
+    proposals: z.array(evidenceProposalDraftSchema).max(100),
+    noEvidenceReason: nonEmptyTextSchema.optional(),
+  })
+  .superRefine((result, context) => {
+    if (result.proposals.length === 0 && result.noEvidenceReason === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['noEvidenceReason'],
+        message: 'An empty Analyst result requires a reason',
+      })
+    }
+    if (result.proposals.length > 0 && result.noEvidenceReason !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['noEvidenceReason'],
+        message: 'A non-empty Analyst result must not claim no Evidence',
+      })
+    }
+  })
+
+export const evidenceProposalBatchSchema = z
+  .strictObject({
+    schemaVersion: schemaVersionSchema,
+    projectId: projectIdSchema,
+    episodeId: episodeIdSchema,
     correlationId: correlationIdSchema,
     episodeRevision: entityRevisionSchema,
-    proposals: z.array(evidenceProposalSchema).min(1).max(100),
+    proposals: z.array(evidenceProposalSchema).max(100),
+    noEvidenceReason: nonEmptyTextSchema.optional(),
     submittedAt: utcTimestampSchema,
     source: z.strictObject({ kind: z.literal('AGENT'), role: z.literal('EVIDENCE_ANALYST') }),
   })
@@ -154,6 +217,7 @@ export const evidenceProposalBatchSchema = z
     const proposalIds = new Set<string>()
     for (const [index, proposal] of batch.proposals.entries()) {
       if (
+        proposal.projectId !== batch.projectId ||
         proposal.episodeId !== batch.episodeId ||
         proposal.correlationId !== batch.correlationId
       ) {
@@ -171,6 +235,20 @@ export const evidenceProposalBatchSchema = z
         })
       }
       proposalIds.add(proposal.id)
+    }
+    if (batch.proposals.length === 0 && batch.noEvidenceReason === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['noEvidenceReason'],
+        message: 'An empty Evidence batch requires a reason',
+      })
+    }
+    if (batch.proposals.length > 0 && batch.noEvidenceReason !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['noEvidenceReason'],
+        message: 'A non-empty Evidence batch must not claim no Evidence',
+      })
     }
   })
 
@@ -243,6 +321,7 @@ export const acceptedEvidenceSchema = z.discriminatedUnion('kind', [
     kind: z.literal('CONCEPT_OBSERVATION'),
     projectId: projectIdSchema,
     taskId: taskIdSchema.optional(),
+    episodeId: episodeIdSchema,
     conceptId: conceptIdSchema,
     correlationId: correlationIdSchema,
     supportsState: z.literal('OBSERVED'),
@@ -341,7 +420,6 @@ export const evidenceBatchApplicationResultSchema = z.strictObject({
         ledgerRevision: entityRevisionSchema.optional(),
       }),
     )
-    .min(1)
     .max(100),
 })
 
@@ -352,6 +430,8 @@ export type PromptDependence = z.infer<typeof promptDependenceSchema>
 export type CanonicalConcept = z.infer<typeof canonicalConceptSchema>
 export type ConceptAliasProposal = z.infer<typeof conceptAliasProposalSchema>
 export type EvidenceProposal = z.infer<typeof evidenceProposalSchema>
+export type EvidenceProposalDraft = z.infer<typeof evidenceProposalDraftSchema>
+export type AnalystSemanticResult = z.infer<typeof analystSemanticResultSchema>
 export type EvidenceProposalBatch = z.infer<typeof evidenceProposalBatchSchema>
 export type EvidenceDecision = z.infer<typeof evidenceDecisionSchema>
 export type AcceptedEvidence = z.infer<typeof acceptedEvidenceSchema>

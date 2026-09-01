@@ -438,7 +438,20 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - `DEMONSTRATED` 이상에서도 Helper 진입과 질문 제안이 유지된다.
 - 카드는 접근성을 높이지만 클릭 자체가 Evidence가 되지 않고 자유 입력을 가리지 않는다.
 
-### [>] T13. Event 정규화, Episode assembler와 Evidence Analyst
+### [x] T13. Event 정규화, Episode assembler와 Evidence Analyst
+
+**승인 기록**
+
+- 2026-09-02 사용자가 structured Event source, Episode close policy, durable Analysis Job, hidden no-tool Analyst, deterministic Evidence 적용, retry/dead-letter와 live Kiro 회귀 계획을 승인했다.
+- FINAL_UPGRADE Episode의 실제 개인화 적용 source는 T18 flow에서 연결하되, T13 contract와 assembler type 경계는 유지하기로 했다.
+
+**검증 기록**
+
+- 2026-09-02 Node.js 24.19.0과 pnpm 11.12.0에서 format 126 files, lint 126 files, typecheck, Drizzle schema, unit 2개, package/app integration 156개, eval 10개, build와 smoke 4개가 통과했다. macOS sandbox의 Chromium Mach port 제한을 분리한 승인된 외부 실행에서 Playwright E2E 1개도 통과했다.
+- Builder·Decision·Helper의 검증된 Application 전이가 redacted Activity Event가 되고, BUILD_TASK·DECISION·HELPER_CONVERSATION Episode 종료와 initial Analysis Job 생성은 transaction 하나로 묶인다. DB unique constraint와 idempotency가 닫힌 Episode당 initial dispatch 하나를 보장한다.
+- Analysis Job은 30초 soft timeout, 자동 재시도 1회, terminal `FAILED`/`ANALYSIS_FAILED`, UI failure 조회와 수동 재시도, revision·attempt가 다른 late result 거절을 versioned SQLite history로 보존하고 재시작 뒤 복구한다.
+- Evidence Analyst prompt v1.0.1은 stable metadata를 만들지 않는 hidden no-tool semantic adapter다. strict empty result도 `SUCCEEDED`로 끝나며, Proposal은 Core가 user-authored source와 상태 cap을 재검증해 채택·거절한다. Builder Concept usage는 사용자 이해와 분리된 `CONCEPT_OBSERVATION`으로만 `OBSERVED`를 만든다.
+- `evidence-analyst-v1.0-mixed` fixture와 기록된 사람 review가 직접 유도 반복 `NONE/DIRECTLY_LED`와 독립 적용 `STRONG/INDEPENDENT`를 분리했다. 로그인된 Kiro CLI 2.20.2 Agent Engine v2/`claude-haiku-4.5` live runner에서 tool 0회, Proposal 2개, Core 거절 1개·채택 1개, runtime validation `DEMONSTRATED`, Job `SUCCEEDED`와 Episode `ANALYZED`를 확인했다.
 
 **범위**
 
@@ -463,7 +476,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - event마다 LLM을 호출하지 않으며 분석 실패가 code와 Project History를 훼손하지 않는다.
 - 어떤 원문·행동이 State 변경·보류에 사용됐는지 사용자에게 설명할 수 있다.
 
-### [ ] T14. Crew App shell과 공통 session 복원
+### [>] T14. Crew App shell과 공통 session 복원
 
 **범위**
 

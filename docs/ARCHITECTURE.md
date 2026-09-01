@@ -2,9 +2,9 @@
 
 ## 1. 상태
 
-- 상태: 사용자 승인 완료, T12 Helper 최소 맥락·실제 대화 완료, T13 Event·Episode·Evidence Analyst가 다음 작업
+- 상태: 사용자 승인 완료, T13 Event 정규화·Episode assembler·Evidence Analyst 완료, T14 Crew App shell이 다음 작업
 - 기준 입력: [PROJECT_BRIEF.md](../PROJECT_BRIEF.md), [SPEC.md](SPEC.md)
-- T03 versioned contract와 Agent/UI runtime validation, T04 pure reducer와 Evidence policy v1.0.0, T05 SQLite schema/repository/migration, T06 application use case와 역할 고정 MCP server, T07 criterion 기반 evaluation contract와 harness, T08 Candidate loop, T09 Discovery Agent prompt v1.1.0과 Learning Spec revision flow, T10 native workspace lifecycle, T11 Builder prompt v1.1.0과 Decision gate, T12 Helper prompt v1.0.0과 bounded context/refresh는 구현됐다.
+- T03 versioned contract와 Agent/UI runtime validation, T04 pure reducer와 Evidence policy v1.0.0, T05 SQLite schema/repository/migration, T06 application use case와 역할 고정 MCP server, T07 criterion 기반 evaluation contract와 harness, T08 Candidate loop, T09 Discovery Agent prompt v1.1.0과 Learning Spec revision flow, T10 native workspace lifecycle, T11 Builder prompt v1.1.0과 Decision gate, T12 Helper prompt v1.0.0과 bounded context/refresh, T13 Evidence Analyst prompt v1.0.1과 durable Analysis Job은 구현됐다.
 - Kiro/Crew 세부 연결은 capability spike 결과에 따라 이 문서를 갱신한다.
 
 ## 2. 선택한 기술 스택과 선택 이유
@@ -125,6 +125,7 @@ Helper는 전체 Builder transcript와 전체 Ledger를 기본으로 읽지 않�
 normalized Activity Events
 → Episode assembler
 → Episode closed
+→ durable AnalysisJob PENDING
 → Evidence Analyst dispatch
 → Evidence Proposals
 → Core validation
@@ -199,7 +200,9 @@ T06의 application handler는 Agent와 UI transport가 공유하는 검증·tran
 
 T12는 Helper가 활성 Task가 없는 완료 Project에서도 마지막 current Task를 읽게 하고, Live Context freshness를 `CURRENT`, `STALE`, `MISSING`으로 구분한다. 질문에 명시된 Concept, 현재 Context와 active Decision Concept만 최대 5개까지 선택하며 무관한 Ledger fallback을 만들지 않는다. 관련 과거 Episode와 redaction된 사용자 발화·Helper 요약은 기존 Event 저장 경계에서 제한적으로 조회하고, Builder가 명시한 workspace-contained code reference는 질문 시점에만 bounded excerpt로 읽어 응답에 포함하되 DB에는 복제하지 않는다. raw diff와 Builder transcript는 저장하지 않으며 사용할 수 없는 reference를 내용처럼 추측하지 않는다.
 
-stale/missing Context refresh는 audit-only 신호가 아니라 versioned `ContextRefreshRequest`로 저장한다. Helper는 요청만 만들고 Builder-owned Context를 변경하지 않는다. Builder의 다음 더 새로운 Context update가 pending request를 같은 transaction에서 `FULFILLED`로 닫고, Builder Task context는 pending request를 노출한다. Helper conversation Event 생성과 Episode dispatch/retry는 T13에서 연결한다.
+stale/missing Context refresh는 audit-only 신호가 아니라 versioned `ContextRefreshRequest`로 저장한다. Helper는 요청만 만들고 Builder-owned Context를 변경하지 않는다. Builder의 다음 더 새로운 Context update가 pending request를 같은 transaction에서 `FULFILLED`로 닫고, Builder Task context는 pending request를 노출한다.
+
+T13은 raw Crew transcript가 아니라 검증된 Application 상태 전이에서 `TASK_STARTED`, `LIVE_CONTEXT_UPDATED`, `DECISION_REQUESTED/RESOLVED`, `USER_MESSAGE`, `HELPER_RESPONSE`, `CONCEPT_REPORTED`, `VALIDATION_RESULT`, `TASK_COMPLETED` Event를 만든다. BUILD_TASK는 Task 시작→완료, DECISION은 Request→사용자 Resolution, HELPER_CONVERSATION은 첫 사용자 발화→명시적 종료·관련 Decision 해결·Task 완료로 닫는다. 닫힌 Episode와 initial `AnalysisJob`은 같은 transaction에 저장하므로 Event마다 Analyst를 호출하지 않는다. FINAL_UPGRADE type과 assembler 경계는 유지하되 실제 개인화 적용 source는 T18 flow에서 연결한다.
 
 ### 4.5 storage-sqlite
 
@@ -244,9 +247,11 @@ Builder prompt 원문은 `docs/agent-prompts/builder.md` 하나이며 T11 버전
 
 Helper prompt 원문은 `docs/agent-prompts/helper.md` 하나이며 T12 버전은 1.0.0이다. Helper adapter는 role-bound `get_helper_context`와 `request_builder_context_refresh`만 허용하고 native file, shell, web과 state mutation tool을 갖지 않는다. Application이 current/focused Decision, 최대 5개 관련 Ledger·Episode, 최대 3개의 workspace-contained 8 KiB code excerpt를 조립하고 source를 다시 redaction한다. diff와 대화 원문은 가용성만 표시한다. Kiro CLI 2.20.2 Agent Engine v2 live 회귀에서 `DEMONSTRATED` 상태의 Helper가 현재 Decision과 code excerpt를 읽어 선택지를 비교하고 복합 DB/Excel 비유를 claim 단위로 답했으며, context tool 1회, refresh 0회, Builder state 불변과 secret 미노출을 확인했다.
 
+Evidence Analyst prompt 원문은 `docs/agent-prompts/evidence-analyst.md` 하나이며 T13 버전은 1.0.1이다. hidden Agent definition은 tool allowlist가 비어 있고 bounded Episode Context만 받아 stable ID·timestamp·provenance를 제외한 strict semantic JSON을 반환한다. adapter가 Core-owned metadata를 채우고 Application의 deterministic Evidence policy가 Proposal별 채택·거절, misconception issue와 Ledger를 계산한다. 빈 Proposal 결과도 성공으로 완료하며 Builder 보고는 사용자 이해가 아닌 Core `CONCEPT_OBSERVATION`으로만 `OBSERVED`를 만든다. Kiro CLI 2.20.2 Agent Engine v2 live 회귀에서 tool 호출 0회, mixed-strength Proposal 2개, 직접 유도 반복 거절 1개, 독립 적용 채택 1개, runtime validation `DEMONSTRATED`, Job `SUCCEEDED`와 Episode `ANALYZED`를 확인했다.
+
 Crew 0.3.0의 App event bridge는 실제 stream을 App DOM event로 전달하지 않고, generic App API client는 `/api/chat` SSE를 JSON으로 파싱한다. 따라서 event는 MVP primary 경로에서 제외한다. raw fetch는 same-origin `POST /api/chat` 하나와 고정 payload로 제한하고, slot 생성·history/result 조회는 permission-checked App API를 사용한다. 이 세부사항은 UI나 Core가 아니라 이 adapter에만 존재한다. 참고: <https://kiro.dev/docs/crew/apps/sdk/>
 
-Analyst의 durable 상태는 Crew task가 아니라 Core `AnalysisJob`이 소유한다. `analysisJobId`, Episode/correlation ID, attempt, deadline과 revision을 SQLite에 저장하고, timeout retry 뒤 늦은 결과는 현재 attempt와 일치할 때만 수용한다. Crew slot은 재생성 가능한 runtime handle이다.
+Analyst의 durable 상태는 Crew task가 아니라 Core `AnalysisJob`이 소유한다. `analysisJobId`, Episode/correlation ID, attempt, deadline과 revision을 SQLite에 저장하고, timeout retry 뒤 늦은 결과는 현재 attempt와 일치할 때만 수용한다. adapter startup/poll은 deadline이 지난 `RUNNING` lease를 Core recovery command로 회수해 남은 retry 또는 terminal failure로 전이하므로 runtime process가 중단돼도 고립되지 않는다. Crew slot은 재생성 가능한 runtime handle이다.
 
 ### 4.8 UI
 
@@ -344,7 +349,7 @@ CanonicalConcept 1 ── N MisconceptionIssue
 - source Agent 또는 user
 - redaction status
 
-정확한 DDL과 forward migration은 `packages/storage-sqlite/src/schema.ts`와 `packages/storage-sqlite/drizzle/`에 둔다. append row의 contract JSON은 stable key order와 SHA-256 hash로 검증하며 selected Candidate, active Task, Decision 상태, Live Context와 Concept Ledger head는 별도 projection으로 복구한다. T07은 revisioned `EvaluationRun`과 특정 run에 연결된 immutable `BaselineResult` table을 migration `0003`으로 추가했다. `AnalysisJob`은 T13에서 contract가 확정된 뒤 forward migration으로 추가한다.
+정확한 DDL과 forward migration은 `packages/storage-sqlite/src/schema.ts`와 `packages/storage-sqlite/drizzle/`에 둔다. append row의 contract JSON은 stable key order와 SHA-256 hash로 검증하며 selected Candidate, active Task, Decision 상태, Live Context, Analysis Job과 Concept Ledger head는 별도 projection으로 복구한다. T07은 revisioned `EvaluationRun`과 특정 run에 연결된 immutable `BaselineResult` table을 migration `0003`으로, T13은 `analysis_jobs` head와 `analysis_job_revisions` history를 forward migration `0005`로 추가했다.
 
 ## 6. API 및 외부 연동 계약
 
@@ -481,7 +486,7 @@ Crew App의 `permissions.api`는 T01에서 host SDK의 client-side path guard로
 
 - validation/permission 오류는 우회하지 않고 caller에 구조화해 반환한다.
 - stale context는 최신 version 조회 후 재시도한다.
-- Analyst 실패는 Episode와 durable AnalysisJob을 `pending_analysis`로 유지하고 새 attempt로 재시도한다.
+- 첫 retryable Analyst 실패는 Episode를 `PENDING_ANALYSIS`로 유지하고 durable AnalysisJob을 다음 `PENDING` attempt로 돌린다. 두 번째 실패는 Job `FAILED`와 Episode `ANALYSIS_FAILED`로 보존하며 UI의 명시적 수동 재시도만 다시 연다.
 - timeout 뒤 도착한 Analyst 결과는 current attempt/revision과 일치하지 않으면 폐기한다.
 - Builder 결과와 Project History는 Analyst 실패 때문에 폐기하지 않는다.
 - SQLite migration 전에 backup 또는 recoverable copy 경계를 둔다.

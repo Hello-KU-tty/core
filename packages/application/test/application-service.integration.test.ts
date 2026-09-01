@@ -9,6 +9,7 @@ import {
 } from '@vibe-helper/application'
 import {
   builderTaskSchema,
+  analysisJobSchema,
   candidateRoundSchema,
   canonicalConceptSchema,
   decisionRequestSchema,
@@ -25,6 +26,8 @@ import { describe, expect, it } from 'vitest'
 
 import {
   builderTaskFixture,
+  analysisJobFixture,
+  analysisJobPendingFixture,
   activityEventFixture,
   candidateFixture,
   candidateRoundFixture,
@@ -55,7 +58,7 @@ const fixedIdGenerator = (() => {
 })()
 
 const createHarness = async (
-  options: { readonly generateId?: (prefix: string) => string } = {},
+  options: { readonly generateId?: (prefix: string) => string; readonly now?: () => Date } = {},
 ) => {
   const workspaceRoot = await mkdtemp(join(tmpdir(), 'vibe-helper-application-workspaces-'))
   const storage = await openInMemorySqliteStorage()
@@ -63,7 +66,7 @@ const createHarness = async (
   const service = new ApplicationService({
     storage,
     workspacePolicy,
-    now: () => new Date(timestamp),
+    now: options.now ?? (() => new Date(timestamp)),
     generateId: options.generateId ?? fixedIdGenerator,
   })
   return { service, storage, workspaceRoot, workspacePolicy }
@@ -390,6 +393,8 @@ describe('ApplicationService boundary', () => {
       repository.appendDecisionRequest(decisionRequestSchema.parse(decisionRequestFixture))
       repository.appendActivityEvent(activityEventSchema.parse(activityEventFixture))
       repository.appendEpisode(episodeSchema.parse(episodeFixture))
+      repository.appendAnalysisJob(analysisJobSchema.parse(analysisJobPendingFixture))
+      repository.appendAnalysisJob(analysisJobSchema.parse(analysisJobFixture))
       repository.appendCanonicalConcept(canonicalConceptSchema.parse(canonicalConceptFixture))
     })
     await expect(
@@ -399,6 +404,9 @@ describe('ApplicationService boundary', () => {
         correlationId: ids.correlation,
         actor: { kind: 'AGENT', role: 'EVIDENCE_ANALYST' },
         idempotencyKey: 'idem_00000000-0000-4000-8000-000000000203',
+        analysisJobId: ids.analysisJob,
+        expectedJobRevision: 2,
+        attempt: 1,
         batch: evidenceProposalBatchFixture,
       }),
     ).resolves.toMatchObject({ success: true })
@@ -484,6 +492,8 @@ describe('ApplicationService boundary', () => {
       repository.appendDecisionRequest(decisionRequestSchema.parse(decisionRequestFixture))
       repository.appendActivityEvent(activityEventSchema.parse(activityEventFixture))
       repository.appendEpisode(episodeSchema.parse(episodeFixture))
+      repository.appendAnalysisJob(analysisJobSchema.parse(analysisJobPendingFixture))
+      repository.appendAnalysisJob(analysisJobSchema.parse(analysisJobFixture))
       repository.appendCanonicalConcept(canonicalConceptSchema.parse(canonicalConceptFixture))
     })
     const request = {
@@ -492,6 +502,9 @@ describe('ApplicationService boundary', () => {
       correlationId: ids.correlation,
       actor: { kind: 'AGENT', role: 'EVIDENCE_ANALYST' },
       idempotencyKey: ids.idempotency,
+      analysisJobId: ids.analysisJob,
+      expectedJobRevision: 2,
+      attempt: 1,
       batch: evidenceProposalBatchFixture,
     } as const
 
@@ -1372,6 +1385,22 @@ describe('T11 Decision gate and Builder resume application flow', () => {
         report,
       }),
     ).toMatchObject({ success: true, data: { resourceRevision: 4 } })
+    const observationTrace = storage.repository
+      .readEvidenceTracesForProject(ids.project)
+      .find((trace) => trace.concept.canonicalName === 'discriminated union')
+    expect(observationTrace).toMatchObject({
+      ledger: { state: { state: 'OBSERVED' } },
+      proposals: [],
+      acceptedEvidence: [
+        {
+          kind: 'CONCEPT_OBSERVATION',
+          projectId: ids.project,
+          taskId: ids.task,
+          supportsState: 'OBSERVED',
+          source: { kind: 'CORE' },
+        },
+      ],
+    })
   })
 
   it('keeps the Task active when independent work can continue', async () => {
@@ -1460,5 +1489,319 @@ describe('T11 Decision gate and Builder resume application flow', () => {
         },
       }),
     ).toMatchObject({ success: true, data: { resourceRevision: 3 } })
+  })
+
+  it('normalizes a Helper exchange, queues one job and accepts an empty analysis result', async () => {
+    const { service, storage } = await createHarness()
+    seedBuilderGraph(storage)
+
+    const recorded = await service.executeUi({
+      schemaVersion: 1,
+      kind: 'UI_RECORD_HELPER_EXCHANGE',
+      correlationId: ids.correlation,
+      actor: { kind: 'UI' },
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000301',
+      projectId: ids.project,
+      taskId: ids.task,
+      userMessage: 'Why is runtime validation needed here?',
+      helperResponseSummary: 'It checks unknown input before typed code uses it.',
+      closeConversation: true,
+    })
+    expect(recorded).toMatchObject({
+      success: true,
+      data: { episodeRevision: 3, status: 'PENDING_ANALYSIS' },
+    })
+    if (!recorded.success || !('episodeId' in recorded.data)) throw new Error('missing episode')
+
+    const pendingResult = await service.executeAnalysis({
+      schemaVersion: 1,
+      kind: 'ANALYSIS_LIST_PENDING',
+      correlationId: ids.correlation,
+      actor: { kind: 'KIRO_ADAPTER' },
+      limit: 10,
+    })
+    if (!pendingResult.success) throw new Error('pending job query failed')
+    const pending = analysisJobSchema.array().parse(pendingResult.data)
+    expect(pending).toHaveLength(1)
+    const pendingJob = pending[0]
+    if (pendingJob === undefined) throw new Error('pending job missing')
+    expect(pendingJob).toMatchObject({
+      episodeId: recorded.data.episodeId,
+      episodeRevision: 3,
+      status: 'PENDING',
+      attempt: 0,
+    })
+
+    const claimedResult = await service.executeAnalysis({
+      schemaVersion: 1,
+      kind: 'ANALYSIS_CLAIM_JOB',
+      correlationId: ids.correlation,
+      actor: { kind: 'KIRO_ADAPTER' },
+      projectId: ids.project,
+      analysisJobId: pendingJob.id,
+      expectedJobRevision: pendingJob.revision,
+      runtimeHandle: 'kiro-session-helper-empty',
+    })
+    if (!claimedResult.success) throw new Error('job claim failed')
+    const claimed = analysisJobSchema.parse(claimedResult.data)
+    expect(claimed).toMatchObject({ status: 'RUNNING', attempt: 1, revision: 2 })
+
+    const context = await service.executeAgent('EVIDENCE_ANALYST', {
+      schemaVersion: 1,
+      kind: 'ANALYST_GET_EPISODE_CONTEXT',
+      correlationId: ids.correlation,
+      actor: { kind: 'AGENT', role: 'EVIDENCE_ANALYST' },
+      projectId: ids.project,
+      episodeId: claimed.episodeId,
+      expectedEpisodeRevision: claimed.episodeRevision,
+    })
+    expect(context).toMatchObject({
+      success: true,
+      data: {
+        episode: { type: 'HELPER_CONVERSATION', status: 'PENDING_ANALYSIS' },
+        events: [
+          { actor: { kind: 'USER' }, payload: { type: 'USER_MESSAGE' } },
+          { actor: { kind: 'AGENT', role: 'HELPER' }, payload: { type: 'HELPER_RESPONSE' } },
+        ],
+        analysisJob: { id: claimed.id, status: 'RUNNING', attempt: 1 },
+      },
+    })
+
+    const emptyResult = {
+      schemaVersion: 1,
+      episodeId: claimed.episodeId,
+      episodeRevision: claimed.episodeRevision,
+      correlationId: claimed.correlationId,
+      proposals: [],
+      noEvidenceReason: 'The user asked a question but did not explain or apply the concept.',
+    } as const
+    const submitted = await service.executeAnalysis({
+      schemaVersion: 1,
+      kind: 'ANALYSIS_SUBMIT_RESULT',
+      correlationId: ids.correlation,
+      actor: { kind: 'KIRO_ADAPTER' },
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000302',
+      projectId: ids.project,
+      analysisJobId: claimed.id,
+      expectedJobRevision: claimed.revision,
+      attempt: claimed.attempt,
+      result: emptyResult,
+    })
+    expect(submitted).toMatchObject({ success: true, data: { outcomes: [] } })
+    expect(storage.repository.readAnalysisJob(ids.project, claimed.id)).toMatchObject({
+      status: 'SUCCEEDED',
+      revision: 3,
+      resultSummary: {
+        proposalCount: 0,
+        acceptedCount: 0,
+        rejectedCount: 0,
+        noEvidenceReason: emptyResult.noEvidenceReason,
+      },
+    })
+    expect(
+      storage.repository.readEpisodeAggregate(ids.project, claimed.episodeId)?.episode,
+    ).toMatchObject({ status: 'ANALYZED', revision: 4 })
+
+    const late = await service.executeAnalysis({
+      schemaVersion: 1,
+      kind: 'ANALYSIS_SUBMIT_RESULT',
+      correlationId: ids.correlation,
+      actor: { kind: 'KIRO_ADAPTER' },
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000303',
+      projectId: ids.project,
+      analysisJobId: claimed.id,
+      expectedJobRevision: claimed.revision,
+      attempt: claimed.attempt,
+      result: emptyResult,
+    })
+    expect(late).toMatchObject({ success: false, error: { code: 'ANALYSIS_JOB_STALE' } })
+  })
+
+  it('retries one failed Analyst attempt, dead-letters the second and supports manual retry', async () => {
+    const { service, storage } = await createHarness()
+    seedBuilderGraph(storage)
+
+    const recorded = await service.executeUi({
+      schemaVersion: 1,
+      kind: 'UI_RECORD_HELPER_EXCHANGE',
+      correlationId: ids.correlation,
+      actor: { kind: 'UI' },
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000311',
+      projectId: ids.project,
+      taskId: ids.task,
+      userMessage: 'Can you explain this validation branch?',
+      helperResponseSummary: 'The branch rejects malformed external input.',
+      closeConversation: true,
+    })
+    if (!recorded.success || !('episodeId' in recorded.data)) throw new Error('missing episode')
+    const initial = storage.repository.readAnalysisJobForEpisode(
+      ids.project,
+      recorded.data.episodeId,
+    )
+    if (initial === null) throw new Error('missing analysis job')
+
+    const claim = async (job: typeof initial, handle: string) => {
+      const result = await service.executeAnalysis({
+        schemaVersion: 1,
+        kind: 'ANALYSIS_CLAIM_JOB',
+        correlationId: ids.correlation,
+        actor: { kind: 'KIRO_ADAPTER' },
+        projectId: ids.project,
+        analysisJobId: job.id,
+        expectedJobRevision: job.revision,
+        runtimeHandle: handle,
+      })
+      if (!result.success) throw new Error('job claim failed')
+      return analysisJobSchema.parse(result.data)
+    }
+    const fail = async (job: typeof initial) => {
+      const result = await service.executeAnalysis({
+        schemaVersion: 1,
+        kind: 'ANALYSIS_FAIL_ATTEMPT',
+        correlationId: ids.correlation,
+        actor: { kind: 'KIRO_ADAPTER' },
+        projectId: ids.project,
+        analysisJobId: job.id,
+        expectedJobRevision: job.revision,
+        attempt: job.attempt,
+        failure: {
+          code: 'ANALYST_TIMEOUT',
+          message: 'The 30 second deadline elapsed.',
+          retryable: true,
+        },
+      })
+      if (!result.success) throw new Error('job failure transition failed')
+      return analysisJobSchema.parse(result.data)
+    }
+
+    const firstRunning = await claim(initial, 'kiro-session-first')
+    const firstFailed = await fail(firstRunning)
+    expect(firstFailed).toMatchObject({ status: 'PENDING', attempt: 1, revision: 3 })
+    const secondRunning = await claim(firstFailed, 'kiro-session-second')
+    const deadLetter = await fail(secondRunning)
+    expect(deadLetter).toMatchObject({
+      status: 'FAILED',
+      attempt: 2,
+      revision: 5,
+      lastFailure: { code: 'ANALYST_TIMEOUT', retryable: true },
+    })
+    expect(
+      storage.repository.readEpisodeAggregate(ids.project, initial.episodeId)?.episode,
+    ).toMatchObject({ status: 'ANALYSIS_FAILED', revision: 4 })
+
+    const visibleFailure = await service.executeUi({
+      schemaVersion: 1,
+      kind: 'UI_READ_ANALYSIS_JOBS',
+      correlationId: ids.correlation,
+      actor: { kind: 'UI' },
+      projectId: ids.project,
+      status: 'FAILED',
+      limit: 10,
+    })
+    expect(visibleFailure).toMatchObject({
+      success: true,
+      data: [
+        {
+          id: deadLetter.id,
+          status: 'FAILED',
+          attempt: 2,
+          lastFailure: { code: 'ANALYST_TIMEOUT', retryable: true },
+        },
+      ],
+    })
+
+    const retried = await service.executeUi({
+      schemaVersion: 1,
+      kind: 'UI_RETRY_ANALYSIS',
+      correlationId: ids.correlation,
+      actor: { kind: 'UI' },
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000312',
+      projectId: ids.project,
+      analysisJobId: deadLetter.id,
+      expectedJobRevision: deadLetter.revision,
+    })
+    expect(retried).toMatchObject({
+      success: true,
+      data: { status: 'PENDING', attempt: 0, revision: 6, episodeRevision: 5 },
+    })
+    expect(
+      storage.repository.readEpisodeAggregate(ids.project, initial.episodeId)?.episode,
+    ).toMatchObject({ status: 'PENDING_ANALYSIS', revision: 5 })
+  })
+
+  it('recovers expired running attempts after an Analyst runtime restart', async () => {
+    let currentTime = new Date(timestamp)
+    const { service, storage } = await createHarness({ now: () => currentTime })
+    seedBuilderGraph(storage)
+
+    const recorded = await service.executeUi({
+      schemaVersion: 1,
+      kind: 'UI_RECORD_HELPER_EXCHANGE',
+      correlationId: ids.correlation,
+      actor: { kind: 'UI' },
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000321',
+      projectId: ids.project,
+      taskId: ids.task,
+      userMessage: 'Why validate this external payload?',
+      helperResponseSummary: 'Validation protects the runtime input boundary.',
+      closeConversation: true,
+    })
+    if (!recorded.success || !('episodeId' in recorded.data)) throw new Error('missing episode')
+    const initial = storage.repository.readAnalysisJobForEpisode(
+      ids.project,
+      recorded.data.episodeId,
+    )
+    if (initial === null) throw new Error('missing analysis job')
+
+    const claim = async (job: typeof initial, runtimeHandle: string) => {
+      const response = await service.executeAnalysis({
+        schemaVersion: 1,
+        kind: 'ANALYSIS_CLAIM_JOB',
+        correlationId: ids.correlation,
+        actor: { kind: 'KIRO_ADAPTER' },
+        projectId: ids.project,
+        analysisJobId: job.id,
+        expectedJobRevision: job.revision,
+        runtimeHandle,
+      })
+      if (!response.success) throw new Error('claim failed')
+      return analysisJobSchema.parse(response.data)
+    }
+    const firstRunning = await claim(initial, 'abandoned-runtime-1')
+    expect(firstRunning.deadlineAt).toBe('2026-08-25T03:00:30.000Z')
+
+    currentTime = new Date('2026-08-25T03:00:31.000Z')
+    const firstRecovery = await service.executeAnalysis({
+      schemaVersion: 1,
+      kind: 'ANALYSIS_RECOVER_EXPIRED',
+      correlationId: ids.correlation,
+      actor: { kind: 'KIRO_ADAPTER' },
+      limit: 10,
+    })
+    if (!firstRecovery.success) throw new Error('first recovery failed')
+    const retryPending = analysisJobSchema.array().parse(firstRecovery.data)
+    expect(retryPending).toMatchObject([
+      { id: initial.id, status: 'PENDING', attempt: 1, revision: 3 },
+    ])
+
+    const recoveredJob = retryPending[0]
+    if (recoveredJob === undefined) throw new Error('recovered job missing')
+    const secondRunning = await claim(recoveredJob, 'abandoned-runtime-2')
+    expect(secondRunning.deadlineAt).toBe('2026-08-25T03:01:01.000Z')
+    currentTime = new Date('2026-08-25T03:01:02.000Z')
+    const secondRecovery = await service.executeAnalysis({
+      schemaVersion: 1,
+      kind: 'ANALYSIS_RECOVER_EXPIRED',
+      correlationId: ids.correlation,
+      actor: { kind: 'KIRO_ADAPTER' },
+      limit: 10,
+    })
+    if (!secondRecovery.success) throw new Error('second recovery failed')
+    expect(analysisJobSchema.array().parse(secondRecovery.data)).toMatchObject([
+      { id: initial.id, status: 'FAILED', attempt: 2, revision: 5 },
+    ])
+    expect(
+      storage.repository.readEpisodeAggregate(ids.project, initial.episodeId)?.episode,
+    ).toMatchObject({ status: 'ANALYSIS_FAILED', revision: 4 })
   })
 })

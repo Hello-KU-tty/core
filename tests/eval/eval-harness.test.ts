@@ -2,6 +2,8 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
 import {
+  analystSemanticResultSchema,
+  activityEventSchema,
   baselineResultSchema,
   builderTaskSchema,
   candidateRoundSchema,
@@ -9,6 +11,7 @@ import {
   discoveryInputSchema,
   evaluationCriterionResultSchema,
   evaluationFixtureSchema,
+  episodeSchema,
   learningSpecRevisionSchema,
   liveProjectContextSchema,
   projectCandidateRevisionSchema,
@@ -331,6 +334,80 @@ describe('T12 Helper prompt regression', () => {
         expect.objectContaining({ criterionKey: 'helper_relevance', status: 'PASSED' }),
         expect.objectContaining({ criterionKey: 'analogy_claims', status: 'PASSED' }),
         expect.objectContaining({ criterionKey: 'helper_non_coercive', status: 'PASSED' }),
+      ]),
+    )
+  })
+})
+
+describe('T13 Evidence Analyst prompt regression', () => {
+  it('separates directly led NONE from independent STRONG Evidence in one Episode', async () => {
+    const fixture = evaluationFixtureSchema.parse(
+      await loadInput(
+        'tests/eval/fixtures/prompt-regressions/evidence-analyst-v1.0-mixed.manifest.json',
+      ),
+    )
+    const subject = parseEvaluationSubject(
+      await loadInput('tests/eval/fixtures/prompt-regressions/evidence-analyst-v1.0-mixed.json'),
+    )
+    const reviews = evaluationCriterionResultSchema
+      .array()
+      .parse(
+        await loadInput(
+          'tests/eval/fixtures/prompt-regressions/evidence-analyst-v1.0-mixed.review.json',
+        ),
+      )
+    const evaluation = evaluateCalibrationCase({
+      fixture,
+      subject,
+      humanReviews: new Map(reviews.map((review) => [review.criterionKey, review])),
+    })
+    const episode = episodeSchema.parse(subject.episode)
+    const events = activityEventSchema.array().parse(subject.analystInteraction?.events)
+    const result = analystSemanticResultSchema.parse(subject.analystInteraction?.result)
+
+    expect(result).toMatchObject({
+      episodeId: episode.id,
+      episodeRevision: episode.revision,
+      correlationId: episode.correlationId,
+      proposals: [
+        {
+          concept: { proposedCanonicalName: 'discriminated union' },
+          signal: 'REPHRASE',
+          strength: 'NONE',
+          promptDependence: 'DIRECTLY_LED',
+          maximumSupportedState: null,
+        },
+        {
+          concept: { proposedCanonicalName: 'runtime validation' },
+          signal: 'APPLICATION',
+          strength: 'STRONG',
+          promptDependence: 'INDEPENDENT',
+          maximumSupportedState: 'DEMONSTRATED',
+        },
+      ],
+    })
+    const userMessageIds = new Set(
+      events.flatMap((event) =>
+        event.actor.kind === 'USER' && event.payload.type === 'USER_MESSAGE'
+          ? [event.payload.messageId]
+          : [],
+      ),
+    )
+    expect(
+      result.proposals.every((proposal) =>
+        proposal.userEvidenceSources.every(
+          (reference) =>
+            reference.kind === 'USER_MESSAGE' && userMessageIds.has(reference.messageId),
+        ),
+      ),
+    ).toBe(true)
+    expect(evaluation.status).toBe('PASSED')
+    expect(evaluation.criterionResults).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ criterionKey: 'contract_valid', status: 'PASSED' }),
+        expect.objectContaining({ criterionKey: 'redaction_no_leak', status: 'PASSED' }),
+        expect.objectContaining({ criterionKey: 'analyst_provenance', status: 'PASSED' }),
+        expect.objectContaining({ criterionKey: 'analyst_mixed_strength', status: 'PASSED' }),
       ]),
     )
   })

@@ -267,6 +267,14 @@
 - **검토한 대안:** 완료 Project에서 Helper를 닫음, missing을 stale boolean 하나로 표현, 질문과 무관한 Ledger를 채워 반환, Helper에 전체 workspace `fs_read`나 shell 허용, 전체 repository·diff·Builder transcript를 매 질문 저장·주입, refresh를 audit summary로만 보존.
 - **tradeoff:** Context response와 SQLite migration, bounded file read와 refresh lifecycle test가 늘어난다. 대신 AC-MVP-005의 현재성·최소성·복구 가능성을 재시작 뒤에도 검증할 수 있고, Helper가 넓은 file 권한이나 raw transcript 저장 없이 현재 코드에 근거한 답을 할 수 있다. 실제 Helper conversation Event와 Episode 조립은 T13, quick card UI는 T16에 남긴다.
 
+## 2026-09-02: T13 structured Activity·Episode와 durable Analyst job 경계
+
+- **상태:** 승인
+- **맥락:** T03~T06은 Event, Episode, Evidence contract와 reducer·SQLite 골격을 만들었지만 T10~T12의 실제 Builder, Decision과 Helper 흐름은 아직 Event를 생성하지 않는다. Episode 종료 뒤 실행할 durable `AnalysisJob`, timeout/retry와 late result 차단도 없으며, 현재 Evidence batch는 근거가 전혀 없는 정상 분석을 표현하지 못한다. T01은 Crew event bridge나 native spawn 대신 hidden no-tool Analyst slot과 Core-owned durable job을 MVP 경계로 검증했다.
+- **결정:** raw Crew event나 전체 transcript가 아니라 검증된 Application 상태 전이에서만 redacted Activity Event를 만든다. BUILD_TASK는 Task 시작부터 완료까지, DECISION은 요청부터 사용자 Resolution까지, HELPER_CONVERSATION은 첫 사용자 메시지부터 명시적 종료·관련 Decision 해결·Task 완료까지, FINAL_UPGRADE는 명시적 개인화 적용 행동 단위로 조립한다. Episode 종료와 `AnalysisJob` 생성은 한 transaction으로 처리한다. Job은 Episode revision, attempt와 30초 soft deadline을 가진 versioned `PENDING → RUNNING → SUCCEEDED/FAILED` 이력을 보존하고 자동 재시도는 1회로 제한한다. adapter startup/poll은 deadline이 지난 `RUNNING` lease를 Core command로 회수한다. 재시도 중 Episode는 `PENDING_ANALYSIS`, 두 attempt가 모두 실패하면 `ANALYSIS_FAILED`로 두며 명시적 수동 재시도만 다시 `PENDING_ANALYSIS`로 연다. current job revision·attempt와 맞지 않는 늦은 결과는 상태와 Evidence를 바꾸지 않고 거절한다. primary Analyst runtime은 bounded Episode context를 받은 hidden no-tool slot이며 semantic output의 ID, timestamp, provenance와 attempt token은 adapter/Core가 채운다. proposal 0개도 성공한 분석으로 허용하고 reason/count summary를 Job에 보존하며, Builder Concept usage는 사용자 이해와 분리된 deterministic `CONCEPT_OBSERVATION`으로 처리한다.
+- **검토한 대안:** raw Crew stream을 Event source of truth로 사용, Event마다 Analyst 호출, hard cancel을 전제로 한 spawn task, Agent가 job/ID/provenance 생성, timeout 뒤 결과를 attempt 확인 없이 수용, Evidence가 없을 때 가짜 NONE proposal 생성, Builder 사용 Concept를 사용자 이해 Evidence로 처리.
+- **tradeoff:** Event normalization, Episode close와 job transition을 기존 use case transaction에 연결해야 해 contract와 migration이 늘어나고 Helper conversation 종료 signal이 필요하다. 대신 provider/session이 사라져도 분석을 복구할 수 있고, 실패한 분석이 Builder 결과를 롤백하지 않으며, 한 Episode당 한 initial dispatch와 제한된 retry, provenance 분리와 빈 결과를 재현 가능하게 검증할 수 있다.
+
 ## 2026-08-24: 구현 세부 선택 위임
 
 - **상태:** 승인

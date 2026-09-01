@@ -1,0 +1,20 @@
+[
+  {
+    "criterionKey": "analyst_provenance",
+    "dimension": "EVIDENCE_QUALITY",
+    "reviewMode": "HUMAN",
+    "status": "PASSED",
+    "explanation": "Both proposals cite exact USER_MESSAGE references. The Helper explanation appears only as context for judging that the discriminated-union repetition was directly led.",
+    "evidenceReferences": ["analystInteraction.events", "analystInteraction.result.proposals[*].userEvidenceSources"],
+    "metrics": []
+  },
+  {
+    "criterionKey": "analyst_mixed_strength",
+    "dimension": "EVIDENCE_QUALITY",
+    "reviewMode": "HUMAN",
+    "status": "PASSED",
+    "explanation": "The response does not promote the user's near-verbatim discriminated-union repetition, but separately recognizes a concrete and independently introduced runtime-validation boundary application as strong Evidence.",
+    "evidenceReferences": ["analystInteraction.result.proposals[0]", "analystInteraction.result.proposals[1]"],
+    "metrics": []
+  }
+]

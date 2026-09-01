@@ -239,6 +239,7 @@ describe('Concept State and misconception reducers', () => {
       kind: 'CONCEPT_OBSERVATION',
       projectId: ids.project,
       taskId: ids.task,
+      episodeId: ids.episode,
       conceptId: ids.concept,
       correlationId: ids.correlation,
       supportsState: 'OBSERVED',

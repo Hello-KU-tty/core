@@ -11,6 +11,7 @@ import {
 } from '@vibe-helper/application'
 import {
   acceptedEvidenceSchema,
+  analysisJobSchema,
   activityEventSchema,
   auditRecordSchema,
   baselineResultIdSchema,
@@ -42,6 +43,7 @@ import {
   taskCompletionReportSchema,
   utcTimestampSchema,
   type AcceptedEvidence,
+  type AnalysisJob,
   type ActivityEvent,
   type AuditRecord,
   type BaselineResult,
@@ -940,6 +942,74 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
     })
   }
 
+  appendAnalysisJob(input: AnalysisJob): PersistenceWriteResult {
+    const prepared = prepareRecord(analysisJobSchema, input)
+    const record = prepared.record
+    return this.#write(record.id, () =>
+      this.#appendVersioned({
+        recordId: record.id,
+        revision: record.revision,
+        prepared,
+        existingSql:
+          'SELECT payload_json, payload_hash FROM analysis_job_revisions WHERE analysis_job_id = ? AND revision = ?',
+        existingParams: [record.id, record.revision],
+        headSql: 'SELECT head_revision FROM analysis_jobs WHERE id = ?',
+        headParams: [record.id],
+        insertStable: () => {
+          this.#sqlite
+            .prepare(
+              'INSERT INTO analysis_jobs (id, project_id, episode_id, episode_revision, head_revision, status, attempt, correlation_id, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            )
+            .run(
+              record.id,
+              record.projectId,
+              record.episodeId,
+              record.episodeRevision,
+              record.revision,
+              record.status,
+              record.attempt,
+              record.correlationId,
+              record.updatedAt,
+            )
+        },
+        insertHistory: () => {
+          this.#sqlite
+            .prepare(
+              'INSERT INTO analysis_job_revisions (analysis_job_id, revision, project_id, episode_id, episode_revision, status, attempt, correlation_id, updated_at, payload_json, payload_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            )
+            .run(
+              record.id,
+              record.revision,
+              record.projectId,
+              record.episodeId,
+              record.episodeRevision,
+              record.status,
+              record.attempt,
+              record.correlationId,
+              record.updatedAt,
+              prepared.payloadJson,
+              prepared.payloadHash,
+            )
+        },
+        updateHead: () => {
+          this.#sqlite
+            .prepare(
+              'UPDATE analysis_jobs SET episode_revision = ?, head_revision = ?, status = ?, attempt = ?, correlation_id = ?, updated_at = ? WHERE id = ?',
+            )
+            .run(
+              record.episodeRevision,
+              record.revision,
+              record.status,
+              record.attempt,
+              record.correlationId,
+              record.updatedAt,
+              record.id,
+            )
+        },
+      }),
+    )
+  }
+
   appendCanonicalConcept(input: CanonicalConcept): PersistenceWriteResult {
     const prepared = prepareRecord(canonicalConceptSchema, input)
     const record = prepared.record
@@ -1633,6 +1703,176 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
       )
       return { episode, events, relevantLedgerEntries, evidenceProposals }
     })
+  }
+
+  nextActivitySequence(projectId: string): number {
+    if (!projectSchema.shape.id.safeParse(projectId).success) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Project ID is invalid')
+    }
+    return this.#read(() => {
+      const row = this.#sqlite
+        .prepare<[string], { readonly next_sequence: number }>(
+          'SELECT coalesce(max(sequence) + 1, 0) AS next_sequence FROM activity_events WHERE project_id = ?',
+        )
+        .get(projectId)
+      return row?.next_sequence ?? 0
+    })
+  }
+
+  readOpenEpisode(
+    projectId: string,
+    type: Episode['type'],
+    scope: {
+      readonly taskId?: string
+      readonly decisionId?: string
+      readonly conversationId?: string
+    },
+  ): Episode | null {
+    if (!projectSchema.shape.id.safeParse(projectId).success) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Project ID is invalid')
+    }
+    return this.#read(() => {
+      const rows = this.#sqlite
+        .prepare<[string, string], { readonly id: string }>(
+          "SELECT id FROM episodes WHERE project_id = ? AND type = ? AND status = 'OPEN' ORDER BY updated_at DESC",
+        )
+        .all(projectId, type)
+      for (const row of rows) {
+        const episode = this.#headRecord(
+          `SELECT revisions.payload_json, revisions.payload_hash
+           FROM episodes heads
+           JOIN episode_revisions revisions
+             ON revisions.episode_id = heads.id AND revisions.revision = heads.head_revision
+           WHERE heads.id = ?`,
+          [row.id],
+          episodeSchema,
+        )
+        if (
+          episode !== null &&
+          (scope.taskId === undefined || episode.taskId === scope.taskId) &&
+          (scope.decisionId === undefined || episode.decisionId === scope.decisionId) &&
+          (scope.conversationId === undefined || episode.conversationId === scope.conversationId)
+        ) {
+          return episode
+        }
+      }
+      return null
+    })
+  }
+
+  readAnalysisJob(projectId: string, analysisJobId: string): AnalysisJob | null {
+    if (
+      !projectSchema.shape.id.safeParse(projectId).success ||
+      !analysisJobSchema.shape.id.safeParse(analysisJobId).success
+    ) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Analysis Job identity is invalid')
+    }
+    return this.#read(() =>
+      this.#headRecord(
+        `SELECT revisions.payload_json, revisions.payload_hash
+         FROM analysis_jobs heads
+         JOIN analysis_job_revisions revisions
+           ON revisions.analysis_job_id = heads.id AND revisions.revision = heads.head_revision
+         WHERE heads.project_id = ? AND heads.id = ?`,
+        [projectId, analysisJobId],
+        analysisJobSchema,
+      ),
+    )
+  }
+
+  readAnalysisJobForEpisode(projectId: string, episodeId: string): AnalysisJob | null {
+    if (
+      !projectSchema.shape.id.safeParse(projectId).success ||
+      !episodeSchema.shape.id.safeParse(episodeId).success
+    ) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Analysis Episode identity is invalid')
+    }
+    return this.#read(() =>
+      this.#headRecord(
+        `SELECT revisions.payload_json, revisions.payload_hash
+         FROM analysis_jobs heads
+         JOIN analysis_job_revisions revisions
+           ON revisions.analysis_job_id = heads.id AND revisions.revision = heads.head_revision
+         WHERE heads.project_id = ? AND heads.episode_id = ?`,
+        [projectId, episodeId],
+        analysisJobSchema,
+      ),
+    )
+  }
+
+  readPendingAnalysisJobs(limit: number): readonly AnalysisJob[] {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Pending Analysis Job limit is invalid')
+    }
+    return this.#read(() =>
+      this.#recordList(
+        `SELECT revisions.payload_json, revisions.payload_hash
+         FROM analysis_jobs heads
+         JOIN analysis_job_revisions revisions
+           ON revisions.analysis_job_id = heads.id AND revisions.revision = heads.head_revision
+         WHERE heads.status = 'PENDING' ORDER BY heads.updated_at ASC LIMIT ?`,
+        [limit],
+        analysisJobSchema,
+      ),
+    )
+  }
+
+  readExpiredRunningAnalysisJobs(asOf: string, limit: number): readonly AnalysisJob[] {
+    if (Number.isNaN(Date.parse(asOf)) || !Number.isInteger(limit) || limit < 1 || limit > 100) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Expired Analysis Job query is invalid')
+    }
+    return this.#read(() =>
+      this.#recordList(
+        `SELECT revisions.payload_json, revisions.payload_hash
+         FROM analysis_jobs heads
+         JOIN analysis_job_revisions revisions
+           ON revisions.analysis_job_id = heads.id AND revisions.revision = heads.head_revision
+         WHERE heads.status = 'RUNNING' ORDER BY heads.updated_at ASC LIMIT 100`,
+        [],
+        analysisJobSchema,
+      )
+        .filter(
+          (job) => job.deadlineAt !== undefined && Date.parse(job.deadlineAt) <= Date.parse(asOf),
+        )
+        .slice(0, limit),
+    )
+  }
+
+  readAnalysisJobsForProject(
+    projectId: string,
+    status: AnalysisJob['status'] | undefined,
+    limit: number,
+  ): readonly AnalysisJob[] {
+    if (
+      !projectSchema.shape.id.safeParse(projectId).success ||
+      !Number.isInteger(limit) ||
+      limit < 1 ||
+      limit > 100
+    ) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Analysis Job query is invalid')
+    }
+    return this.#read(() =>
+      status === undefined
+        ? this.#recordList(
+            `SELECT revisions.payload_json, revisions.payload_hash
+             FROM analysis_jobs heads
+             JOIN analysis_job_revisions revisions
+               ON revisions.analysis_job_id = heads.id AND revisions.revision = heads.head_revision
+             WHERE heads.project_id = ? ORDER BY heads.updated_at DESC LIMIT ?`,
+            [projectId, limit],
+            analysisJobSchema,
+          )
+        : this.#recordList(
+            `SELECT revisions.payload_json, revisions.payload_hash
+             FROM analysis_jobs heads
+             JOIN analysis_job_revisions revisions
+               ON revisions.analysis_job_id = heads.id AND revisions.revision = heads.head_revision
+             WHERE heads.project_id = ? AND heads.status = ?
+             ORDER BY heads.updated_at DESC LIMIT ?`,
+            [projectId, status, limit],
+            analysisJobSchema,
+          ),
+    )
   }
 
   readLatestTaskForProject(projectId: string): BuilderTask | null {

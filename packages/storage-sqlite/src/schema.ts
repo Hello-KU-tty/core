@@ -709,6 +709,60 @@ export const episodeEventEdges = sqliteTable(
   ],
 )
 
+export const analysisJobs = sqliteTable(
+  'analysis_jobs',
+  {
+    id: text('id').primaryKey(),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'restrict' }),
+    episodeId: text('episode_id')
+      .notNull()
+      .unique()
+      .references(() => episodes.id, { onDelete: 'restrict' }),
+    episodeRevision: integer('episode_revision').notNull(),
+    headRevision: integer('head_revision').notNull(),
+    status: text('status').notNull(),
+    attempt: integer('attempt').notNull(),
+    correlationId: text('correlation_id').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    revisionCheck('analysis_jobs_head_revision_positive', table.headRevision),
+    check('analysis_jobs_attempt_nonnegative', sql`${table.attempt} >= 0`),
+    index('analysis_jobs_status_updated_idx').on(table.status, table.updatedAt),
+    index('analysis_jobs_correlation_idx').on(table.correlationId),
+  ],
+)
+
+export const analysisJobRevisions = sqliteTable(
+  'analysis_job_revisions',
+  {
+    analysisJobId: text('analysis_job_id')
+      .notNull()
+      .references(() => analysisJobs.id, { onDelete: 'restrict' }),
+    revision: integer('revision').notNull(),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'restrict' }),
+    episodeId: text('episode_id')
+      .notNull()
+      .references(() => episodes.id, { onDelete: 'restrict' }),
+    episodeRevision: integer('episode_revision').notNull(),
+    status: text('status').notNull(),
+    attempt: integer('attempt').notNull(),
+    correlationId: text('correlation_id').notNull(),
+    updatedAt: text('updated_at').notNull(),
+    ...payloadColumns(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.analysisJobId, table.revision] }),
+    revisionCheck('analysis_job_revisions_revision_positive', table.revision),
+    check('analysis_job_revisions_attempt_nonnegative', sql`${table.attempt} >= 0`),
+    check('analysis_job_revisions_payload_json_valid', sql`json_valid(${table.payloadJson})`),
+  ],
+)
+
 export const canonicalConcepts = sqliteTable(
   'canonical_concepts',
   {

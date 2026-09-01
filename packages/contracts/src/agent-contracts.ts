@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { activityEventSchema, episodeSchema } from './activity.js'
+import { analysisJobSchema } from './analysis.js'
 import {
   builderTaskSchema,
   contextRefreshRequestSchema,
@@ -22,6 +23,7 @@ import {
 import { conceptLedgerEntrySchema, evidenceProposalBatchSchema } from './evidence.js'
 import { learningSpecRevisionSchema } from './learning-spec.js'
 import {
+  analysisJobIdSchema,
   correlationIdSchema,
   decisionIdSchema,
   discoverySessionIdSchema,
@@ -274,6 +276,9 @@ export const analystSubmitEvidenceProposalsCommandSchema = z
     ...analystQueryMetadata,
     kind: z.literal('ANALYST_SUBMIT_EVIDENCE_PROPOSALS'),
     idempotencyKey: idempotencyKeySchema,
+    analysisJobId: analysisJobIdSchema,
+    expectedJobRevision: entityRevisionSchema,
+    attempt: z.int().min(1).max(2),
     batch: evidenceProposalBatchSchema,
   })
   .refine((command) => command.batch.correlationId === command.correlationId, {
@@ -402,6 +407,13 @@ export const episodeContextSchema = z.strictObject({
   episode: episodeSchema,
   events: z.array(activityEventSchema).min(1).max(500),
   relevantLedgerEntries: z.array(conceptLedgerEntrySchema).max(20),
+  analysisJob: analysisJobSchema.nullable(),
+  decisionContext: z
+    .strictObject({
+      request: decisionRequestSchema,
+      resolution: decisionResolutionSchema.nullable(),
+    })
+    .nullable(),
 })
 
 export const decisionResultSchema = z.strictObject({

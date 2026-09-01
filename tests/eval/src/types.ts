@@ -53,6 +53,10 @@ export interface EvaluationSubject {
     readonly analogyAnswer: string
     readonly highStateAnswer: string
   }
+  readonly analystInteraction?: {
+    readonly result: unknown
+    readonly events: readonly unknown[]
+  }
 }
 
 export interface EvaluationScorerContext {

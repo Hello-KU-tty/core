@@ -1,0 +1,223 @@
+{
+  "schemaVersion": 1,
+  "episode": {
+    "schemaVersion": 1,
+    "id": "episode_22000000-0000-4000-8000-000000000201",
+    "projectId": "project_22000000-0000-4000-8000-000000000202",
+    "taskId": "task_22000000-0000-4000-8000-000000000203",
+    "conversationId": "conversation_22000000-0000-4000-8000-000000000204",
+    "correlationId": "corr_22000000-0000-4000-8000-000000000205",
+    "revision": 6,
+    "type": "HELPER_CONVERSATION",
+    "status": "PENDING_ANALYSIS",
+    "eventIds": [
+      "event_22000000-0000-4000-8000-000000000211",
+      "event_22000000-0000-4000-8000-000000000212",
+      "event_22000000-0000-4000-8000-000000000213",
+      "event_22000000-0000-4000-8000-000000000214",
+      "event_22000000-0000-4000-8000-000000000215"
+    ],
+    "conceptCandidates": [
+      { "originalExpression": "discriminated union" },
+      { "originalExpression": "runtime validation" }
+    ],
+    "contextReferences": [],
+    "startedAt": "2026-09-02T00:00:00.000Z",
+    "endedAt": "2026-09-02T00:00:04.000Z",
+    "closeReason": "The Helper conversation explicitly ended.",
+    "source": { "kind": "CORE" },
+    "redactionStatus": "VERIFIED_REDACTED"
+  },
+  "analystInteraction": {
+    "events": [
+      {
+        "schemaVersion": 1,
+        "id": "event_22000000-0000-4000-8000-000000000211",
+        "projectId": "project_22000000-0000-4000-8000-000000000202",
+        "taskId": "task_22000000-0000-4000-8000-000000000203",
+        "conversationId": "conversation_22000000-0000-4000-8000-000000000204",
+        "correlationId": "corr_22000000-0000-4000-8000-000000000205",
+        "sequence": 1,
+        "actor": { "kind": "USER" },
+        "occurredAt": "2026-09-02T00:00:00.000Z",
+        "payload": {
+          "type": "USER_MESSAGE",
+          "conversationId": "conversation_22000000-0000-4000-8000-000000000204",
+          "messageId": "message_22000000-0000-4000-8000-000000000221",
+          "redactedExcerpt": "discriminated union이 여기서 어떻게 쓰여?"
+        },
+        "sourceReferences": [
+          {
+            "kind": "USER_MESSAGE",
+            "conversationId": "conversation_22000000-0000-4000-8000-000000000204",
+            "messageId": "message_22000000-0000-4000-8000-000000000221"
+          }
+        ],
+        "redactionStatus": "VERIFIED_REDACTED"
+      },
+      {
+        "schemaVersion": 1,
+        "id": "event_22000000-0000-4000-8000-000000000212",
+        "projectId": "project_22000000-0000-4000-8000-000000000202",
+        "taskId": "task_22000000-0000-4000-8000-000000000203",
+        "conversationId": "conversation_22000000-0000-4000-8000-000000000204",
+        "correlationId": "corr_22000000-0000-4000-8000-000000000205",
+        "sequence": 2,
+        "actor": { "kind": "AGENT", "role": "HELPER" },
+        "occurredAt": "2026-09-02T00:00:01.000Z",
+        "payload": {
+          "type": "HELPER_RESPONSE",
+          "conversationId": "conversation_22000000-0000-4000-8000-000000000204",
+          "messageId": "message_22000000-0000-4000-8000-000000000222",
+          "summary": "type 필드가 union을 나눠 주고 그에 맞는 variant를 선택합니다."
+        },
+        "sourceReferences": [
+          {
+            "kind": "AGENT_MESSAGE",
+            "conversationId": "conversation_22000000-0000-4000-8000-000000000204",
+            "messageId": "message_22000000-0000-4000-8000-000000000222"
+          }
+        ],
+        "redactionStatus": "VERIFIED_REDACTED"
+      },
+      {
+        "schemaVersion": 1,
+        "id": "event_22000000-0000-4000-8000-000000000213",
+        "projectId": "project_22000000-0000-4000-8000-000000000202",
+        "taskId": "task_22000000-0000-4000-8000-000000000203",
+        "conversationId": "conversation_22000000-0000-4000-8000-000000000204",
+        "correlationId": "corr_22000000-0000-4000-8000-000000000205",
+        "sequence": 3,
+        "actor": { "kind": "USER" },
+        "occurredAt": "2026-09-02T00:00:02.000Z",
+        "payload": {
+          "type": "USER_MESSAGE",
+          "conversationId": "conversation_22000000-0000-4000-8000-000000000204",
+          "messageId": "message_22000000-0000-4000-8000-000000000223",
+          "redactedExcerpt": "그러니까 type 필드가 union을 나눠 주는 거네."
+        },
+        "sourceReferences": [
+          {
+            "kind": "USER_MESSAGE",
+            "conversationId": "conversation_22000000-0000-4000-8000-000000000204",
+            "messageId": "message_22000000-0000-4000-8000-000000000223"
+          }
+        ],
+        "redactionStatus": "VERIFIED_REDACTED"
+      },
+      {
+        "schemaVersion": 1,
+        "id": "event_22000000-0000-4000-8000-000000000214",
+        "projectId": "project_22000000-0000-4000-8000-000000000202",
+        "taskId": "task_22000000-0000-4000-8000-000000000203",
+        "conversationId": "conversation_22000000-0000-4000-8000-000000000204",
+        "correlationId": "corr_22000000-0000-4000-8000-000000000205",
+        "sequence": 4,
+        "actor": { "kind": "USER" },
+        "occurredAt": "2026-09-02T00:00:03.000Z",
+        "payload": {
+          "type": "USER_MESSAGE",
+          "conversationId": "conversation_22000000-0000-4000-8000-000000000204",
+          "messageId": "message_22000000-0000-4000-8000-000000000224",
+          "redactedExcerpt": "외부 webhook은 TypeScript 타입만 믿지 말고 실행 시 schema로 필수 필드를 검사한 다음에 써야 잘못된 payload가 렌더링까지 들어오지 않겠어."
+        },
+        "sourceReferences": [
+          {
+            "kind": "USER_MESSAGE",
+            "conversationId": "conversation_22000000-0000-4000-8000-000000000204",
+            "messageId": "message_22000000-0000-4000-8000-000000000224"
+          }
+        ],
+        "redactionStatus": "VERIFIED_REDACTED"
+      },
+      {
+        "schemaVersion": 1,
+        "id": "event_22000000-0000-4000-8000-000000000215",
+        "projectId": "project_22000000-0000-4000-8000-000000000202",
+        "taskId": "task_22000000-0000-4000-8000-000000000203",
+        "conversationId": "conversation_22000000-0000-4000-8000-000000000204",
+        "correlationId": "corr_22000000-0000-4000-8000-000000000205",
+        "sequence": 5,
+        "actor": { "kind": "AGENT", "role": "HELPER" },
+        "occurredAt": "2026-09-02T00:00:04.000Z",
+        "payload": {
+          "type": "HELPER_RESPONSE",
+          "conversationId": "conversation_22000000-0000-4000-8000-000000000204",
+          "messageId": "message_22000000-0000-4000-8000-000000000225",
+          "summary": "That independently applies runtime validation to the external payload boundary."
+        },
+        "sourceReferences": [
+          {
+            "kind": "AGENT_MESSAGE",
+            "conversationId": "conversation_22000000-0000-4000-8000-000000000204",
+            "messageId": "message_22000000-0000-4000-8000-000000000225"
+          }
+        ],
+        "redactionStatus": "VERIFIED_REDACTED"
+      }
+    ],
+    "result": {
+      "schemaVersion": 1,
+      "episodeId": "episode_22000000-0000-4000-8000-000000000201",
+      "episodeRevision": 6,
+      "correlationId": "corr_22000000-0000-4000-8000-000000000205",
+      "proposals": [
+        {
+          "concept": {
+            "originalExpression": "type 필드가 union을 나눠 주는 거네",
+            "proposedCanonicalName": "discriminated union"
+          },
+          "signal": "REPHRASE",
+          "strength": "NONE",
+          "promptDependence": "DIRECTLY_LED",
+          "userEvidenceSources": [
+            {
+              "kind": "USER_MESSAGE",
+              "conversationId": "conversation_22000000-0000-4000-8000-000000000204",
+              "messageId": "message_22000000-0000-4000-8000-000000000223"
+            }
+          ],
+          "contextSources": [
+            {
+              "kind": "AGENT_MESSAGE",
+              "conversationId": "conversation_22000000-0000-4000-8000-000000000204",
+              "messageId": "message_22000000-0000-4000-8000-000000000222"
+            }
+          ],
+          "redactedEvidenceExcerpt": "그러니까 type 필드가 union을 나눠 주는 거네.",
+          "rationale": "The user nearly repeated the Helper explanation, so it does not support a state promotion.",
+          "uncertainty": "The statement is correct but directly led.",
+          "maximumSupportedState": null,
+          "misconception": { "action": "NONE" }
+        },
+        {
+          "concept": {
+            "originalExpression": "실행 시 schema로 필수 필드를 검사",
+            "proposedCanonicalName": "runtime validation"
+          },
+          "signal": "APPLICATION",
+          "strength": "STRONG",
+          "promptDependence": "INDEPENDENT",
+          "userEvidenceSources": [
+            {
+              "kind": "USER_MESSAGE",
+              "conversationId": "conversation_22000000-0000-4000-8000-000000000204",
+              "messageId": "message_22000000-0000-4000-8000-000000000224"
+            }
+          ],
+          "contextSources": [],
+          "redactedEvidenceExcerpt": "외부 webhook은 TypeScript 타입만 믿지 말고 실행 시 schema로 필수 필드를 검사한 다음에 써야 잘못된 payload가 렌더링까지 들어오지 않겠어.",
+          "rationale": "The user independently applied runtime validation to a concrete external-input failure boundary.",
+          "maximumSupportedState": "DEMONSTRATED",
+          "misconception": { "action": "NONE" }
+        }
+      ]
+    }
+  },
+  "redaction": {
+    "output": {
+      "result": "No credential or absolute host path is present in the redacted semantic result."
+    },
+    "forbiddenSentinels": ["synthetic-analyst-secret-117", "synthetic-analyst-bearer-117"]
+  }
+}

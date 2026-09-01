@@ -1,6 +1,6 @@
 # MVP acceptance criterion 추적표
 
-T12 시점의 평가는 계약·품질 실패 검출 기반, 실제 Candidate Agent 회귀, Learning Spec prompt regression, 실제 Builder Decision 수직 흐름과 bounded Helper 대화를 포함한다. 아래 `현재 근거`는 완료된 검증만 뜻하며, 실제 수직 흐름 완료 판정은 `최종 검증` 작업에서 수행한다.
+T13 시점의 평가는 계약·품질 실패 검출 기반, 실제 Candidate Agent 회귀, Learning Spec prompt regression, 실제 Builder Decision 수직 흐름, bounded Helper 대화와 no-tool Evidence Analyst→Core 적용을 포함한다. 아래 `현재 근거`는 완료된 검증만 뜻하며, 실제 UI 수직 흐름 완료 판정은 `최종 검증` 작업에서 수행한다.
 
 | Acceptance criterion | 현재 test/eval 근거 | 현재 보장 | 최종 검증 |
 |---|---|---|---|
@@ -10,9 +10,9 @@ T12 시점의 평가는 계약·품질 실패 검출 기반, 실제 Candidate Ag
 | AC-MVP-004 | Builder Task/Completion Report contract와 application integration test | 실제 build 흐름에 필요한 DTO·상태 경계 | T10, T18, T21 |
 | AC-MVP-005 | `stale-context`, `context_fresh`, `helper-v1.0-analogy`, Application/role server contract, actual Kiro Helper regression | CURRENT/STALE/MISSING, 관련 Decision·Ledger·Episode·bounded code 조립, durable refresh와 완료 Task fallback, read-only Helper의 실제 현재 맥락 답변 | T16, T21 |
 | AC-MVP-006 | `trivial-decision`, `builder-v1.1-decision-webhook`, Application/MCP Decision lifecycle, actual Kiro request→Helper handoff→resolution→apply run | 사소한 질문을 거절하는 사람 review, 실제 Decision의 atomic gate·Task resume·apply-before-complete와 이유 없는 추천 수락 Evidence 차단 | T16, T18, T21 |
-| AC-MVP-007 | `false-mastery`, `false-misconception`, domain Evidence reducer test | Agent-authored source 분리와 사용자 claim provenance | T13, T17, T21 |
-| AC-MVP-008 | `evidence_policy`, Evidence reducer reason-code test | Analyst proposal을 Core가 재현 가능하게 채택·거절 | T13, T17, T21 |
-| AC-MVP-009 | SQLite `readEvidenceTrace` integration test, Concept Ledger reducer test | Evidence→Decision→Ledger trace의 저장·복구 | T13, T17, T21 |
+| AC-MVP-007 | `false-mastery`, `false-misconception`, `evidence-analyst-v1.0-mixed`, 실제 Kiro Analyst 회귀, domain/Application Evidence test | Agent 설명·코드와 USER_MESSAGE/Decision provenance 분리, 직접 유도 반복의 State 비지지, Builder report의 Core-only OBSERVED | T17, T21 |
+| AC-MVP-008 | `evidence_policy`, mixed-strength prompt regression, Application job/result integration, 실제 Kiro Analyst→Core 적용 | 닫힌 Episode당 durable job, strict proposal validator, deterministic 채택·거절, 빈 결과와 late-result 거절 | T17, T21 |
+| AC-MVP-009 | SQLite AnalysisJob/Evidence Trace 재시작 복구, retry/dead-letter/manual retry test, 실제 Kiro Job `SUCCEEDED`·Episode `ANALYZED` | Event→Episode→Proposal→Decision→Ledger와 실패 원인·revision trace의 저장·조회 | T17, T21 |
 | AC-MVP-010 | Concept Ledger/storage integration test | 과거 Evidence를 조회할 durable state 경계 | T17, T21 |
 | AC-MVP-011 | Task Completion Report contract와 application integration test | 결과 경로·검증 결과의 구조화 계약 | T18, T21 |
 | AC-MVP-012 | Agent boundary와 role server contract test, actual Kiro Decision lifecycle | 두 surface가 공유할 stable Core/MCP Decision ID와 revision handoff | T19, T21 |

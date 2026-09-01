@@ -1,5 +1,6 @@
 import type {
   AcceptedEvidence,
+  AnalysisJob,
   ActivityEvent,
   AuditRecord,
   BaselineResult,
@@ -142,6 +143,7 @@ export interface PersistenceRepository {
 
   appendActivityEvent(record: ActivityEvent): PersistenceWriteResult
   appendEpisode(record: Episode): PersistenceWriteResult
+  appendAnalysisJob(record: AnalysisJob): PersistenceWriteResult
 
   appendCanonicalConcept(record: CanonicalConcept): PersistenceWriteResult
   appendConceptAliasProposal(record: ConceptAliasProposal): PersistenceWriteResult
@@ -161,6 +163,25 @@ export interface PersistenceRepository {
   readBuilderTaskAggregate(projectId: string, taskId: string): BuilderTaskAggregate | null
   readLatestTaskForProject(projectId: string): BuilderTask | null
   readEpisodeAggregate(projectId: string, episodeId: string): EpisodeAggregate | null
+  readAnalysisJob(projectId: string, analysisJobId: string): AnalysisJob | null
+  readAnalysisJobForEpisode(projectId: string, episodeId: string): AnalysisJob | null
+  readPendingAnalysisJobs(limit: number): readonly AnalysisJob[]
+  readExpiredRunningAnalysisJobs(asOf: string, limit: number): readonly AnalysisJob[]
+  readAnalysisJobsForProject(
+    projectId: string,
+    status: AnalysisJob['status'] | undefined,
+    limit: number,
+  ): readonly AnalysisJob[]
+  readOpenEpisode(
+    projectId: string,
+    type: Episode['type'],
+    scope: {
+      readonly taskId?: string
+      readonly decisionId?: string
+      readonly conversationId?: string
+    },
+  ): Episode | null
+  nextActivitySequence(projectId: string): number
   readRecentEpisodeAggregatesForProject(
     projectId: string,
     limit: number,

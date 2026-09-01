@@ -1,4 +1,5 @@
 export * from './activity.js'
+export * from './analysis.js'
 export * from './agent-contracts.js'
 export * from './audit.js'
 export * from './build.js'

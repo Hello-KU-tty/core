@@ -25,6 +25,10 @@
     "./helper-prompt-node": {
       "types": "./dist/helper-prompt-node.d.ts",
       "import": "./dist/helper-prompt-node.js"
+    },
+    "./evidence-analyst-prompt-node": {
+      "types": "./dist/evidence-analyst-prompt-node.d.ts",
+      "import": "./dist/evidence-analyst-prompt-node.js"
     }
   },
   "dependencies": {

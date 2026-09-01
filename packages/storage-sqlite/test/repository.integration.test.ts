@@ -6,6 +6,7 @@ import type { PersistenceError } from '@vibe-helper/application'
 import {
   acceptedEvidenceSchema,
   activityEventSchema,
+  analysisJobSchema,
   auditRecordSchema,
   baselineResultSchema,
   builderTaskSchema,
@@ -35,6 +36,7 @@ import { openInMemorySqliteStorage, openSqliteStorage } from '../src/index.js'
 import {
   acceptedEvidenceFixture,
   activityEventFixture,
+  analysisJobPendingFixture,
   auditRecordFixture,
   baselineResultFixture,
   builderTaskFixture,
@@ -110,6 +112,7 @@ const records = {
   decision: decisionRequestSchema.parse(decisionRequestFixture),
   event: activityEventSchema.parse(activityEventFixture),
   episode: episodeSchema.parse(episodeFixture),
+  analysisJob: analysisJobSchema.parse(analysisJobPendingFixture),
   concept: canonicalConceptSchema.parse(canonicalConceptFixture),
   alias: aliasProposalFixture,
   evidenceProposal: evidenceProposalSchema.parse(evidenceProposalFixture),
@@ -137,6 +140,7 @@ const appendRecoveryGraph = (repository: ReturnType<typeof repositoryOf>): void 
   repository.appendDecisionRequest(records.decision)
   repository.appendActivityEvent(records.event)
   repository.appendEpisode(records.episode)
+  repository.appendAnalysisJob(records.analysisJob)
   repository.appendCanonicalConcept(records.concept)
   repository.appendConceptAliasProposal(records.alias)
   repository.appendEvidenceProposal(records.evidenceProposal)
@@ -214,6 +218,16 @@ describe('SQLite persistence repository', () => {
       relevantLedgerEntries: [records.ledger],
       evidenceProposals: [records.evidenceProposal],
     })
+    expect(reopened.repository.readAnalysisJob(ids.project, ids.analysisJob)).toEqual(
+      records.analysisJob,
+    )
+    expect(reopened.repository.readAnalysisJobForEpisode(ids.project, ids.episode)).toEqual(
+      records.analysisJob,
+    )
+    expect(reopened.repository.readPendingAnalysisJobs(10)).toEqual([records.analysisJob])
+    expect(reopened.repository.readAnalysisJobsForProject(ids.project, 'PENDING', 10)).toEqual([
+      records.analysisJob,
+    ])
     expect(reopened.repository.readCanonicalConceptById(ids.concept)).toEqual(records.concept)
     expect(reopened.repository.readCanonicalConceptByName('RUNTIME VALIDATION')).toEqual(
       records.concept,

@@ -63,6 +63,9 @@ const analystCommand = {
   correlationId: ids.correlation,
   actor: { kind: 'AGENT', role: 'EVIDENCE_ANALYST' },
   idempotencyKey: ids.idempotency,
+  analysisJobId: ids.analysisJob,
+  expectedJobRevision: 2,
+  attempt: 1,
   batch: evidenceProposalBatchFixture,
 } as const
 

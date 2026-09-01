@@ -1,6 +1,16 @@
 import { randomUUID } from 'node:crypto'
 
 import {
+  type AnalysisJob,
+  analysisJobSchema,
+  type AnalysisRuntimeRequest,
+  analysisRuntimeRequestSchema,
+  analystSubmitEvidenceProposalsCommandSchema,
+  ANALYSIS_MAX_ATTEMPTS,
+  ANALYSIS_SOFT_TIMEOUT_MS,
+  acceptedEvidenceSchema,
+  type ActivityEvent,
+  activityEventSchema,
   type AgentRequest,
   type AgentRole,
   type AuditRecord,
@@ -25,10 +35,16 @@ import {
   discoveryContextSchema,
   type DiscoveryFeedback,
   type EpisodeContext,
+  type Episode,
+  episodeSchema,
   episodeContextSchema,
   type EvidenceBatchApplicationResult,
   evidenceBatchApplicationResultSchema,
   type EvidenceProposal,
+  evidenceProposalBatchSchema,
+  evidenceProposalSchema,
+  type HelperExchangeReceipt,
+  helperExchangeReceiptSchema,
   type GeneratedResultDescriptor,
   generatedResultDescriptorSchema,
   type HelperContext,
@@ -47,9 +63,11 @@ import {
   validateContract,
 } from '@vibe-helper/contracts'
 import {
+  appendEpisodeEvent,
   applyDecision,
   applyMisconceptionProposal,
   confirmLearningSpec,
+  closeEpisode,
   evaluateEvidenceProposal,
   openDecision,
   reduceCandidateRevision,
@@ -58,6 +76,8 @@ import {
   planBuilderTask,
   transitionBuilderTask,
   supersedeLearningSpec,
+  transitionAnalysisJob,
+  transitionEpisodeAnalysis,
   updateLiveContext as reduceLiveContext,
   writeLearningSpecDraft,
 } from '@vibe-helper/domain'
@@ -93,11 +113,19 @@ export type AgentApplicationResponse =
 
 export type UiApplicationResponse =
   | CommandReceipt
+  | AnalysisJob
+  | readonly AnalysisJob[]
+  | HelperExchangeReceipt
   | HelperContext
   | EvidenceTrace
   | readonly EvidenceTrace[]
   | PreparedBuilderTaskDescriptor
   | GeneratedResultDescriptor
+
+export type AnalysisApplicationResponse =
+  | AnalysisJob
+  | readonly AnalysisJob[]
+  | EvidenceBatchApplicationResult
 
 type IdPrefix =
   | 'discovery_session'
@@ -107,8 +135,14 @@ type IdPrefix =
   | 'decision_option'
   | 'decision_application'
   | 'context_refresh'
+  | 'conversation'
+  | 'message'
+  | 'event'
+  | 'episode'
+  | 'analysis_job'
   | 'audit'
   | 'concept'
+  | 'evidence_proposal'
   | 'evidence_decision'
   | 'evidence'
   | 'misconception'
@@ -244,6 +278,19 @@ export class ApplicationService {
     }
   }
 
+  async executeAnalysis(input: unknown): Promise<ApplicationResult<AnalysisApplicationResponse>> {
+    const sizeError = this.#sizeError(input)
+    if (sizeError !== null) return { success: false, error: sizeError }
+    const validated = validateContract(analysisRuntimeRequestSchema, input)
+    if (!validated.success) return validated
+
+    try {
+      return { success: true, data: await this.#dispatchAnalysis(validated.data) }
+    } catch (error) {
+      return { success: false, error: this.#mapError(error, validated.data.correlationId) }
+    }
+  }
+
   async #dispatchAgent(request: AgentRequest): Promise<AgentApplicationResponse> {
     switch (request.kind) {
       case 'DISCOVERY_GET_CONTEXT':
@@ -295,10 +342,33 @@ export class ApplicationService {
         return this.#resolveUserDecision(request)
       case 'UI_OPEN_HELPER':
         return this.#openHelperFromUi(request)
+      case 'UI_RECORD_HELPER_EXCHANGE':
+        return this.#recordHelperExchange(request)
+      case 'UI_RETRY_ANALYSIS':
+        return this.#retryAnalysis(request)
+      case 'UI_READ_ANALYSIS_JOBS':
+        return this.#readAnalysisJobs(request)
       case 'UI_READ_EVIDENCE_TRACE':
         return this.#readEvidenceTrace(request)
       case 'UI_LAUNCH_RESULT':
         return this.#getResultDescriptor(request)
+    }
+  }
+
+  async #dispatchAnalysis(request: AnalysisRuntimeRequest): Promise<AnalysisApplicationResponse> {
+    switch (request.kind) {
+      case 'ANALYSIS_LIST_PENDING':
+        return this.#storage.transaction((repository) =>
+          repository.readPendingAnalysisJobs(request.limit),
+        )
+      case 'ANALYSIS_RECOVER_EXPIRED':
+        return this.#recoverExpiredAnalysisJobs(request)
+      case 'ANALYSIS_CLAIM_JOB':
+        return this.#claimAnalysisJob(request)
+      case 'ANALYSIS_FAIL_ATTEMPT':
+        return this.#failAnalysisAttempt(request)
+      case 'ANALYSIS_SUBMIT_RESULT':
+        return this.#submitAnalysisResult(request)
     }
   }
 
@@ -1128,6 +1198,21 @@ export class ApplicationService {
             source: { kind: 'CORE' },
           })
         }
+        const event = this.#appendActivityEvent(repository, {
+          projectId: proposed.projectId,
+          taskId: proposed.id,
+          correlationId: proposed.correlationId,
+          actor: request.actor,
+          occurredAt: startedAt,
+          payload: { type: 'TASK_STARTED', taskId: proposed.id },
+          sourceReferences: [],
+        })
+        this.#openEpisode(repository, {
+          type: 'BUILD_TASK',
+          event,
+          taskId: proposed.id,
+          conceptNames: proposed.expectedConcepts,
+        })
         this.#appendAudit(repository, {
           correlationId: request.correlationId,
           actor: request.actor,
@@ -1186,6 +1271,40 @@ export class ApplicationService {
           }
           repository.appendLiveContext(request.context)
           this.#fulfillContextRefreshRequests(repository, current, request.context)
+          const event = this.#appendActivityEvent(repository, {
+            projectId: request.context.projectId,
+            taskId: request.context.taskId,
+            correlationId: current.task.correlationId,
+            actor: request.actor,
+            occurredAt: request.context.updatedAt,
+            payload: {
+              type: 'LIVE_CONTEXT_UPDATED',
+              taskId: request.context.taskId,
+              liveContextId: request.context.id,
+              contextVersion: request.context.contextVersion,
+            },
+            sourceReferences: request.context.relatedFiles,
+          })
+          const buildEpisode = repository.readOpenEpisode(request.context.projectId, 'BUILD_TASK', {
+            taskId: request.context.taskId,
+          })
+          if (buildEpisode === null) {
+            this.#openEpisode(repository, {
+              type: 'BUILD_TASK',
+              event,
+              taskId: request.context.taskId,
+              conceptNames: request.context.activeConceptNames,
+              contextReferences: request.context.relatedFiles,
+            })
+          } else {
+            this.#appendEpisodeEvent(
+              repository,
+              buildEpisode,
+              event,
+              request.context.activeConceptNames,
+              request.context.relatedFiles,
+            )
+          }
           this.#appendAudit(repository, {
             correlationId: request.correlationId,
             actor: request.actor,
@@ -1345,6 +1464,58 @@ export class ApplicationService {
           this.#fulfillContextRefreshRequests(repository, current, contextResult.value)
           repository.appendDecisionRequest(decision)
           if (nextTask.revision !== current.task.revision) repository.appendTask(nextTask)
+          const contextEvent = this.#appendActivityEvent(repository, {
+            projectId: decision.projectId,
+            taskId: decision.taskId,
+            correlationId: current.task.correlationId,
+            actor: request.actor,
+            occurredAt: requestedAt,
+            payload: {
+              type: 'LIVE_CONTEXT_UPDATED',
+              taskId: decision.taskId,
+              liveContextId: contextResult.value.id,
+              contextVersion: contextResult.value.contextVersion,
+            },
+            sourceReferences: contextResult.value.relatedFiles,
+          })
+          const buildEpisode = repository.readOpenEpisode(decision.projectId, 'BUILD_TASK', {
+            taskId: decision.taskId,
+          })
+          if (buildEpisode === null) {
+            this.#openEpisode(repository, {
+              type: 'BUILD_TASK',
+              event: contextEvent,
+              taskId: decision.taskId,
+              conceptNames: contextResult.value.activeConceptNames,
+              contextReferences: contextResult.value.relatedFiles,
+            })
+          } else {
+            this.#appendEpisodeEvent(
+              repository,
+              buildEpisode,
+              contextEvent,
+              contextResult.value.activeConceptNames,
+              contextResult.value.relatedFiles,
+            )
+          }
+          const decisionEvent = this.#appendActivityEvent(repository, {
+            projectId: decision.projectId,
+            taskId: decision.taskId,
+            decisionId: decision.id,
+            correlationId: decision.correlationId,
+            actor: request.actor,
+            occurredAt: decision.requestedAt,
+            payload: { type: 'DECISION_REQUESTED', decisionId: decision.id },
+            sourceReferences: decision.sourceReferences,
+          })
+          this.#openEpisode(repository, {
+            type: 'DECISION',
+            event: decisionEvent,
+            taskId: decision.taskId,
+            decisionId: decision.id,
+            conceptNames: decision.relatedConceptNames,
+            contextReferences: decision.sourceReferences,
+          })
           this.#appendAudit(repository, {
             correlationId: request.correlationId,
             actor: request.actor,
@@ -1481,6 +1652,49 @@ export class ApplicationService {
           nextTask = taskResult.value
           repository.appendTask(nextTask)
         }
+        const event = this.#appendActivityEvent(repository, {
+          projectId: decision.projectId,
+          taskId: decision.taskId,
+          decisionId: decision.id,
+          correlationId: decision.correlationId,
+          actor: { kind: 'USER' },
+          occurredAt: request.resolution.resolvedAt,
+          payload: {
+            type: 'DECISION_RESOLVED',
+            decisionId: decision.id,
+            resolutionId: request.resolution.id,
+            rationaleProvided: request.resolution.rationale !== undefined,
+          },
+          sourceReferences: [{ kind: 'USER_DECISION', decisionId: decision.id }],
+        })
+        const decisionEpisode = repository.readOpenEpisode(decision.projectId, 'DECISION', {
+          decisionId: decision.id,
+        })
+        const currentEpisode =
+          decisionEpisode === null
+            ? this.#openEpisode(repository, {
+                type: 'DECISION',
+                event,
+                taskId: decision.taskId,
+                decisionId: decision.id,
+                conceptNames: decision.relatedConceptNames,
+                contextReferences: decision.sourceReferences,
+              })
+            : this.#appendEpisodeEvent(repository, decisionEpisode, event)
+        this.#closeEpisodeAndQueue(
+          repository,
+          currentEpisode,
+          request.resolution.resolvedAt,
+          'User resolved the Decision.',
+        )
+        this.#closeHelperEpisodes(
+          repository,
+          decision.projectId,
+          { decisionId: decision.id },
+          request.resolution.resolvedAt,
+          'Related Decision was resolved.',
+          decision.correlationId,
+        )
         this.#appendAudit(repository, {
           correlationId: request.correlationId,
           actor: { kind: 'USER' },
@@ -1638,6 +1852,40 @@ export class ApplicationService {
           repository.appendDecisionApplication(application)
           repository.appendLiveContext(contextResult.value)
           this.#fulfillContextRefreshRequests(repository, current, contextResult.value)
+          const event = this.#appendActivityEvent(repository, {
+            projectId: application.projectId,
+            taskId: application.taskId,
+            correlationId: current.task.correlationId,
+            actor: request.actor,
+            occurredAt: application.appliedAt,
+            payload: {
+              type: 'LIVE_CONTEXT_UPDATED',
+              taskId: application.taskId,
+              liveContextId: contextResult.value.id,
+              contextVersion: contextResult.value.contextVersion,
+            },
+            sourceReferences: application.sourceReferences,
+          })
+          const buildEpisode = repository.readOpenEpisode(application.projectId, 'BUILD_TASK', {
+            taskId: application.taskId,
+          })
+          if (buildEpisode === null) {
+            this.#openEpisode(repository, {
+              type: 'BUILD_TASK',
+              event,
+              taskId: application.taskId,
+              conceptNames: contextResult.value.activeConceptNames,
+              contextReferences: application.sourceReferences,
+            })
+          } else {
+            this.#appendEpisodeEvent(
+              repository,
+              buildEpisode,
+              event,
+              contextResult.value.activeConceptNames,
+              application.sourceReferences,
+            )
+          }
           this.#appendAudit(repository, {
             correlationId: request.correlationId,
             actor: request.actor,
@@ -1762,6 +2010,123 @@ export class ApplicationService {
         }
         repository.appendCompletionReport(request.report)
         repository.appendTask(proposed)
+        let buildEpisode = repository.readOpenEpisode(proposed.projectId, 'BUILD_TASK', {
+          taskId: proposed.id,
+        })
+        const conceptNames = request.report.conceptUsage.map((usage) => usage.conceptName)
+        if (conceptNames.length > 0) {
+          const conceptReferences = request.report.conceptUsage.flatMap(
+            (usage) => usage.codeReferences,
+          )
+          const conceptEvent = this.#appendActivityEvent(repository, {
+            projectId: proposed.projectId,
+            taskId: proposed.id,
+            correlationId: proposed.correlationId,
+            actor: request.actor,
+            occurredAt: request.report.completedAt,
+            payload: { type: 'CONCEPT_REPORTED', taskId: proposed.id, conceptNames },
+            sourceReferences: conceptReferences,
+          })
+          buildEpisode =
+            buildEpisode === null
+              ? this.#openEpisode(repository, {
+                  type: 'BUILD_TASK',
+                  event: conceptEvent,
+                  taskId: proposed.id,
+                  conceptNames,
+                  contextReferences: conceptReferences,
+                })
+              : this.#appendEpisodeEvent(
+                  repository,
+                  buildEpisode,
+                  conceptEvent,
+                  conceptNames,
+                  conceptReferences,
+                )
+        }
+        for (const validation of request.report.validationResults) {
+          if (validation.status === 'NOT_RUN' || validation.reference === undefined) continue
+          const validationEvent = this.#appendActivityEvent(repository, {
+            projectId: proposed.projectId,
+            taskId: proposed.id,
+            correlationId: proposed.correlationId,
+            actor: request.actor,
+            occurredAt: request.report.completedAt,
+            payload: {
+              type: 'VALIDATION_RESULT',
+              taskId: proposed.id,
+              result: validation.status,
+              reference: validation.reference,
+            },
+            sourceReferences: [validation.reference],
+          })
+          buildEpisode =
+            buildEpisode === null
+              ? this.#openEpisode(repository, {
+                  type: 'BUILD_TASK',
+                  event: validationEvent,
+                  taskId: proposed.id,
+                })
+              : this.#appendEpisodeEvent(repository, buildEpisode, validationEvent)
+        }
+        const completionEvent = this.#appendActivityEvent(repository, {
+          projectId: proposed.projectId,
+          taskId: proposed.id,
+          correlationId: proposed.correlationId,
+          actor: request.actor,
+          occurredAt: request.report.completedAt,
+          payload: {
+            type: 'TASK_COMPLETED',
+            taskId: proposed.id,
+            completionReportId: request.report.id,
+          },
+          sourceReferences: [
+            ...request.report.codeReferences,
+            ...request.report.diffReferences,
+            ...request.report.validationResults.flatMap((validation) =>
+              validation.reference === undefined ? [] : [validation.reference],
+            ),
+          ].slice(0, 30),
+        })
+        buildEpisode =
+          buildEpisode === null
+            ? this.#openEpisode(repository, {
+                type: 'BUILD_TASK',
+                event: completionEvent,
+                taskId: proposed.id,
+                conceptNames,
+              })
+            : this.#appendEpisodeEvent(repository, buildEpisode, completionEvent)
+        const analysisJob = this.#closeEpisodeAndQueue(
+          repository,
+          buildEpisode,
+          request.report.completedAt,
+          'Builder Task completed.',
+        )
+        this.#closeHelperEpisodes(
+          repository,
+          proposed.projectId,
+          { taskId: proposed.id },
+          request.report.completedAt,
+          'Builder Task completed.',
+          proposed.correlationId,
+        )
+        for (const usage of request.report.conceptUsage) {
+          const contextSources =
+            usage.codeReferences.length > 0
+              ? usage.codeReferences
+              : [{ kind: 'EVENT' as const, eventId: completionEvent.id }]
+          this.#recordConceptObservation(repository, {
+            projectId: proposed.projectId,
+            taskId: proposed.id,
+            episodeId: analysisJob.episodeId,
+            correlationId: proposed.correlationId,
+            conceptName: usage.conceptName,
+            contextSources,
+            observedAt: request.report.completedAt,
+            description: usage.usageReason,
+          })
+        }
         this.#appendAudit(repository, {
           correlationId: request.correlationId,
           actor: request.actor,
@@ -2054,6 +2419,426 @@ export class ApplicationService {
     })
   }
 
+  #recordHelperExchange(
+    request: Extract<UiRequest, { kind: 'UI_RECORD_HELPER_EXCHANGE' }>,
+  ): HelperExchangeReceipt {
+    const recordedAt = this.#timestamp()
+    return this.#storage.transaction((repository) =>
+      this.#idempotent(
+        repository,
+        request,
+        'ui.record_helper_exchange',
+        helperExchangeReceiptSchema,
+        () => {
+          const recovery = repository.recoverProject(request.projectId)
+          if (recovery === null) throw this.#notFound(request.correlationId, 'PROJECT_NOT_FOUND')
+          const task =
+            request.taskId === undefined
+              ? recovery.currentTask
+              : (repository.readBuilderTaskAggregate(request.projectId, request.taskId)?.task ??
+                null)
+          if (task === null) throw this.#notFound(request.correlationId, 'BUILDER_TASK_NOT_FOUND')
+          const conversationId = request.conversationId ?? this.#generateId('conversation')
+          const userMessageId = this.#generateId('message')
+          const helperMessageId = this.#generateId('message')
+          const userEvent = this.#appendActivityEvent(repository, {
+            projectId: request.projectId,
+            taskId: task.id,
+            ...(request.decisionId === undefined ? {} : { decisionId: request.decisionId }),
+            conversationId,
+            correlationId: request.correlationId,
+            actor: { kind: 'USER' },
+            occurredAt: recordedAt,
+            payload: {
+              type: 'USER_MESSAGE',
+              conversationId,
+              messageId: userMessageId,
+              redactedExcerpt: redactSensitiveText(request.userMessage),
+            },
+            sourceReferences: [{ kind: 'USER_MESSAGE', conversationId, messageId: userMessageId }],
+          })
+          const existing = repository.readOpenEpisode(request.projectId, 'HELPER_CONVERSATION', {
+            conversationId,
+          })
+          let episode =
+            existing === null
+              ? this.#openEpisode(repository, {
+                  type: 'HELPER_CONVERSATION',
+                  event: userEvent,
+                  taskId: task.id,
+                  ...(request.decisionId === undefined ? {} : { decisionId: request.decisionId }),
+                  conversationId,
+                })
+              : this.#appendEpisodeEvent(repository, existing, userEvent)
+          const helperEvent = this.#appendActivityEvent(repository, {
+            projectId: request.projectId,
+            taskId: task.id,
+            ...(request.decisionId === undefined ? {} : { decisionId: request.decisionId }),
+            conversationId,
+            correlationId: request.correlationId,
+            actor: { kind: 'AGENT', role: 'HELPER' },
+            occurredAt: recordedAt,
+            payload: {
+              type: 'HELPER_RESPONSE',
+              conversationId,
+              messageId: helperMessageId,
+              summary: redactSensitiveText(request.helperResponseSummary),
+            },
+            sourceReferences: [
+              { kind: 'AGENT_MESSAGE', conversationId, messageId: helperMessageId },
+            ],
+          })
+          episode = this.#appendEpisodeEvent(repository, episode, helperEvent)
+          if (request.closeConversation) {
+            this.#closeEpisodeAndQueue(
+              repository,
+              episode,
+              recordedAt,
+              'Helper conversation explicitly ended.',
+            )
+          }
+          const response = helperExchangeReceiptSchema.parse({
+            schemaVersion: 1,
+            correlationId: request.correlationId,
+            conversationId,
+            episodeId: episode.id,
+            episodeRevision: request.closeConversation ? episode.revision + 1 : episode.revision,
+            status: request.closeConversation ? 'PENDING_ANALYSIS' : 'OPEN',
+          })
+          return {
+            response,
+            resourceId: episode.id,
+            resourceRevision: response.episodeRevision,
+          }
+        },
+      ),
+    )
+  }
+
+  #retryAnalysis(request: Extract<UiRequest, { kind: 'UI_RETRY_ANALYSIS' }>): AnalysisJob {
+    const retriedAt = this.#timestamp()
+    return this.#storage.transaction((repository) =>
+      this.#idempotent(repository, request, 'ui.retry_analysis', analysisJobSchema, () => {
+        const current = repository.readAnalysisJob(request.projectId, request.analysisJobId)
+        if (current === null) throw this.#notFound(request.correlationId, 'ANALYSIS_JOB_NOT_FOUND')
+        this.#assertRevision(
+          request.expectedJobRevision,
+          current.revision,
+          request.correlationId,
+          'ANALYSIS_JOB_STALE',
+        )
+        if (current.status !== 'FAILED') {
+          throw this.#validationError(
+            request.correlationId,
+            'ANALYSIS_RETRY_NOT_ALLOWED',
+            'Only a failed Analysis Job can be retried manually.',
+          )
+        }
+        const aggregate = repository.readEpisodeAggregate(request.projectId, current.episodeId)
+        if (aggregate === null) throw this.#notFound(request.correlationId, 'EPISODE_NOT_FOUND')
+        const episodeResult = transitionEpisodeAnalysis({
+          current: aggregate.episode,
+          status: 'PENDING_ANALYSIS',
+          changedAt: retriedAt,
+        })
+        if (episodeResult.outcome === 'REJECTED') {
+          throw this.#domainError(request.correlationId, episodeResult.reasonCode)
+        }
+        repository.appendEpisode(episodeResult.value)
+        const proposed = analysisJobSchema.parse({
+          ...current,
+          episodeRevision: episodeResult.value.revision,
+          revision: current.revision + 1,
+          status: 'PENDING',
+          attempt: 0,
+          updatedAt: retriedAt,
+          lastFailure: undefined,
+          startedAt: undefined,
+          completedAt: undefined,
+        })
+        const jobResult = transitionAnalysisJob({ current, proposed })
+        if (jobResult.outcome === 'REJECTED') {
+          throw this.#domainError(request.correlationId, jobResult.reasonCode)
+        }
+        repository.appendAnalysisJob(jobResult.value)
+        this.#appendAudit(repository, {
+          correlationId: request.correlationId,
+          actor: request.actor,
+          action: 'UPDATED',
+          resource: {
+            type: 'ANALYSIS_JOB',
+            id: jobResult.value.id,
+            revision: jobResult.value.revision,
+          },
+          summary: 'Reset a failed Analysis Job for an explicit user retry.',
+          changedFields: ['status', 'attempt', 'revision', 'episodeRevision'],
+          occurredAt: retriedAt,
+        })
+        return {
+          response: jobResult.value,
+          resourceId: jobResult.value.id,
+          resourceRevision: jobResult.value.revision,
+        }
+      }),
+    )
+  }
+
+  #readAnalysisJobs(
+    request: Extract<UiRequest, { kind: 'UI_READ_ANALYSIS_JOBS' }>,
+  ): readonly AnalysisJob[] {
+    return this.#storage.transaction((repository) => {
+      if (repository.recoverProject(request.projectId) === null) {
+        throw this.#notFound(request.correlationId, 'PROJECT_NOT_FOUND')
+      }
+      return repository.readAnalysisJobsForProject(request.projectId, request.status, request.limit)
+    })
+  }
+
+  #claimAnalysisJob(
+    request: Extract<AnalysisRuntimeRequest, { kind: 'ANALYSIS_CLAIM_JOB' }>,
+  ): AnalysisJob {
+    const startedAt = this.#timestamp()
+    return this.#storage.transaction((repository) => {
+      const current = repository.readAnalysisJob(request.projectId, request.analysisJobId)
+      if (current === null) throw this.#notFound(request.correlationId, 'ANALYSIS_JOB_NOT_FOUND')
+      this.#assertRevision(
+        request.expectedJobRevision,
+        current.revision,
+        request.correlationId,
+        'ANALYSIS_JOB_STALE',
+      )
+      const proposed = analysisJobSchema.parse({
+        ...current,
+        revision: current.revision + 1,
+        status: 'RUNNING',
+        attempt: current.attempt + 1,
+        runtimeHandle: request.runtimeHandle,
+        deadlineAt: new Date(Date.parse(startedAt) + current.timeoutMs).toISOString(),
+        lastFailure: undefined,
+        updatedAt: startedAt,
+        startedAt,
+        completedAt: undefined,
+      })
+      const result = transitionAnalysisJob({ current, proposed })
+      if (result.outcome === 'REJECTED') {
+        throw this.#domainError(request.correlationId, result.reasonCode)
+      }
+      repository.appendAnalysisJob(result.value)
+      this.#appendAudit(repository, {
+        correlationId: request.correlationId,
+        actor: request.actor,
+        action: 'UPDATED',
+        resource: { type: 'ANALYSIS_JOB', id: result.value.id, revision: result.value.revision },
+        summary: 'Claimed a pending Analysis Job for one bounded Analyst attempt.',
+        changedFields: ['status', 'attempt', 'revision'],
+        occurredAt: startedAt,
+      })
+      return result.value
+    })
+  }
+
+  #recoverExpiredAnalysisJobs(
+    request: Extract<AnalysisRuntimeRequest, { kind: 'ANALYSIS_RECOVER_EXPIRED' }>,
+  ): readonly AnalysisJob[] {
+    const recoveredAt = this.#timestamp()
+    return this.#storage.transaction((repository) =>
+      repository.readExpiredRunningAnalysisJobs(recoveredAt, request.limit).map((current) => {
+        const terminal = current.attempt >= current.maxAttempts
+        const proposed = analysisJobSchema.parse({
+          ...current,
+          revision: current.revision + 1,
+          status: terminal ? 'FAILED' : 'PENDING',
+          runtimeHandle: undefined,
+          deadlineAt: undefined,
+          lastFailure: {
+            code: 'ANALYST_TIMEOUT',
+            message: 'Recovered an expired Analyst attempt after runtime interruption.',
+            retryable: true,
+          },
+          updatedAt: recoveredAt,
+          ...(terminal ? { completedAt: recoveredAt } : { completedAt: undefined }),
+        })
+        const result = transitionAnalysisJob({ current, proposed })
+        if (result.outcome === 'REJECTED') {
+          throw this.#domainError(request.correlationId, result.reasonCode)
+        }
+        repository.appendAnalysisJob(result.value)
+        if (terminal) {
+          const aggregate = repository.readEpisodeAggregate(current.projectId, current.episodeId)
+          if (aggregate === null) throw this.#notFound(request.correlationId, 'EPISODE_NOT_FOUND')
+          const episodeResult = transitionEpisodeAnalysis({
+            current: aggregate.episode,
+            status: 'ANALYSIS_FAILED',
+            changedAt: recoveredAt,
+          })
+          if (episodeResult.outcome === 'REJECTED') {
+            throw this.#domainError(request.correlationId, episodeResult.reasonCode)
+          }
+          repository.appendEpisode(episodeResult.value)
+        }
+        this.#appendAudit(repository, {
+          correlationId: current.correlationId,
+          actor: request.actor,
+          action: 'UPDATED',
+          resource: {
+            type: 'ANALYSIS_JOB',
+            id: result.value.id,
+            revision: result.value.revision,
+          },
+          summary: terminal
+            ? 'Recovered an expired Analysis Job as a terminal failure.'
+            : 'Recovered an expired Analysis Job for its remaining retry.',
+          changedFields: ['status', 'revision', 'lastFailure'],
+          occurredAt: recoveredAt,
+        })
+        return result.value
+      }),
+    )
+  }
+
+  #failAnalysisAttempt(
+    request: Extract<AnalysisRuntimeRequest, { kind: 'ANALYSIS_FAIL_ATTEMPT' }>,
+  ): AnalysisJob {
+    const failedAt = this.#timestamp()
+    return this.#storage.transaction((repository) => {
+      const current = repository.readAnalysisJob(request.projectId, request.analysisJobId)
+      if (current === null) throw this.#notFound(request.correlationId, 'ANALYSIS_JOB_NOT_FOUND')
+      this.#assertRevision(
+        request.expectedJobRevision,
+        current.revision,
+        request.correlationId,
+        'ANALYSIS_JOB_STALE',
+      )
+      if (current.status !== 'RUNNING' || current.attempt !== request.attempt) {
+        throw this.#validationError(
+          request.correlationId,
+          'ANALYSIS_RESULT_STALE',
+          'Analysis failure does not match the current running attempt.',
+        )
+      }
+      const terminal = !request.failure.retryable || current.attempt >= current.maxAttempts
+      const proposed = analysisJobSchema.parse({
+        ...current,
+        revision: current.revision + 1,
+        status: terminal ? 'FAILED' : 'PENDING',
+        runtimeHandle: undefined,
+        deadlineAt: undefined,
+        lastFailure: request.failure,
+        updatedAt: failedAt,
+        ...(terminal ? { completedAt: failedAt } : { completedAt: undefined }),
+      })
+      const result = transitionAnalysisJob({ current, proposed })
+      if (result.outcome === 'REJECTED') {
+        throw this.#domainError(request.correlationId, result.reasonCode)
+      }
+      repository.appendAnalysisJob(result.value)
+      if (terminal) {
+        const aggregate = repository.readEpisodeAggregate(request.projectId, current.episodeId)
+        if (aggregate === null) throw this.#notFound(request.correlationId, 'EPISODE_NOT_FOUND')
+        const episodeResult = transitionEpisodeAnalysis({
+          current: aggregate.episode,
+          status: 'ANALYSIS_FAILED',
+          changedAt: failedAt,
+        })
+        if (episodeResult.outcome === 'REJECTED') {
+          throw this.#domainError(request.correlationId, episodeResult.reasonCode)
+        }
+        repository.appendEpisode(episodeResult.value)
+      }
+      this.#appendAudit(repository, {
+        correlationId: request.correlationId,
+        actor: request.actor,
+        action: 'UPDATED',
+        resource: { type: 'ANALYSIS_JOB', id: result.value.id, revision: result.value.revision },
+        summary: terminal
+          ? 'Recorded a terminal Analysis Job failure after the retry budget was exhausted.'
+          : 'Recorded a retryable Analysis Job attempt failure.',
+        changedFields: ['status', 'revision', 'lastFailure'],
+        occurredAt: failedAt,
+      })
+      return result.value
+    })
+  }
+
+  async #submitAnalysisResult(
+    request: Extract<AnalysisRuntimeRequest, { kind: 'ANALYSIS_SUBMIT_RESULT' }>,
+  ): Promise<EvidenceBatchApplicationResult> {
+    const submittedAt = this.#timestamp()
+    const context = this.#storage.transaction((repository) => {
+      const job = repository.readAnalysisJob(request.projectId, request.analysisJobId)
+      if (job === null) throw this.#notFound(request.correlationId, 'ANALYSIS_JOB_NOT_FOUND')
+      this.#assertRevision(
+        request.expectedJobRevision,
+        job.revision,
+        request.correlationId,
+        'ANALYSIS_JOB_STALE',
+      )
+      const aggregate = repository.readEpisodeAggregate(request.projectId, job.episodeId)
+      if (aggregate === null) throw this.#notFound(request.correlationId, 'EPISODE_NOT_FOUND')
+      return { job, episode: aggregate.episode }
+    })
+    if (
+      request.result.episodeId !== context.job.episodeId ||
+      request.result.episodeRevision !== context.job.episodeRevision ||
+      request.result.correlationId !== context.job.correlationId ||
+      request.attempt !== context.job.attempt
+    ) {
+      throw this.#validationError(
+        request.correlationId,
+        'ANALYSIS_RESULT_STALE',
+        'Semantic Analyst result does not match the current job attempt.',
+      )
+    }
+    const batch = evidenceProposalBatchSchema.parse({
+      schemaVersion: 1,
+      projectId: request.projectId,
+      episodeId: context.job.episodeId,
+      correlationId: context.job.correlationId,
+      episodeRevision: context.job.episodeRevision,
+      proposals: request.result.proposals.map((draft) => ({
+        schemaVersion: 1,
+        id: this.#generateId('evidence_proposal'),
+        projectId: request.projectId,
+        ...(context.episode.taskId === undefined ? {} : { taskId: context.episode.taskId }),
+        episodeId: context.job.episodeId,
+        correlationId: context.job.correlationId,
+        ...draft,
+        redactedEvidenceExcerpt: redactSensitiveText(draft.redactedEvidenceExcerpt),
+        rationale: redactSensitiveText(draft.rationale),
+        ...(draft.uncertainty === undefined
+          ? {}
+          : { uncertainty: redactSensitiveText(draft.uncertainty) }),
+        misconception: {
+          ...draft.misconception,
+          ...(draft.misconception.summary === undefined
+            ? {}
+            : { summary: redactSensitiveText(draft.misconception.summary) }),
+        },
+        proposedAt: submittedAt,
+        source: { kind: 'AGENT', role: 'EVIDENCE_ANALYST' },
+        redactionStatus: 'VERIFIED_REDACTED',
+      })),
+      ...(request.result.noEvidenceReason === undefined
+        ? {}
+        : { noEvidenceReason: redactSensitiveText(request.result.noEvidenceReason) }),
+      submittedAt,
+      source: { kind: 'AGENT', role: 'EVIDENCE_ANALYST' },
+    })
+    return this.#submitEvidenceProposals(
+      analystSubmitEvidenceProposalsCommandSchema.parse({
+        schemaVersion: 1,
+        kind: 'ANALYST_SUBMIT_EVIDENCE_PROPOSALS',
+        correlationId: request.correlationId,
+        actor: { kind: 'AGENT', role: 'EVIDENCE_ANALYST' },
+        idempotencyKey: request.idempotencyKey,
+        analysisJobId: request.analysisJobId,
+        expectedJobRevision: request.expectedJobRevision,
+        attempt: request.attempt,
+        batch,
+      }),
+    )
+  }
+
   async #getEpisodeContext(
     request: Extract<AgentRequest, { kind: 'ANALYST_GET_EPISODE_CONTEXT' }>,
   ): Promise<EpisodeContext> {
@@ -2077,6 +2862,30 @@ export class ApplicationService {
       episode: aggregate.episode,
       events: aggregate.events,
       relevantLedgerEntries: aggregate.relevantLedgerEntries,
+      analysisJob: this.#storage.transaction((repository) =>
+        repository.readAnalysisJobForEpisode(request.projectId, request.episodeId),
+      ),
+      decisionContext:
+        aggregate.episode.decisionId === undefined || aggregate.episode.taskId === undefined
+          ? null
+          : this.#storage.transaction((repository) => {
+              const task = repository.readBuilderTaskAggregate(
+                request.projectId,
+                aggregate.episode.taskId as string,
+              )
+              const decision = task?.decisionRequests.find(
+                (candidate) => candidate.id === aggregate.episode.decisionId,
+              )
+              return decision === undefined
+                ? null
+                : {
+                    request: decision,
+                    resolution:
+                      task?.decisionResolutions.find(
+                        (candidate) => candidate.decisionId === decision.id,
+                      ) ?? null,
+                  }
+            }),
     })
     await this.#workspacePolicy.validateReferences(project, response, request.correlationId)
     return response
@@ -2085,14 +2894,7 @@ export class ApplicationService {
   async #submitEvidenceProposals(
     request: Extract<AgentRequest, { kind: 'ANALYST_SUBMIT_EVIDENCE_PROPOSALS' }>,
   ): Promise<EvidenceBatchApplicationResult> {
-    const projectId = request.batch.proposals[0]?.projectId
-    if (projectId === undefined) {
-      throw this.#validationError(
-        request.correlationId,
-        'EVIDENCE_BATCH_EMPTY',
-        'Evidence batch must contain at least one proposal.',
-      )
-    }
+    const projectId = request.batch.projectId
     const project = this.#storage.transaction(
       (repository) => repository.recoverProject(projectId)?.project ?? null,
     )
@@ -2106,6 +2908,27 @@ export class ApplicationService {
         'analyst.submit_evidence_proposals',
         evidenceBatchApplicationResultSchema,
         () => {
+          const job = repository.readAnalysisJob(projectId, request.analysisJobId)
+          if (job === null) throw this.#notFound(request.correlationId, 'ANALYSIS_JOB_NOT_FOUND')
+          this.#assertRevision(
+            request.expectedJobRevision,
+            job.revision,
+            request.correlationId,
+            'ANALYSIS_JOB_STALE',
+          )
+          if (
+            job.status !== 'RUNNING' ||
+            job.attempt !== request.attempt ||
+            job.episodeId !== request.batch.episodeId ||
+            job.episodeRevision !== request.batch.episodeRevision ||
+            job.correlationId !== request.batch.correlationId
+          ) {
+            throw this.#validationError(
+              request.correlationId,
+              'ANALYSIS_RESULT_STALE',
+              'Evidence result does not match the current running Analysis attempt.',
+            )
+          }
           const aggregate = repository.readEpisodeAggregate(projectId, request.batch.episodeId)
           if (aggregate === null) throw this.#notFound(request.correlationId, 'EPISODE_NOT_FOUND')
           this.#assertRevision(
@@ -2118,9 +2941,13 @@ export class ApplicationService {
           const outcomes: EvidenceBatchApplicationResult['outcomes'][number][] = []
           for (const proposal of request.batch.proposals) {
             const concept = this.#resolveConcept(repository, proposal, request.batch.submittedAt)
+            const resolvedProposal = evidenceProposalSchema.parse({
+              ...proposal,
+              concept: { ...proposal.concept, canonicalConceptId: concept.id },
+            })
             const priorTrace = repository.readEvidenceTrace(concept.id)
             const evaluation = evaluateEvidenceProposal({
-              proposal,
+              proposal: resolvedProposal,
               episode: aggregate.episode,
               episodeRevision: request.batch.episodeRevision,
               events: aggregate.events,
@@ -2138,7 +2965,7 @@ export class ApplicationService {
                 acceptedAt: request.batch.submittedAt,
               },
             })
-            repository.appendEvidenceProposal(proposal)
+            repository.appendEvidenceProposal(resolvedProposal)
             repository.appendEvidenceDecision(evaluation.decision)
             if (evaluation.outcome === 'REJECTED') {
               outcomes.push({
@@ -2152,10 +2979,10 @@ export class ApplicationService {
             const currentTrace = repository.readEvidenceTrace(concept.id)
             const issuesResult = applyMisconceptionProposal({
               issues: currentTrace?.misconceptionIssues ?? [],
-              proposal,
+              proposal: resolvedProposal,
               evidence: evaluation.evidence,
-              ...(proposal.misconception.action === 'OPEN' &&
-              proposal.misconception.issueId === undefined
+              ...(resolvedProposal.misconception.action === 'OPEN' &&
+              resolvedProposal.misconception.issueId === undefined
                 ? { newIssueId: this.#generateId('misconception') }
                 : {}),
               appliedAt: request.batch.submittedAt,
@@ -2189,17 +3016,17 @@ export class ApplicationService {
                 concept,
                 acceptedAliases: unique([
                   ...(currentLedger?.acceptedAliases ?? []),
-                  proposal.concept.originalExpression,
+                  resolvedProposal.concept.originalExpression,
                 ]),
                 state: stateResult.value,
                 openIssues,
                 relatedProjectIds: unique([
                   ...(currentLedger?.relatedProjectIds ?? []),
-                  proposal.projectId,
+                  resolvedProposal.projectId,
                 ]),
                 relatedTaskIds: unique([
                   ...(currentLedger?.relatedTaskIds ?? []),
-                  ...(proposal.taskId === undefined ? [] : [proposal.taskId]),
+                  ...(resolvedProposal.taskId === undefined ? [] : [resolvedProposal.taskId]),
                 ]),
                 revision: currentLedger === null ? 1 : currentLedger.revision + 1,
                 updatedAt: request.batch.submittedAt,
@@ -2232,10 +3059,58 @@ export class ApplicationService {
             correlationId: request.correlationId,
             outcomes,
           })
+          const analyzedAt = request.batch.submittedAt
+          const episodeResult = transitionEpisodeAnalysis({
+            current: aggregate.episode,
+            status: 'ANALYZED',
+            changedAt: analyzedAt,
+          })
+          if (episodeResult.outcome === 'REJECTED') {
+            throw this.#domainError(request.correlationId, episodeResult.reasonCode)
+          }
+          repository.appendEpisode(episodeResult.value)
+          const completedJob = analysisJobSchema.parse({
+            ...job,
+            revision: job.revision + 1,
+            status: 'SUCCEEDED',
+            runtimeHandle: undefined,
+            deadlineAt: undefined,
+            lastFailure: undefined,
+            resultSummary: {
+              proposalCount: request.batch.proposals.length,
+              acceptedCount: outcomes.filter((outcome) => outcome.decision.outcome === 'ACCEPTED')
+                .length,
+              rejectedCount: outcomes.filter((outcome) => outcome.decision.outcome === 'REJECTED')
+                .length,
+              ...(request.batch.noEvidenceReason === undefined
+                ? {}
+                : { noEvidenceReason: request.batch.noEvidenceReason }),
+            },
+            updatedAt: analyzedAt,
+            completedAt: analyzedAt,
+          })
+          const jobResult = transitionAnalysisJob({ current: job, proposed: completedJob })
+          if (jobResult.outcome === 'REJECTED') {
+            throw this.#domainError(request.correlationId, jobResult.reasonCode)
+          }
+          repository.appendAnalysisJob(jobResult.value)
+          this.#appendAudit(repository, {
+            correlationId: request.correlationId,
+            actor: { kind: 'CORE' },
+            action: 'UPDATED',
+            resource: {
+              type: 'ANALYSIS_JOB',
+              id: jobResult.value.id,
+              revision: jobResult.value.revision,
+            },
+            summary: 'Completed an Analysis Job after deterministic Evidence processing.',
+            changedFields: ['status', 'revision'],
+            occurredAt: analyzedAt,
+          })
           return {
             response,
-            resourceId: aggregate.episode.id,
-            resourceRevision: aggregate.episode.revision,
+            resourceId: jobResult.value.id,
+            resourceRevision: jobResult.value.revision,
           }
         },
       ),
@@ -2624,6 +3499,229 @@ export class ApplicationService {
         occurredAt: context.updatedAt,
       })
     }
+  }
+
+  #appendActivityEvent(
+    repository: PersistenceRepository,
+    input: Omit<ActivityEvent, 'schemaVersion' | 'id' | 'sequence' | 'redactionStatus'>,
+  ): ActivityEvent {
+    const event = activityEventSchema.parse({
+      schemaVersion: 1,
+      id: this.#generateId('event'),
+      ...input,
+      sequence: repository.nextActivitySequence(input.projectId),
+      redactionStatus: 'VERIFIED_REDACTED',
+    })
+    repository.appendActivityEvent(event)
+    return event
+  }
+
+  #openEpisode(
+    repository: PersistenceRepository,
+    input: {
+      readonly type: Episode['type']
+      readonly event: ActivityEvent
+      readonly taskId?: string
+      readonly decisionId?: string
+      readonly conversationId?: string
+      readonly conceptNames?: readonly string[]
+      readonly contextReferences?: Episode['contextReferences']
+    },
+  ): Episode {
+    const episode = episodeSchema.parse({
+      schemaVersion: 1,
+      id: this.#generateId('episode'),
+      projectId: input.event.projectId,
+      ...(input.taskId === undefined ? {} : { taskId: input.taskId }),
+      ...(input.decisionId === undefined ? {} : { decisionId: input.decisionId }),
+      ...(input.conversationId === undefined ? {} : { conversationId: input.conversationId }),
+      correlationId: input.event.correlationId,
+      revision: 1,
+      type: input.type,
+      status: 'OPEN',
+      eventIds: [input.event.id],
+      conceptCandidates: unique(input.conceptNames ?? []).map((originalExpression) => ({
+        originalExpression,
+      })),
+      contextReferences: input.contextReferences ?? [],
+      startedAt: input.event.occurredAt,
+      source: { kind: 'CORE' },
+      redactionStatus: 'VERIFIED_REDACTED',
+    })
+    repository.appendEpisode(episode)
+    return episode
+  }
+
+  #appendEpisodeEvent(
+    repository: PersistenceRepository,
+    current: Episode,
+    event: ActivityEvent,
+    conceptNames: readonly string[] = [],
+    contextReferences: Episode['contextReferences'] = [],
+  ): Episode {
+    const result = appendEpisodeEvent({ current, event })
+    if (result.outcome === 'REJECTED') {
+      throw this.#domainError(event.correlationId, result.reasonCode)
+    }
+    if (result.outcome === 'NO_OP') return result.value
+    const next = episodeSchema.parse({
+      ...result.value,
+      conceptCandidates: [
+        ...result.value.conceptCandidates,
+        ...unique(conceptNames)
+          .filter(
+            (name) =>
+              !result.value.conceptCandidates.some(
+                (candidate) => candidate.originalExpression.toLowerCase() === name.toLowerCase(),
+              ),
+          )
+          .map((originalExpression) => ({ originalExpression })),
+      ],
+      contextReferences: [...result.value.contextReferences, ...contextReferences].slice(0, 100),
+    })
+    repository.appendEpisode(next)
+    return next
+  }
+
+  #closeEpisodeAndQueue(
+    repository: PersistenceRepository,
+    current: Episode,
+    endedAt: string,
+    closeReason: string,
+  ): AnalysisJob {
+    const aggregate = repository.readEpisodeAggregate(current.projectId, current.id)
+    if (aggregate === null) throw this.#notFound(current.correlationId, 'EPISODE_NOT_FOUND')
+    const proposed = episodeSchema.parse({
+      ...current,
+      revision: current.revision + 1,
+      status: 'PENDING_ANALYSIS',
+      endedAt,
+      closeReason,
+    })
+    const result = closeEpisode({ current, proposed, events: aggregate.events })
+    if (result.outcome === 'REJECTED') {
+      throw this.#domainError(current.correlationId, result.reasonCode)
+    }
+    repository.appendEpisode(result.value)
+    const job = analysisJobSchema.parse({
+      schemaVersion: 1,
+      id: this.#generateId('analysis_job'),
+      projectId: current.projectId,
+      episodeId: current.id,
+      episodeRevision: result.value.revision,
+      correlationId: current.correlationId,
+      revision: 1,
+      status: 'PENDING',
+      attempt: 0,
+      maxAttempts: ANALYSIS_MAX_ATTEMPTS,
+      timeoutMs: ANALYSIS_SOFT_TIMEOUT_MS,
+      createdAt: endedAt,
+      updatedAt: endedAt,
+      source: { kind: 'CORE' },
+      redactionStatus: 'VERIFIED_REDACTED',
+    })
+    repository.appendAnalysisJob(job)
+    this.#appendAudit(repository, {
+      correlationId: current.correlationId,
+      actor: { kind: 'CORE' },
+      action: 'CREATED',
+      resource: { type: 'ANALYSIS_JOB', id: job.id, revision: job.revision },
+      summary: 'Queued one durable Analysis Job for the closed Episode.',
+      changedFields: ['status', 'revision'],
+      occurredAt: endedAt,
+    })
+    return job
+  }
+
+  #closeHelperEpisodes(
+    repository: PersistenceRepository,
+    projectId: string,
+    scope: { readonly taskId?: string; readonly decisionId?: string },
+    endedAt: string,
+    closeReason: string,
+    correlationId: string,
+  ): void {
+    for (let count = 0; count < 50; count += 1) {
+      const episode = repository.readOpenEpisode(projectId, 'HELPER_CONVERSATION', scope)
+      if (episode === null) return
+      this.#closeEpisodeAndQueue(repository, episode, endedAt, closeReason)
+    }
+    throw this.#validationError(
+      correlationId,
+      'HELPER_EPISODE_LIMIT_EXCEEDED',
+      'Too many open Helper Episodes matched one close operation.',
+    )
+  }
+
+  #recordConceptObservation(
+    repository: PersistenceRepository,
+    input: {
+      readonly projectId: string
+      readonly taskId: string
+      readonly episodeId: string
+      readonly correlationId: string
+      readonly conceptName: string
+      readonly contextSources: ActivityEvent['sourceReferences']
+      readonly observedAt: string
+      readonly description: string
+    },
+  ): void {
+    let concept = repository.readCanonicalConceptByName(input.conceptName)
+    if (concept === null) {
+      concept = canonicalConceptSchema.parse({
+        schemaVersion: 1,
+        id: this.#generateId('concept'),
+        canonicalName: input.conceptName,
+        description: input.description,
+        revision: 1,
+        createdAt: input.observedAt,
+        updatedAt: input.observedAt,
+        source: { kind: 'CORE' },
+      })
+      repository.appendCanonicalConcept(concept)
+    }
+    const evidence = acceptedEvidenceSchema.parse({
+      schemaVersion: 1,
+      id: this.#generateId('evidence'),
+      kind: 'CONCEPT_OBSERVATION',
+      projectId: input.projectId,
+      taskId: input.taskId,
+      episodeId: input.episodeId,
+      conceptId: concept.id,
+      correlationId: input.correlationId,
+      supportsState: 'OBSERVED',
+      contextSources: input.contextSources,
+      acceptedAt: input.observedAt,
+      source: { kind: 'CORE' },
+      redactionStatus: 'VERIFIED_REDACTED',
+    })
+    repository.appendAcceptedEvidence(evidence)
+    const trace = repository.readEvidenceTrace(concept.id)
+    const acceptedEvidence = trace?.acceptedEvidence ?? [evidence]
+    const currentLedger = trace?.ledger ?? null
+    const stateResult = reduceConceptState({
+      conceptId: concept.id,
+      ...(currentLedger === null ? {} : { current: currentLedger.state }),
+      acceptedEvidence,
+      nextRevision: currentLedger === null ? 1 : currentLedger.state.revision + 1,
+      updatedAt: input.observedAt,
+    })
+    if (stateResult.outcome === 'REJECTED') {
+      throw this.#domainError(input.correlationId, stateResult.reasonCode)
+    }
+    repository.appendConceptLedger({
+      schemaVersion: 1,
+      id: currentLedger?.id ?? this.#generateId('concept_ledger'),
+      concept,
+      acceptedAliases: unique([...(currentLedger?.acceptedAliases ?? []), input.conceptName]),
+      state: stateResult.value,
+      openIssues: currentLedger?.openIssues ?? [],
+      relatedProjectIds: unique([...(currentLedger?.relatedProjectIds ?? []), input.projectId]),
+      relatedTaskIds: unique([...(currentLedger?.relatedTaskIds ?? []), input.taskId]),
+      revision: currentLedger === null ? 1 : currentLedger.revision + 1,
+      updatedAt: input.observedAt,
+      source: { kind: 'CORE' },
+    })
   }
 
   #resolveConcept(

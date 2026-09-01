@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture_00000000-0000-4000-8000-000000000117",
+  "name": "Evidence Analyst v1.0.1 mixed-strength regression",
+  "description": "Redacted Analyst v1.0.1 regression that separates a directly led repetition from an independent runtime-validation application in one closed Helper Episode and retains required empty arrays.",
+  "kind": "FALSE_MASTERY",
+  "inputPath": "tests/eval/fixtures/inputs/webhook-lens.json",
+  "expectedContractDomains": ["EPISODE"],
+  "criteria": [
+    {
+      "key": "contract_valid",
+      "dimension": "CONTRACT_INTEGRITY",
+      "reviewMode": "AUTOMATED",
+      "description": "The analyzed Episode satisfies the strict runtime contract.",
+      "successDefinition": "The closed Helper Episode passes validation."
+    },
+    {
+      "key": "redaction_no_leak",
+      "dimension": "REDACTION",
+      "reviewMode": "AUTOMATED",
+      "description": "The semantic result contains no credential sentinel or host user path.",
+      "successDefinition": "No forbidden sentinel or user-home path remains."
+    },
+    {
+      "key": "analyst_provenance",
+      "dimension": "EVIDENCE_QUALITY",
+      "reviewMode": "HUMAN",
+      "description": "Every proposal cites a user-authored source and Agent wording is context only.",
+      "successDefinition": "Agent-authored explanation is not presented as direct user Evidence."
+    },
+    {
+      "key": "analyst_mixed_strength",
+      "dimension": "EVIDENCE_QUALITY",
+      "reviewMode": "HUMAN",
+      "description": "The result keeps the directly led repetition at NONE while preserving the separate independent application as STRONG.",
+      "successDefinition": "Claims are split by Concept and prompt dependence without false mastery."
+    }
+  ],
+  "scenarioTags": ["prompt regression", "evidence analyst", "mixed strength", "directly led", "independent application", "provenance"],
+  "fixtureVersion": "1.0.1",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED"
+}

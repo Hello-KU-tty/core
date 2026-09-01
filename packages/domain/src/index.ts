@@ -1,4 +1,5 @@
 export * from './candidate-reducer.js'
+export * from './analysis-job-reducer.js'
 export * from './concept-state-reducer.js'
 export * from './decision-reducer.js'
 export * from './evidence-policy.js'

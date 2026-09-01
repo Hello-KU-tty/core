@@ -28,7 +28,7 @@ pnpm test:eval
 | Live Context | context version과 필수 Decision/Concept 포함 여부 | 후속 Agent 응답의 의미적 충분성 |
 | Decision | strict contract | 사용자에게 물을 만큼 중요한 실제 선택인지 |
 | Helper | focused Decision, freshness, redaction과 read-only tool allowlist | 첫 답변의 현재성·간결성, claim 단위 비유와 비강제성 |
-| Evidence | production deterministic Evidence policy의 outcome/reason | false mastery와 false misconception의 claim 의미 |
+| Evidence | strict semantic result, source reference, production deterministic Evidence policy의 outcome/reason | false mastery, mixed strength와 false misconception의 claim 의미 |
 | Redaction | synthetic sentinel과 user-home path 잔존 여부 | 새로운 민감정보 유형의 맥락별 검토 |
 
 사람 review가 없으면 harness는 통과로 추정하지 않고 `NEEDS_REVIEW`를 반환한다. `FAILED`는 기대한 품질 차이를 검출한 결과일 수 있고, scorer 실행 자체의 실패인 `ERROR`와 구분한다. 그래서 calibration run은 의도적으로 실패해야 하는 negative fixture를 포함해도 `COMPLETED`다.
@@ -46,5 +46,7 @@ T08부터 실제 Kiro 출력은 `fixtures/agent-runs`에서 별도 회귀 사례
 T09의 selected-Candidate→Learning Spec 경로는 `pnpm test:eval:live-spec`으로 별도 실행한다. 이 runner는 synthetic selected Candidate를 Application/SQLite에 만든 뒤 Agent에게 semantic draft만 제출하게 하고 Core-owned metadata와 저장 결과를 확인한다. Kiro CLI가 로그아웃 상태면 Agent 결과를 만들지 않고 인증 오류로 실패하며 mock 성공으로 대체하지 않는다.
 
 T12의 실제 Helper 대화는 `pnpm test:eval:live-helper`로 별도 실행한다. runner는 current Decision, `DEMONSTRATED` Concept State, 과거 Episode와 secret이 포함된 source reference를 합성한 뒤, Helper가 role-bound context tool을 한 번만 사용해 redaction된 excerpt에 근거한 답을 하는지 확인한다. CURRENT Context에서 refresh를 만들거나 Builder-owned Task·Context·Decision을 바꾸면 실패한다. `helper-v1.0-analogy` prompt regression은 실제 live 출력과 별도로 첫 답변, claim 단위 비유와 높은 State에서의 비강제적 접근성을 기록된 사람 review로 고정한다.
+
+T13의 실제 Evidence 분석은 `pnpm test:eval:live-analyst`로 실행한다. runner는 같은 Episode 안의 직접 유도 반복과 독립적인 적용을 함께 제공하고, hidden no-tool Analyst의 strict semantic JSON을 adapter/Application에 제출한다. tool 호출, strict contract, Proposal 채택·거절, Ledger State, durable Job과 Episode 종료 상태가 기대와 다르면 실패한다. `evidence-analyst-v1.0-mixed` prompt regression과 기록된 사람 review는 USER_MESSAGE provenance, `NONE/DIRECTLY_LED`와 `STRONG/INDEPENDENT` 분리를 고정한다.
 
 새 fixture는 개인정보·credential·실제 사용자 경로를 포함하지 않고 `containsPersonalData: false`, `redactionStatus: VERIFIED_REDACTED`를 유지해야 한다. 자동 criterion을 추가하면 scorer registry와 good/bad 보정 사례를 함께 추가한다.

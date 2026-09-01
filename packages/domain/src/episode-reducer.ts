@@ -11,6 +11,96 @@ export interface CloseEpisodeInput {
   readonly events: readonly ActivityEvent[]
 }
 
+export interface AppendEpisodeEventInput {
+  readonly current: Episode
+  readonly event: ActivityEvent
+}
+
+export function appendEpisodeEvent(input: AppendEpisodeEventInput): DomainResult<Episode> {
+  const entityIds = [input.current.id, input.event.id]
+  if (input.current.status !== 'OPEN') {
+    return rejected({
+      operation: 'EPISODE_EVENT_APPEND',
+      reasonCode: 'EPISODE_NOT_OPEN',
+      entityIds,
+    })
+  }
+  if (input.current.eventIds.includes(input.event.id)) {
+    return noOp(input.current, {
+      operation: 'EPISODE_EVENT_APPEND',
+      reasonCode: 'EPISODE_EVENT_DUPLICATE',
+      entityIds,
+    })
+  }
+  if (
+    input.event.projectId !== input.current.projectId ||
+    input.event.correlationId !== input.current.correlationId ||
+    (input.current.taskId !== undefined && input.event.taskId !== input.current.taskId) ||
+    (input.current.decisionId !== undefined &&
+      input.event.decisionId !== undefined &&
+      input.event.decisionId !== input.current.decisionId) ||
+    (input.current.conversationId !== undefined &&
+      input.event.conversationId !== undefined &&
+      input.event.conversationId !== input.current.conversationId) ||
+    compareUtc(input.event.occurredAt, input.current.startedAt) < 0
+  ) {
+    return rejected({
+      operation: 'EPISODE_EVENT_APPEND',
+      reasonCode: 'EPISODE_EVENT_SCOPE_INVALID',
+      entityIds,
+    })
+  }
+  const next = episodeSchema.parse({
+    ...input.current,
+    revision: input.current.revision + 1,
+    eventIds: [...input.current.eventIds, input.event.id],
+  })
+  return applied(next, {
+    operation: 'EPISODE_EVENT_APPEND',
+    reasonCode: 'EPISODE_EVENT_APPENDED',
+    entityIds,
+    supportingIds: next.eventIds,
+  })
+}
+
+export interface TransitionEpisodeAnalysisInput {
+  readonly current: Episode
+  readonly status: 'PENDING_ANALYSIS' | 'ANALYZED' | 'ANALYSIS_FAILED'
+  readonly changedAt: string
+  readonly closeReason?: string
+}
+
+export function transitionEpisodeAnalysis(
+  input: TransitionEpisodeAnalysisInput,
+): DomainResult<Episode> {
+  const allowed =
+    (input.current.status === 'PENDING_ANALYSIS' &&
+      (input.status === 'ANALYZED' || input.status === 'ANALYSIS_FAILED')) ||
+    (input.current.status === 'ANALYSIS_FAILED' && input.status === 'PENDING_ANALYSIS')
+  if (!allowed) {
+    return rejected({
+      operation: 'EPISODE_ANALYSIS_TRANSITION',
+      reasonCode: 'EPISODE_ANALYSIS_TRANSITION_NOT_ALLOWED',
+      entityIds: [input.current.id],
+    })
+  }
+  const next = episodeSchema.parse({
+    ...input.current,
+    revision: input.current.revision + 1,
+    status: input.status,
+    endedAt: input.current.endedAt ?? input.changedAt,
+    closeReason:
+      input.closeReason ?? input.current.closeReason ?? 'Episode analysis state changed.',
+  })
+  return applied(next, {
+    operation: 'EPISODE_ANALYSIS_TRANSITION',
+    reasonCode: 'EPISODE_ANALYSIS_TRANSITIONED',
+    entityIds: [next.id],
+    before: input.current.status,
+    after: next.status,
+  })
+}
+
 function immutableEpisodeContent(episode: Episode): unknown {
   const {
     revision: _revision,

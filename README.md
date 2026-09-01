@@ -2,7 +2,7 @@
 
 Vibe Helper는 코딩 초보자가 자기에게 실용적인 TypeScript 서비스를 고르고, Kiro Builder와 함께 실제로 만들며, 필요한 순간 Helper와 대화해 개념을 익히도록 돕는 build-first 개발 환경이다. 제품은 개발을 교육용 단계로 끊지 않고 실제 Decision, 작업 맥락과 사용자 행동에서 나온 Evidence를 다음 설명과 project 추천에 연결한다.
 
-현재 repository는 bootstrap 문서, T01 Kiro/Crew capability probe, T02 TypeScript workspace skeleton, T03 공유 contract/runtime validation, T04 deterministic domain reducer, T05 SQLite persistence, T06 application/MCP 권한 경계, T07 평가 harness, T08 Discovery Candidate loop와 T09 Learning Spec 생성·조정·확정을 포함한다. 다음 작업은 T10 Builder Task, workspace와 Live Context이며, `spikes/kiro-crew/`의 코드는 외부 기능 경계를 확인하기 위한 폐기 가능한 실험물이다.
+현재 repository는 T00~T13의 승인·구현 결과를 포함한다. Discovery→Learning Spec→Builder/Decision→Helper→Event/Episode→Evidence/Concept State Core 흐름과 durable SQLite 복구, 역할별 Kiro adapter 및 실제 Agent 회귀가 연결돼 있다. 다음 작업은 T14 Crew App shell과 공통 session 복원이며, `spikes/kiro-crew/`의 코드는 외부 기능 경계를 확인하기 위한 폐기 가능한 실험물이다.
 
 ## 문서 읽는 순서
 
@@ -32,7 +32,7 @@ MVP host는 Kiro/Crew이고 Agent 중심 Crew App을 primary surface로 삼는�
 
 ## 현재 착수점
 
-T00~T09가 완료됐고 현재 착수 작업은 T10 Builder Task, workspace와 Live Context다. T09은 canonical Discovery prompt v1.1.0, semantic-only Spec tool, selected-Candidate→draft→revision→user confirmation과 새 Session Discovery 복귀 흐름을 구현했다. `LEARNER_FOCUS`만 필수 Evidence target으로 계산한다. T08의 실제 Kiro CLI 2/Haiku 8-Candidate round와 T09의 실제 selected-Candidate→DRAFT Spec 저장이 Kiro Agent Engine v2→role-bound MCP→Application→SQLite 경로에서 통과했다. 평가 실행법과 자동/사람 review 경계는 `tests/eval/README.md`, Agent 회귀 결과는 `tests/eval/results/`, AC 추적표는 `tests/eval/TRACEABILITY.md`에 있다. T01의 상세 계획과 결과는 `docs/spikes/KIRO_CREW_CAPABILITY_SPIKE.md`, `docs/spikes/KIRO_CREW_CAPABILITY_RESULTS.md`에 있다.
+T00~T13이 완료됐고 현재 착수 작업은 T14 Crew App shell과 공통 session 복원이다. T13은 의미 있는 Application 전이를 Event로 정규화하고 BUILD_TASK, DECISION과 HELPER_CONVERSATION Episode를 닫은 뒤 durable Analysis Job을 한 번 queue한다. no-tool Evidence Analyst v1.0.1의 semantic Proposal은 deterministic Core가 채택·거절하며 retry/dead-letter, late result 거절, 빈 결과, trace와 Core-only `OBSERVED`를 보존한다. 실제 Kiro CLI 2/Haiku mixed-strength 회귀도 tool 호출 없이 Core 적용까지 통과했다. 평가 실행법과 자동/사람 review 경계는 `tests/eval/README.md`, Agent 회귀 결과는 `tests/eval/results/`, AC 추적표는 `tests/eval/TRACEABILITY.md`에 있다. T01의 상세 계획과 결과는 `docs/spikes/KIRO_CREW_CAPABILITY_SPIKE.md`, `docs/spikes/KIRO_CREW_CAPABILITY_RESULTS.md`에 있다.
 
 ## 로컬 개발
 
@@ -55,6 +55,9 @@ pnpm test:integration
 pnpm test:eval
 pnpm test:eval:live-discovery # local Kiro 로그인 환경에서 실행하는 bounded live probe
 pnpm test:eval:live-spec      # selected Candidate에서 draft Spec을 저장하는 bounded live probe
+pnpm test:eval:live-builder   # Decision gate를 포함한 bounded Builder live probe
+pnpm test:eval:live-helper    # current context 기반 read-only Helper live probe
+pnpm test:eval:live-analyst   # closed Episode→no-tool Analyst→Core Evidence live probe
 pnpm build
 pnpm test:smoke
 pnpm test:e2e

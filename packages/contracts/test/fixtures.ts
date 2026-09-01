@@ -21,6 +21,7 @@ export const ids = {
   eventUser: 'event_00000000-0000-4000-8000-000000000019',
   eventDecision: 'event_00000000-0000-4000-8000-000000000020',
   episode: 'episode_00000000-0000-4000-8000-000000000021',
+  analysisJob: 'analysis_job_00000000-0000-4000-8000-000000000034',
   concept: 'concept_00000000-0000-4000-8000-000000000022',
   evidenceProposal: 'evidence_proposal_00000000-0000-4000-8000-000000000023',
   evidenceDecision: 'evidence_decision_00000000-0000-4000-8000-000000000024',
@@ -452,6 +453,34 @@ export const episodeFixture = {
   redactionStatus: 'VERIFIED_REDACTED',
 } as const
 
+export const analysisJobPendingFixture = {
+  schemaVersion: 1,
+  id: ids.analysisJob,
+  projectId: ids.project,
+  episodeId: ids.episode,
+  episodeRevision: 1,
+  correlationId: ids.correlation,
+  revision: 1,
+  status: 'PENDING',
+  attempt: 0,
+  maxAttempts: 2,
+  timeoutMs: 30_000,
+  createdAt: timestamp,
+  updatedAt: timestamp,
+  source: { kind: 'CORE' },
+  redactionStatus: 'VERIFIED_REDACTED',
+} as const
+
+export const analysisJobFixture = {
+  ...analysisJobPendingFixture,
+  revision: 2,
+  status: 'RUNNING',
+  attempt: 1,
+  runtimeHandle: 'analyst-slot-1',
+  deadlineAt: '2026-08-25T03:00:30.000Z',
+  startedAt: timestamp,
+} as const
+
 export const canonicalConceptFixture = {
   schemaVersion: 1,
   id: ids.concept,
@@ -491,6 +520,7 @@ export const evidenceProposalFixture = {
 
 export const evidenceProposalBatchFixture = {
   schemaVersion: 1,
+  projectId: ids.project,
   episodeId: ids.episode,
   correlationId: ids.correlation,
   episodeRevision: 1,

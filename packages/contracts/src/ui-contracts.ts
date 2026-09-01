@@ -1,13 +1,17 @@
 import { z } from 'zod'
 
+import { analysisJobStatusSchema } from './analysis.js'
 import { builderTaskSchema, decisionResolutionSchema } from './build.js'
 import { discoveryFeedbackSchema, discoveryInputSchema } from './discovery.js'
 import { learningSpecDraftContentSchema } from './learning-spec.js'
 import {
+  analysisJobIdSchema,
   conceptIdSchema,
+  conversationIdSchema,
   correlationIdSchema,
   decisionIdSchema,
   entityRevisionSchema,
+  episodeIdSchema,
   idempotencyKeySchema,
   discoverySessionIdSchema,
   learningSpecIdSchema,
@@ -15,6 +19,7 @@ import {
   projectIdSchema,
   relativePosixPathSchema,
   schemaVersionSchema,
+  shortTextSchema,
   taskIdSchema,
 } from './primitives.js'
 
@@ -105,6 +110,36 @@ export const uiOpenHelperQuerySchema = z.strictObject({
   question: nonEmptyTextSchema.optional(),
 })
 
+export const uiRecordHelperExchangeCommandSchema = z.strictObject({
+  ...uiRequestMetadata,
+  kind: z.literal('UI_RECORD_HELPER_EXCHANGE'),
+  idempotencyKey: idempotencyKeySchema,
+  projectId: projectIdSchema,
+  taskId: taskIdSchema.optional(),
+  decisionId: decisionIdSchema.optional(),
+  conversationId: conversationIdSchema.optional(),
+  userMessage: nonEmptyTextSchema,
+  helperResponseSummary: shortTextSchema,
+  closeConversation: z.boolean(),
+})
+
+export const uiRetryAnalysisCommandSchema = z.strictObject({
+  ...uiRequestMetadata,
+  kind: z.literal('UI_RETRY_ANALYSIS'),
+  idempotencyKey: idempotencyKeySchema,
+  projectId: projectIdSchema,
+  analysisJobId: analysisJobIdSchema,
+  expectedJobRevision: entityRevisionSchema,
+})
+
+export const uiReadAnalysisJobsQuerySchema = z.strictObject({
+  ...uiRequestMetadata,
+  kind: z.literal('UI_READ_ANALYSIS_JOBS'),
+  projectId: projectIdSchema,
+  status: analysisJobStatusSchema.optional(),
+  limit: z.int().min(1).max(100),
+})
+
 export const uiReadEvidenceTraceQuerySchema = z.strictObject({
   ...uiRequestMetadata,
   kind: z.literal('UI_READ_EVIDENCE_TRACE'),
@@ -136,6 +171,15 @@ export const preparedBuilderTaskDescriptorSchema = z.strictObject({
   status: z.literal('READY'),
 })
 
+export const helperExchangeReceiptSchema = z.strictObject({
+  schemaVersion: schemaVersionSchema,
+  correlationId: correlationIdSchema,
+  conversationId: conversationIdSchema,
+  episodeId: episodeIdSchema,
+  episodeRevision: entityRevisionSchema,
+  status: z.enum(['OPEN', 'PENDING_ANALYSIS']),
+})
+
 export const uiRequestSchema = z.discriminatedUnion('kind', [
   uiStartDiscoveryCommandSchema,
   uiRecordDiscoveryFeedbackCommandSchema,
@@ -145,6 +189,9 @@ export const uiRequestSchema = z.discriminatedUnion('kind', [
   uiReturnToDiscoveryCommandSchema,
   uiResolveDecisionCommandSchema,
   uiOpenHelperQuerySchema,
+  uiRecordHelperExchangeCommandSchema,
+  uiRetryAnalysisCommandSchema,
+  uiReadAnalysisJobsQuerySchema,
   uiReadEvidenceTraceQuerySchema,
   uiLaunchResultCommandSchema,
 ])
@@ -152,3 +199,4 @@ export const uiRequestSchema = z.discriminatedUnion('kind', [
 export type UiRequest = z.infer<typeof uiRequestSchema>
 export type GeneratedResultDescriptor = z.infer<typeof generatedResultDescriptorSchema>
 export type PreparedBuilderTaskDescriptor = z.infer<typeof preparedBuilderTaskDescriptorSchema>
+export type HelperExchangeReceipt = z.infer<typeof helperExchangeReceiptSchema>
