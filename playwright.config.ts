@@ -16,10 +16,18 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: {
-    command: 'pnpm --filter @vibe-helper/crew-app dev',
-    url: 'http://127.0.0.1:4173',
-    reuseExistingServer: false,
-    timeout: 30_000,
-  },
+  webServer: [
+    {
+      command: 'pnpm --filter @vibe-helper/crew-backend dev:test',
+      url: 'http://127.0.0.1:4174/health',
+      reuseExistingServer: false,
+      timeout: 30_000,
+    },
+    {
+      command: 'pnpm --filter @vibe-helper/crew-app dev',
+      url: 'http://127.0.0.1:4173',
+      reuseExistingServer: false,
+      timeout: 30_000,
+    },
+  ],
 })

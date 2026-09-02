@@ -275,6 +275,14 @@
 - **검토한 대안:** raw Crew stream을 Event source of truth로 사용, Event마다 Analyst 호출, hard cancel을 전제로 한 spawn task, Agent가 job/ID/provenance 생성, timeout 뒤 결과를 attempt 확인 없이 수용, Evidence가 없을 때 가짜 NONE proposal 생성, Builder 사용 Concept를 사용자 이해 Evidence로 처리.
 - **tradeoff:** Event normalization, Episode close와 job transition을 기존 use case transaction에 연결해야 해 contract와 migration이 늘어나고 Helper conversation 종료 signal이 필요하다. 대신 provider/session이 사라져도 분석을 복구할 수 있고, 실패한 분석이 Builder 결과를 롤백하지 않으며, 한 Episode당 한 initial dispatch와 제한된 retry, provenance 분리와 빈 결과를 재현 가능하게 검증할 수 있다.
 
+## 2026-09-02: T14 Crew Node backend와 durable session read model
+
+- **상태:** 승인
+- **맥락:** T05의 `recoverProject`는 stable project ID가 주어졌을 때 current Core 상태를 복구하지만 Crew App browser가 SQLite/Application을 호출할 production transport, Project History 목록 query와 UI용 session snapshot은 없다. Helper 원문 대화는 Crew slot history에 있고 durable Core에는 redacted user excerpt와 Helper summary만 남으므로 두 저장 경계를 같은 것으로 취급할 수도 없다. 설치된 Crew 0.3.0과 공식 manifest는 app-relative Node backend, same-origin reverse proxy와 Gateway proxy HMAC을 지원한다.
+- **결정:** `apps/crew-backend`를 TypeScript Node composition root로 추가하고 Crew App UI는 고정 same-origin endpoint를 통해서만 기존 `ApplicationService.executeUi`를 호출한다. backend는 host가 제공한 absolute app-data와 generated-workspace 경계에서 SQLite/Application을 조합하고 proxy HMAC, method/content type, 2 MiB payload와 strict response schema를 검증한다. UI contract에는 project 목록과 session restore query/read model을 추가하며 project, Discovery/Spec, current 또는 active Task, pending Decision, Live Context와 redacted Helper conversation summary를 한 snapshot으로 반환한다. Project별 Builder/Helper slot key는 stable project ID에서 결정적으로 파생하고 Crew history를 runtime 보조 source로 복원한다. Crew 연결이 실패해도 Core snapshot과 redacted history는 유지하며 localStorage, seed나 mock을 production fallback으로 사용하지 않는다. UI route는 host subpath와 충돌하지 않는 hash route를 사용하고 React Router를 추가하지 않는다.
+- **검토한 대안:** browser가 SQLite/storage package를 직접 bundle, 기존 Agent MCP를 UI transport로 재사용, app-scoped storage에 Core state를 복제, `apps/mcp-server`에 HTTP 책임 추가, Crew slot/history만 source of truth로 사용, production mock/seed fallback, 새 router/server framework dependency 추가.
+- **tradeoff:** 별도 backend process와 HMAC·HTTP integration test, Project History query와 Crew/Core 부분 실패 상태가 늘어난다. 대신 UI와 storage dependency 방향, TypeScript-only 경계, Agent별 MCP 권한과 local-first 단일 source of truth를 유지하고 Crew Agent 연결과 durable project 조회를 독립적으로 복구할 수 있다. full Helper 원문은 Crew slot이 있을 때만 복원하며 offline에는 이미 저장된 redacted 요약만 정직하게 표시한다.
+
 ## 2026-08-24: 구현 세부 선택 위임
 
 - **상태:** 승인

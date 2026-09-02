@@ -160,6 +160,7 @@ export interface PersistenceRepository {
   recoverProject(projectId: string): ProjectRecoveryState | null
   readDiscoveryAggregate(projectId: string, discoverySessionId?: string): DiscoveryAggregate | null
   readDiscoveryAggregateBySession(discoverySessionId: string): DiscoveryAggregate | null
+  readProjects(limit: number): readonly Project[]
   readBuilderTaskAggregate(projectId: string, taskId: string): BuilderTaskAggregate | null
   readLatestTaskForProject(projectId: string): BuilderTask | null
   readEpisodeAggregate(projectId: string, episodeId: string): EpisodeAggregate | null
@@ -186,6 +187,11 @@ export interface PersistenceRepository {
     projectId: string,
     limit: number,
   ): readonly EpisodeAggregate[]
+  readRecentHelperConversationAggregatesForProject(
+    projectId: string,
+    limit: number,
+  ): readonly EpisodeAggregate[]
+  countHelperConversationsForProject(projectId: string): number
   readCanonicalConceptById(conceptId: string): CanonicalConcept | null
   readCanonicalConceptByName(canonicalName: string): CanonicalConcept | null
   readIdempotencyReceipt(key: string): IdempotencyReceipt | null

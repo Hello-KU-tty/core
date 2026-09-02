@@ -110,6 +110,19 @@ export const uiOpenHelperQuerySchema = z.strictObject({
   question: nonEmptyTextSchema.optional(),
 })
 
+export const uiListProjectsQuerySchema = z.strictObject({
+  ...uiRequestMetadata,
+  kind: z.literal('UI_LIST_PROJECTS'),
+  limit: z.int().min(1).max(100),
+})
+
+export const uiRestoreProjectSessionQuerySchema = z.strictObject({
+  ...uiRequestMetadata,
+  kind: z.literal('UI_RESTORE_PROJECT_SESSION'),
+  projectId: projectIdSchema,
+  helperConversationLimit: z.int().min(1).max(20),
+})
+
 export const uiRecordHelperExchangeCommandSchema = z.strictObject({
   ...uiRequestMetadata,
   kind: z.literal('UI_RECORD_HELPER_EXCHANGE'),
@@ -188,6 +201,8 @@ export const uiRequestSchema = z.discriminatedUnion('kind', [
   uiPrepareBuilderTaskCommandSchema,
   uiReturnToDiscoveryCommandSchema,
   uiResolveDecisionCommandSchema,
+  uiListProjectsQuerySchema,
+  uiRestoreProjectSessionQuerySchema,
   uiOpenHelperQuerySchema,
   uiRecordHelperExchangeCommandSchema,
   uiRetryAnalysisCommandSchema,

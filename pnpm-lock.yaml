@@ -52,6 +52,15 @@ importers:
         specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(tsx@4.23.12)
 
+  apps/crew-backend:
+    dependencies:
+      '@vibe-helper/application':
+        specifier: workspace:*
+        version: link:../../packages/application
+      '@vibe-helper/storage-sqlite':
+        specifier: workspace:*
+        version: link:../../packages/storage-sqlite
+
   apps/mcp-server:
     dependencies:
       '@modelcontextprotocol/server':

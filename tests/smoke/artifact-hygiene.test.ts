@@ -26,6 +26,7 @@ describe('artifact and local-data hygiene', () => {
     const buildDirectories = [
       'apps/crew-app/dist',
       'apps/crew-app/dist-types',
+      'apps/crew-backend/dist',
       'apps/mcp-server/dist',
       'packages/contracts/dist',
       'packages/domain/dist',
@@ -64,5 +65,29 @@ describe('artifact and local-data hygiene', () => {
     expect(baseTsconfig.compilerOptions.inlineSources).toBe(false)
     expect(baseTsconfig.compilerOptions.declarationMap).toBe(false)
     expect(viteConfig).toContain('sourcemap: false')
+  })
+
+  it('keeps the Crew manifest narrow and test fallbacks out of the production UI bundle', async () => {
+    const manifest = JSON.parse(await readFile(path.join(workspaceRoot, 'app.json'), 'utf8')) as {
+      ui: { entry: string }
+      backend: { entryPoint: string; type: string; healthCheck: string }
+      permissions: { api: string[]; storage: boolean; network: boolean }
+    }
+    const bundle = await readFile(path.join(workspaceRoot, manifest.ui.entry), 'utf8')
+
+    expect(manifest.backend).toMatchObject({
+      entryPoint: 'apps/crew-backend/dist/main.js',
+      type: 'node',
+      healthCheck: '/health',
+    })
+    expect(manifest.permissions).toEqual({
+      api: ['/apps/vibe-helper/api', '/api/chat/slots', '/api/chat/slots/*'],
+      storage: false,
+      network: false,
+      events: [],
+    })
+    expect(bundle).not.toContain('vibe-helper.test')
+    expect(bundle).not.toContain('test-proxy-secret')
+    expect(bundle).not.toContain('synthetic-browser-secret')
   })
 })

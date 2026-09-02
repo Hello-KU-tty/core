@@ -13,6 +13,7 @@ const workspaceRoot = process.cwd()
 
 const packageLocations = [
   'apps/crew-app',
+  'apps/crew-backend',
   'apps/mcp-server',
   'packages/contracts',
   'packages/domain',
@@ -26,6 +27,10 @@ const dependencyRules: readonly DependencyRule[] = [
   {
     packageName: '@vibe-helper/crew-app',
     allowedInternalDependencies: ['@vibe-helper/contracts', '@vibe-helper/kiro-adapter'],
+  },
+  {
+    packageName: '@vibe-helper/crew-backend',
+    allowedInternalDependencies: ['@vibe-helper/application', '@vibe-helper/storage-sqlite'],
   },
   {
     packageName: '@vibe-helper/mcp-server',

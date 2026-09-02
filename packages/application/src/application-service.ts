@@ -49,11 +49,17 @@ import {
   generatedResultDescriptorSchema,
   type HelperContext,
   helperContextSchema,
+  type HelperConversationSummary,
+  helperConversationSummarySchema,
   type LearningSpecRevision,
   type LiveProjectContext,
   type OperationError,
   type Project,
+  type ProjectHistory,
+  projectHistorySchema,
   type ProjectCandidateRevision,
+  type ProjectSessionSnapshot,
+  projectSessionSnapshotSchema,
   type PreparedBuilderTaskDescriptor,
   preparedBuilderTaskDescriptorSchema,
   liveProjectContextSchema,
@@ -94,6 +100,7 @@ import {
 import {
   type BuilderTaskAggregate,
   type DiscoveryAggregate,
+  type EpisodeAggregate,
   type EvidenceTrace,
   type IdempotencyReceipt,
   PersistenceError,
@@ -121,6 +128,8 @@ export type UiApplicationResponse =
   | readonly EvidenceTrace[]
   | PreparedBuilderTaskDescriptor
   | GeneratedResultDescriptor
+  | ProjectHistory
+  | ProjectSessionSnapshot
 
 export type AnalysisApplicationResponse =
   | AnalysisJob
@@ -234,6 +243,12 @@ function readCorrelationId(input: unknown): string | undefined {
   return parsed.success ? parsed.data : undefined
 }
 
+function suggestedSurface(project: Project): 'DISCOVERY' | 'SPEC' | 'BUILD' {
+  if (project.status === 'DISCOVERY') return 'DISCOVERY'
+  if (project.status === 'SPEC_REVIEW') return 'SPEC'
+  return 'BUILD'
+}
+
 export class ApplicationService {
   readonly #storage: StorageUnitOfWork
   readonly #workspacePolicy: WorkspacePathPolicy
@@ -340,6 +355,10 @@ export class ApplicationService {
         return this.#returnToDiscovery(request)
       case 'UI_RESOLVE_DECISION':
         return this.#resolveUserDecision(request)
+      case 'UI_LIST_PROJECTS':
+        return this.#listProjects(request)
+      case 'UI_RESTORE_PROJECT_SESSION':
+        return this.#restoreProjectSession(request)
       case 'UI_OPEN_HELPER':
         return this.#openHelperFromUi(request)
       case 'UI_RECORD_HELPER_EXCHANGE':
@@ -353,6 +372,99 @@ export class ApplicationService {
       case 'UI_LAUNCH_RESULT':
         return this.#getResultDescriptor(request)
     }
+  }
+
+  #listProjects(request: Extract<UiRequest, { kind: 'UI_LIST_PROJECTS' }>): ProjectHistory {
+    return this.#storage.transaction((repository) =>
+      projectHistorySchema.parse({
+        schemaVersion: 1,
+        correlationId: request.correlationId,
+        projects: repository.readProjects(request.limit).map((project) => {
+          const recovery = repository.recoverProject(project.id)
+          if (recovery === null) {
+            throw new PersistenceError(
+              'CORRUPT_DATABASE',
+              'Project head disappeared during History assembly',
+              project.id,
+            )
+          }
+          const task =
+            recovery.activeTask ??
+            recovery.currentTask ??
+            repository.readLatestTaskForProject(project.id)
+          const taskAggregate =
+            task === null ? null : repository.readBuilderTaskAggregate(project.id, task.id)
+          return {
+            project,
+            suggestedSurface: suggestedSurface(project),
+            activeTask: recovery.activeTask,
+            pendingDecisionCount: recovery.pendingDecisions.length,
+            currentContextVersion: taskAggregate?.liveContext?.contextVersion ?? null,
+            helperConversationCount: repository.countHelperConversationsForProject(project.id),
+          }
+        }),
+      }),
+    )
+  }
+
+  #restoreProjectSession(
+    request: Extract<UiRequest, { kind: 'UI_RESTORE_PROJECT_SESSION' }>,
+  ): ProjectSessionSnapshot {
+    return this.#storage.transaction((repository) => {
+      const recovery = repository.recoverProject(request.projectId)
+      if (recovery === null) throw this.#notFound(request.correlationId, 'PROJECT_NOT_FOUND')
+      const currentTask =
+        recovery.activeTask ??
+        recovery.currentTask ??
+        repository.readLatestTaskForProject(request.projectId)
+      const taskAggregate =
+        currentTask === null
+          ? null
+          : repository.readBuilderTaskAggregate(request.projectId, currentTask.id)
+      const helperConversations = repository
+        .readRecentHelperConversationAggregatesForProject(
+          request.projectId,
+          request.helperConversationLimit,
+        )
+        .map((aggregate) => this.#helperConversationSummary(aggregate))
+
+      return projectSessionSnapshotSchema.parse({
+        schemaVersion: 1,
+        correlationId: request.correlationId,
+        project: recovery.project,
+        suggestedSurface: suggestedSurface(recovery.project),
+        discoverySession: recovery.discoverySession,
+        selectedCandidate: recovery.selectedCandidate,
+        learningSpec: recovery.learningSpec,
+        activeTask: recovery.activeTask,
+        currentTask,
+        liveContext: taskAggregate?.liveContext ?? recovery.liveContext,
+        pendingDecisions: recovery.pendingDecisions,
+        helperConversations,
+      })
+    })
+  }
+
+  #helperConversationSummary(aggregate: EpisodeAggregate): HelperConversationSummary {
+    const userExcerpts = aggregate.events.flatMap((event) =>
+      event.payload.type === 'USER_MESSAGE' ? [event.payload.redactedExcerpt] : [],
+    )
+    const helperSummaries = aggregate.events.flatMap((event) =>
+      event.payload.type === 'HELPER_RESPONSE' ? [event.payload.summary] : [],
+    )
+    return helperConversationSummarySchema.parse({
+      conversationId: aggregate.episode.conversationId,
+      episodeId: aggregate.episode.id,
+      taskId: aggregate.episode.taskId,
+      ...(aggregate.episode.decisionId === undefined
+        ? {}
+        : { decisionId: aggregate.episode.decisionId }),
+      status: aggregate.episode.status,
+      startedAt: aggregate.episode.startedAt,
+      ...(aggregate.episode.endedAt === undefined ? {} : { endedAt: aggregate.episode.endedAt }),
+      redactedUserExcerpts: userExcerpts.slice(-5),
+      helperResponseSummaries: helperSummaries.slice(-5),
+    })
   }
 
   async #dispatchAnalysis(request: AnalysisRuntimeRequest): Promise<AnalysisApplicationResponse> {

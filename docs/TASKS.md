@@ -476,7 +476,18 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - event마다 LLM을 호출하지 않으며 분석 실패가 code와 Project History를 훼손하지 않는다.
 - 어떤 원문·행동이 State 변경·보류에 사용됐는지 사용자에게 설명할 수 있다.
 
-### [>] T14. Crew App shell과 공통 session 복원
+### [x] T14. Crew App shell과 공통 session 복원
+
+**승인 기록**
+
+- 2026-09-02 사용자가 Project History/session read model, Crew Node backend와 same-origin HMAC proxy, deterministic Builder/Helper slot binding, hash route와 공통 상태를 포함한 T14 구현 계획을 승인했다.
+
+**검증 기록**
+
+- 2026-09-02 Node.js 24.19.0과 pnpm 11.12.0에서 `pnpm check` 전체가 통과했다. format·lint 139 files, typecheck, Drizzle schema, unit 2개, package/app integration 165개, eval 10개, production build, smoke 5개와 Chromium E2E 1개를 확인했다.
+- 공식 Crew 0.3.0 `AppManifest` parser로 repository root `app.json`의 field와 app-root-relative entry containment을 검증했다. production bundle은 inline style을 포함한 단일 `index.mjs`이며 test SDK, synthetic proxy secret, localStorage fallback, SQLite와 Node module이 섞이지 않음을 확인했다.
+- E2E는 빈 History와 loading, 실제 Application command로 만든 Project의 History→Discovery→Build route, deterministic Builder/Helper history redaction, hash route 새로고침 복원, Crew만 끊겼을 때 durable Core 유지, permission denial, recoverable contract error와 Core disconnected 상태를 한 session에서 검증한다.
+- Project History/session snapshot은 local SQLite의 project, Discovery/Spec, current·active Task, pending Decision, Live Context와 durable redacted Helper Episode summary를 반환한다. Crew raw history는 보조 source이며 실패해도 저장된 결과를 가리지 않는다.
 
 **범위**
 
@@ -500,7 +511,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - Kiro 연결이 끊겨도 이미 저장한 결과와 history는 볼 수 있고 재시도 방법이 보인다.
 - 임의 mock state가 production flow에 섞이지 않는다.
 
-### [ ] T15. Discovery와 Spec 사용자 경험
+### [>] T15. Discovery와 Spec 사용자 경험
 
 **범위**
 

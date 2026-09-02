@@ -11,7 +11,7 @@
   },
   "scripts": {
     "build:bundle": "vite build",
-    "dev": "vite --host 127.0.0.1 --port 4173 --strictPort"
+    "dev": "vite --mode test --host 127.0.0.1 --port 4173 --strictPort"
   },
   "dependencies": {
     "@vibe-helper/contracts": "workspace:*",

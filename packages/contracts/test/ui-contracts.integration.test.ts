@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import {
   uiRequestSchema,
   uiPrepareBuilderTaskCommandSchema,
+  uiListProjectsQuerySchema,
+  uiRestoreProjectSessionQuerySchema,
   uiResolveDecisionCommandSchema,
   uiReturnToDiscoveryCommandSchema,
   uiStartDiscoveryCommandSchema,
@@ -105,6 +107,36 @@ describe('UI external input contracts', () => {
     expect(
       uiPrepareBuilderTaskCommandSchema.safeParse({ ...prepare, workspacePath: '/tmp/owned-by-ui' })
         .success,
+    ).toBe(false)
+  })
+
+  it('accepts bounded Project History and session restore queries', () => {
+    const list = {
+      schemaVersion: 1,
+      kind: 'UI_LIST_PROJECTS',
+      correlationId: ids.correlation,
+      actor: { kind: 'UI' },
+      limit: 25,
+    } as const
+    const restore = {
+      schemaVersion: 1,
+      kind: 'UI_RESTORE_PROJECT_SESSION',
+      correlationId: ids.correlation,
+      actor: { kind: 'UI' },
+      projectId: ids.project,
+      helperConversationLimit: 10,
+    } as const
+
+    expect(uiListProjectsQuerySchema.parse(list)).toEqual(list)
+    expect(uiRestoreProjectSessionQuerySchema.parse(restore)).toEqual(restore)
+    expect(uiRequestSchema.safeParse(list).success).toBe(true)
+    expect(uiRequestSchema.safeParse(restore).success).toBe(true)
+    expect(uiListProjectsQuerySchema.safeParse({ ...list, limit: 101 }).success).toBe(false)
+    expect(
+      uiRestoreProjectSessionQuerySchema.safeParse({
+        ...restore,
+        helperConversationLimit: 0,
+      }).success,
     ).toBe(false)
   })
 })

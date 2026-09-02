@@ -1893,6 +1893,23 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
     )
   }
 
+  readProjects(limit: number): readonly Project[] {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Project limit must be 1 through 100')
+    }
+    return this.#read(() =>
+      this.#recordList(
+        `SELECT revisions.payload_json, revisions.payload_hash
+         FROM projects heads
+         JOIN project_revisions revisions
+           ON revisions.project_id = heads.id AND revisions.revision = heads.head_revision
+         ORDER BY heads.updated_at DESC, heads.id ASC LIMIT ?`,
+        [limit],
+        projectSchema,
+      ),
+    )
+  }
+
   readRecentEpisodeAggregatesForProject(
     projectId: string,
     limit: number,
@@ -1915,6 +1932,49 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
         const aggregate = this.readEpisodeAggregate(projectId, row.id)
         return aggregate === null ? [] : [aggregate]
       })
+    })
+  }
+
+  readRecentHelperConversationAggregatesForProject(
+    projectId: string,
+    limit: number,
+  ): readonly EpisodeAggregate[] {
+    if (!projectSchema.shape.id.safeParse(projectId).success || !Number.isInteger(limit)) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Helper conversation query is invalid')
+    }
+    if (limit < 1 || limit > 20) {
+      throw new PersistenceError(
+        'VALIDATION_FAILED',
+        'Helper conversation limit must be 1 through 20',
+      )
+    }
+    return this.#read(() => {
+      const rows = this.#sqlite
+        .prepare<[string, number], { readonly id: string }>(
+          `SELECT id FROM episodes
+           WHERE project_id = ? AND type = 'HELPER_CONVERSATION'
+           ORDER BY updated_at DESC LIMIT ?`,
+        )
+        .all(projectId, limit)
+      return rows.flatMap((row) => {
+        const aggregate = this.readEpisodeAggregate(projectId, row.id)
+        return aggregate === null ? [] : [aggregate]
+      })
+    })
+  }
+
+  countHelperConversationsForProject(projectId: string): number {
+    if (!projectSchema.shape.id.safeParse(projectId).success) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Project ID is invalid')
+    }
+    return this.#read(() => {
+      const row = this.#sqlite
+        .prepare<[string], { readonly count: number }>(
+          `SELECT count(*) AS count FROM episodes
+           WHERE project_id = ? AND type = 'HELPER_CONVERSATION'`,
+        )
+        .get(projectId)
+      return row?.count ?? 0
     })
   }
 

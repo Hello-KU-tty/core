@@ -29,6 +29,10 @@
     "./evidence-analyst-prompt-node": {
       "types": "./dist/evidence-analyst-prompt-node.d.ts",
       "import": "./dist/evidence-analyst-prompt-node.js"
+    },
+    "./crew-app": {
+      "types": "./dist/crew-app-client.d.ts",
+      "import": "./dist/crew-app-client.js"
     }
   },
   "dependencies": {

@@ -2,9 +2,9 @@
 
 ## 1. 상태
 
-- 상태: 사용자 승인 완료, T13 Event 정규화·Episode assembler·Evidence Analyst 완료, T14 Crew App shell이 다음 작업
+- 상태: 사용자 승인 완료, T14 Crew App shell과 공통 session 복원 완료
 - 기준 입력: [PROJECT_BRIEF.md](../PROJECT_BRIEF.md), [SPEC.md](SPEC.md)
-- T03 versioned contract와 Agent/UI runtime validation, T04 pure reducer와 Evidence policy v1.0.0, T05 SQLite schema/repository/migration, T06 application use case와 역할 고정 MCP server, T07 criterion 기반 evaluation contract와 harness, T08 Candidate loop, T09 Discovery Agent prompt v1.1.0과 Learning Spec revision flow, T10 native workspace lifecycle, T11 Builder prompt v1.1.0과 Decision gate, T12 Helper prompt v1.0.0과 bounded context/refresh, T13 Evidence Analyst prompt v1.0.1과 durable Analysis Job은 구현됐다.
+- T03 versioned contract와 Agent/UI runtime validation, T04 pure reducer와 Evidence policy v1.0.0, T05 SQLite schema/repository/migration, T06 application use case와 역할 고정 MCP server, T07 criterion 기반 evaluation contract와 harness, T08 Candidate loop, T09 Discovery Agent prompt v1.1.0과 Learning Spec revision flow, T10 native workspace lifecycle, T11 Builder prompt v1.1.0과 Decision gate, T12 Helper prompt v1.0.0과 bounded context/refresh, T13 Evidence Analyst prompt v1.0.1과 durable Analysis Job, T14 Crew Node backend와 Project History/session restore UI는 구현됐다.
 - Kiro/Crew 세부 연결은 capability spike 결과에 따라 이 문서를 갱신한다.
 
 ## 2. 선택한 기술 스택과 선택 이유
@@ -145,6 +145,7 @@ Evidence 분석 실패는 Builder result와 Project History를 롤백하지 않�
 ```text
 apps/
   crew-app/              # Agent 중심 primary UI
+  crew-backend/          # Crew reverse proxy 뒤 UI→Application composition root
   mcp-server/            # Agent용 typed tool/resource 실행 process
 packages/
   contracts/             # runtime schema와 shared DTO
@@ -274,6 +275,8 @@ Kiro IDE Code mode:
 - 같은 stable ID를 사용하고 Crew raw chat session 공유는 요구하지 않음
 
 MVP에는 별도 Open VSX extension/webview나 `apps/kiro-panel`을 만들지 않는다. 공식 Kiro 문서상 `.kiro/agents/`는 IDE와 CLI 양쪽에서 지원되고 Agent config의 MCP가 우선 적용된다. 실제 S4 CLI runtime이 동일 config와 Core revision handoff를 통과했다. macOS 시각 picker와 Windows host smoke는 제출 전 검증 항목이다.
+
+T14 Crew App은 browser bundle이 SQLite나 Node application implementation을 직접 import하지 않고, Crew가 관리하는 TypeScript Node backend의 same-origin reverse proxy를 통해 UI command/query를 호출한다. backend는 host가 제공한 absolute app-data 경계에서 SQLite와 generated workspace를 조합하고 Gateway proxy HMAC, 고정 route/method, payload 크기와 runtime schema를 검증한다. Project History와 session restore는 Core의 durable read model을 source of truth로 사용하며, Builder/Helper Crew slot은 project ID에서 결정적으로 파생한 교체 가능한 runtime binding이다. Crew history가 unavailable이어도 redacted Activity/Episode summary와 저장된 project state는 계속 표시하고 임의 대화나 mock state를 만들지 않는다.
 
 ## 5. 데이터 모델
 

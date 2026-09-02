@@ -182,6 +182,11 @@ describe('SQLite persistence repository', () => {
       pendingDecisions: [records.decision],
       liveContext: records.context,
     })
+    expect(reopened.repository.readProjects(10)).toEqual([records.project])
+    expect(reopened.repository.countHelperConversationsForProject(ids.project)).toBe(0)
+    expect(
+      reopened.repository.readRecentHelperConversationAggregatesForProject(ids.project, 10),
+    ).toEqual([])
     expect(reopened.repository.readEvidenceTrace(ids.concept)).toEqual({
       concept: records.concept,
       ledger: records.ledger,

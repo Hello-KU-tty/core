@@ -8,6 +8,7 @@
     { "path": "./packages/kiro-adapter" },
     { "path": "./tests/eval" },
     { "path": "./apps/mcp-server" },
+    { "path": "./apps/crew-backend" },
     { "path": "./apps/crew-app" }
   ]
 }

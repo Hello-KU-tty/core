@@ -124,6 +124,83 @@ const seedBuilderGraph = (storage: Awaited<ReturnType<typeof openInMemorySqliteS
 }
 
 describe('ApplicationService boundary', () => {
+  it('lists durable Project History and restores the current session read model', async () => {
+    const { service, storage } = await createHarness()
+    seedBuilderGraph(storage)
+    storage.transaction((repository) => {
+      repository.appendLiveContext(liveContextFixture)
+      repository.appendDecisionRequest(decisionRequestFixture)
+    })
+
+    const exchange = await service.executeUi({
+      schemaVersion: 1,
+      kind: 'UI_RECORD_HELPER_EXCHANGE',
+      correlationId: ids.correlation,
+      actor: { kind: 'UI' },
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000401',
+      projectId: ids.project,
+      taskId: ids.task,
+      decisionId: ids.decision,
+      conversationId: ids.conversation,
+      userMessage: 'token=synthetic-secret should be redacted before recovery.',
+      helperResponseSummary: 'Compared strict and permissive runtime validation.',
+      closeConversation: false,
+    })
+    expect(exchange).toMatchObject({ success: true, data: { status: 'OPEN' } })
+
+    const history = await service.executeUi({
+      schemaVersion: 1,
+      kind: 'UI_LIST_PROJECTS',
+      correlationId: ids.correlation,
+      actor: { kind: 'UI' },
+      limit: 25,
+    })
+    expect(history).toMatchObject({
+      success: true,
+      data: {
+        projects: [
+          {
+            project: { id: ids.project, status: 'BUILDING' },
+            suggestedSurface: 'BUILD',
+            activeTask: { id: ids.task, status: 'ACTIVE' },
+            pendingDecisionCount: 1,
+            currentContextVersion: 1,
+            helperConversationCount: 1,
+          },
+        ],
+      },
+    })
+
+    const restored = await service.executeUi({
+      schemaVersion: 1,
+      kind: 'UI_RESTORE_PROJECT_SESSION',
+      correlationId: ids.correlation,
+      actor: { kind: 'UI' },
+      projectId: ids.project,
+      helperConversationLimit: 10,
+    })
+    expect(restored).toMatchObject({
+      success: true,
+      data: {
+        project: { id: ids.project },
+        suggestedSurface: 'BUILD',
+        activeTask: { id: ids.task },
+        currentTask: { id: ids.task },
+        liveContext: { id: ids.context, contextVersion: 1 },
+        pendingDecisions: [{ id: ids.decision }],
+        helperConversations: [
+          {
+            conversationId: ids.conversation,
+            status: 'OPEN',
+            redactedUserExcerpts: ['token=[REDACTED] should be redacted before recovery.'],
+            helperResponseSummaries: ['Compared strict and permissive runtime validation.'],
+          },
+        ],
+      },
+    })
+    expect(JSON.stringify(restored)).not.toContain('synthetic-secret')
+  })
+
   it('persists and replays an idempotent UI command, but rejects key reuse', async () => {
     const { service, storage } = await createHarness()
     const request = {

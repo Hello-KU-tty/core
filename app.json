@@ -1,0 +1,26 @@
+{
+  "name": "vibe-helper",
+  "version": "0.1.0",
+  "displayName": "Vibe Helper",
+  "description": "Learn unfamiliar development concepts by building a project you personally need.",
+  "author": "hurdoo",
+  "tags": ["learning", "developer-tools", "projects"],
+  "defaultEnabled": false,
+  "ui": {
+    "entry": "apps/crew-app/dist/index.mjs",
+    "pages": [{ "route": "/apps/vibe-helper", "label": "Vibe Helper", "icon": "Sprout" }]
+  },
+  "permissions": {
+    "api": ["/apps/vibe-helper/api", "/api/chat/slots", "/api/chat/slots/*"],
+    "storage": false,
+    "network": false,
+    "events": []
+  },
+  "backend": {
+    "entryPoint": "apps/crew-backend/dist/main.js",
+    "port": "auto",
+    "healthCheck": "/health",
+    "routes": "/apps/vibe-helper/api",
+    "type": "node"
+  }
+}
