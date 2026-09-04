@@ -260,15 +260,19 @@ function CandidateCard({
   candidate,
   currentRoundIndex,
   selected,
+  expanded,
   disabled,
   onToggle,
+  onExpandedChange,
   onFeedback,
 }: {
   readonly candidate: ProjectCandidateRevision
   readonly currentRoundIndex: number
   readonly selected: boolean
+  readonly expanded: boolean
   readonly disabled: boolean
   readonly onToggle: () => void
+  readonly onExpandedChange: (expanded: boolean) => void
   readonly onFeedback: (action: DiscoveryFeedbackAction) => void
 }) {
   const reference = candidateReference(candidate)
@@ -322,7 +326,11 @@ function CandidateCard({
           이 방향 선택
         </button>
       </div>
-      <details className="candidate-details">
+      <details
+        className="candidate-details"
+        open={expanded}
+        onToggle={(event) => onExpandedChange(event.currentTarget.open)}
+      >
         <summary>세부 범위와 변경 이력</summary>
         <div className="candidate-scope">
           <p>
@@ -356,14 +364,18 @@ function CandidatePreviewCard({
   preview,
   candidate,
   selected,
+  expanded,
   disabled,
   onToggle,
+  onExpandedChange,
 }: {
   readonly preview: CandidatePreview
   readonly candidate: ProjectCandidateRevision | null
   readonly selected: boolean
+  readonly expanded: boolean
   readonly disabled: boolean
   readonly onToggle: () => void
+  readonly onExpandedChange: (expanded: boolean) => void
 }) {
   return (
     <li className={`candidate-card${selected ? ' candidate-card-selected' : ''}`}>
@@ -415,7 +427,11 @@ function CandidatePreviewCard({
             </ul>
             <span className="candidate-ready-label">선택 준비됨</span>
           </div>
-          <details className="candidate-details">
+          <details
+            className="candidate-details"
+            open={expanded}
+            onToggle={(event) => onExpandedChange(event.currentTarget.open)}
+          >
             <summary>세부 범위 미리 보기</summary>
             <div className="candidate-scope">
               <p>
@@ -469,7 +485,18 @@ export function DiscoveryWorkspace({
   const latestRound = context?.rounds.at(-1)
   const previewRound = context?.previewRound ?? null
   const [selectedKeys, setSelectedKeys] = useState<ReadonlySet<string>>(new Set())
+  const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(new Set())
   const [message, setMessage] = useState('')
+
+  const setCandidateExpanded = (key: string, expanded: boolean): void => {
+    setExpandedKeys((current) => {
+      if (current.has(key) === expanded) return current
+      const next = new Set(current)
+      if (expanded) next.add(key)
+      else next.delete(key)
+      return next
+    })
+  }
 
   const candidates = useMemo(() => {
     if (context === null || context === undefined || latestRound === undefined) return []
@@ -749,6 +776,7 @@ export function DiscoveryWorkspace({
                       preview={preview}
                       candidate={enrichedPreviewCandidates.get(preview.candidateId) ?? null}
                       selected={selectedKeys.has(key)}
+                      expanded={expandedKeys.has(key)}
                       disabled={previewToggleDisabled}
                       onToggle={() =>
                         setSelectedKeys((current) => {
@@ -758,6 +786,7 @@ export function DiscoveryWorkspace({
                           return next
                         })
                       }
+                      onExpandedChange={(expanded) => setCandidateExpanded(key, expanded)}
                     />
                   )
                 })
@@ -769,6 +798,7 @@ export function DiscoveryWorkspace({
                       candidate={candidate}
                       currentRoundIndex={latestRound.roundIndex}
                       selected={selectedKeys.has(key)}
+                      expanded={expandedKeys.has(key)}
                       disabled={inactive}
                       onToggle={() =>
                         setSelectedKeys((current) => {
@@ -778,6 +808,7 @@ export function DiscoveryWorkspace({
                           return next
                         })
                       }
+                      onExpandedChange={(expanded) => setCandidateExpanded(key, expanded)}
                       onFeedback={(action) => void onFeedback(action)}
                     />
                   )

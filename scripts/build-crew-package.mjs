@@ -40,7 +40,7 @@ const runtimeFiles = [
     'agents/vibe-helper-discovery-spec-recovery.json',
     'agents/vibe-helper-discovery-spec-recovery.json',
   ],
-  ['apps/crew-app/dist/index.mjs', 'ui/dist/index-0.1.2.mjs'],
+  ['apps/crew-app/dist/index.mjs', 'ui/dist/index-0.1.3.mjs'],
   ['apps/crew-backend/dist/main.bundle.js', 'apps/crew-backend/dist/main.js'],
 ]
 
@@ -70,7 +70,7 @@ if (typeof drizzleVersion !== 'string' || !/^\d+\.\d+\.\d+$/.test(drizzleVersion
 
 const runtimeManifest = {
   name: 'vibe-helper-runtime',
-  version: '0.1.2',
+  version: '0.1.3',
   private: true,
   type: 'module',
   engines: { node: '>=24 <27' },

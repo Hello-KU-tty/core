@@ -81,6 +81,7 @@ Learning Goal 입력
 - 사용자가 명시적으로 선택할 때까지 pin, reject, merge, revise, shrink, regenerate와 추가 후보 생성을 반복할 수 있다.
 - 첫 미리보기에는 제목, 요약, 매력 이유, 핵심 상호작용과 기술 필요성을 우선한다. 같은 identity의 background 보강이 핵심 개념, MVP와 권장 범위를 완성한다. Concept Necessity, Personal Utility, Adoption Feasibility, Learner Fit, Scope Feasibility, Adjacent Complexity, Deployability, Distinctiveness의 상세 평가는 관심·선택 이후 또는 비교가 필요할 때 지연 생성할 수 있다.
 - 후보는 여러 열의 큰 카드가 아니라 한 줄씩 빠르게 훑는 목록으로 보여준다. 눈에 띄는 checkbox로 관심 후보를 담고 빼며, 선택 상태와 선택 개수를 즉시 확인할 수 있어야 한다.
+- Background 상세 보강이 끝나 preview가 완성 Candidate로 바뀌어도 같은 Candidate ID의 관심 목록, 펼쳐 본 상세와 사용자의 목록 검토 맥락을 초기화하지 않는다.
 - 자유 조정 입력은 후보 목록보다 위에 둔다. 사용자는 아래 목록에서 관심 후보를 담은 뒤 위 입력으로 돌아와 생각을 적으며, 범위 축소·확장 같은 조정은 후보별 버튼 대신 입력 예시와 자연어 요청으로 제공한다.
 
 ## 8. Learning Spec 요구

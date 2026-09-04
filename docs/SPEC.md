@@ -128,6 +128,7 @@ Concept Ledger + Project History
 - `FR-DIS-017`: preview identity가 저장된 뒤 enrichment Agent는 새 후보를 발명하거나 제목·핵심 방향을 바꾸지 않고 지정된 preview만 완성해야 한다. 모든 preview가 완성될 때 기존 ProjectCandidate revision과 Candidate Round를 한 transaction에서 materialize해야 한다.
 - `FR-DIS-018`: preview와 enrichment는 독립적인 idempotency 경계를 가져야 한다. 실패 시 저장된 preview와 성공한 enrichment를 보존하고 누락된 batch만 재시도하며, 사용자는 같은 Session revision에서 기존 atomic Candidate Round 생성으로 전환할 수 있어야 한다. 늦게 도착한 staged 결과는 이미 생성된 Round를 덮어쓰지 않아야 한다.
 - `FR-DIS-019`: preview는 상세 보강 중에도 checkbox 관심 목록에 담을 수 있지만, SELECT·refinement와 Spec 생성은 참조하는 Candidate가 complete revision으로 materialize된 뒤에만 허용해야 한다.
+- `FR-DIS-020`: background enrichment가 complete Round를 materialize해 preview 표현을 완성 Candidate 표현으로 교체해도 동일 Candidate ID의 checkbox와 펼친 상세 상태를 유지해야 한다.
 
 완료 관찰:
 

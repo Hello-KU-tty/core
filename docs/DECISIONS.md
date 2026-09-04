@@ -373,6 +373,14 @@
 - **복구:** 구현 전 기준점은 `09edb18`, staged storage·UI 기준점은 `9866670`이다. 기존 Candidate/Round schema와 atomic fallback은 제거하지 않았고, migration은 additive다. preview 전 실패는 preview만, 일부 enrichment 실패는 누락 batch만 다시 실행한다. 늦은 staged submit은 current revision/round 검증에서 거절된다.
 - **tradeoff:** 첫 유용 목록은 23초에 나타나 checkbox와 basket을 쓸 수 있지만 SELECT·refinement는 complete Round까지 최종 관측 148초 잠긴다. 이는 T15가 정의한 background 수렴 조건에는 부합하지만 이상적인 3~5초 상호작용은 아니다. T21에서 장기 P95, background 완료 분포와 선택 후보 우선 상세화 가능성을 평가한다.
 
+## 2026-09-05: Background 완료 시 Candidate 검토 상태 유지
+
+- **상태:** 사용자 승인
+- **맥락:** 사용자가 enrichment 중 준비된 preview 상세를 펼친 뒤 complete Round가 materialize되면 preview 카드와 완성 Candidate 카드의 React component type이 바뀌며 native `details.open` 상태가 초기화됐다. Candidate와 basket identity는 유지됐지만 펼쳐 본 항목이 닫혀 검토 맥락이 끊겼다.
+- **결정:** 펼침 상태를 개별 카드 DOM이 아니라 `DiscoveryWorkspace`의 Candidate ID·revision key 집합으로 제어한다. Preview revision 1과 materialized Candidate revision 1은 같은 key를 사용하므로 표현이 교체돼도 열린 상태를 이어받는다. 새로운 Candidate revision은 별도 key로 취급한다.
+- **검증:** 390x844 Chromium E2E에서 FIRST enrichment 뒤 첫 preview 상세를 펼치고 SECOND 완료·10개 Candidate 전환 뒤 같은 Candidate의 완성 상세가 열린 상태임을 검증했다. 전체 `pnpm check`의 unit 2개, integration 189개, eval 17개, smoke 6개와 Chromium E2E 11개가 통과했다. versioned UI를 0.1.3으로 올려 data-preserving Kiro update를 수행했고, 설치 전후 58 project·59 Discovery Session·24 Learning Spec과 SQLite `quick_check=ok`가 유지됐다. 설치 UI hash가 source package와 일치하고 Gateway의 실제 Core read 요청이 HTTP 200으로 성공했다.
+- **tradeoff:** 펼침 상태는 현재 앱 화면의 local UI state이므로 완전한 페이지 이탈·재진입까지 durable 복원하지 않는다. 이는 in-flight UI 재연결을 MVP 밖으로 둔 기존 결정과 일치한다.
+
 ## 2026-08-24: 구현 세부 선택 위임
 
 - **상태:** 승인

@@ -686,8 +686,17 @@ test('shows durable previews and keeps the basket usable while fixed Candidate d
   await expect(page.getByLabel('Agent에게 원하는 방향 말하기')).toBeDisabled()
   await expect(page.getByRole('button', { name: '이 방향 선택' })).toHaveCount(0)
 
+  await expect(page.getByRole('heading', { name: '상세 5/10 준비됨' })).toBeVisible()
+  const firstCandidate = page
+    .getByRole('listitem')
+    .filter({ has: page.getByRole('heading', { name: 'Safe Config Lab', exact: true }) })
+  await firstCandidate.getByText('세부 범위 미리 보기', { exact: true }).click()
+  await expect(firstCandidate.locator('details')).toHaveAttribute('open', '')
+
   await expect(page.getByText('10개 후보')).toBeVisible()
   await expect(previewCheckbox).toBeChecked()
+  await expect(firstCandidate.getByText('세부 범위와 변경 이력', { exact: true })).toBeVisible()
+  await expect(firstCandidate.locator('details')).toHaveAttribute('open', '')
   await expect(page.getByRole('button', { name: '이 방향 선택' }).first()).toBeEnabled()
 })
 

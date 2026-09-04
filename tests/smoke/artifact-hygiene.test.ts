@@ -97,7 +97,7 @@ describe('artifact and local-data hygiene', () => {
       type: 'node',
       healthCheck: '/health',
     })
-    expect(manifest.ui.entry).toBe('dist/index-0.1.2.mjs')
+    expect(manifest.ui.entry).toBe('dist/index-0.1.3.mjs')
     expect(manifest.permissions).toEqual({
       api: ['/apps/vibe-helper/api', '/api/chat', '/api/chat/slots', '/api/chat/slots/*'],
       storage: false,
