@@ -39,6 +39,7 @@
 - Build-first: 교육을 위해 개발을 반복적으로 중단하지 않는다.
 - 실제 판단: 교육용 가짜 선택지를 만들지 않고 실제 제품·기술 Decision만 사용자에게 요청한다.
 - 낮은 부담: Learning Spec은 권장안을 기본으로 쉽게 시작할 수 있게 한다.
+- 익숙한 조작감: UI는 SEED Design의 명확한 정보 위계, 목록형 선택과 모바일 터치 영역을 참고하고 Kiro의 보라색 계열을 대표색으로 사용한다.
 - 자연스러운 교육: Helper는 강사가 아니라 현재 판단을 돕는 동료다.
 - 투명한 작업: 실제 Agent 메시지, ToolCall, 파일 변경, 테스트와 오류 수정 흐름을 숨기지 않는다.
 - 보수적 Evidence: Agent가 말하거나 작성한 내용은 사용자 이해 근거가 아니다.
@@ -69,20 +70,25 @@ Learning Goal 입력
 - 필수 입력은 배우고 싶은 기술 또는 개념이다.
 - Personal Need, 최근 불편, 관심 영역, 현재 수준은 선택 입력이다.
 - available time 입력은 받지 않는다.
-- 초기에는 기본적으로 약 10개 후보를 보여주되 고정값으로 취급하지 않는다.
+- 첫 응답은 빠르게 훑을 수 있는 4~6개의 간결한 후보를 보여주고, 사용자가 `다른 후보 더 보기`를 선택하면 기존 후보를 보존한 채 누적 약 8~10개까지 확장한다. 개수는 고정 계약이 아니다.
 - 고정된 프로젝트 카테고리나 10개 주제 목록을 사용하지 않는다.
 - 같은 CRUD 구조에 테마만 바꾼 후보를 다양하다고 판단하지 않는다.
 - Personal Need가 있으면 관련 후보와 독립 탐색 후보를 자연스럽게 섞는다.
 - DIRECT, EXPAND, DISCOVER, UPGRADE는 hard router가 아니라 내부 생성 tag다.
 - 후보는 같은 ProjectCandidate의 revision으로 반복 수정한다.
 - RefinedCandidate와 FinalCandidate 별도 타입은 만들지 않는다.
-- 사용자가 명시적으로 선택할 때까지 pin, reject, merge, revise, shrink, regenerate를 반복할 수 있다.
-- Concept Necessity, Personal Utility, Adoption Feasibility, Learner Fit, Scope Feasibility, Adjacent Complexity, Deployability, Distinctiveness를 평가한다.
+- 사용자가 명시적으로 선택할 때까지 pin, reject, merge, revise, shrink, regenerate와 추가 후보 생성을 반복할 수 있다.
+- 첫 스캔에는 제목, 요약, 매력 이유, 핵심 상호작용, 기술 필요성, 핵심 개념과 권장 범위를 우선한다. Concept Necessity, Personal Utility, Adoption Feasibility, Learner Fit, Scope Feasibility, Adjacent Complexity, Deployability, Distinctiveness의 상세 평가는 관심·선택 이후 또는 비교가 필요할 때 지연 생성할 수 있다.
+- 후보는 여러 열의 큰 카드가 아니라 한 줄씩 빠르게 훑는 목록으로 보여준다. 눈에 띄는 checkbox로 관심 후보를 담고 빼며, 선택 상태와 선택 개수를 즉시 확인할 수 있어야 한다.
+- 자유 조정 입력은 후보 목록보다 위에 둔다. 사용자는 아래 목록에서 관심 후보를 담은 뒤 위 입력으로 돌아와 생각을 적으며, 범위 축소·확장 같은 조정은 후보별 버튼 대신 입력 예시와 자연어 요청으로 제공한다.
 
 ## 8. Learning Spec 요구
 
 - Discovery가 권장안을 먼저 완성한다.
 - 사용자는 `이대로 시작`, `조금 바꾸기`, `다른 주제로 돌아가기`를 선택할 수 있다.
+- `다른 주제로 돌아가기`는 Agent 호출 없이 즉시 이전 후보를 보여준다. 새 후보 생성은 사용자의 별도 선택 뒤 시작한다.
+- 실행 중인 Agent 요청을 둔 채 화면을 이탈했다가 돌아왔을 때 stream과 진행 표시를 다시 연결하는 기능은 MVP 범위에 포함하지 않는다. 이미 Core에 저장된 결과와 기존 프로젝트 상태의 복원은 유지한다.
+- Spec은 작은 textbox가 반복되는 직접 편집 form이 아니라 제품 흐름과 역할 분담을 초보자가 읽기 쉬운 시각적 요약으로 보여준다. 수정은 큰 자유 입력으로 Agent에게 반복 요청한다.
 - 범위는 다음 세 가지로 나눈다.
   - LEARNER_FOCUS: 이번 프로젝트에서 자연스럽게 이해하고 판단할 목표
   - AGENT_SUPPORT: 제품에 필요하지만 Builder가 주로 구현하고 학습을 강요하지 않는 부분

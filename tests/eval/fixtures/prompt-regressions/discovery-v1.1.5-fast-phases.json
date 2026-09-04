@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 1,
+  "discovery": {
+    "round": {
+      "appliedFeedbackIds": ["feedback_346260bf-6e8d-4524-bf92-b24092c29ff7"],
+      "candidates": [
+        {
+          "candidateId": "candidate_4bb80b59-b504-4ea1-bf0b-1ea84cc9083c",
+          "revision": 2
+        }
+      ],
+      "correlationId": "corr_7108201c-f599-42db-b598-51fa1dfea65b",
+      "createdAt": "2026-09-04T07:51:24.440Z",
+      "discoverySessionId": "discovery_session_0036d5d7-4c09-4576-99c9-fd569575b4b7",
+      "diversityCheck": {
+        "dimensionsReviewed": ["PROBLEM_DOMAIN", "TARGET_USER", "CORE_INTERACTION"],
+        "modeCollapseDetected": false,
+        "rationale": "코드 공유와 가벼운 투표의 상호작용 장점을 결합하되 실시간 상태 동기화가 중심인 하나의 제품으로 좁혔다."
+      },
+      "generationRationale": "선택한 두 후보의 즉각적인 입력·결과 공유 장점만 합치고 IDE 수준 기능을 제외해 하루 안에 시도할 범위로 줄였다.",
+      "id": "candidate_round_eb052ebe-107c-4c07-83d8-99c41b60c5a5",
+      "inputSnapshot": {
+        "currentLevel": "BEGINNER",
+        "learningGoal": "[T15 성능 측정] 실시간 상태 동기화를 배우고 싶어요",
+        "personalNeed": "친구들과 브라우저에서 함께 연습할 작은 도구를 만들고 싶어요"
+      },
+      "redactionStatus": "NOT_REQUIRED",
+      "roundIndex": 2,
+      "schemaVersion": 1,
+      "source": {
+        "kind": "AGENT",
+        "role": "DISCOVERY"
+      }
+    },
+    "candidates": [
+      {
+        "appeal": "자신이 만든 도구로 친구들과 즉시 코딩 아이디어를 공유하고 함께 실험할 수 있다.",
+        "coreConcepts": ["WebSocket 실시간 연결", "텍스트 입력 순서 보장", "상태 동기화"],
+        "coreInteraction": "텍스트 입력이 실시간으로 동기화되고, 실행하면 모두가 같은 결과를 본다.",
+        "correlationId": "corr_7108201c-f599-42db-b598-51fa1dfea65b",
+        "createdAt": "2026-09-04T07:51:24.440Z",
+        "discoverySessionId": "discovery_session_0036d5d7-4c09-4576-99c9-fd569575b4b7",
+        "generationTags": ["DIRECT", "DISCOVER"],
+        "id": "candidate_4bb80b59-b504-4ea1-bf0b-1ea84cc9083c",
+        "mvpFeatures": ["공유 코드 입력창", "실행 및 출력 동기화", "기본 에러 표시"],
+        "parentRevisions": [
+          {
+            "candidateId": "candidate_4bb80b59-b504-4ea1-bf0b-1ea84cc9083c",
+            "revision": 1
+          },
+          {
+            "candidateId": "candidate_525d076b-3789-4b19-b9c4-e65e066e93bc",
+            "revision": 1
+          }
+        ],
+        "redactionStatus": "NOT_REQUIRED",
+        "revision": 2,
+        "schemaVersion": 1,
+        "source": {
+          "kind": "AGENT",
+          "role": "DISCOVERY"
+        },
+        "suggestedScope": {
+          "agentSupport": ["코드 컴파일·실행", "에러 처리"],
+          "excluded": ["파일 저장", "IDE 기능", "사용자 인증"],
+          "learnerFocus": ["WebSocket 메시지 흐름", "입력 순서 보장"]
+        },
+        "summary": "여러 명이 접속한 후 한 사람이 코드를 입력하면 모두의 화면에 즉시 나타나고, 실행 버튼을 누르면 결과를 함께 본다.",
+        "targetUsers": ["친구와 함께 프로그래밍을 배우거나 실험하고 싶은 사람"],
+        "technologyNecessity": "여러 브라우저가 동시에 연결되어 입력과 실행 결과를 실시간으로 동기화해야 하므로 WebSocket 기반 실시간 통신이 필수다.",
+        "title": "친구들과 함께 실행하는 코드 에디터",
+        "usageMoment": "친구들과 온라인으로 함께 문제를 풀거나 코드를 테스트할 때."
+      }
+    ]
+  },
+  "learningSpec": {
+    "correlationId": "corr_7108201c-f599-42db-b598-51fa1dfea65b",
+    "createdAt": "2026-09-04T07:51:45.420Z",
+    "deploymentConstraints": [
+      "로컬 개발 환경에서 npm 기반 실행 가능해야 함",
+      "WebSocket 지원 가능한 서버 환경 필요",
+      "친구들이 접속할 수 있는 공개 URL은 선택사항"
+    ],
+    "expectedDecisions": [
+      {
+        "category": "ARCHITECTURE",
+        "description": "WebSocket 서버를 Node.js와 어떤 프레임워크로 구현할지 결정한다.",
+        "whyUserInputMatters": "선호하는 백엔드 환경에 따라 배포 난이도와 개발 경험이 달라지고 불필요한 리팩터링을 피할 수 있다."
+      },
+      {
+        "category": "DATA_MODEL",
+        "description": "입력 순서를 타임스탬프 또는 시퀀스 번호 중 어떤 방식으로 보장할지 결정한다.",
+        "whyUserInputMatters": "동기화 알고리즘의 기초가 되며 이후 race condition을 이해하고 디버깅하는 방식에 영향을 준다."
+      },
+      {
+        "category": "PRODUCT_BEHAVIOR",
+        "description": "같은 코드 라인을 동시에 수정할 때 마지막 입력 우선 또는 병합 규칙을 선택한다.",
+        "whyUserInputMatters": "사용자 경험과 동기화 로직의 복잡도를 결정하므로 간단한 MVP의 경계를 정하는 데 필요하다."
+      },
+      {
+        "category": "COST_DEPLOYMENT",
+        "description": "초기 실행 환경을 로컬 또는 접근 가능한 서버 중에서 선택한다.",
+        "whyUserInputMatters": "친구들과 실제로 함께 쓸지에 따라 WebSocket 호스팅 방식과 테스트 방법이 달라진다."
+      }
+    ],
+    "id": "learning_spec_692ff513-8ecc-4cbb-aa5b-b4e96c25e6df",
+    "mvpFeatures": [
+      "모든 사용자가 같은 코드를 보는 공유 코드 입력창",
+      "한 사람이 입력하면 다른 화면에 나타나는 실시간 입력 동기화",
+      "실행 버튼과 결과 공유",
+      "기본 에러 메시지 표시"
+    ],
+    "primaryUsageMoment": "친구들과 온라인으로 함께 문제를 풀거나 코드를 테스트하고 싶을 때.",
+    "productPurpose": "친구들과 온라인으로 함께 코드를 작성하고 실행하는 공유 코드 에디터를 만든다.",
+    "projectId": "project_eca3b840-a6e2-4cab-a5b9-ea4a1bb02f09",
+    "redactionStatus": "NOT_REQUIRED",
+    "revision": 1,
+    "runtimeConstraint": "TYPESCRIPT",
+    "schemaVersion": 1,
+    "scope": [
+      {
+        "category": "LEARNER_FOCUS",
+        "conceptNames": ["WebSocket 메시지 흐름", "클라이언트-서버 동기화", "텍스트 입력 순서 보장"],
+        "rationale": "여러 클라이언트가 동시에 연결되어 상태를 실시간 동기화하는 핵심을 직접 경험한다.",
+        "title": "WebSocket 기반 실시간 통신"
+      },
+      {
+        "category": "AGENT_SUPPORT",
+        "conceptNames": ["코드 컴파일·실행", "에러 처리 및 피드백", "웹 UI 기본 구성"],
+        "rationale": "제품에 필요하지만 현재 실시간 동기화 학습 목표와는 별개인 구현을 지원한다.",
+        "title": "코드 실행 및 기본 인프라"
+      },
+      {
+        "category": "EXCLUDED",
+        "conceptNames": ["파일 저장 및 로드", "사용자 인증 및 세션 관리", "IDE 수준의 문법 강조", "코드 히스토리 및 버전 관리"],
+        "rationale": "MVP에서는 핵심 동기화 경험에 집중하고 이후 추가한다.",
+        "title": "고급 기능 및 운영"
+      }
+    ],
+    "selectedCandidate": {
+      "candidateId": "candidate_4bb80b59-b504-4ea1-bf0b-1ea84cc9083c",
+      "revision": 2
+    },
+    "source": {
+      "kind": "AGENT",
+      "role": "DISCOVERY"
+    },
+    "status": "DRAFT",
+    "successMoment": "여러 친구가 동시에 접속한 후 한 명이 코드를 입력하는 즉시 모두에게 같은 코드가 나타나고, 실행하면 같은 결과를 본다.",
+    "targetUsers": [
+      "친구와 함께 프로그래밍을 배우거나 실험하고 싶은 학생",
+      "온라인에서 코딩 문제를 함께 풀고 싶은 사람"
+    ],
+    "updatedAt": "2026-09-04T07:51:45.420Z"
+  }
+}

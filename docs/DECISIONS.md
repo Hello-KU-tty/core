@@ -283,6 +283,86 @@
 - **검토한 대안:** browser가 SQLite/storage package를 직접 bundle, 기존 Agent MCP를 UI transport로 재사용, app-scoped storage에 Core state를 복제, `apps/mcp-server`에 HTTP 책임 추가, Crew slot/history만 source of truth로 사용, production mock/seed fallback, 새 router/server framework dependency 추가.
 - **tradeoff:** 별도 backend process와 HMAC·HTTP integration test, Project History query와 Crew/Core 부분 실패 상태가 늘어난다. 대신 UI와 storage dependency 방향, TypeScript-only 경계, Agent별 MCP 권한과 local-first 단일 source of truth를 유지하고 Crew Agent 연결과 durable project 조회를 독립적으로 복구할 수 있다. full Helper 원문은 Crew slot이 있을 때만 복원하며 offline에는 이미 저장된 redacted 요약만 정직하게 표시한다.
 
+## 2026-09-02: T15 Discovery Crew Agent transport와 설치 package 경계
+
+- **상태:** 승인
+- **맥락:** T14 UI는 durable Core를 복원하지만 Discovery Agent dispatch와 app-owned Agent/MCP packaging이 없었다. Crew 0.3.0은 app Agent를 전역 Kiro Agent directory로 materialize하므로 상대 prompt file과 workspace package link를 유지하지 않으며, 앱 설치 시 `node_modules`를 제외한다. 반면 자동 포트 Node backend가 health check를 통과한 뒤 manifest의 loopback HTTP MCP URL을 실제 포트로 재등록하는 경로는 target host에서 확인됐다. T08 CLI 2 stdio의 느린 Candidate submit은 `Transport closed`를 냈지만 target Crew 0.3.0의 실제 10-Candidate run에서는 재현되지 않았다.
+- **결정:** canonical Discovery prompt v1.1.0은 build에서 검증해 inline Agent config로 생성하고, Agent에는 app-owned `vibe-helper:discovery-core` 하나만 허용한다. Discovery MCP는 별도 범용 process가 아니라 Crew가 감독하는 기존 Node backend의 고정 `/mcp/discovery`에 role-bound Streamable HTTP handler로 조합한다. backend는 loopback에만 bind하고 handler는 `DISCOVERY` catalog만 노출하며 app manifest는 외부 network permission을 갖지 않는다. UI는 stable project ID에서 파생한 temporary slot과 고정 `/api/chat` SSE만 사용하고, Core tool turn에 필요한 schema version, project/session/correlation ID, expected session revision과 host-generated idempotency key를 Agent message에 명시한다. Agent가 이 값을 변경하거나 누락해도 Core validation이 최종 경계다. 완료 판정은 SSE 문장이 아니라 durable Candidate Round/Spec revision으로 하며, target 실측에 맞춰 420초 동안 진행 시간을 보여주고 timeout·host disconnect 뒤 retry 전에 Core를 먼저 복원한다. 설치물은 backend ESM bundle, `ui/dist/index.mjs` UI bundle, inline Agent, SQL migrations와 정확히 고정한 `better-sqlite3`·`drizzle-orm` runtime dependency만 담은 `dist/crew-package`로 staging한다. Crew host가 `ui.entry`를 고정 설치 `ui/` root에 상대적으로 해석하므로 manifest entry는 `dist/index.mjs`로 제한하고 smoke test가 manifest-entry와 staged file의 일치를 검증한다.
+- **검증:** macOS target Crew 0.3.0에서 app별 trust만 추가하고 전역 third-party 허용은 사용하지 않았다. health-gated MCP initialize가 protocol `2025-11-25`와 Discovery tool capability를 반환했다. 실제 `auto` Agent는 `get_discovery_context`와 `submit_candidate_round`를 호출해 약 196초에 10개 Candidate, Round 1개를 SQLite에 저장하고 Session revision을 1에서 2로 올렸다. slot은 오류 없이 종료했고 `Transport closed`는 없었다. 따라서 T08의 staged partial draft fallback 조건은 충족되지 않았고 atomic round contract를 유지했다.
+- **검토한 대안:** repository 전체를 그대로 설치, workspace package별 runtime install, prompt의 상대 `file://` 참조, app-relative stdio command, Agent가 session metadata를 추측, SSE 완료를 durable 성공으로 간주, 180초 고정 timeout, Candidate staged partial submit.
+- **tradeoff:** backend가 UI HMAC route와 Agent HTTP MCP를 함께 조합하고 설치 시 두 native runtime package를 받아야 한다. 대신 Crew health lifecycle과 실제 포트 재등록을 사용해 별도 daemon·고정 포트를 만들지 않으며, role catalog·Core validation·SQLite transaction은 transport와 독립적으로 유지된다. T08에서 미뤘던 persistent HTTP는 stdio 오류 우회가 아니라 Crew app의 지원되는 supervised backend transport로 범위를 좁혀 승인하며, T19/T21은 clean install과 fresh retry 무중복 회귀를 계속 확인한다.
+
+## 2026-09-03: T15 progressive Discovery와 즉시 복귀 latency 보완
+
+- **상태:** 승인
+- **맥락:** target 사용 흐름에서 최초 10개 후보는 약 193초가 걸렸고, 같은 project slot의 긴 transcript를 재사용한 재생성과 Spec→Discovery 자동 재생성은 각각 약 636초와 443초까지 늘었다. 두 흐름 모두 첫 tool submit에서 `candidates` 배열이 JSON 문자열로 이중 인코딩되어 validation에 실패한 뒤 Agent가 전체 의미 내용을 다시 생성했다. Candidate 카드가 첫 스캔에서 사용하지 않는 8개 criterion rationale와 risks까지 후보마다 요구한 점, Spec 뒤로가기가 새 Session과 Agent run을 즉시 시작한 점도 체감 대기를 키웠다.
+- **결정:** 첫 round는 간결한 4~6개 Candidate로 줄이고, 사용자의 `MORE` feedback에서 기존 후보를 carry한 채 4~6개를 더해 누적 약 8~10개로 확장한다. 첫 스캔 계약은 상세 evaluation과 risks를 선택으로 두고 관심·비교 이후 지연 생성한다. Spec→Discovery는 local navigation만 수행해 이전 후보를 즉시 보여주며, 입력 수정과 `새 후보 받기`를 별도 명시 action으로 분리한다. 새 Discovery Session은 수정 입력을 저장하고, Agent slot은 project 장기 transcript 대신 Session ID와 expected revision으로 파생한다. MCP transport는 512 KiB 이하의 한 번 JSON-stringified candidate array만 복구한 뒤 기존 strict schema로 다시 검증한다. 60초 뒤 UI는 background 상태로 전환해 navigation을 풀되 durable Core 결과를 총 420초까지 관찰한다. prompt 1.1.1로 progressive 계약을 도입하고, 첫 target 재측정 77.2초에서 5개 카드 약 6 KiB와 round rationale 약 1 KiB가 남은 것을 확인해 1.1.2에서는 첫 round를 4개 우선으로 하고 카드 항목 수·자유 서술·round rationale·tool 전후 설명을 더 제한한다. 각 버전은 fixture/eval, contract와 UI/E2E를 함께 검증한다.
+- **운영 목표:** Spec→Discovery 복귀 1초 이내·Agent 0회, 첫 4~6개 Candidate P95 60초, 단일 refinement와 Spec draft P95 45초, tool validation 재시도율 1% 미만을 초기 guardrail로 기록한다. provider 응답 보장은 아니며 target 관측에 따라 조정한다.
+- **검토한 대안:** 매번 10개 full-detail Candidate 생성, Spec 뒤로가기 즉시 자동 재생성, project별 단일 장기 slot 유지, stringified payload를 Core schema에 영구 허용, 420초 동안 foreground 전체 잠금, validation 실패 때 모델 전체 재생성.
+- **검증:** target Kiro Crew 0.3.0의 data-preserving update 뒤 설치 bundle hash, prompt 1.1.2, backend health와 기존 SQLite 보존을 확인했다. prompt 1.1.1은 첫 round 5개를 77.2초에 저장했고, 카드 항목과 round rationale을 더 제한한 1.1.2는 다른 unseen goal·Personal Need 없음 조건에서 4개를 47.4초에 atomic 저장했다. deterministic fixture/eval과 E2E도 함께 통과했다. 단일 47.4초 관측은 60초 guardrail 안이지만 P95 주장은 아니므로 반복 측정은 T21에 남긴다.
+- **tradeoff:** 사용자가 전체 후보군을 보려면 한 번 더 선택해야 하고 상세 평가가 첫 화면에는 없으며 temporary slot 수가 늘어난다. 대신 첫 유용 결과와 되돌리기가 빨라지고, 상태는 Core에서 복원되며, transport 표현 오류와 의미 생성 실패를 분리할 수 있다. 첫 후보 품질과 model별 latency 비교는 동일 unseen fixture와 target 실측으로 계속 확인한다.
+
+## 2026-09-03: T15 목록형 Discovery와 읽기 중심 Spec UI
+
+- **상태:** 승인
+- **맥락:** target 모바일 사용에서 2열 Candidate card는 8~10개 주제를 한눈에 비교하기 어렵고 작은 checkbox와 후보별 PIN/REJECT/SHRINK/EXPAND button이 선택의 위계를 흐렸다. 자유 조정 입력은 목록 아래에 있어 관심 후보를 고른 뒤 다시 의도를 표현하는 흐름과 떨어졌으며, Spec의 여러 작은 textbox는 초보 사용자에게 제품 범위를 이해하기보다 설계 문서를 직접 편집하도록 요구했다. 기존 짙은 녹색·serif 중심 styling도 Kiro 안의 앱으로서 일관성과 일상적인 제품 UI의 조작감이 부족했다.
+- **결정:** 새 UI dependency를 추가하지 않고 SEED Design의 mobile-first list, semantic hierarchy, 큰 touch target과 명시적 selected state를 참고한다. Kiro의 대표 보라색 계열을 단일 brand token으로 사용하고 장식적인 serif·과도한 card nesting을 줄인다. Candidate는 한 열 목록과 24px check control로 보여주며 관심 후보를 local basket에 담는다. refinement composer와 선택 요약은 목록 위로 옮기고 SHRINK/EXPAND는 후보별 button 대신 placeholder 예시와 자연어 request로 제공한다. Spec은 direct edit form을 primary UI에서 제거하고 사용자·상황·성공의 story flow, MVP, 세 scope와 예상 Decision을 읽기 중심으로 시각화한다. 변경은 큰 자유 입력으로 Discovery Agent에 반복 요청하며 Core의 기존 direct update contract는 호환성을 위해 유지한다.
+- **성능 목표:** 이번 UI 변경에서는 model/config를 바꾸지 않는다. 현재 설치 Agent가 `auto`이고 4개 후보 단일 관측이 47.4초이므로 무거운 특정 모델로 고정됐다고 단정하지 않는다. 다만 사용자 상호작용 turn은 각각 P95 30초 이내를 T15 완료 gate로 높이고 첫 유용 반응 3~5초를 지향한다. 동일 unseen 입력에서 `auto`와 승인된 빠른 model/config의 품질·latency를 비교하기 전에는 T15를 다시 완료 처리하지 않는다.
+- **검토한 대안:** 기존 2열 card의 밀도만 낮춤, 모든 semantic feedback을 후보별 icon button으로 유지, Spec textarea 높이만 늘림, SEED React package와 styling pipeline을 즉시 도입, UI 변경과 동시에 model을 교체.
+- **tradeoff:** SHRINK/EXPAND 같은 action의 발견성은 placeholder와 안내 문구에 의존하고 direct field-level 수정은 사라진다. 대신 첫 화면의 비교와 선택 책임이 명확해지고, 사용자는 세부 schema를 편집하지 않고 Agent와 대화하며 revision을 검토한다. SEED package 자체를 쓰지 않아 시각 원칙을 수동 검증해야 하지만 dependency·build 경계는 늘지 않는다.
+
+## 2026-09-03: 선택 후보 refinement는 현재 목록을 좁힌다
+
+- **상태:** 승인
+- **맥락:** target에서 4개 중 2·3번을 checkbox로 담고 두 장점을 합쳐 달라고 요청했지만 다음 Round가 선택하지 않은 1·4번과 merge 결과를 함께 표시했다. Feedback target과 코멘트는 정확히 저장됐으나 기존 Core가 모든 unaffected Candidate 보존을 강제해, 관심 목록이 shortlist가 아니라 기존 목록에 결과를 추가하는 동작이 됐다. 또한 이전 10개 전체 생성에서 progressive 4개 starter로 바뀐 이유가 UI에 보이지 않아 데이터가 임의로 사라진 것처럼 느껴졌다.
+- **결정:** target이 있는 `MERGE`, `REVISE`, `SHRINK`, `EXPAND`는 selection narrowing action이다. 다음 current Round에는 해당 결과와 같은 turn에서 명시적으로 pin된 Candidate만 포함하고, 선택하지 않은 이전 Candidate는 immutable revision/history에 보존하되 current 목록에서는 제외한다. 기존 목록을 유지해 넓히는 동작은 target 없는 명시적 `MORE`만 담당한다. prompt는 1.1.3으로 올리고 Core가 이 current-set 규칙을 deterministic하게 검증한다. 이미 old carry 규칙으로 저장된 narrowing Round는 UI projection에서 결과와 pin만 보여 다음 사용자 action 전에도 의도한 shortlist를 복원한다. 첫 Round 4개 우선 정책은 첫 응답 단축을 위해 유지하되 UI에서 빠른 첫 묶음과 8~10개까지 늘리는 action을 설명한다.
+- **검토한 대안:** merge 결과를 기존 목록에 계속 추가, 담지 않은 Candidate에 자동 REJECT feedback 생성, 저장된 과거 Round 수정, 첫 Round를 다시 항상 10개로 복원.
+- **tradeoff:** 한 번 좁힌 뒤 제외된 후보를 현재 목록에서 즉시 되살리는 별도 action은 없고 History 또는 새 후보 요청을 거쳐야 한다. 대신 checkbox basket과 결과 목록의 의미가 일치하고, historical provenance를 삭제하거나 소급 변경하지 않으며, `MORE`의 확장 의미와 refinement의 축소 의미가 분리된다.
+
+## 2026-09-04: T15 Discovery는 Haiku와 ephemeral Core context를 우선 사용
+
+- **상태:** 승인
+- **맥락:** target `auto`의 첫 Candidate 4개는 47.4~50.9초, 첫 Spec은 47.5초로 T15 P95 30초 gate를 넘었다. 동일한 redacted unseen fixture의 Kiro CLI 2.21.0 live screening에서 `auto`는 Candidate를 41.6초에 저장했고 `claude-haiku-4.5`는 Candidate를 22.1초, Spec을 18.2초에 저장했다. `gpt-5.6-luna`는 Candidate field를 계약과 다른 이름으로 바꾸며 `submit_candidate_round`를 17회 재시도한 뒤 결과를 저장하지 못했다. Personal Need가 있는 두 번째 Haiku Candidate run은 36.4초였고 첫 round에서 생략해야 할 evaluation을 Candidate마다 8개씩 생성해 payload가 10.7KB로 증가했다. 모든 정상 저장에서 Core validation과 SQLite write는 밀리초 수준이었으며 매 turn 선행 `get_discovery_context` Agent 왕복은 약 9초였다.
+- **결정:** T15 Discovery Crew Agent의 명시 model을 `claude-haiku-4.5`로 고정한다. App이 strict Core response로 이미 복원한 현재 aggregate를 current Round, current Candidate, pending user Feedback, selected Candidate와 current Spec만 남긴 bounded snapshot으로 만들고 app-owned temporary slot의 ephemeral context에 주입한다. snapshot의 session ID와 expected revision이 dispatch metadata와 일치하면 Agent는 정상 경로에서 `get_discovery_context`를 건너뛰고 바로 submit tool을 호출한다. context 주입 실패, 누락, ID/revision 불일치와 stale submit에서는 기존 read-only tool을 fallback으로 사용한다. Session/revision별 clean slot, Core optimistic revision, strict submit validation과 atomic Round/Spec 저장은 유지한다. 첫 screening에서 계약을 지키지 못한 Luna는 사용하지 않고 Terra 비교는 Haiku가 이후 품질 또는 P95 gate를 충족하지 못할 때만 수행한다.
+- **검토한 대안:** `auto` 유지, Luna를 속도만 보고 채택, 과거처럼 한 slot transcript 재사용, Core validation 생략, context 조회 tool만 남기고 UI polling 최적화.
+- **tradeoff:** Haiku는 hardest reasoning보다 짧은 구조화 Discovery 처리에 맞지만 Auto보다 의미 품질이 낮아질 수 있어 unseen fixture와 target 반복 측정이 필요하다. ephemeral context도 model input에는 포함되지만 별도 Agent 추론 왕복과 visible transcript 누적을 없앤다. Crew의 app context API를 사용할 수 없는 host에서는 fallback 조회 때문에 개선 폭이 줄어들며, 첫 round optional evaluation 과출력은 후속 phase-specific schema가 필요할 수 있다.
+
+## 2026-09-04: T15 Discovery phase를 분리하고 MERGE metadata는 Core가 계산
+
+- **상태:** 승인
+- **맥락:** Haiku와 ephemeral context를 적용한 target 5회 측정에서 first Candidate와 first Spec의 보수적 P95는 각각 26.4초와 20.7초로 30초 gate를 통과했지만, 일반 `submit_candidate_round`로 전체 lineage를 다시 쓰는 MERGE는 한 번 52.7초까지 늘어 P95 gate를 넘었다. Candidate와 Spec이 한 Agent prompt/tool catalog에 같이 있고 MERGE Agent가 pending Feedback, parent reference, revision과 Round metadata까지 반복 생성하는 비용이 남아 있었다. 별도 Spec run에서는 Agent stream이 설명만 남기고 submit tool 없이 종료해 UI가 durable 결과를 오래 기다리는 실패도 확인했다.
+- **결정:** canonical Discovery prompt는 v1.1.5 하나를 유지하되 build 시 ROUND·MERGE·SPEC의 bounded prompt와 Agent config로 분리한다. 각 Agent/MCP route는 `get_discovery_context`와 해당 phase의 submit tool만 허용한다. MERGE는 의미 Candidate 하나만 받는 `submit_candidate_merge`를 추가하고 role-bound adapter/Core가 pending user Feedback 하나, applied Feedback ID, parent revisions, Candidate revision과 Round metadata를 현재 durable context에서 계산한다. 일반 Round와 immutable lineage contract는 변경하지 않는다. Spec Agent는 설명보다 `submit_learning_spec`을 정확히 한 번 먼저 호출해야 하며, stream 종료 뒤 짧은 propagation grace에도 Core revision이 증가하지 않으면 UI는 장기 polling 대신 즉시 재시도 가능한 `TOOL_REJECTED` 상태를 표시한다.
+- **검증:** target Kiro Crew 0.3.0에서 같은 redacted synthetic fixture를 최종 5회 실행했고 15개 phase 모두 ephemeral context가 주입되어 durable submit에 성공했다. nearest-rank P95는 first Candidate 26.564초, MERGE 21.044초, first Spec 22.900초였고 사용자 action부터 durable 결과까지도 26.582초, 21.066초, 22.919초였다. 실제 narrowed Candidate와 Spec의 strict contract, 두 parent lineage, 사람 Concept Necessity·scope review와 privacy-safe latency 배열을 v1.1.5 regression fixture로 고정했다.
+- **검토한 대안:** 하나의 전체 Discovery Agent와 일반 Round schema 유지, Agent가 모든 stable metadata를 계속 생성, preview/staged Candidate 저장 계약 도입, 더 큰 모델로 교체, tool 없는 Spec 응답을 420초까지 polling.
+- **tradeoff:** 설치 package에 세 Agent와 세 고정 MCP route가 생기지만 각 surface의 권한과 prompt 크기가 작아지고 MERGE 품질 책임과 stable metadata 책임이 분리된다. 5표본 P95는 T15 gate에 쓰는 보수적 회귀일 뿐 장기 분포를 대표하지 않으므로 T21에서 표본을 늘린다. 모든 구간이 30초 안이어서 preview/lazy enrichment 계약 변경은 하지 않으며 3~5초 first-useful 목표는 후속 metric으로 남긴다.
+
+## 2026-09-04: T15 stale UI·실행 복원·Spec revision 보장
+
+- **상태:** 승인
+- **맥락:** 실제 사용자 재검증에서 업데이트 전에 열린 UI가 제거된 legacy Discovery Agent를 호출했고, 화면 이탈 뒤에는 실행 표시가 사라져 같은 Session이 처음부터 시작하는 것처럼 보였다. 기존 Spec 수정 두 번은 Agent가 설명만 반환하고 submit tool을 호출하지 않아 Core Spec revision이 1에 머물렀다. Crew slot의 긴 170초 관측은 model 추론만이 아니라 범용 file permission 대기까지 포함했다.
+- **결정:** UI가 모든 Core 요청에 protocol v2를 보내고 backend는 불일치 요청을 Agent dispatch 전에 409로 차단한다. app version과 UI entry filename을 함께 올려 새로 연 화면이 갱신 bundle을 사용하게 한다. 화면 재진입 때 current Session/revision/phase에서 파생한 exact slot을 조회해 `running`이면 중복 dispatch 없이 Core polling만 복원하고, 완료됐지만 durable 결과가 없으면 저장 상태 기반 재시도 또는 수정문 재입력을 명시한다. prompt v1.1.6의 정상 SPEC Agent/MCP는 주입된 Core snapshot과 `submit_learning_spec`만 사용하고, context 주입이 불가능할 때만 별도 recovery Agent에 read tool을 노출한다. Spec stream이 tool 없이 정상 종료하면 최신 Core snapshot에서 같은 수정 의도를 한 번만 자동 재제출하며 두 번째 실패는 현재 revision을 유지한 오류로 표시한다. 성공은 Agent 문장이 아니라 durable Spec revision 증가로만 판정한다.
+- **검증:** Chromium E2E에서 stale protocol 차단, 실행 중 slot 재진입과 중복 dispatch 0회, 첫 Spec revision 1, 정상 수정 revision 2, 첫 no-tool 뒤 bounded recovery revision 2를 검증했다. target raw Haiku 수정 2회 중 1회는 no-tool이었고 정상 수정은 23.384초에 revision 2를 저장했다. 같은 fixture에서 SPEC만 Terra는 첫 Spec 43.257초, Auto는 첫 Spec 39.240초·수정 36.027초로 30초를 넘겨 Haiku를 유지한다.
+- **검토한 대안:** 구 UI의 실패를 일반 host 오류로 처리, 화면 재진입마다 새 Agent dispatch, project 단위 장기 slot 재사용, 정상 SPEC에도 context read tool 유지, 설명 응답을 수정 성공으로 표시, no-tool 종료를 420초 동안 계속 polling, Spec에 Terra 또는 Auto 사용.
+- **tradeoff:** 네 번째 recovery Agent와 protocol 호환성 경계, Spec에 한정된 최대 1회 자동 재제출이 생긴다. 대신 stale 실행과 중복 요청을 빠르게 분리하고 Agent의 말과 durable 상태가 어긋나는 성공 표시를 막는다. 자동 복구가 필요한 예외 turn은 30초를 넘을 수 있고 first Candidate 49.310초 outlier도 관측됐으므로 T15 성능 gate는 완료 처리하지 않는다.
+
+## 2026-09-04: T15 최종 사용자 승인과 MVP 재진입 경계
+
+- **상태:** 승인
+- **맥락:** 사용자는 T15 UI/UX 승인 테스트에서 Spec을 revision 2로 수정하고 Builder 화면까지 이동하는 실제 흐름을 이미 확인했다. 남은 항목으로 제시한 실행 중 화면 이탈·재진입 복원은 MVP에서 요구하지 않으며, 성능은 최종 설치본으로 한 번 더 확인한 뒤 승인 결과와 합쳐 종료하기로 했다.
+- **결정:** 저장 완료된 Project/session/Task/Decision/Context의 durable 복원은 기존 T14 경계로 유지한다. 반면 진행 중 Agent stream과 progress를 화면 재진입 시 다시 연결하는 기능은 MVP acceptance에서 제외한다. 이미 구현된 exact-slot 조회와 중복 dispatch 방지는 방어 기능으로 남기지만 release 보장을 주장하지 않는다. T15 성능은 최종 v1.1.6·Haiku target 대표 실행 한 번에서 first Candidate, 단일 MERGE refinement와 첫 Spec이 각각 30초 이내이면 통과로 판정하고, 사용자의 UI/UX 및 Spec revision 2→Builder 승인을 최종 human acceptance로 사용한다. 장기 P95 표본은 T21에서 수집한다.
+- **검토한 대안:** in-flight 재진입을 T15 blocker로 유지, 구현된 복원 기능 제거, 5회 이상을 다시 수행한 뒤에만 T15 종료, 49.310초 과거 outlier만으로 즉시 실패 확정.
+- **tradeoff:** MVP는 앱 이탈 중 진행 표시의 연속성을 보장하지 않으며 단일 대표 성능 실행은 장기 tail latency를 증명하지 않는다. 대신 저장된 결과의 정합성과 핵심 Discovery→Spec→Builder 흐름에 완료 판단을 집중하고, 더 넓은 성능 분포는 T21 release 검증에서 다룬다.
+- **재검증:** 최종 설치본의 대표 실행은 MERGE 13.226초, 첫 Spec 18.860초, Spec 수정 23.097초에 durable 저장됐고 수정 결과는 revision 2였다. first Candidate만 50.132초로 30초 gate를 넘었으므로 T15는 완료하지 않으며 잔여 범위는 첫 Candidate latency로 좁힌다.
+
+## 2026-09-04: T15 First Candidate 대안 spike
+
+- **상태:** 검토 완료, 제품 변경 미승인
+- **맥락:** 사용자는 가능하면 상세 Candidate 10개를 유지하되 6개 축소, 설명 축소와 다른 구조까지 같은 target에서 비교하도록 승인했다. 현재 Haiku 4개 상세 baseline은 50.132초였다.
+- **결과:** Haiku 10개 compact는 완전한 상세 필드와 고유 제목·상호작용 10개를 33.940초에 저장했지만 gate를 넘었다. Luna 6개 exact-envelope는 성공 시 14.420~16.063초였으나 4회 중 3회만 저장됐고 Luna 10개도 19.991초 성공 뒤 no-durable 실패가 재현됐다. Haiku 4개 ultra와 6개 compact는 잘못된 tool 표현 또는 envelope로 저장되지 않았다. initial-only 최소 prompt는 최대 70.837초였고 저장 실패도 남았다. Haiku 5×2 병렬은 첫 시도 두 batch가 22.727초·24.561초였지만 10개 중 4개 방향이 의미상 겹쳤으며, partition 지시 재시험은 한 batch가 저장되지 않았다. Luna+Haiku hedge도 두 호출 모두 저장되지 않아 43.194초에 실패했다.
+- **판정:** 기존 single Round contract에서 개수, 설명량, prompt 길이와 model만 바꾸는 저위험안 중 latency와 durable reliability를 함께 충족한 것은 없다. production은 Haiku v1.1.6으로 복원했고 어떤 실험 variant도 채택하지 않는다.
+- **권장 Decision Request:** 10개 lightweight preview를 작은 초기 contract로 먼저 저장하고, 그 10개 identity를 고정한 뒤 상세 필드를 background enrichment하는 계약을 다음 구현안으로 제안한다. 선택된 preview를 우선 상세화하고 Spec은 해당 Candidate의 complete revision 뒤에만 허용한다. 독립 batch가 새 후보를 다시 발명하지 않아 parallel spike의 중복을 피한다.
+- **tradeoff:** 사용자는 10개 제목·핵심 방향을 먼저 볼 수 있고 전체 상세도 결국 받지만 일부 행은 잠시 loading 상태가 된다. Candidate preview 상태, staging/finalize transaction, enrichment 실패·재시도와 UI projection이 새로 필요하며 이 구조 자체의 latency는 아직 직접 측정하지 않았다. 따라서 사용자 승인과 contract 문서 변경 전에는 구현하지 않는다.
+
 ## 2026-08-24: 구현 세부 선택 위임
 
 - **상태:** 승인

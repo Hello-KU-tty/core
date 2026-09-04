@@ -1,0 +1,28 @@
+[
+  {
+    "criterionKey": "concept_necessity",
+    "dimension": "CONCEPT_NECESSITY",
+    "reviewMode": "HUMAN",
+    "status": "PASSED",
+    "explanation": "The merged Candidate makes simultaneous shared text and execution output the primary interaction, so removing WebSocket-style state synchronization would turn it into a different single-user or delayed product.",
+    "evidenceReferences": [
+      "discovery.candidates[0].coreInteraction",
+      "discovery.candidates[0].technologyNecessity",
+      "discovery.candidates[0].coreConcepts"
+    ],
+    "metrics": []
+  },
+  {
+    "criterionKey": "scope_appropriateness",
+    "dimension": "SPEC_SCOPE",
+    "reviewMode": "HUMAN",
+    "status": "PASSED",
+    "explanation": "The Spec keeps WebSocket flow, client-server synchronization and input ordering in Learner Focus; code execution, error handling and basic UI stay in Agent Support; persistence, authentication and IDE-grade features remain excluded. The listed Decisions expose real concurrency and deployment tradeoffs without expanding the MVP.",
+    "evidenceReferences": [
+      "learningSpec.scope",
+      "learningSpec.mvpFeatures",
+      "learningSpec.expectedDecisions"
+    ],
+    "metrics": []
+  }
+]

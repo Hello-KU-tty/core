@@ -10,7 +10,7 @@
   },
   "scripts": {
     "preflight": "node ./scripts/check-toolchain.mjs",
-    "build": "pnpm preflight && tsc -b --pretty false && pnpm --filter @vibe-helper/crew-app build:bundle",
+    "build": "pnpm preflight && tsc -b --pretty false && node ./scripts/build-crew-agents.mjs && pnpm --filter @vibe-helper/crew-app build:bundle && node ./scripts/build-crew-package.mjs",
     "typecheck": "pnpm preflight && tsc -b --pretty false",
     "lint": "biome lint .",
     "format": "biome format --write .",
@@ -32,6 +32,7 @@
     "@biomejs/biome": "2.5.10",
     "@playwright/test": "1.62.1",
     "@types/node": "24.13.3",
+    "esbuild": "0.28.2",
     "typescript": "7.0.2",
     "vitest": "4.1.11"
   }

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { ApplicationService, WorkspacePathPolicy } from '../../../packages/application/dist/index.js'
+import { agentRoleSchema } from '../../../packages/contracts/dist/index.js'
 import { openSqliteStorage } from '../../../packages/storage-sqlite/dist/index.js'
 
 import { createCrewBackendServer } from '../../../apps/crew-backend/dist/server.js'
@@ -16,6 +17,12 @@ const application = new ApplicationService({ storage, workspacePolicy })
 const server = createCrewBackendServer({
   application,
   proxySecret: 'test-proxy-secret-with-at-least-thirty-two-bytes',
+  testAgentExecutor: async (input) => {
+    if (typeof input !== 'object' || input === null || !('role' in input) || !('request' in input)) {
+      throw new TypeError('test Agent envelope is invalid')
+    }
+    return application.executeAgent(agentRoleSchema.parse(input.role), input.request)
+  },
 })
 
 const close = () => server.close(() => storage.close())

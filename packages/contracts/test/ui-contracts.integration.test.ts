@@ -83,6 +83,7 @@ describe('UI external input contracts', () => {
       discoverySessionId: ids.discoverySession,
       expectedSessionRevision: 3,
       expectedSpecRevision: 1,
+      input: { ...discoveryInputFixture, learningGoal: 'Build a smaller runtime validator' },
     } as const
 
     expect(uiUpdateLearningSpecCommandSchema.parse(update)).toEqual(update)

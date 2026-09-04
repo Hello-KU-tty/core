@@ -197,6 +197,352 @@ describe('T08 Discovery Agent regression', () => {
   })
 })
 
+describe('T15 Discovery Agent v1.1.2 starter regression', () => {
+  it('keeps four concise Candidates valid and diverse while deferring evaluation detail', async () => {
+    const fixture = evaluationFixtureSchema.parse(
+      await loadInput(
+        'tests/eval/fixtures/prompt-regressions/discovery-v1.1.2-starter-webhook.manifest.json',
+      ),
+    )
+    const subject = parseEvaluationSubject(
+      await loadInput(
+        'tests/eval/fixtures/prompt-regressions/discovery-v1.1.2-starter-webhook.json',
+      ),
+    )
+    const reviews = evaluationCriterionResultSchema
+      .array()
+      .parse(
+        await loadInput(
+          'tests/eval/fixtures/prompt-regressions/discovery-v1.1.2-starter-webhook.review.json',
+        ),
+      )
+    const result = evaluateCalibrationCase({
+      fixture,
+      subject,
+      humanReviews: new Map(reviews.map((review) => [review.criterionKey, review])),
+    })
+    const round = candidateRoundSchema.parse(subject.discovery?.round)
+    const candidates = subject.discovery?.candidates.map((candidate) =>
+      projectCandidateRevisionSchema.parse(candidate),
+    )
+
+    expect(round.candidates).toHaveLength(4)
+    expect(candidates).toHaveLength(4)
+    expect(
+      candidates?.every(
+        (candidate) => candidate.evaluation === undefined && candidate.risks === undefined,
+      ),
+    ).toBe(true)
+    expect(result.status).toBe('PASSED')
+    expect(result.criterionResults).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ criterionKey: 'contract_valid', status: 'PASSED' }),
+        expect.objectContaining({
+          criterionKey: 'no_structural_mode_collapse',
+          status: 'PASSED',
+        }),
+        expect.objectContaining({ criterionKey: 'semantic_diversity', status: 'PASSED' }),
+        expect.objectContaining({ criterionKey: 'concept_necessity', status: 'PASSED' }),
+      ]),
+    )
+  })
+})
+
+describe('T15 Discovery Agent v1.1.4 ephemeral context regression', () => {
+  it('stores one concise valid round without a context tool round trip', async () => {
+    const fixture = evaluationFixtureSchema.parse(
+      await loadInput(
+        'tests/eval/fixtures/prompt-regressions/discovery-v1.1.4-fast-context.manifest.json',
+      ),
+    )
+    const subject = parseEvaluationSubject(
+      await loadInput('tests/eval/fixtures/prompt-regressions/discovery-v1.1.4-fast-context.json'),
+    )
+    const reviews = evaluationCriterionResultSchema
+      .array()
+      .parse(
+        await loadInput(
+          'tests/eval/fixtures/prompt-regressions/discovery-v1.1.4-fast-context.review.json',
+        ),
+      )
+    const performance = (await loadInput(
+      'tests/eval/fixtures/prompt-regressions/discovery-v1.1.4-fast-context.performance.json',
+    )) as Record<string, unknown>
+    const result = evaluateCalibrationCase({
+      fixture,
+      subject,
+      humanReviews: new Map(reviews.map((review) => [review.criterionKey, review])),
+    })
+    const round = candidateRoundSchema.parse(subject.discovery?.round)
+    const candidates = subject.discovery?.candidates.map((candidate) =>
+      projectCandidateRevisionSchema.parse(candidate),
+    )
+
+    expect(round.candidates).toHaveLength(4)
+    expect(candidates).toHaveLength(4)
+    expect(
+      candidates?.every(
+        (candidate) => candidate.evaluation === undefined && candidate.risks === undefined,
+      ),
+    ).toBe(true)
+    expect(performance).toMatchObject({
+      promptVersion: '1.1.4',
+      model: 'claude-haiku-4.5',
+      providedContext: true,
+      candidateCount: 4,
+      getContextCalls: 0,
+      submitCalls: 1,
+      containsPersonalData: false,
+    })
+    expect(performance.durableMilliseconds).toEqual(expect.any(Number))
+    expect(Number(performance.durableMilliseconds)).toBeLessThan(30_000)
+    expect(result.status).toBe('PASSED')
+  })
+})
+
+describe('T15 Discovery Agent v1.1.5 phase split regression', () => {
+  it('keeps ROUND, Core-derived MERGE and tool-first SPEC valid under the target latency budget', async () => {
+    const fixture = evaluationFixtureSchema.parse(
+      await loadInput(
+        'tests/eval/fixtures/prompt-regressions/discovery-v1.1.5-fast-phases.manifest.json',
+      ),
+    )
+    const subject = parseEvaluationSubject(
+      await loadInput('tests/eval/fixtures/prompt-regressions/discovery-v1.1.5-fast-phases.json'),
+    )
+    const reviews = evaluationCriterionResultSchema
+      .array()
+      .parse(
+        await loadInput(
+          'tests/eval/fixtures/prompt-regressions/discovery-v1.1.5-fast-phases.review.json',
+        ),
+      )
+    const performance = (await loadInput(
+      'tests/eval/fixtures/prompt-regressions/discovery-v1.1.5-fast-phases.performance.json',
+    )) as {
+      readonly promptVersion: string
+      readonly model: string
+      readonly sampleCount: number
+      readonly successfulRuns: number
+      readonly failedRuns: number
+      readonly providedContext: boolean
+      readonly contextInjectionSuccesses: number
+      readonly submitSuccesses: number
+      readonly containsPersonalData: boolean
+      readonly phases: Readonly<
+        Record<
+          'initial' | 'merge' | 'spec',
+          {
+            readonly durableP95Milliseconds: number
+            readonly interactionP95Milliseconds: number
+          }
+        >
+      >
+    }
+    const result = evaluateCalibrationCase({
+      fixture,
+      subject,
+      humanReviews: new Map(reviews.map((review) => [review.criterionKey, review])),
+    })
+    const round = candidateRoundSchema.parse(subject.discovery?.round)
+    const candidate = projectCandidateRevisionSchema.parse(subject.discovery?.candidates[0])
+    const spec = learningSpecRevisionSchema.parse(subject.learningSpec)
+
+    expect(round.roundIndex).toBe(2)
+    expect(round.appliedFeedbackIds).toHaveLength(1)
+    expect(round.candidates).toEqual([{ candidateId: candidate.id, revision: 2 }])
+    expect(candidate.parentRevisions).toHaveLength(2)
+    expect(spec.selectedCandidate).toEqual({ candidateId: candidate.id, revision: 2 })
+    expect(performance).toMatchObject({
+      promptVersion: '1.1.5',
+      model: 'claude-haiku-4.5',
+      sampleCount: 5,
+      successfulRuns: 5,
+      failedRuns: 0,
+      providedContext: true,
+      contextInjectionSuccesses: 15,
+      submitSuccesses: 15,
+      containsPersonalData: false,
+    })
+    expect(
+      Object.values(performance.phases).every(
+        (phase) =>
+          phase.durableP95Milliseconds < 30_000 && phase.interactionP95Milliseconds < 30_000,
+      ),
+    ).toBe(true)
+    expect(result.status).toBe('PASSED')
+  })
+})
+
+describe('T15 Discovery Agent v1.1.6 Spec persistence recovery', () => {
+  it('keeps the normal Spec surface submit-only and records the bounded recovery evidence', async () => {
+    const prompt = await readFile(
+      path.join(workspaceRoot, 'docs/agent-prompts/discovery.md'),
+      'utf8',
+    )
+    const performance = (await loadInput(
+      'tests/eval/fixtures/prompt-regressions/discovery-v1.1.6-spec-recovery.performance.json',
+    )) as {
+      readonly promptVersion: string
+      readonly selectedModel: string
+      readonly normalSpecTools: readonly string[]
+      readonly recoverySpecTools: readonly string[]
+      readonly boundedUiRecoveryAttempts: number
+      readonly durableRevisionAfterUiRecoveryE2e: number
+      readonly haikuRawRefinement: {
+        readonly samples: number
+        readonly durableSuccesses: number
+        readonly noToolCompletions: number
+      }
+      readonly modelComparisons: Readonly<
+        Record<string, { readonly firstSpecMilliseconds: number; readonly bothDurable: boolean }>
+      >
+      readonly finalHaikuUserFlowSample: {
+        readonly refinedSpecRevision: number
+        readonly refinedSpecMilliseconds: number
+      }
+      readonly userApprovedFinalGateRerun: {
+        readonly firstCandidateMilliseconds: number
+        readonly mergeMilliseconds: number
+        readonly firstSpecMilliseconds: number
+        readonly refinedSpecMilliseconds: number
+        readonly refinedSpecRevision: number
+        readonly allRequiredPhasesWithinGate: boolean
+      }
+      readonly latencyGateFullyMet: boolean
+      readonly containsPersonalData: boolean
+    }
+
+    expect(prompt).toContain('Prompt version: `1.1.6`')
+    expect(prompt).toContain('확인 질문이나 설명으로 끝내지 마라')
+    expect(performance).toMatchObject({
+      promptVersion: '1.1.6',
+      selectedModel: 'claude-haiku-4.5',
+      normalSpecTools: ['submit_learning_spec'],
+      recoverySpecTools: ['get_discovery_context', 'submit_learning_spec'],
+      boundedUiRecoveryAttempts: 2,
+      durableRevisionAfterUiRecoveryE2e: 2,
+      containsPersonalData: false,
+      latencyGateFullyMet: false,
+    })
+    expect(performance.haikuRawRefinement).toMatchObject({
+      samples: 2,
+      durableSuccesses: 1,
+      noToolCompletions: 1,
+    })
+    expect(performance.finalHaikuUserFlowSample).toMatchObject({
+      refinedSpecRevision: 2,
+      refinedSpecMilliseconds: 23_384,
+    })
+    expect(performance.userApprovedFinalGateRerun).toMatchObject({
+      firstCandidateMilliseconds: 50_132,
+      mergeMilliseconds: 13_226,
+      firstSpecMilliseconds: 18_860,
+      refinedSpecMilliseconds: 23_097,
+      refinedSpecRevision: 2,
+      allRequiredPhasesWithinGate: false,
+    })
+    expect(
+      Object.values(performance.modelComparisons).every(
+        (comparison) => comparison.bothDurable && comparison.firstSpecMilliseconds > 30_000,
+      ),
+    ).toBe(true)
+  })
+})
+
+describe('T15 first-Candidate performance alternatives', () => {
+  it('records failed low-risk variants and leaves the contract-changing recommendation unshipped', async () => {
+    const performance = (await loadInput(
+      'tests/eval/fixtures/prompt-regressions/discovery-v1.1.6-first-candidate-alternatives.performance.json',
+    )) as {
+      readonly baseline: { readonly durableMilliseconds: number }
+      readonly singleBatchVariants: readonly {
+        readonly variant: string
+        readonly attempts?: number
+        readonly durableSuccesses?: number
+      }[]
+      readonly otherStrategies: readonly {
+        readonly variant: string
+        readonly atomicCombinedRound?: boolean
+      }[]
+      readonly conclusion: {
+        readonly existingSingleRoundVariantMeetsLatencyAndReliability: boolean
+        readonly recommendedNextDesign: string
+        readonly recommendationDirectlyValidated: boolean
+        readonly requiresContractAndStorageChange: boolean
+        readonly productionVariantChanged: boolean
+        readonly stablePackageRestored: boolean
+      }
+      readonly containsPersonalData: boolean
+    }
+
+    expect(performance.baseline.durableMilliseconds).toBe(50_132)
+    expect(
+      performance.singleBatchVariants.find(
+        (variant) => variant.variant === 'luna-6-compact-explicit-envelope',
+      ),
+    ).toMatchObject({ attempts: 4, durableSuccesses: 3 })
+    expect(
+      performance.otherStrategies.find(
+        (variant) => variant.variant === 'haiku-5x2-parallel-unpartitioned',
+      ),
+    ).toMatchObject({ atomicCombinedRound: false })
+    expect(performance.conclusion).toEqual({
+      existingSingleRoundVariantMeetsLatencyAndReliability: false,
+      recommendedNextDesign: 'TEN_PREVIEWS_THEN_FIXED_PREVIEW_ENRICHMENT',
+      recommendationDirectlyValidated: false,
+      requiresContractAndStorageChange: true,
+      productionVariantChanged: false,
+      stablePackageRestored: true,
+    })
+    expect(performance.containsPersonalData).toBe(false)
+  })
+})
+
+describe('T15 Discovery Agent v1.1.3 selection narrowing regression', () => {
+  it('keeps only the merged result current while preserving both selected parents as lineage', async () => {
+    const fixture = evaluationFixtureSchema.parse(
+      await loadInput(
+        'tests/eval/fixtures/prompt-regressions/discovery-v1.1.3-narrow-merge.manifest.json',
+      ),
+    )
+    const subject = parseEvaluationSubject(
+      await loadInput('tests/eval/fixtures/prompt-regressions/discovery-v1.1.3-narrow-merge.json'),
+    )
+    const reviews = evaluationCriterionResultSchema
+      .array()
+      .parse(
+        await loadInput(
+          'tests/eval/fixtures/prompt-regressions/discovery-v1.1.3-narrow-merge.review.json',
+        ),
+      )
+    const result = evaluateCalibrationCase({
+      fixture,
+      subject,
+      humanReviews: new Map(reviews.map((review) => [review.criterionKey, review])),
+    })
+    const round = candidateRoundSchema.parse(subject.discovery?.round)
+    const candidates = subject.discovery?.candidates.map((candidate) =>
+      projectCandidateRevisionSchema.parse(candidate),
+    )
+
+    expect(round.roundIndex).toBe(2)
+    expect(round.appliedFeedbackIds).toHaveLength(1)
+    expect(round.candidates).toEqual([
+      { candidateId: 'candidate_00000000-0000-4000-8000-000000000915', revision: 2 },
+    ])
+    expect(candidates).toHaveLength(1)
+    expect(candidates?.[0]?.parentRevisions).toHaveLength(2)
+    expect(result.status).toBe('PASSED')
+    expect(result.criterionResults).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ criterionKey: 'contract_valid', status: 'PASSED' }),
+        expect.objectContaining({ criterionKey: 'concept_necessity', status: 'PASSED' }),
+      ]),
+    )
+  })
+})
+
 describe('T09 Learning Spec prompt regression', () => {
   it('keeps all scope boundaries while deriving required Evidence from Learner Focus only', async () => {
     const fixture = evaluationFixtureSchema.parse(

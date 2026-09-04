@@ -5,6 +5,12 @@
   "type": "module",
   "main": "./dist/main.js",
   "types": "./dist/main.d.ts",
+  "exports": {
+    "./role-server": {
+      "types": "./dist/role-server.d.ts",
+      "import": "./dist/role-server.js"
+    }
+  },
   "dependencies": {
     "@modelcontextprotocol/server": "2.0.0",
     "@vibe-helper/application": "workspace:*",

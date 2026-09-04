@@ -18,6 +18,9 @@ coverage/
 playwright-report/
 test-results/
 
+# Generated Crew Agent configs (source: docs/agent-prompts)
+/agents/*.json
+
 # Logs and local runtime data
 *.log
 .data/

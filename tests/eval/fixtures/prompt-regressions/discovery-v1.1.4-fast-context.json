@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 1,
+  "discovery": {
+    "round": {
+      "schemaVersion": 1,
+      "id": "candidate_round_e3047ea7-48ec-461f-b59c-4754ab72d497",
+      "discoverySessionId": "discovery_session_10000000-0000-4000-8000-000000000002",
+      "correlationId": "corr_10000000-0000-4000-8000-000000000003",
+      "roundIndex": 1,
+      "inputSnapshot": {
+        "learningGoal": "WebSocket과 실시간 상태 동기화를 배우고 싶다",
+        "personalNeed": "동아리 공연 리허설에서 다음 순서와 준비 상태를 여러 사람이 동시에 확인하고 싶다",
+        "currentLevel": "NEW"
+      },
+      "appliedFeedbackIds": [],
+      "candidates": [
+        {
+          "candidateId": "candidate_53a2a9be-dac0-4fec-b69a-e5c04dac6388",
+          "revision": 1
+        },
+        {
+          "candidateId": "candidate_c3ec2e1c-3e53-4d8e-a9c7-99bb23c6db89",
+          "revision": 1
+        },
+        {
+          "candidateId": "candidate_94638456-258c-45c1-992c-ab973e847738",
+          "revision": 1
+        },
+        {
+          "candidateId": "candidate_02219368-1218-4618-aaa4-78e0ff0290e0",
+          "revision": 1
+        }
+      ],
+      "generationRationale": "네 가지 후보는 모두 실시간 동기화가 핵심이지만, 공연 진행, 팀 협업, 라이브 이벤트, 분산 시스템이라는 다른 맥락에서 WebSocket을 경험하게 합니다.",
+      "diversityCheck": {
+        "dimensionsReviewed": [
+          "PROBLEM_DOMAIN",
+          "TARGET_USER",
+          "CORE_INTERACTION",
+          "DATA_SHAPE"
+        ],
+        "modeCollapseDetected": false,
+        "rationale": "공연 진행 관리, 팀 작업 흐름, 라이브 경매, 멀티플레이어 게임은 각각 다른 사용자층과 데이터 구조를 가지며 실시간 동기화의 서로 다른 측면을 드러냅니다."
+      },
+      "createdAt": "2026-09-04T06:49:25.873Z",
+      "source": {
+        "kind": "AGENT",
+        "role": "DISCOVERY"
+      },
+      "redactionStatus": "NOT_REQUIRED"
+    },
+    "candidates": [
+      {
+        "schemaVersion": 1,
+        "id": "candidate_02219368-1218-4618-aaa4-78e0ff0290e0",
+        "discoverySessionId": "discovery_session_10000000-0000-4000-8000-000000000002",
+        "correlationId": "corr_10000000-0000-4000-8000-000000000003",
+        "revision": 1,
+        "parentRevisions": [],
+        "title": "멀티플레이어 간단한 게임",
+        "summary": "여러 플레이어가 같은 방에서 실시간으로 움직임과 점수를 공유하며 진행되는 간단한 브라우저 게임입니다.",
+        "targetUsers": ["게임을 즐기는 사람들"],
+        "coreInteraction": "한 플레이어의 캐릭터 위치 또는 행동이 변하면 모든 플레이어의 화면에 즉시 반영되어 함께 게임이 진행됩니다.",
+        "usageMoment": "여럿이 같은 게임 세션에 들어와 실시간 상호작용을 할 때.",
+        "appeal": "낮은 지연 시간으로 매끄러운 멀티플레이 경험을 만들 수 있습니다.",
+        "technologyNecessity": "WebSocket을 통해 게임 상태가 수백 밀리초 단위로 동기화되어야 게임이 재미있으므로 필수입니다.",
+        "coreConcepts": ["WebSocket 프로토콜", "레이턴시 최소화", "게임 루프 동기화"],
+        "mvpFeatures": [
+          "플레이어 위치 실시간 업데이트",
+          "기본 게임 로직",
+          "점수 계산 및 공유"
+        ],
+        "suggestedScope": {
+          "learnerFocus": [
+            "WebSocket 고빈도 메시지 처리",
+            "효율적인 데이터 구조",
+            "네트워크 지연 대응"
+          ],
+          "agentSupport": ["게임 물리 엔진", "UI 렌더링"],
+          "excluded": ["복잡한 게임 레벨 에디터", "랭킹 시스템"]
+        },
+        "generationTags": ["DISCOVER"],
+        "createdAt": "2026-09-04T06:49:25.873Z",
+        "source": {
+          "kind": "AGENT",
+          "role": "DISCOVERY"
+        },
+        "redactionStatus": "NOT_REQUIRED"
+      },
+      {
+        "schemaVersion": 1,
+        "id": "candidate_53a2a9be-dac0-4fec-b69a-e5c04dac6388",
+        "discoverySessionId": "discovery_session_10000000-0000-4000-8000-000000000002",
+        "correlationId": "corr_10000000-0000-4000-8000-000000000003",
+        "revision": 1,
+        "parentRevisions": [],
+        "title": "리허설 순서 보드",
+        "summary": "무대 팀원들이 다음 공연 순서, 준비 상태, 변경사항을 실시간으로 공유하는 웹 대시보드입니다.",
+        "targetUsers": ["공연 동아리 진행자"],
+        "coreInteraction": "공연 순서 항목을 추가하고 각 팀원이 준비 완료 체크박스를 누르면 모든 기기에 즉시 반영됩니다.",
+        "usageMoment": "리허설 중 진행 상황을 실시간 추적할 때.",
+        "appeal": "여러 사람이 동시에 같은 정보를 보고 혼동 없이 다음 순서를 준비할 수 있습니다.",
+        "technologyNecessity": "WebSocket을 통해 한 사람의 체크박스 입력이 모든 클라이언트에 즉시 전파되어야 하므로 필수입니다.",
+        "coreConcepts": ["WebSocket 연결", "상태 동기화", "실시간 이벤트"],
+        "mvpFeatures": [
+          "순서 항목 입력 및 표시",
+          "준비 상태 체크박스",
+          "모든 기기에 동시 업데이트"
+        ],
+        "suggestedScope": {
+          "learnerFocus": [
+            "WebSocket 서버 구축",
+            "클라이언트-서버 메시지 설계",
+            "상태 변경 감지 및 브로드캐스트"
+          ],
+          "agentSupport": ["사용자 인증", "데이터 저장소"],
+          "excluded": ["복잡한 권한 관리", "과거 데이터 저장소 쿼리"]
+        },
+        "generationTags": ["DIRECT"],
+        "createdAt": "2026-09-04T06:49:25.873Z",
+        "source": {
+          "kind": "AGENT",
+          "role": "DISCOVERY"
+        },
+        "redactionStatus": "NOT_REQUIRED"
+      },
+      {
+        "schemaVersion": 1,
+        "id": "candidate_94638456-258c-45c1-992c-ab973e847738",
+        "discoverySessionId": "discovery_session_10000000-0000-4000-8000-000000000002",
+        "correlationId": "corr_10000000-0000-4000-8000-000000000003",
+        "revision": 1,
+        "parentRevisions": [],
+        "title": "라이브 경매 시스템",
+        "summary": "여러 입찰자가 실시간으로 같은 경매 항목에 대해 입찰가를 올리고 최고가, 시간 남은 양을 모두가 동시에 볼 수 있습니다.",
+        "targetUsers": ["경매 이벤트 참여자"],
+        "coreInteraction": "입찰자가 입찰가를 제출하면 다른 모든 입찰자와 진행자의 화면에 즉시 최고가와 시간이 업데이트됩니다.",
+        "usageMoment": "라이브 경매가 진행될 때 현재 상태를 모두가 같은 시점에 봐야 할 때.",
+        "appeal": "공정한 경매 진행과 긴장감 있는 입찰 경험을 실시간으로 제공합니다.",
+        "technologyNecessity": "WebSocket이 아니면 입찰 결과가 지연되어 중복 입찰이나 혼동이 발생하므로 핵심입니다.",
+        "coreConcepts": ["WebSocket 양방향 통신", "동시성 처리", "실시간 상태 일관성"],
+        "mvpFeatures": [
+          "입찰 폼 제출",
+          "최고가 및 카운트다운 표시",
+          "모든 클라이언트 동기화"
+        ],
+        "suggestedScope": {
+          "learnerFocus": ["WebSocket 양방향 메시지 처리", "동시 입찰 충돌 해결", "타이머 동기화"],
+          "agentSupport": ["사용자 계정 관리", "입찰 히스토리 저장"],
+          "excluded": ["결제 시스템", "상세 리포팅"]
+        },
+        "generationTags": ["EXPAND"],
+        "createdAt": "2026-09-04T06:49:25.873Z",
+        "source": {
+          "kind": "AGENT",
+          "role": "DISCOVERY"
+        },
+        "redactionStatus": "NOT_REQUIRED"
+      },
+      {
+        "schemaVersion": 1,
+        "id": "candidate_c3ec2e1c-3e53-4d8e-a9c7-99bb23c6db89",
+        "discoverySessionId": "discovery_session_10000000-0000-4000-8000-000000000002",
+        "correlationId": "corr_10000000-0000-4000-8000-000000000003",
+        "revision": 1,
+        "parentRevisions": [],
+        "title": "팀 작업 보드",
+        "summary": "프로젝트 팀이 각자 담당 작업의 진행 상태를 실시간 업데이트하고 팀원들이 즉시 확인하는 협업 도구입니다.",
+        "targetUsers": ["소규모 프로젝트 팀원"],
+        "coreInteraction": "한 팀원이 작업 상태를 '진행 중' → '완료'로 바꾸면 모든 팀원의 화면에 즉각 반영됩니다.",
+        "usageMoment": "프로젝트 진행 중 서로의 진도를 실시간으로 추적할 때.",
+        "appeal": "상태 업데이트가 지연되지 않아 팀이 의사결정을 빠르게 할 수 있고 병렬 작업이 수월합니다.",
+        "technologyNecessity": "WebSocket을 통해 상태 변경을 즉시 모든 팀원에게 전달하지 않으면 오래된 정보로 작업할 수 있으므로 필수입니다.",
+        "coreConcepts": ["WebSocket", "이벤트 기반 업데이트", "다중 클라이언트 동기화"],
+        "mvpFeatures": ["작업 항목 생성", "상태 드롭다운 선택", "실시간 상태 전파"],
+        "suggestedScope": {
+          "learnerFocus": ["WebSocket 메시지 구조 설계", "브로드캐스팅 로직", "연결 관리"],
+          "agentSupport": ["데이터베이스 저장", "로그인 기능"],
+          "excluded": ["작업 우선순위 알고리즘", "상세 히스토리 조회"]
+        },
+        "generationTags": ["DIRECT"],
+        "createdAt": "2026-09-04T06:49:25.873Z",
+        "source": {
+          "kind": "AGENT",
+          "role": "DISCOVERY"
+        },
+        "redactionStatus": "NOT_REQUIRED"
+      }
+    ]
+  }
+}

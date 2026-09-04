@@ -1,0 +1,139 @@
+{
+  "schemaVersion": 1,
+  "discovery": {
+    "round": {
+      "schemaVersion": 1,
+      "id": "candidate_round_00000000-0000-4000-8000-000000000901",
+      "discoverySessionId": "discovery_session_00000000-0000-4000-8000-000000000902",
+      "correlationId": "corr_00000000-0000-4000-8000-000000000903",
+      "roundIndex": 1,
+      "inputSnapshot": {
+        "learningGoal": "TypeScript discriminated union과 runtime validation을 배우고 싶다",
+        "interestAreas": ["developer tools", "API debugging"],
+        "currentLevel": "BEGINNER"
+      },
+      "appliedFeedbackIds": [],
+      "candidates": [
+        { "candidateId": "candidate_00000000-0000-4000-8000-000000000904", "revision": 1 },
+        { "candidateId": "candidate_00000000-0000-4000-8000-000000000905", "revision": 1 },
+        { "candidateId": "candidate_00000000-0000-4000-8000-000000000906", "revision": 1 },
+        { "candidateId": "candidate_00000000-0000-4000-8000-000000000907", "revision": 1 }
+      ],
+      "generationRationale": "Four first-useful directions expose different runtime boundaries without making the learner inspect full evaluation matrices.",
+      "diversityCheck": {
+        "dimensionsReviewed": ["PROBLEM_DOMAIN", "TARGET_USER", "CORE_INTERACTION", "DATA_SHAPE", "USER_APPEAL"],
+        "modeCollapseDetected": false,
+        "rationale": "Configuration editing, webhook replay, form-state simulation and database-row inspection use distinct users, interactions and data shapes."
+      },
+      "createdAt": "2026-09-03T01:00:00.000Z",
+      "source": { "kind": "AGENT", "role": "DISCOVERY" },
+      "redactionStatus": "VERIFIED_REDACTED"
+    },
+    "candidates": [
+      {
+        "schemaVersion": 1,
+        "id": "candidate_00000000-0000-4000-8000-000000000904",
+        "discoverySessionId": "discovery_session_00000000-0000-4000-8000-000000000902",
+        "correlationId": "corr_00000000-0000-4000-8000-000000000903",
+        "revision": 1,
+        "parentRevisions": [],
+        "title": "Safe Config Gate",
+        "summary": "Paste a local config and see valid values separated from actionable errors before the app starts.",
+        "targetUsers": ["Developers maintaining small local TypeScript tools"],
+        "coreInteraction": "Edit one configuration object, validate it, then compare accepted variants with rejected fields.",
+        "usageMoment": "Before connecting a changed configuration file to a local tool.",
+        "appeal": "Turns an invisible startup failure into an immediate, inspectable gate.",
+        "technologyNecessity": "Runtime validation checks unknown config while a discriminated result controls safe success and error branches.",
+        "coreConcepts": ["runtime validation", "discriminated union"],
+        "mvpFeatures": ["Config editor", "Validation result panel", "Accepted value preview"],
+        "suggestedScope": {
+          "learnerFocus": ["Schema design", "Success and error narrowing"],
+          "agentSupport": ["Local editor shell"],
+          "excluded": ["Remote secrets", "Cloud sync"]
+        },
+        "generationTags": ["DIRECT"],
+        "createdAt": "2026-09-03T01:00:00.000Z",
+        "source": { "kind": "AGENT", "role": "DISCOVERY" },
+        "redactionStatus": "VERIFIED_REDACTED"
+      },
+      {
+        "schemaVersion": 1,
+        "id": "candidate_00000000-0000-4000-8000-000000000905",
+        "discoverySessionId": "discovery_session_00000000-0000-4000-8000-000000000902",
+        "correlationId": "corr_00000000-0000-4000-8000-000000000903",
+        "revision": 1,
+        "parentRevisions": [],
+        "title": "Webhook Replay Desk",
+        "summary": "Replay several provider events and inspect which typed handler accepts each payload.",
+        "targetUsers": ["Backend developers debugging webhook integrations"],
+        "coreInteraction": "Choose a provider event, replay its payload, and trace validation into the matching handler.",
+        "usageMoment": "When an integration behaves differently for payment, refund and unknown events.",
+        "appeal": "Makes opaque webhook failures reproducible without live credentials.",
+        "technologyNecessity": "Unknown JSON must be validated before its event discriminator can select a safe handler.",
+        "coreConcepts": ["runtime validation", "event discriminators"],
+        "mvpFeatures": ["Event sample picker", "Replay action", "Handler trace"],
+        "suggestedScope": {
+          "learnerFocus": ["Payload schemas", "Exhaustive event routing"],
+          "agentSupport": ["Synthetic event samples"],
+          "excluded": ["Provider credentials", "Hosted event storage"]
+        },
+        "generationTags": ["DIRECT", "DISCOVER"],
+        "createdAt": "2026-09-03T01:00:00.000Z",
+        "source": { "kind": "AGENT", "role": "DISCOVERY" },
+        "redactionStatus": "VERIFIED_REDACTED"
+      },
+      {
+        "schemaVersion": 1,
+        "id": "candidate_00000000-0000-4000-8000-000000000906",
+        "discoverySessionId": "discovery_session_00000000-0000-4000-8000-000000000902",
+        "correlationId": "corr_00000000-0000-4000-8000-000000000903",
+        "revision": 1,
+        "parentRevisions": [],
+        "title": "Form State Theater",
+        "summary": "Drive a multi-step form through idle, editing, validating, failed and submitted states.",
+        "targetUsers": ["Frontend learners building multi-step forms"],
+        "coreInteraction": "Trigger state transitions and observe which controls and messages are valid in each state.",
+        "usageMoment": "While diagnosing impossible UI combinations in a complex form.",
+        "appeal": "Impossible states become visible scenes that can be played and fixed.",
+        "technologyNecessity": "A discriminated state union prevents invalid combinations and validates restored draft data at runtime.",
+        "coreConcepts": ["discriminated union", "state transition"],
+        "mvpFeatures": ["State controls", "Transition timeline", "Invalid draft warning"],
+        "suggestedScope": {
+          "learnerFocus": ["State variants", "Exhaustive rendering"],
+          "agentSupport": ["Accessible form controls"],
+          "excluded": ["Authentication", "Cross-device drafts"]
+        },
+        "generationTags": ["EXPAND"],
+        "createdAt": "2026-09-03T01:00:00.000Z",
+        "source": { "kind": "AGENT", "role": "DISCOVERY" },
+        "redactionStatus": "VERIFIED_REDACTED"
+      },
+      {
+        "schemaVersion": 1,
+        "id": "candidate_00000000-0000-4000-8000-000000000907",
+        "discoverySessionId": "discovery_session_00000000-0000-4000-8000-000000000902",
+        "correlationId": "corr_00000000-0000-4000-8000-000000000903",
+        "revision": 1,
+        "parentRevisions": [],
+        "title": "Database Row Guard",
+        "summary": "Inspect nullable query rows and convert them into explicit found, missing and invalid results.",
+        "targetUsers": ["Developers adding a database to a small data app"],
+        "coreInteraction": "Run a sample query, inspect its raw row, and transform it into one safe result variant.",
+        "usageMoment": "Before query data reaches calculations or a user-facing screen.",
+        "appeal": "Shows exactly where a loose row becomes dependable application data.",
+        "technologyNecessity": "Row validation detects malformed values and a result union makes missing and invalid outcomes explicit.",
+        "coreConcepts": ["runtime validation", "result union"],
+        "mvpFeatures": ["Sample query runner", "Raw row inspector", "Result variant viewer"],
+        "suggestedScope": {
+          "learnerFocus": ["Nullable row validation", "Result narrowing"],
+          "agentSupport": ["Local SQLite fixture"],
+          "excluded": ["Production migration", "Remote database"]
+        },
+        "generationTags": ["DISCOVER"],
+        "createdAt": "2026-09-03T01:00:00.000Z",
+        "source": { "kind": "AGENT", "role": "DISCOVERY" },
+        "redactionStatus": "VERIFIED_REDACTED"
+      }
+    ]
+  }
+}

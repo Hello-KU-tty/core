@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "promptVersion": "1.1.5",
+  "model": "claude-haiku-4.5",
+  "target": "Kiro Crew 0.3.0",
+  "inputPath": "tests/eval/fixtures/inputs/t15-realtime-practice.json",
+  "sampleCount": 5,
+  "successfulRuns": 5,
+  "failedRuns": 0,
+  "p95Method": "nearest-rank",
+  "providedContext": true,
+  "contextInjectionSuccesses": 15,
+  "submitSuccesses": 15,
+  "phases": {
+    "initial": {
+      "durableMilliseconds": [25410, 21913, 26564, 24734, 24915],
+      "durableP95Milliseconds": 26564,
+      "interactionMilliseconds": [25439, 21930, 26582, 24749, 24931],
+      "interactionP95Milliseconds": 26582,
+      "candidateCount": 4
+    },
+    "merge": {
+      "durableMilliseconds": [21044, 13514, 17988, 15284, 16045],
+      "durableP95Milliseconds": 21044,
+      "interactionMilliseconds": [21066, 13532, 18007, 15304, 16062],
+      "interactionP95Milliseconds": 21066,
+      "candidateCount": 1
+    },
+    "spec": {
+      "durableMilliseconds": [20273, 22900, 21767, 20657, 19356],
+      "durableP95Milliseconds": 22900,
+      "interactionMilliseconds": [20293, 22919, 21784, 20674, 19374],
+      "interactionP95Milliseconds": 22919,
+      "specRevision": 1
+    }
+  },
+  "containsPersonalData": false
+}

@@ -9,6 +9,7 @@ import {
   baselineResultSchema,
   builderTaskSchema,
   candidateRoundSchema,
+  candidateDraftSchema,
   conceptLedgerEntrySchema,
   contextRefreshRequestSchema,
   contractErrorSchema,
@@ -105,6 +106,36 @@ describe('versioned strict payload fixtures', () => {
     expect(result.success).toBe(false)
     if (result.success) return
     expect(result.error.code).toBe('UNSUPPORTED_SCHEMA_VERSION')
+  })
+
+  it('accepts a concise starter Candidate without deferred evaluation and risks', () => {
+    const { evaluation: _evaluation, risks: _risks, ...content } = candidateFixture
+    const {
+      schemaVersion: _schemaVersion,
+      id: _id,
+      discoverySessionId: _discoverySessionId,
+      correlationId: _correlationId,
+      revision: _revision,
+      parentRevisions: _parentRevisions,
+      createdAt: _createdAt,
+      source: _source,
+      redactionStatus: _redactionStatus,
+      ...draftContent
+    } = content
+    expect(
+      candidateDraftSchema.parse({ lineage: { kind: 'NEW' }, ...draftContent }),
+    ).not.toHaveProperty('evaluation')
+  })
+
+  it('accepts target-free MORE feedback and rejects a targeted addition', () => {
+    const more = { ...discoveryFeedbackFixture, intent: 'MORE', targets: [] } as const
+    expect(discoveryFeedbackSchema.parse(more)).toEqual(more)
+    expect(
+      discoveryFeedbackSchema.safeParse({
+        ...more,
+        targets: [{ candidateId: candidateFixture.id, revision: 1 }],
+      }).success,
+    ).toBe(false)
   })
 
   it('serializes a redacted, recoverable operation error without raw diagnostics', () => {

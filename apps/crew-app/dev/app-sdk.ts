@@ -48,6 +48,31 @@ const api = {
     return readJson(await fetch(path))
   },
   async post(path: string, input: Readonly<Record<string, unknown>>): Promise<unknown> {
+    if (path === chatSlotsPath) {
+      if (localStorage.getItem('vibe-helper.test.crew-disconnected') === 'true') {
+        throw new Error('Synthetic Crew disconnect')
+      }
+      const stored = localStorage.getItem('vibe-helper.test.slots')
+      const slots: unknown = stored === null ? [] : JSON.parse(stored)
+      if (!Array.isArray(slots) || typeof input.name !== 'string') {
+        throw new Error('Synthetic Crew slot request is invalid')
+      }
+      const slot = {
+        key: input.name,
+        name: input.name,
+        agent: input.agent,
+        memory_mode: input.memory_mode,
+        messages: [],
+      }
+      localStorage.setItem('vibe-helper.test.slots', JSON.stringify([...slots, slot]))
+      return slot
+    }
+    if (path.startsWith(`${chatSlotsPath}/`) && path.endsWith('/context')) {
+      if (localStorage.getItem('vibe-helper.test.crew-disconnected') === 'true') {
+        throw new Error('Synthetic Crew disconnect')
+      }
+      return { ok: typeof input.content === 'string' && input.content.length > 0 }
+    }
     const body = JSON.stringify(input)
     const headers: Record<string, string> = { 'content-type': 'application/json' }
     if (path.startsWith(applicationPrefix)) headers['x-kirocrew-proxy'] = await signature(body)

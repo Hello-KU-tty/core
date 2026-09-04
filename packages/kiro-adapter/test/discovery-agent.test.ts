@@ -41,9 +41,13 @@ describe('Discovery Agent adapter', () => {
     expect(definition.prompt).toContain('사용자가 UI에서 직접 기록하는 action')
     expect(definition.prompt).toContain('expectedSpecRevision')
     expect(definition.prompt).toContain('Spec ID, selected Candidate reference')
+    expect(definition.prompt).toContain('간결한 후보 4개를 우선')
+    expect(definition.prompt).toContain('각 권장 범위 1~2개')
+    expect(definition.prompt).toContain('JSON 문자열이 아니라 실제 배열')
     expect(DISCOVERY_TOOL_NAMES).toEqual([
       'get_discovery_context',
       'submit_candidate_round',
+      'submit_candidate_merge',
       'submit_learning_spec',
     ])
   })
@@ -131,6 +135,34 @@ describe('Discovery Agent adapter', () => {
     })
     expect(receipt.resourceRevision).toBe(2)
 
+    const mergeReceipt = await adapter.submitCandidateMerge({
+      schemaVersion: 1,
+      projectId: ids.project,
+      discoverySessionId: ids.discoverySession,
+      correlationId: ids.correlation,
+      idempotencyKey: ids.idempotency,
+      expectedSessionRevision: 1,
+      candidate: {
+        title: candidateFixture.title,
+        summary: candidateFixture.summary,
+        targetUsers: candidateFixture.targetUsers,
+        coreInteraction: candidateFixture.coreInteraction,
+        usageMoment: candidateFixture.usageMoment,
+        appeal: candidateFixture.appeal,
+        personalNeedRelationship: candidateFixture.personalNeedRelationship,
+        technologyNecessity: candidateFixture.technologyNecessity,
+        coreConcepts: candidateFixture.coreConcepts,
+        mvpFeatures: candidateFixture.mvpFeatures,
+        suggestedScope: candidateFixture.suggestedScope,
+        risks: candidateFixture.risks,
+        generationTags: candidateFixture.generationTags,
+        evaluation: candidateFixture.evaluation,
+      },
+      generationRationale: candidateRoundFixture.generationRationale,
+      diversityCheck: candidateRoundFixture.diversityCheck,
+    })
+    expect(mergeReceipt.resourceRevision).toBe(2)
+
     const specReceipt = await adapter.submitLearningSpec({
       schemaVersion: 1,
       projectId: ids.project,
@@ -145,6 +177,7 @@ describe('Discovery Agent adapter', () => {
     expect(calls).toEqual([
       'get_discovery_context',
       'submit_candidate_round',
+      'submit_candidate_merge',
       'submit_learning_spec',
     ])
   })

@@ -127,9 +127,9 @@ const projectCandidateContentShape = {
   coreConcepts: z.array(labelSchema).min(1).max(12),
   mvpFeatures: z.array(shortTextSchema).min(1).max(20),
   suggestedScope: candidateScopeSuggestionSchema,
-  risks: z.array(shortTextSchema).max(12),
+  risks: z.array(shortTextSchema).max(12).optional(),
   generationTags: z.array(candidateGenerationTagSchema).min(1).max(4),
-  evaluation: candidateEvaluationSchema,
+  evaluation: candidateEvaluationSchema.optional(),
 } as const
 
 export const projectCandidateRevisionSchema = z
@@ -218,6 +218,11 @@ export const discoverySubmitCandidateRoundToolInputSchema = z.strictObject({
   diversityCheck: candidateDiversityCheckSchema,
 })
 
+export const discoverySubmitCandidateMergeToolInputSchema =
+  discoverySubmitCandidateRoundToolInputSchema
+    .omit({ appliedFeedbackIds: true, carriedCandidates: true, candidates: true })
+    .extend({ candidate: candidateDraftSchema.omit({ lineage: true }) })
+
 export const candidateRoundSchema = z
   .strictObject({
     schemaVersion: schemaVersionSchema,
@@ -263,6 +268,7 @@ export const discoveryFeedbackIntentSchema = z.enum([
   'SHRINK',
   'EXPAND',
   'REGENERATE',
+  'MORE',
   'SELECT',
 ])
 
@@ -295,11 +301,18 @@ export const discoveryFeedbackSchema = z
         message: 'SELECT feedback requires exactly one candidate revision',
       })
     }
-    if (feedback.intent !== 'REGENERATE' && feedback.targets.length === 0) {
+    if (!['REGENERATE', 'MORE'].includes(feedback.intent) && feedback.targets.length === 0) {
       context.addIssue({
         code: 'custom',
         path: ['targets'],
         message: `${feedback.intent} feedback requires a candidate revision`,
+      })
+    }
+    if (feedback.intent === 'MORE' && feedback.targets.length !== 0) {
+      context.addIssue({
+        code: 'custom',
+        path: ['targets'],
+        message: 'MORE feedback must not target an existing candidate revision',
       })
     }
     if (['REVISE', 'SHRINK', 'EXPAND'].includes(feedback.intent) && feedback.targets.length !== 1) {

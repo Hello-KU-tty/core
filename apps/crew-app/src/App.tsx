@@ -1,15 +1,31 @@
 import { useAppApi } from '@kirocrew/app-sdk'
-import type { CrewAppSurface, ProjectHistory, ProjectSessionSnapshot } from '@vibe-helper/contracts'
+import type {
+  CrewAppSurface,
+  DiscoveryInput,
+  ProjectHistory,
+  ProjectSessionSnapshot,
+} from '@vibe-helper/contracts'
 import {
   CrewAppClientError,
-  CrewCoreClient,
-  CrewSessionClient,
+  type DiscoveryAgentPhase,
   type CrewConversationMessage,
+  CrewCoreClient,
+  createDiscoveryEphemeralContext,
+  CrewDiscoveryClient,
   type CrewProjectSessions,
+  CrewSessionClient,
 } from '@vibe-helper/kiro-adapter/crew-app'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import appStyles from './app.css?inline'
+import {
+  AgentRunBanner,
+  type AgentRunView,
+  type DiscoveryFeedbackAction,
+  DiscoveryStartView,
+  DiscoveryWorkspace,
+  SpecWorkspace,
+} from './DiscoveryFlow.js'
 
 type RouteName = 'discovery' | 'spec' | 'build' | 'history'
 
@@ -27,6 +43,42 @@ interface ViewError {
 export interface VibeHelperAppProps {
   readonly coreClient: CrewCoreClient
   readonly sessionClient: CrewSessionClient
+  readonly discoveryClient: CrewDiscoveryClient
+}
+
+interface AgentExpectationRound {
+  readonly kind: 'ROUND'
+  readonly baseline: number
+}
+
+interface AgentExpectationSpec {
+  readonly kind: 'SPEC'
+  readonly baseline: number
+}
+
+type AgentExpectation = AgentExpectationRound | AgentExpectationSpec
+
+const TARGET_DISCOVERY_FOREGROUND_MS = import.meta.env.MODE === 'test' ? 700 : 30_000
+const TARGET_DISCOVERY_TIMEOUT_MS = import.meta.env.MODE === 'test' ? 6_000 : 420_000
+const TARGET_DISCOVERY_COMPLETION_GRACE_MS = import.meta.env.MODE === 'test' ? 1_800 : 900
+
+interface AgentRequest {
+  readonly projectId: string
+  readonly message: string
+  readonly expectation: AgentExpectation
+}
+
+interface RecoverableAgentRun {
+  readonly phase: DiscoveryAgentPhase
+  readonly expectation: AgentExpectation
+  readonly retryMessage: string | null
+}
+
+const idleAgentRun: AgentRunView = {
+  status: 'IDLE',
+  startedAt: null,
+  detail: '',
+  retry: null,
 }
 
 const surfaceRoute: Record<CrewAppSurface, RouteName> = {
@@ -60,6 +112,75 @@ function href(name: RouteName, projectId?: string | null): string {
 
 function correlationId(): string {
   return `corr_${crypto.randomUUID()}`
+}
+
+function entityId(prefix: 'project' | 'idem' | 'feedback'): string {
+  return `${prefix}_${crypto.randomUUID()}`
+}
+
+function expectationMet(snapshot: ProjectSessionSnapshot, expectation: AgentExpectation): boolean {
+  if (expectation.kind === 'ROUND') {
+    return (snapshot.discoveryContext?.rounds.length ?? 0) > expectation.baseline
+  }
+  return (snapshot.discoveryContext?.learningSpec?.revision ?? 0) > expectation.baseline
+}
+
+function discoveryAgentPhase(
+  snapshot: ProjectSessionSnapshot,
+  expectation: AgentExpectation,
+): DiscoveryAgentPhase {
+  if (expectation.kind === 'SPEC') return 'SPEC'
+  const context = snapshot.discoveryContext
+  if (context === null || context === undefined) return 'ROUND'
+  const appliedFeedbackIds = new Set(context.rounds.flatMap((round) => round.appliedFeedbackIds))
+  const pending = context.feedback.filter((feedback) => !appliedFeedbackIds.has(feedback.id))
+  return pending.length === 1 && pending[0]?.intent === 'MERGE' ? 'MERGE' : 'ROUND'
+}
+
+function recoverableAgentRun(snapshot: ProjectSessionSnapshot): RecoverableAgentRun | null {
+  const session = snapshot.discoverySession
+  const context = snapshot.discoveryContext
+  if (session === null || context === null) return null
+  if (session.status === 'SELECTED') {
+    const specRevision = context.learningSpec?.revision ?? 0
+    return {
+      phase: 'SPEC',
+      expectation: { kind: 'SPEC', baseline: specRevision },
+      retryMessage:
+        specRevision === 0
+          ? '선택된 후보를 바탕으로 권장 Learning Spec 초안을 바로 제출해 주세요.'
+          : null,
+    }
+  }
+  if (session.status !== 'ACTIVE') return null
+  if (context.rounds.length === 0) {
+    return {
+      phase: 'ROUND',
+      expectation: { kind: 'ROUND', baseline: 0 },
+      retryMessage: '현재 학습 목표를 바탕으로 첫 Candidate Round를 제출해 주세요.',
+    }
+  }
+  const appliedFeedbackIds = new Set(context.rounds.flatMap((round) => round.appliedFeedbackIds))
+  const pending = context.feedback.filter((feedback) => !appliedFeedbackIds.has(feedback.id))
+  if (pending.length === 0) return null
+  const expectation = { kind: 'ROUND', baseline: context.rounds.length } as const
+  return {
+    phase: discoveryAgentPhase(snapshot, expectation),
+    expectation,
+    retryMessage:
+      'Core에 저장된 최신 user-authored Discovery Feedback을 반영해 다음 Candidate Round를 제출해 주세요.',
+  }
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds))
+}
+
+function actionErrorMessage(error: unknown): string {
+  if (error instanceof CrewAppClientError) return error.message
+  return error instanceof Error
+    ? error.message
+    : '요청을 처리하지 못했습니다. 저장된 상태를 확인해 주세요.'
 }
 
 function viewError(error: unknown): ViewError {
@@ -190,86 +311,6 @@ function HistoryView({
   )
 }
 
-function DiscoveryView({ snapshot }: { readonly snapshot: ProjectSessionSnapshot }) {
-  const input = snapshot.discoverySession?.input
-  return (
-    <section className="content-grid" aria-labelledby="discovery-title">
-      <article className="primary-panel">
-        <p className="eyebrow">Learning direction</p>
-        <h2 id="discovery-title">{snapshot.project.learningGoal}</h2>
-        <p className="lede">
-          {input?.personalNeed ??
-            'Discovery is keeping the learning goal open until a useful project direction is selected.'}
-        </p>
-        <dl className="detail-list">
-          <div>
-            <dt>Session</dt>
-            <dd>{snapshot.discoverySession?.status ?? 'Not started'}</dd>
-          </div>
-          <div>
-            <dt>Current level</dt>
-            <dd>{input?.currentLevel ?? 'Not specified'}</dd>
-          </div>
-          <div>
-            <dt>Recent friction</dt>
-            <dd>{input?.recentFriction ?? 'None recorded'}</dd>
-          </div>
-        </dl>
-      </article>
-      <aside className="secondary-panel">
-        <p className="eyebrow">Selected direction</p>
-        <h3>{snapshot.selectedCandidate?.title ?? 'No candidate selected'}</h3>
-        <p>
-          {snapshot.selectedCandidate === null
-            ? 'Candidate generation and comparison continue in the Discovery conversation.'
-            : (snapshot.selectedCandidate.personalNeedRelationship ??
-              snapshot.selectedCandidate.appeal)}
-        </p>
-      </aside>
-    </section>
-  )
-}
-
-function SpecView({ snapshot }: { readonly snapshot: ProjectSessionSnapshot }) {
-  const spec = snapshot.learningSpec
-  if (spec === null) return <EmptyState route="spec" />
-  return (
-    <section aria-labelledby="spec-title">
-      <div className="section-heading">
-        <div>
-          <p className="eyebrow">Learning spec · revision {spec.revision}</p>
-          <h2 id="spec-title">{spec.productPurpose}</h2>
-        </div>
-        <StatusPill value={spec.status} />
-      </div>
-      <div className="spec-grid">
-        <article className="primary-panel">
-          <h3>Success moment</h3>
-          <p className="lede">{spec.successMoment}</p>
-          <h3>MVP features</h3>
-          <ul className="clean-list">
-            {spec.mvpFeatures.map((feature) => (
-              <li key={feature}>{feature}</li>
-            ))}
-          </ul>
-        </article>
-        <aside className="secondary-panel">
-          <h3>Learning scope</h3>
-          <ul className="scope-list">
-            {spec.scope.map((item) => (
-              <li key={`${item.category}-${item.title}`}>
-                <span>{item.category.replaceAll('_', ' ')}</span>
-                <strong>{item.title}</strong>
-                <small>{item.conceptNames.join(' · ') || 'No concepts listed'}</small>
-              </li>
-            ))}
-          </ul>
-        </aside>
-      </div>
-    </section>
-  )
-}
-
 function Conversation({
   title,
   messages,
@@ -391,7 +432,7 @@ function BuildView({
   )
 }
 
-export function VibeHelperApp({ coreClient, sessionClient }: VibeHelperAppProps) {
+export function VibeHelperApp({ coreClient, sessionClient, discoveryClient }: VibeHelperAppProps) {
   const [route, setRoute] = useState<AppRoute>(readRoute)
   const [history, setHistory] = useState<ProjectHistory | null>(null)
   const [historyError, setHistoryError] = useState<ViewError | null>(null)
@@ -402,6 +443,11 @@ export function VibeHelperApp({ coreClient, sessionClient }: VibeHelperAppProps)
   const [loadingHistory, setLoadingHistory] = useState(true)
   const [loadingSession, setLoadingSession] = useState(false)
   const [refresh, setRefresh] = useState(0)
+  const [operationBusy, setOperationBusy] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [agentRun, setAgentRun] = useState<AgentRunView>(idleAgentRun)
+  const agentRunSequence = useRef(0)
+  const inspectedRecoveryKeys = useRef(new Set<string>())
 
   useEffect(() => {
     const onHashChange = (): void => setRoute(readRoute())
@@ -420,7 +466,12 @@ export function VibeHelperApp({ coreClient, sessionClient }: VibeHelperAppProps)
       .then((nextHistory) => {
         if (!active) return
         setHistory(nextHistory)
-        if (route.name !== 'history' && route.projectId === null && nextHistory.projects[0]) {
+        if (
+          route.name !== 'history' &&
+          route.name !== 'discovery' &&
+          route.projectId === null &&
+          nextHistory.projects[0]
+        ) {
           window.location.hash = href(route.name, nextHistory.projects[0].project.id).slice(1)
         }
       })
@@ -481,6 +532,519 @@ export function VibeHelperApp({ coreClient, sessionClient }: VibeHelperAppProps)
   const openProject = (projectId: string, surface: CrewAppSurface): void =>
     navigate(surfaceRoute[surface], projectId)
 
+  const performAgentRequest = useCallback(
+    async function perform(request: AgentRequest): Promise<void> {
+      const runSequence = agentRunSequence.current + 1
+      agentRunSequence.current = runSequence
+      setActionError(null)
+      const retry = (): void => {
+        void perform(request)
+      }
+      try {
+        const restored = await coreClient.restoreProjectSession(correlationId(), request.projectId)
+        setSnapshot(restored)
+        if (expectationMet(restored, request.expectation)) {
+          setAgentRun(idleAgentRun)
+          setRefresh((value) => value + 1)
+          return
+        }
+        const startedAt = Date.now()
+        setAgentRun({
+          status: 'DISPATCHING',
+          startedAt,
+          detail: '사용자 입력과 Core에 저장된 최신 상태를 연결하고 있습니다.',
+          retry: null,
+        })
+        const discoverySession = restored.discoverySession
+        if (discoverySession === null) {
+          throw new CrewAppClientError(
+            'CONTRACT',
+            'DISCOVERY_SESSION_MISSING',
+            'Core did not return an active Discovery Session.',
+          )
+        }
+        const agentPhase = discoveryAgentPhase(restored, request.expectation)
+        const dispatchReceipt = await discoveryClient.dispatch(
+          discoverySession.id,
+          discoverySession.revision,
+          `${request.message}\n\nCore tool identifiers: schemaVersion=1, projectId=${request.projectId}, discoverySessionId=${discoverySession.id}, correlationId=${discoverySession.correlationId}, expectedSessionRevision=${discoverySession.revision}, idempotencyKey=${entityId('idem')}.`,
+          createDiscoveryEphemeralContext(restored, agentPhase),
+          agentPhase,
+        )
+        if (agentRunSequence.current !== runSequence) return
+        void (async () => {
+          try {
+            let completion = await dispatchReceipt.completion
+            const completionAttempts = agentPhase === 'SPEC' ? 2 : 1
+            for (let attempt = 0; attempt < completionAttempts; attempt += 1) {
+              if (agentRunSequence.current !== runSequence) return
+              await delay(TARGET_DISCOVERY_COMPLETION_GRACE_MS)
+              if (agentRunSequence.current !== runSequence) return
+              const current = await coreClient.restoreProjectSession(
+                correlationId(),
+                request.projectId,
+              )
+              if (expectationMet(current, request.expectation)) return
+              if (attempt === 0 && agentPhase === 'SPEC' && completion === 'DONE') {
+                const currentSession = current.discoverySession
+                if (currentSession !== null) {
+                  setAgentRun({
+                    status: 'RUNNING',
+                    startedAt,
+                    detail:
+                      '저장 없이 끝난 Spec 응답을 최신 Core 상태에서 한 번 복구하고 있습니다.',
+                    retry: null,
+                  })
+                  const recoveryReceipt = await discoveryClient.dispatch(
+                    currentSession.id,
+                    currentSession.revision,
+                    `${request.message}\n\n이전 응답은 Core 저장 없이 끝났습니다. 확인 질문이나 설명을 하지 말고 submit_learning_spec으로 다음 revision을 제출하세요. Core tool identifiers: schemaVersion=1, projectId=${request.projectId}, discoverySessionId=${currentSession.id}, correlationId=${currentSession.correlationId}, expectedSessionRevision=${currentSession.revision}, idempotencyKey=${entityId('idem')}.`,
+                    createDiscoveryEphemeralContext(current, 'SPEC'),
+                    'SPEC',
+                  )
+                  completion = await recoveryReceipt.completion
+                  continue
+                }
+              }
+              if (agentRunSequence.current !== runSequence) return
+              agentRunSequence.current += 1
+              setAgentRun({
+                status: 'TOOL_REJECTED',
+                startedAt: null,
+                detail:
+                  completion === 'TOOL_VALIDATION_FAILED'
+                    ? 'Core가 Agent의 제출 형식을 거절했습니다. 현재 저장 상태에서 안전하게 재시도할 수 있어요.'
+                    : 'Agent 응답은 끝났지만 Core에 새 결과가 저장되지 않았습니다. 현재 저장 상태에서 안전하게 재시도할 수 있어요.',
+                retry,
+              })
+              return
+            }
+          } catch {
+            // The normal Core polling path owns connection failure reporting.
+          }
+        })()
+        setAgentRun({
+          status: 'RUNNING',
+          startedAt,
+          detail: '첫 4~6개 후보를 간결하게 만들고 Core schema로 검증하고 있습니다.',
+          retry: null,
+        })
+
+        const pollUntil = async (deadline: number): Promise<boolean> => {
+          while (Date.now() < deadline && agentRunSequence.current === runSequence) {
+            await delay(900)
+            const next = await coreClient.restoreProjectSession(correlationId(), request.projectId)
+            if (agentRunSequence.current !== runSequence) return true
+            setSnapshot(next)
+            if (expectationMet(next, request.expectation)) {
+              setAgentRun(idleAgentRun)
+              setRefresh((value) => value + 1)
+              return true
+            }
+          }
+          return agentRunSequence.current !== runSequence
+        }
+
+        if (await pollUntil(startedAt + TARGET_DISCOVERY_FOREGROUND_MS)) return
+        setAgentRun({
+          status: 'BACKGROUND',
+          startedAt,
+          detail:
+            '이 화면을 떠나도 작업은 계속됩니다. 저장된 이전 결과를 보거나 다른 화면으로 이동할 수 있어요.',
+          retry: null,
+        })
+        void (async () => {
+          try {
+            if (await pollUntil(startedAt + TARGET_DISCOVERY_TIMEOUT_MS)) return
+            if (agentRunSequence.current !== runSequence) return
+            setAgentRun({
+              status: 'TIMED_OUT',
+              startedAt: null,
+              detail:
+                'Core에는 아직 새 결과가 없습니다. 먼저 저장 상태를 확인한 뒤 안전하게 다시 요청할 수 있습니다.',
+              retry,
+            })
+          } catch (error) {
+            if (agentRunSequence.current !== runSequence) return
+            setAgentRun({
+              status: 'HOST_DISCONNECTED',
+              startedAt: null,
+              detail:
+                error instanceof CrewAppClientError
+                  ? error.message
+                  : 'Core 상태를 확인할 수 없습니다. 이미 저장된 프로젝트와 피드백은 유지됩니다.',
+              retry,
+            })
+          }
+        })()
+        return
+      } catch (error) {
+        setAgentRun({
+          status: 'HOST_DISCONNECTED',
+          startedAt: null,
+          detail:
+            error instanceof CrewAppClientError
+              ? error.message
+              : 'Crew의 Discovery Agent에 연결할 수 없습니다. 이미 Core에 저장된 프로젝트와 피드백은 유지됩니다.',
+          retry,
+        })
+      }
+    },
+    [coreClient, discoveryClient],
+  )
+
+  const startDiscovery = async (input: DiscoveryInput): Promise<void> => {
+    setOperationBusy(true)
+    setActionError(null)
+    const projectId = entityId('project')
+    try {
+      await coreClient.startDiscovery({
+        schemaVersion: 1,
+        kind: 'UI_START_DISCOVERY',
+        correlationId: correlationId(),
+        actor: { kind: 'UI' },
+        idempotencyKey: entityId('idem'),
+        projectId,
+        input,
+      })
+      const next = await coreClient.restoreProjectSession(correlationId(), projectId)
+      setSnapshot(next)
+      window.location.hash = href('discovery', projectId).slice(1)
+      await performAgentRequest({
+        projectId,
+        message:
+          '새 Discovery를 시작합니다. 제공된 최신 Core context를 사용해 첫 Candidate Round를 생성해 주세요.',
+        expectation: { kind: 'ROUND', baseline: 0 },
+      })
+    } catch (error) {
+      setActionError(actionErrorMessage(error))
+    } finally {
+      setOperationBusy(false)
+    }
+  }
+
+  const recordDiscoveryFeedback = async (action: DiscoveryFeedbackAction): Promise<void> => {
+    const session = snapshot?.discoverySession
+    const round = snapshot?.discoveryContext?.rounds.at(-1)
+    if (snapshot === null || session === null || session === undefined || round === undefined) {
+      setActionError('현재 Candidate Round를 복원한 뒤 다시 시도해 주세요.')
+      return
+    }
+    setOperationBusy(true)
+    setActionError(null)
+    const baselineRound = snapshot.discoveryContext?.rounds.length ?? 0
+    const baselineSpec = snapshot.discoveryContext?.learningSpec?.revision ?? 0
+    try {
+      await coreClient.recordDiscoveryFeedback({
+        schemaVersion: 1,
+        kind: 'UI_RECORD_DISCOVERY_FEEDBACK',
+        correlationId: session.correlationId,
+        actor: { kind: 'UI' },
+        idempotencyKey: entityId('idem'),
+        expectedSessionRevision: session.revision,
+        feedback: {
+          schemaVersion: 1,
+          id: entityId('feedback'),
+          discoverySessionId: session.id,
+          roundId: round.id,
+          correlationId: session.correlationId,
+          intent: action.intent,
+          targets: [...action.targets],
+          ...(action.message === undefined ? {} : { message: action.message }),
+          createdAt: new Date().toISOString(),
+          source: { kind: 'USER' },
+          redactionStatus: 'NOT_REQUIRED',
+        },
+      })
+      const next = await coreClient.restoreProjectSession(correlationId(), snapshot.project.id)
+      setSnapshot(next)
+      if (action.intent === 'SELECT') {
+        window.location.hash = href('spec', snapshot.project.id).slice(1)
+        await performAgentRequest({
+          projectId: snapshot.project.id,
+          message:
+            '사용자가 UI에서 후보를 선택했습니다. 제공된 최신 Core context를 사용하고 설명보다 먼저 submit_learning_spec을 호출해 낮은 부담의 권장 Learning Spec 초안을 저장해 주세요.',
+          expectation: { kind: 'SPEC', baseline: baselineSpec },
+        })
+      } else {
+        await performAgentRequest({
+          projectId: snapshot.project.id,
+          message:
+            '제공된 최신 Core context의 user-authored Discovery Feedback을 모두 반영해 다음 Candidate Round를 제출해 주세요.',
+          expectation: { kind: 'ROUND', baseline: baselineRound },
+        })
+      }
+    } catch (error) {
+      setActionError(actionErrorMessage(error))
+    } finally {
+      setOperationBusy(false)
+    }
+  }
+
+  const refineLearningSpec = async (message: string): Promise<void> => {
+    if (snapshot === null) return
+    setOperationBusy(true)
+    setActionError(null)
+    try {
+      await performAgentRequest({
+        projectId: snapshot.project.id,
+        message: `제공된 최신 Core context를 사용하고 설명보다 먼저 submit_learning_spec을 호출해 Learning Spec을 저장해 주세요. 조정 요청: ${message}`,
+        expectation: {
+          kind: 'SPEC',
+          baseline: snapshot.discoveryContext?.learningSpec?.revision ?? 0,
+        },
+      })
+    } finally {
+      setOperationBusy(false)
+    }
+  }
+
+  const confirmAndPrepare = async (): Promise<void> => {
+    const spec = snapshot?.learningSpec
+    if (snapshot === null || spec === null || spec === undefined) return
+    setOperationBusy(true)
+    setActionError(null)
+    try {
+      let confirmedRevision = spec.revision
+      if (spec.status !== 'CONFIRMED') {
+        const receipt = await coreClient.confirmLearningSpec({
+          schemaVersion: 1,
+          kind: 'UI_CONFIRM_LEARNING_SPEC',
+          correlationId: snapshot.discoverySession?.correlationId ?? snapshot.project.correlationId,
+          actor: { kind: 'UI' },
+          idempotencyKey: entityId('idem'),
+          projectId: snapshot.project.id,
+          learningSpecId: spec.id,
+          expectedSpecRevision: spec.revision,
+        })
+        confirmedRevision = receipt.resourceRevision
+      }
+      await coreClient.prepareBuilderTask({
+        schemaVersion: 1,
+        kind: 'UI_PREPARE_BUILDER_TASK',
+        correlationId: snapshot.discoverySession?.correlationId ?? snapshot.project.correlationId,
+        actor: { kind: 'UI' },
+        idempotencyKey: entityId('idem'),
+        projectId: snapshot.project.id,
+        learningSpecId: spec.id,
+        expectedSpecRevision: confirmedRevision,
+      })
+      window.location.hash = href('build', snapshot.project.id).slice(1)
+      setRefresh((value) => value + 1)
+    } catch (error) {
+      setActionError(actionErrorMessage(error))
+    } finally {
+      setOperationBusy(false)
+    }
+  }
+
+  const returnToDiscovery = (): void => {
+    if (snapshot === null) return
+    setActionError(null)
+    window.location.hash = href('discovery', snapshot.project.id).slice(1)
+  }
+
+  const restartDiscovery = async (input: DiscoveryInput): Promise<void> => {
+    const session = snapshot?.discoverySession
+    const spec = snapshot?.learningSpec
+    if (
+      snapshot === null ||
+      session === null ||
+      session === undefined ||
+      spec === null ||
+      spec === undefined
+    )
+      return
+    setOperationBusy(true)
+    setActionError(null)
+    try {
+      await coreClient.returnToDiscovery({
+        schemaVersion: 1,
+        kind: 'UI_RETURN_TO_DISCOVERY',
+        correlationId: session.correlationId,
+        actor: { kind: 'UI' },
+        idempotencyKey: entityId('idem'),
+        projectId: snapshot.project.id,
+        discoverySessionId: session.id,
+        expectedSessionRevision: session.revision,
+        expectedSpecRevision: spec.revision,
+        input,
+      })
+      const next = await coreClient.restoreProjectSession(correlationId(), snapshot.project.id)
+      setSnapshot(next)
+      window.location.hash = href('discovery', snapshot.project.id).slice(1)
+      await performAgentRequest({
+        projectId: snapshot.project.id,
+        message:
+          '사용자가 입력을 확인하고 새 후보 생성을 명시적으로 요청했습니다. 제공된 새 active Discovery context를 사용해 간결한 첫 Candidate Round 4~6개를 생성해 주세요.',
+        expectation: { kind: 'ROUND', baseline: 0 },
+      })
+    } catch (error) {
+      setActionError(actionErrorMessage(error))
+    } finally {
+      setOperationBusy(false)
+    }
+  }
+
+  const generateCurrentDiscovery = async (): Promise<void> => {
+    if (snapshot === null || snapshot.discoverySession?.status !== 'ACTIVE') return
+    setOperationBusy(true)
+    try {
+      await performAgentRequest({
+        projectId: snapshot.project.id,
+        message:
+          '사용자가 첫 후보 생성을 명시적으로 요청했습니다. 제공된 최신 Core context를 사용해 간결한 Candidate 4~6개를 생성해 주세요.',
+        expectation: {
+          kind: 'ROUND',
+          baseline: snapshot.discoveryContext?.rounds.length ?? 0,
+        },
+      })
+    } finally {
+      setOperationBusy(false)
+    }
+  }
+
+  const recoverableRun = snapshot === null ? null : recoverableAgentRun(snapshot)
+  const recoveryKey =
+    route.projectId !== null &&
+    (route.name === 'discovery' || route.name === 'spec') &&
+    !loadingSession &&
+    !operationBusy &&
+    agentRun.status === 'IDLE' &&
+    snapshot?.discoverySession !== null &&
+    snapshot?.discoverySession !== undefined &&
+    recoverableRun !== null
+      ? [
+          snapshot.discoverySession.id,
+          snapshot.discoverySession.revision,
+          recoverableRun.phase,
+          recoverableRun.expectation.kind,
+          recoverableRun.expectation.baseline,
+        ].join(':')
+      : null
+
+  useEffect(() => {
+    if (recoveryKey === null || inspectedRecoveryKeys.current.has(recoveryKey)) return
+    inspectedRecoveryKeys.current.add(recoveryKey)
+    const currentSnapshot = snapshot
+    const run = recoverableRun
+    const projectId = route.projectId
+    if (
+      currentSnapshot === null ||
+      currentSnapshot.discoverySession === null ||
+      run === null ||
+      projectId === null
+    )
+      return
+    const discoverySession = currentSnapshot.discoverySession
+
+    const retryRequest =
+      run.retryMessage === null
+        ? null
+        : { projectId, message: run.retryMessage, expectation: run.expectation }
+    const retryRecoveredRun =
+      retryRequest === null
+        ? null
+        : (): void => {
+            void performAgentRequest(retryRequest)
+          }
+    void (async () => {
+      try {
+        const inspection = await discoveryClient.inspectRun(
+          discoverySession.id,
+          discoverySession.revision,
+          run.phase,
+        )
+        if (inspection.status === 'MISSING') return
+        if (inspection.status === 'LEGACY') {
+          setAgentRun({
+            status: 'TOOL_REJECTED',
+            startedAt: null,
+            detail:
+              retryRequest === null
+                ? '업데이트 전 Agent 실행은 현재 앱과 호환되지 않습니다. 수정 요청을 입력창에 다시 적어 주세요.'
+                : '업데이트 전 Agent 실행은 현재 앱과 호환되지 않습니다. Core의 저장 상태를 기준으로 다시 요청할 수 있어요.',
+            retry: retryRecoveredRun,
+          })
+          return
+        }
+        if (inspection.status === 'COMPLETED') {
+          setAgentRun({
+            status: 'TOOL_REJECTED',
+            startedAt: null,
+            detail:
+              retryRequest === null
+                ? '이전 Agent 응답은 끝났지만 수정 결과가 저장되지 않았습니다. 수정 요청을 다시 입력해 주세요.'
+                : '이전 Agent 응답은 끝났지만 Core에 새 결과가 없습니다. 저장된 상태에서 안전하게 다시 요청할 수 있어요.',
+            retry: retryRecoveredRun,
+          })
+          return
+        }
+
+        const runSequence = agentRunSequence.current + 1
+        agentRunSequence.current = runSequence
+        setAgentRun({
+          status: 'BACKGROUND',
+          startedAt: null,
+          detail:
+            '이전에 시작한 Agent 작업을 다시 연결했습니다. 완료될 때까지 저장 상태를 확인합니다.',
+          retry: null,
+        })
+        const deadline = Date.now() + TARGET_DISCOVERY_TIMEOUT_MS
+        while (Date.now() < deadline && agentRunSequence.current === runSequence) {
+          await delay(900)
+          const next = await coreClient.restoreProjectSession(correlationId(), projectId)
+          if (agentRunSequence.current !== runSequence) return
+          setSnapshot(next)
+          if (expectationMet(next, run.expectation)) {
+            setAgentRun(idleAgentRun)
+            setRefresh((value) => value + 1)
+            return
+          }
+          const latestInspection = await discoveryClient.inspectRun(
+            discoverySession.id,
+            discoverySession.revision,
+            run.phase,
+          )
+          if (latestInspection.status === 'RUNNING') continue
+          agentRunSequence.current += 1
+          setAgentRun({
+            status: 'TOOL_REJECTED',
+            startedAt: null,
+            detail:
+              retryRequest === null
+                ? 'Agent 실행은 끝났지만 수정 결과가 저장되지 않았습니다. 수정 요청을 다시 입력해 주세요.'
+                : 'Agent 실행은 끝났지만 Core에 새 결과가 없습니다. 저장된 상태에서 안전하게 다시 요청할 수 있어요.',
+            retry: retryRecoveredRun,
+          })
+          return
+        }
+        if (agentRunSequence.current !== runSequence) return
+        setAgentRun({
+          status: 'TIMED_OUT',
+          startedAt: null,
+          detail: '복원한 Agent 작업이 아직 끝나지 않았습니다. Core의 저장 상태는 유지됩니다.',
+          retry: retryRecoveredRun,
+        })
+      } catch (error) {
+        setAgentRun({
+          status: 'HOST_DISCONNECTED',
+          startedAt: null,
+          detail: actionErrorMessage(error),
+          retry: retryRecoveredRun,
+        })
+      }
+    })()
+  }, [
+    coreClient,
+    discoveryClient,
+    performAgentRequest,
+    recoverableRun,
+    recoveryKey,
+    route.projectId,
+    snapshot,
+  ])
+
   let content: ReactNode
   if (historyError !== null) content = <ErrorState error={historyError} retry={retry} />
   else if (route.name === 'history')
@@ -490,11 +1054,41 @@ export function VibeHelperApp({ coreClient, sessionClient }: VibeHelperAppProps)
       ) : (
         <HistoryView history={history} openProject={openProject} />
       )
+  else if (route.name === 'discovery' && route.projectId === null)
+    content = (
+      <>
+        <AgentRunBanner run={agentRun} />
+        <DiscoveryStartView busy={operationBusy} error={actionError} onStart={startDiscovery} />
+      </>
+    )
   else if (loadingSession) content = <LoadingState label={`Opening ${routeLabels[route.name]}`} />
   else if (sessionError !== null) content = <ErrorState error={sessionError} retry={retry} />
   else if (snapshot === null) content = <EmptyState route={route.name} />
-  else if (route.name === 'discovery') content = <DiscoveryView snapshot={snapshot} />
-  else if (route.name === 'spec') content = <SpecView snapshot={snapshot} />
+  else if (route.name === 'discovery')
+    content = (
+      <DiscoveryWorkspace
+        snapshot={snapshot}
+        run={agentRun}
+        busy={operationBusy}
+        actionError={actionError}
+        onFeedback={recordDiscoveryFeedback}
+        onGenerate={generateCurrentDiscovery}
+        onRestart={restartDiscovery}
+        onBackToSpec={() => navigate('spec', snapshot.project.id)}
+      />
+    )
+  else if (route.name === 'spec')
+    content = (
+      <SpecWorkspace
+        snapshot={snapshot}
+        run={agentRun}
+        busy={operationBusy}
+        actionError={actionError}
+        onRefine={refineLearningSpec}
+        onConfirmAndPrepare={confirmAndPrepare}
+        onReturn={returnToDiscovery}
+      />
+    )
   else content = <BuildView snapshot={snapshot} sessions={sessions} crewError={crewError} />
 
   return (
@@ -565,10 +1159,20 @@ export function VibeHelperApp({ coreClient, sessionClient }: VibeHelperAppProps)
 export function App() {
   const api = useAppApi()
   const clients = useMemo(
-    () => ({ core: new CrewCoreClient(api), sessions: new CrewSessionClient(api) }),
+    () => ({
+      core: new CrewCoreClient(api),
+      sessions: new CrewSessionClient(api),
+      discovery: new CrewDiscoveryClient(api),
+    }),
     [api],
   )
-  return <VibeHelperApp coreClient={clients.core} sessionClient={clients.sessions} />
+  return (
+    <VibeHelperApp
+      coreClient={clients.core}
+      sessionClient={clients.sessions}
+      discoveryClient={clients.discovery}
+    />
+  )
 }
 
 export default App

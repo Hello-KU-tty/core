@@ -1,11 +1,11 @@
-import { readFile, readdir } from 'node:fs/promises'
+import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
 import {
-  findBoundaryViolations,
   type DependencyRule,
+  findBoundaryViolations,
   type WorkspaceManifest,
 } from '../support/workspace-boundaries.js'
 
@@ -30,7 +30,12 @@ const dependencyRules: readonly DependencyRule[] = [
   },
   {
     packageName: '@vibe-helper/crew-backend',
-    allowedInternalDependencies: ['@vibe-helper/application', '@vibe-helper/storage-sqlite'],
+    allowedInternalDependencies: [
+      '@vibe-helper/application',
+      '@vibe-helper/contracts',
+      '@vibe-helper/mcp-server',
+      '@vibe-helper/storage-sqlite',
+    ],
   },
   {
     packageName: '@vibe-helper/mcp-server',

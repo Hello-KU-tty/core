@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture_00000000-0000-4000-8000-000000000114",
+  "name": "Discovery Agent v1.1.2 bounded starter regression",
+  "description": "Redacted prompt regression fixture for a four-Candidate first useful round with deferred evaluation detail.",
+  "kind": "UNSEEN_DISCOVERY",
+  "inputPath": "tests/eval/fixtures/inputs/webhook-lens.json",
+  "expectedContractDomains": ["DISCOVERY"],
+  "criteria": [
+    {
+      "key": "contract_valid",
+      "dimension": "CONTRACT_INTEGRITY",
+      "reviewMode": "AUTOMATED",
+      "description": "The concise Candidate Round satisfies the strict current contract without evaluation or risks.",
+      "successDefinition": "Runtime validation and Candidate references succeed."
+    },
+    {
+      "key": "no_structural_mode_collapse",
+      "dimension": "DISCOVERY_DIVERSITY",
+      "reviewMode": "AUTOMATED",
+      "description": "The smaller starter set does not repeat one exact product structure.",
+      "successDefinition": "Every normalized structural signature is distinct."
+    },
+    {
+      "key": "semantic_diversity",
+      "dimension": "DISCOVERY_DIVERSITY",
+      "reviewMode": "HUMAN",
+      "description": "Four concise cards still represent meaningfully different product experiences.",
+      "successDefinition": "A reviewer can distinguish problems, users, interactions and data shapes without deferred detail."
+    },
+    {
+      "key": "concept_necessity",
+      "dimension": "CONCEPT_NECESSITY",
+      "reviewMode": "HUMAN",
+      "description": "Runtime validation and discriminated unions remain central in every concise Candidate.",
+      "successDefinition": "Removing the target concepts would remove each Candidate's core behavior."
+    }
+  ],
+  "scenarioTags": ["prompt regression", "concise starter", "unseen", "deferred evaluation"],
+  "fixtureVersion": "1.1.2",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED"
+}

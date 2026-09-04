@@ -14,7 +14,8 @@ import { openSqliteStorage } from '../packages/storage-sqlite/dist/index.js'
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const liveModel = process.env.VIBE_HELPER_LIVE_EVAL_MODEL ?? 'claude-haiku-4.5'
-const liveEffort = process.env.VIBE_HELPER_LIVE_EVAL_EFFORT ?? 'low'
+const liveEffort = process.env.VIBE_HELPER_LIVE_EVAL_EFFORT ?? ''
+const useProvidedContext = process.env.VIBE_HELPER_LIVE_EVAL_PROVIDED_CONTEXT === 'true'
 const timeoutMs = Number(process.env.VIBE_HELPER_LIVE_EVAL_TIMEOUT_MS ?? 600_000)
 if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 60_000 || timeoutMs > 1_200_000) {
   throw new TypeError('VIBE_HELPER_LIVE_EVAL_TIMEOUT_MS must be 60000..1200000')
@@ -196,7 +197,7 @@ const agentConfig = {
   },
   tools: definition.tools,
   allowedTools: definition.allowedTools,
-  ...(liveModel === 'auto' ? {} : { model: liveModel }),
+  model: liveModel,
 }
 await writeFile(
   join(agentWorkspace, '.kiro', 'agents', `${definition.name}.json`),
@@ -204,12 +205,57 @@ await writeFile(
   'utf8',
 )
 process.stdout.write(
-  `${JSON.stringify({ phase: 'STARTED', runtimeRoot, liveModel, liveEffort, timeoutMs })}\n`,
+  `${JSON.stringify({ phase: 'STARTED', runtimeRoot, liveModel, liveEffort, useProvidedContext, timeoutMs })}\n`,
 )
 
+const providedContext = JSON.stringify({
+  schemaVersion: 1,
+  kind: 'VIBE_HELPER_DISCOVERY_CONTEXT',
+  purpose: 'SPEC',
+  expectedSessionRevision: 3,
+  project: {
+    id: ids.project,
+    title: input.learningGoal,
+    learningGoal: input.learningGoal,
+    status: 'SPEC_REVIEW',
+  },
+  session: {
+    id: ids.session,
+    correlationId: ids.correlation,
+    revision: 3,
+    status: 'SELECTED',
+    input,
+  },
+  latestRound: {
+    id: ids.round,
+    roundIndex: 1,
+    appliedFeedbackIds: [],
+    candidates: [{ candidateId: ids.candidate, revision: 1 }],
+  },
+  currentCandidates: [candidate],
+  pendingFeedback: [
+    {
+      id: ids.selection,
+      roundId: ids.round,
+      intent: 'SELECT',
+      targets: [{ candidateId: ids.candidate, revision: 1 }],
+      message: 'Use this project direction.',
+    },
+  ],
+  selectedCandidate: candidate,
+  learningSpec: null,
+  relevantLedgerEntries: [],
+})
 const turn = [
   'Run one synthetic, redacted Learning Spec evaluation for the already selected Candidate.',
-  `Call get_discovery_context with kind=DISCOVERY_GET_CONTEXT for projectId ${ids.project} and discoverySessionId ${ids.session}.`,
+  ...(useProvidedContext
+    ? [
+        'Use the following validated ephemeral Core snapshot directly and do not call get_discovery_context because its IDs and revision match this request:',
+        providedContext,
+      ]
+    : [
+        `Call get_discovery_context with kind=DISCOVERY_GET_CONTEXT for projectId ${ids.project} and discoverySessionId ${ids.session}.`,
+      ]),
   `Use correlationId ${ids.correlation} for every tool call.`,
   'Create the recommended Learning Spec from the selected Candidate and submit it once with submit_learning_spec.',
   `Use idempotencyKey=${ids.specIdempotency}, expectedSessionRevision=3, and expectedSpecRevision=0.`,
@@ -219,27 +265,29 @@ const turn = [
   'After the tool succeeds, reply only with LEARNING_SPEC_STORED.',
 ].join('\n')
 
+const runStartedAt = Date.now()
 const run = await new Promise((resolveRun, rejectRun) => {
-  const child = spawn(
-    'kiro-cli',
-    [
-      'chat',
-      '--agent',
-      definition.name,
-      '--agent-engine',
-      'v2',
-      '--effort',
-      liveEffort,
-      '--no-interactive',
-      '--require-mcp-startup',
-      '--trust-tools=@vibe-helper-discovery-core',
-      '--output-format',
-      'stream-json',
-      '--verbose',
-      turn,
-    ],
-    { cwd: agentWorkspace, env: process.env, stdio: ['ignore', 'pipe', 'pipe'], detached: true },
-  )
+  const chatArguments = [
+    'chat',
+    '--agent',
+    definition.name,
+    '--agent-engine',
+    'v2',
+    ...(liveEffort === '' ? [] : ['--effort', liveEffort]),
+    '--no-interactive',
+    '--require-mcp-startup',
+    '--trust-tools=@vibe-helper-discovery-core',
+    '--output-format',
+    'stream-json',
+    '--verbose',
+    turn,
+  ]
+  const child = spawn('kiro-cli', chatArguments, {
+    cwd: agentWorkspace,
+    env: process.env,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    detached: true,
+  })
   const stdout = []
   const stderr = []
   let timedOut = false
@@ -294,6 +342,22 @@ await writeFile(
   'utf8',
 )
 storage.close()
+const durableMilliseconds = Math.max(0, Date.parse(learningSpec.createdAt) - runStartedAt)
+const turnMilliseconds = Math.max(0, Date.now() - runStartedAt)
+const toolCallTitles = run.stdout
+  .toString('utf8')
+  .trim()
+  .split('\n')
+  .flatMap((line) => {
+    try {
+      const event = JSON.parse(line)
+      return event?.type === 'sessionUpdate' && event?.data?.update?.sessionUpdate === 'tool_call'
+        ? [String(event.data.update.title ?? '')]
+        : []
+    } catch {
+      return []
+    }
+  })
 process.stdout.write(
   `${JSON.stringify({
     runtimeRoot,
@@ -302,9 +366,16 @@ process.stdout.write(
     promptVersion: definition.promptVersion,
     liveModel,
     liveEffort,
+    useProvidedContext,
     timeoutMs,
     learningSpecId: learningSpec.id,
     learningSpecRevision: learningSpec.revision,
     sessionRevision: aggregate.session.revision,
+    durableMilliseconds,
+    turnMilliseconds,
+    learningSpecPayloadBytes: Buffer.byteLength(JSON.stringify(learningSpec), 'utf8'),
+    getContextCalls: toolCallTitles.filter((title) => title.includes('get_discovery_context'))
+      .length,
+    submitCalls: toolCallTitles.filter((title) => title.includes('submit_learning_spec')).length,
   })}\n`,
 )

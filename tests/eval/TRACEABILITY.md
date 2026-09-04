@@ -1,12 +1,12 @@
 # MVP acceptance criterion 추적표
 
-T13 시점의 평가는 계약·품질 실패 검출 기반, 실제 Candidate Agent 회귀, Learning Spec prompt regression, 실제 Builder Decision 수직 흐름, bounded Helper 대화와 no-tool Evidence Analyst→Core 적용을 포함한다. 아래 `현재 근거`는 완료된 검증만 뜻하며, 실제 UI 수직 흐름 완료 판정은 `최종 검증` 작업에서 수행한다.
+T15 시점의 평가는 계약·품질 실패 검출 기반, 실제 Candidate Agent 회귀, phase별 Discovery/Spec과 target latency 회귀, 실제 Builder Decision 수직 흐름, bounded Helper 대화와 no-tool Evidence Analyst→Core 적용을 포함한다. 아래 `현재 근거`는 완료된 검증만 뜻하며, 전체 제품 수직 흐름 완료 판정은 `최종 검증` 작업에서 수행한다.
 
 | Acceptance criterion | 현재 test/eval 근거 | 현재 보장 | 최종 검증 |
 |---|---|---|---|
-| AC-MVP-001 | unseen/Personal Need corpus, `candidate-mode-collapse`, actual Kiro `discovery-agent-v1-webhook` regression | 고정 taxonomy 없이 unseen goal에서 생성한 8개 후보의 strict contract, 구조 차이와 기록된 의미 다양성·Concept Necessity review | T21 |
-| AC-MVP-002 | Candidate reducer와 Application integration의 PIN/REJECT/MERGE/REVISE/SHRINK/EXPAND/REGENERATE/SELECT, MCP adapter contract | feedback-to-round lineage, stale target 거절, UI-only 명시적 selection과 terminal Discovery | T21 |
-| AC-MVP-003 | `spec-scope-leak`, prompt v1.1.0 `learning-spec-v1.1-webhook`, Spec domain/Application/MCP integration, actual Kiro selected-Candidate→DRAFT Spec run | 세 scope, selected-Candidate revision, direct/Agent 조정, 명시적 확정, 확정 전 Task 차단, Learner Focus 전용 Evidence target과 실제 role-bound MCP 저장 | T15, T21 |
+| AC-MVP-001 | unseen/Personal Need corpus, `candidate-mode-collapse`, actual Kiro `discovery-agent-v1-webhook` regression, `discovery-v1.1.6-first-candidate-alternatives` | 고정 taxonomy 없이 unseen goal에서 생성한 후보의 strict contract와 구조 차이, Candidate 수·설명량·model·병렬/hedge별 target latency·저장 신뢰성 및 의미 중복 review | T21 |
+| AC-MVP-002 | Candidate reducer와 Application integration의 PIN/REJECT/MERGE/REVISE/SHRINK/EXPAND/REGENERATE/MORE/SELECT, MCP adapter contract, `discovery-v1.1.2-starter-webhook`, `discovery-v1.1.3-narrow-merge`, `discovery-v1.1.4-fast-context`, `discovery-v1.1.5-fast-phases`, v1.1.6 re-entry E2E | feedback-to-round lineage, MORE carry, selection refinement narrowing, bounded starter, ephemeral context fallback, Core-derived MERGE metadata와 exact slot 재진입 시 중복 dispatch 차단 | T21 |
+| AC-MVP-003 | `spec-scope-leak`, prompt v1.1.0 `learning-spec-v1.1-webhook`, Spec domain/Application/MCP integration, actual Kiro selected-Candidate→DRAFT Spec run, `discovery-v1.1.5-fast-phases`, `discovery-v1.1.6-spec-recovery` | 세 scope, selected-Candidate revision, direct/Agent 조정, 명시적 확정, 확정 전 Task 차단, submit-only 정상 Spec surface와 no-tool bounded recovery의 durable revision 2 | T21 |
 | AC-MVP-004 | Builder Task/Completion Report contract와 application integration test | 실제 build 흐름에 필요한 DTO·상태 경계 | T10, T18, T21 |
 | AC-MVP-005 | `stale-context`, `context_fresh`, `helper-v1.0-analogy`, Application/role server contract, actual Kiro Helper regression | CURRENT/STALE/MISSING, 관련 Decision·Ledger·Episode·bounded code 조립, durable refresh와 완료 Task fallback, read-only Helper의 실제 현재 맥락 답변 | T16, T21 |
 | AC-MVP-006 | `trivial-decision`, `builder-v1.1-decision-webhook`, Application/MCP Decision lifecycle, actual Kiro request→Helper handoff→resolution→apply run | 사소한 질문을 거절하는 사람 review, 실제 Decision의 atomic gate·Task resume·apply-before-complete와 이유 없는 추천 수락 Evidence 차단 | T16, T18, T21 |

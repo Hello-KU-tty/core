@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { episodeStatusSchema } from './activity.js'
+import { discoveryContextSchema } from './agent-contracts.js'
 import { builderTaskSchema, decisionRequestSchema, liveProjectContextSchema } from './build.js'
 import {
   discoverySessionSchema,
@@ -54,6 +55,7 @@ export const projectSessionSnapshotSchema = z.strictObject({
   project: projectSchema,
   suggestedSurface: crewAppSurfaceSchema,
   discoverySession: discoverySessionSchema.nullable(),
+  discoveryContext: discoveryContextSchema.nullable(),
   selectedCandidate: projectCandidateRevisionSchema.nullable(),
   learningSpec: learningSpecRevisionSchema.nullable(),
   activeTask: builderTaskSchema.nullable(),

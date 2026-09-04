@@ -1499,7 +1499,7 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
                JOIN discovery_session_revisions revisions
                  ON revisions.session_id = heads.id AND revisions.revision = heads.head_revision
                WHERE heads.project_id = ?
-               ORDER BY heads.updated_at DESC LIMIT 1`,
+               ORDER BY heads.updated_at DESC, heads.rowid DESC LIMIT 1`,
               [projectId],
               discoverySessionSchema,
             )
@@ -2082,7 +2082,7 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
          JOIN discovery_session_revisions revisions
            ON revisions.session_id = heads.id AND revisions.revision = heads.head_revision
          WHERE heads.project_id = ?
-         ORDER BY heads.updated_at DESC LIMIT 1`,
+         ORDER BY heads.updated_at DESC, heads.rowid DESC LIMIT 1`,
         [projectId],
         discoverySessionSchema,
       )

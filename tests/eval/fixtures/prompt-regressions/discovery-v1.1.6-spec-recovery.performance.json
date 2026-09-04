@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "promptVersion": "1.1.6",
+  "target": "Kiro Crew 0.3.0",
+  "inputPath": "tests/eval/fixtures/inputs/t15-realtime-practice.json",
+  "selectedModel": "claude-haiku-4.5",
+  "normalSpecTools": ["submit_learning_spec"],
+  "recoverySpecTools": ["get_discovery_context", "submit_learning_spec"],
+  "boundedUiRecoveryAttempts": 2,
+  "durableRevisionAfterUiRecoveryE2e": 2,
+  "haikuRawRefinement": {
+    "samples": 2,
+    "durableSuccesses": 1,
+    "noToolCompletions": 1,
+    "successfulDurableMilliseconds": [23384]
+  },
+  "modelComparisons": {
+    "gpt-5.6-terra": {
+      "firstSpecMilliseconds": 43257,
+      "refinedSpecMilliseconds": 14270,
+      "bothDurable": true
+    },
+    "auto": {
+      "firstSpecMilliseconds": 39240,
+      "refinedSpecMilliseconds": 36027,
+      "bothDurable": true
+    }
+  },
+  "finalHaikuUserFlowSample": {
+    "firstCandidateMilliseconds": 27103,
+    "mergeMilliseconds": 13296,
+    "firstSpecMilliseconds": 22316,
+    "refinedSpecMilliseconds": 23384,
+    "refinedSpecRevision": 2
+  },
+  "observedFirstCandidateOutlierMilliseconds": 49310,
+  "userApprovedFinalGateRerun": {
+    "firstCandidateMilliseconds": 50132,
+    "mergeMilliseconds": 13226,
+    "firstSpecMilliseconds": 18860,
+    "refinedSpecMilliseconds": 23097,
+    "refinedSpecRevision": 2,
+    "allRequiredPhasesWithinGate": false
+  },
+  "latencyGateMilliseconds": 30000,
+  "latencyGateFullyMet": false,
+  "containsPersonalData": false
+}

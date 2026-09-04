@@ -11,7 +11,8 @@ import { openSqliteStorage } from '../packages/storage-sqlite/dist/index.js'
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const liveModel = process.env.VIBE_HELPER_LIVE_EVAL_MODEL ?? 'claude-haiku-4.5'
-const liveEffort = process.env.VIBE_HELPER_LIVE_EVAL_EFFORT ?? 'low'
+const liveEffort = process.env.VIBE_HELPER_LIVE_EVAL_EFFORT ?? ''
+const useProvidedContext = process.env.VIBE_HELPER_LIVE_EVAL_PROVIDED_CONTEXT === 'true'
 const timeoutMs = Number(process.env.VIBE_HELPER_LIVE_EVAL_TIMEOUT_MS ?? 600_000)
 if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 60_000 || timeoutMs > 1_200_000) {
   throw new TypeError('VIBE_HELPER_LIVE_EVAL_TIMEOUT_MS must be 60000..1200000')
@@ -83,19 +84,51 @@ const agentConfig = {
   },
   tools: definition.tools,
   allowedTools: definition.allowedTools,
-  ...(liveModel === 'auto' ? {} : { model: liveModel }),
+  model: liveModel,
 }
 const agentConfigPath = join(agentWorkspace, '.kiro', 'agents', `${definition.name}.json`)
 await writeFile(agentConfigPath, `${JSON.stringify(agentConfig, null, 2)}\n`, 'utf8')
 process.stdout.write(
-  `${JSON.stringify({ phase: 'STARTED', runtimeRoot, liveModel, liveEffort, agentEngine: 'v2', timeoutMs })}\n`,
+  `${JSON.stringify({ phase: 'STARTED', runtimeRoot, liveModel, liveEffort, useProvidedContext, agentEngine: 'v2', timeoutMs })}\n`,
 )
 
+const providedContext = JSON.stringify({
+  schemaVersion: 1,
+  kind: 'VIBE_HELPER_DISCOVERY_CONTEXT',
+  purpose: 'ROUND',
+  expectedSessionRevision: 1,
+  project: {
+    id: ids.project,
+    title: input.learningGoal,
+    learningGoal: input.learningGoal,
+    status: 'DISCOVERY',
+  },
+  session: {
+    id: ids.session,
+    correlationId: ids.correlation,
+    revision: 1,
+    status: 'ACTIVE',
+    input,
+  },
+  latestRound: null,
+  currentCandidates: [],
+  pendingFeedback: [],
+  selectedCandidate: null,
+  learningSpec: null,
+  relevantLedgerEntries: [],
+})
 const turn = [
   'Run one synthetic, redacted Discovery evaluation.',
-  `Call get_discovery_context for projectId ${ids.project} and discoverySessionId ${ids.session}.`,
+  ...(useProvidedContext
+    ? [
+        'Use the following validated ephemeral Core snapshot directly and do not call get_discovery_context because its IDs and revision match this request:',
+        providedContext,
+      ]
+    : [
+        `Call get_discovery_context for projectId ${ids.project} and discoverySessionId ${ids.session}.`,
+      ]),
   `Use correlationId ${ids.correlation} for every tool call.`,
-  'Then generate an initial Candidate Round with exactly 8 meaningfully different TypeScript project Candidates and submit it with submit_candidate_round. Eight is an allowed approximate initial round, not a fixed product contract.',
+  'Then generate an initial Candidate Round with exactly 4 meaningfully different TypeScript project Candidates and submit it with submit_candidate_round.',
   'Keep every text field to one short sentence and use the smallest useful arrays so the complete round can be submitted promptly without losing semantic differences.',
   'Use appliedFeedbackIds=[], carriedCandidates=[], lineage kind NEW for every Candidate, a new schema-valid idempotency key, and expectedSessionRevision=1.',
   'Do not invent Candidate/Round IDs, timestamps, source, redaction status, round index, or input snapshot; the role-bound adapter supplies them.',
@@ -103,32 +136,29 @@ const turn = [
   'After the tool succeeds, reply only with DISCOVERY_ROUND_STORED.',
 ].join('\n')
 
+const runStartedAt = Date.now()
 const run = await new Promise((resolveRun, rejectRun) => {
-  const child = spawn(
-    'kiro-cli',
-    [
-      'chat',
-      '--agent',
-      definition.name,
-      '--agent-engine',
-      'v2',
-      '--effort',
-      liveEffort,
-      '--no-interactive',
-      '--require-mcp-startup',
-      '--trust-tools=@vibe-helper-discovery-core',
-      '--output-format',
-      'stream-json',
-      '--verbose',
-      turn,
-    ],
-    {
-      cwd: agentWorkspace,
-      env: process.env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      detached: true,
-    },
-  )
+  const chatArguments = [
+    'chat',
+    '--agent',
+    definition.name,
+    '--agent-engine',
+    'v2',
+    ...(liveEffort === '' ? [] : ['--effort', liveEffort]),
+    '--no-interactive',
+    '--require-mcp-startup',
+    '--trust-tools=@vibe-helper-discovery-core',
+    '--output-format',
+    'stream-json',
+    '--verbose',
+    turn,
+  ]
+  const child = spawn('kiro-cli', chatArguments, {
+    cwd: agentWorkspace,
+    env: process.env,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    detached: true,
+  })
   const stdout = []
   const stderr = []
   let timedOut = false
@@ -181,6 +211,12 @@ const roundKeys = new Set(
 const candidates = aggregate.candidates.filter((candidate) =>
   roundKeys.has(`${candidate.id}:${candidate.revision}`),
 )
+if (candidates.length !== 4) {
+  storage.close()
+  throw new Error(
+    `Discovery Agent stored ${String(candidates.length)} Candidates instead of 4. Inspect ${transcriptPath}.`,
+  )
+}
 const subjectPath = join(runtimeRoot, 'discovery-subject.json')
 await writeFile(
   subjectPath,
@@ -188,6 +224,22 @@ await writeFile(
   'utf8',
 )
 storage.close()
+const durableMilliseconds = Math.max(0, Date.parse(round.createdAt) - runStartedAt)
+const turnMilliseconds = Math.max(0, Date.now() - runStartedAt)
+const toolCallTitles = run.stdout
+  .toString('utf8')
+  .trim()
+  .split('\n')
+  .flatMap((line) => {
+    try {
+      const event = JSON.parse(line)
+      return event?.type === 'sessionUpdate' && event?.data?.update?.sessionUpdate === 'tool_call'
+        ? [String(event.data.update.title ?? '')]
+        : []
+    } catch {
+      return []
+    }
+  })
 process.stdout.write(
   `${JSON.stringify({
     runtimeRoot,
@@ -196,9 +248,17 @@ process.stdout.write(
     promptVersion: definition.promptVersion,
     liveModel,
     liveEffort,
+    useProvidedContext,
     agentEngine: 'v2',
     timeoutMs,
     candidateCount: candidates.length,
     sessionRevision: aggregate.session.revision,
+    durableMilliseconds,
+    turnMilliseconds,
+    candidatePayloadBytes: Buffer.byteLength(JSON.stringify(candidates), 'utf8'),
+    roundPayloadBytes: Buffer.byteLength(JSON.stringify(round), 'utf8'),
+    getContextCalls: toolCallTitles.filter((title) => title.includes('get_discovery_context'))
+      .length,
+    submitCalls: toolCallTitles.filter((title) => title.includes('submit_candidate_round')).length,
   })}\n`,
 )

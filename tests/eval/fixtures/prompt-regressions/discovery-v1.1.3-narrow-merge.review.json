@@ -1,0 +1,15 @@
+[
+  {
+    "criterionKey": "concept_necessity",
+    "dimension": "CONCEPT_NECESSITY",
+    "reviewMode": "HUMAN",
+    "status": "PASSED",
+    "explanation": "The service needs a transaction boundary to reject overlapping reservations and a scheduler to execute durable follow-up work at the requested time; these are the two selected behaviors rather than decorative technologies.",
+    "evidenceReferences": [
+      "discovery.candidates[0].coreInteraction",
+      "discovery.candidates[0].technologyNecessity",
+      "discovery.candidates[0].mvpFeatures"
+    ],
+    "metrics": []
+  }
+]

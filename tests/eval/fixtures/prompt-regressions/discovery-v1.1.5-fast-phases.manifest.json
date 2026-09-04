@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture_00000000-0000-4000-8000-000000000117",
+  "name": "Discovery Agent v1.1.5 fast phase regression",
+  "description": "Redacted target Crew regression for phase-specific ROUND, Core-derived MERGE and tool-first SPEC Agents using injected Core context.",
+  "kind": "UNSEEN_DISCOVERY",
+  "inputPath": "tests/eval/fixtures/inputs/t15-realtime-practice.json",
+  "expectedContractDomains": ["DISCOVERY", "LEARNING_SPEC"],
+  "criteria": [
+    {
+      "key": "contract_valid",
+      "dimension": "CONTRACT_INTEGRITY",
+      "reviewMode": "AUTOMATED",
+      "description": "The narrowed Candidate Round and first Learning Spec satisfy both strict contracts.",
+      "successDefinition": "Runtime validation succeeds and the Spec selects the sole current merged Candidate revision."
+    },
+    {
+      "key": "concept_necessity",
+      "dimension": "CONCEPT_NECESSITY",
+      "reviewMode": "HUMAN",
+      "description": "The merged project still requires real-time state synchronization as its core behavior.",
+      "successDefinition": "Removing bidirectional synchronization removes the shared coding interaction."
+    },
+    {
+      "key": "scope_appropriateness",
+      "dimension": "SPEC_SCOPE",
+      "reviewMode": "HUMAN",
+      "description": "The fast Spec keeps the learner on WebSocket synchronization while delegating adjacent implementation work.",
+      "successDefinition": "The three scope categories and expected Decisions remain useful and understandable for a beginner."
+    }
+  ],
+  "scenarioTags": [
+    "prompt regression",
+    "phase split",
+    "core-derived merge",
+    "ephemeral context",
+    "latency"
+  ],
+  "fixtureVersion": "1.1.5",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED"
+}

@@ -806,6 +806,242 @@ describe('ApplicationService boundary', () => {
       error: { code: 'DISCOVERY_SESSION_NOT_ACTIVE' },
     })
   })
+
+  it('adds MORE Candidates while preserving every current Candidate reference', async () => {
+    const { service, storage } = await createHarness()
+    const addedCandidateId = 'candidate_00000000-0000-4000-8000-000000000073'
+    const moreFeedbackId = 'feedback_00000000-0000-4000-8000-000000000074'
+    const nextRoundId = 'candidate_round_00000000-0000-4000-8000-000000000075'
+    storage.transaction((repository) => {
+      repository.appendProject(
+        projectSchema.parse({
+          ...projectFixture,
+          status: 'DISCOVERY',
+          generatedWorkspacePath: undefined,
+        }),
+      )
+      repository.appendDiscoverySession(discoverySessionSchema.parse(discoverySessionFixture))
+    })
+
+    await expect(
+      service.executeAgent('DISCOVERY', {
+        schemaVersion: 1,
+        kind: 'DISCOVERY_SUBMIT_CANDIDATE_ROUND',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'DISCOVERY' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000073',
+        expectedSessionRevision: 1,
+        round: candidateRoundFixture,
+        candidates: [candidateFixture],
+      }),
+    ).resolves.toMatchObject({ success: true, data: { resourceRevision: 2 } })
+
+    await expect(
+      service.executeUi({
+        schemaVersion: 1,
+        kind: 'UI_RECORD_DISCOVERY_FEEDBACK',
+        correlationId: ids.correlation,
+        actor: { kind: 'UI' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000074',
+        expectedSessionRevision: 2,
+        feedback: {
+          ...discoveryFeedbackFixture,
+          id: moreFeedbackId,
+          intent: 'MORE',
+          targets: [],
+          message: 'Keep this Candidate and add distinct directions.',
+        },
+      }),
+    ).resolves.toMatchObject({ success: true, data: { resourceRevision: 3 } })
+
+    const addedCandidate = {
+      ...candidateFixture,
+      id: addedCandidateId,
+      title: 'Typed Event Route Map',
+      coreInteraction: 'Route variant-shaped events and inspect the safe branch selected for each.',
+    }
+    const added = await service.executeAgent('DISCOVERY', {
+      schemaVersion: 1,
+      kind: 'DISCOVERY_SUBMIT_CANDIDATE_ROUND',
+      correlationId: ids.correlation,
+      actor: { kind: 'AGENT', role: 'DISCOVERY' },
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000075',
+      expectedSessionRevision: 3,
+      round: {
+        ...candidateRoundFixture,
+        id: nextRoundId,
+        roundIndex: 2,
+        appliedFeedbackIds: [moreFeedbackId],
+        candidates: [
+          { candidateId: ids.candidate, revision: 1 },
+          { candidateId: addedCandidateId, revision: 1 },
+        ],
+      },
+      candidates: [addedCandidate],
+    })
+
+    expect(added).toMatchObject({ success: true, data: { resourceRevision: 4 } })
+    expect(storage.repository.readDiscoveryAggregate(ids.project)).toMatchObject({
+      rounds: [
+        { roundIndex: 1 },
+        {
+          roundIndex: 2,
+          appliedFeedbackIds: [moreFeedbackId],
+          candidates: [
+            { candidateId: ids.candidate, revision: 1 },
+            { candidateId: addedCandidateId, revision: 1 },
+          ],
+        },
+      ],
+    })
+  })
+
+  it('narrows a MERGE Round to the merged result while preserving prior Candidates in history', async () => {
+    const { service, storage } = await createHarness()
+    const secondCandidateId = 'candidate_00000000-0000-4000-8000-000000000076'
+    const thirdCandidateId = 'candidate_00000000-0000-4000-8000-000000000077'
+    const fourthCandidateId = 'candidate_00000000-0000-4000-8000-000000000078'
+    const mergeFeedbackId = 'feedback_00000000-0000-4000-8000-000000000079'
+    const narrowRoundId = 'candidate_round_00000000-0000-4000-8000-000000000080'
+    const secondCandidate = {
+      ...candidateFixture,
+      id: secondCandidateId,
+      title: 'Scheduled Digest Worker',
+    }
+    const thirdCandidate = {
+      ...candidateFixture,
+      id: thirdCandidateId,
+      title: 'Shared Resource Booking',
+    }
+    const fourthCandidate = {
+      ...candidateFixture,
+      id: fourthCandidateId,
+      title: 'Monthly Spending Report',
+    }
+    storage.transaction((repository) => {
+      repository.appendProject(
+        projectSchema.parse({
+          ...projectFixture,
+          status: 'DISCOVERY',
+          generatedWorkspacePath: undefined,
+        }),
+      )
+      repository.appendDiscoverySession(discoverySessionSchema.parse(discoverySessionFixture))
+    })
+
+    await expect(
+      service.executeAgent('DISCOVERY', {
+        schemaVersion: 1,
+        kind: 'DISCOVERY_SUBMIT_CANDIDATE_ROUND',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'DISCOVERY' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000076',
+        expectedSessionRevision: 1,
+        round: {
+          ...candidateRoundFixture,
+          candidates: [candidateFixture, secondCandidate, thirdCandidate, fourthCandidate].map(
+            (candidate) => ({ candidateId: candidate.id, revision: 1 }),
+          ),
+        },
+        candidates: [candidateFixture, secondCandidate, thirdCandidate, fourthCandidate],
+      }),
+    ).resolves.toMatchObject({ success: true, data: { resourceRevision: 2 } })
+
+    await expect(
+      service.executeUi({
+        schemaVersion: 1,
+        kind: 'UI_RECORD_DISCOVERY_FEEDBACK',
+        correlationId: ids.correlation,
+        actor: { kind: 'UI' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000077',
+        expectedSessionRevision: 2,
+        feedback: {
+          ...discoveryFeedbackFixture,
+          id: mergeFeedbackId,
+          intent: 'MERGE',
+          targets: [
+            { candidateId: secondCandidateId, revision: 1 },
+            { candidateId: thirdCandidateId, revision: 1 },
+          ],
+          message: 'Combine the autonomous schedule with the practical booking flow.',
+        },
+      }),
+    ).resolves.toMatchObject({ success: true, data: { resourceRevision: 3 } })
+
+    const mergedCandidate = {
+      ...secondCandidate,
+      revision: 2,
+      parentRevisions: [
+        { candidateId: secondCandidateId, revision: 1 },
+        { candidateId: thirdCandidateId, revision: 1 },
+      ],
+      title: 'Scheduled Resource Booking Keeper',
+    }
+    const carriedRound = {
+      ...candidateRoundFixture,
+      id: narrowRoundId,
+      roundIndex: 2,
+      appliedFeedbackIds: [mergeFeedbackId],
+      candidates: [
+        { candidateId: ids.candidate, revision: 1 },
+        { candidateId: fourthCandidateId, revision: 1 },
+        { candidateId: secondCandidateId, revision: 2 },
+      ],
+    }
+    await expect(
+      service.executeAgent('DISCOVERY', {
+        schemaVersion: 1,
+        kind: 'DISCOVERY_SUBMIT_CANDIDATE_ROUND',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'DISCOVERY' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000078',
+        expectedSessionRevision: 3,
+        round: carriedRound,
+        candidates: [mergedCandidate],
+      }),
+    ).resolves.toMatchObject({
+      success: false,
+      error: { code: 'CANDIDATE_ROUND_CONTENT_INVALID' },
+    })
+
+    await expect(
+      service.executeAgent('DISCOVERY', {
+        schemaVersion: 1,
+        kind: 'DISCOVERY_SUBMIT_CANDIDATE_ROUND',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'DISCOVERY' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000079',
+        expectedSessionRevision: 3,
+        round: {
+          ...carriedRound,
+          candidates: [{ candidateId: secondCandidateId, revision: 2 }],
+        },
+        candidates: [mergedCandidate],
+      }),
+    ).resolves.toMatchObject({ success: true, data: { resourceRevision: 4 } })
+
+    expect(storage.repository.readDiscoveryAggregate(ids.project)).toMatchObject({
+      rounds: [
+        { roundIndex: 1 },
+        {
+          roundIndex: 2,
+          candidates: [{ candidateId: secondCandidateId, revision: 2 }],
+        },
+      ],
+      candidates: expect.arrayContaining([
+        expect.objectContaining({ id: ids.candidate, revision: 1 }),
+        expect.objectContaining({ id: fourthCandidateId, revision: 1 }),
+        expect.objectContaining({
+          id: secondCandidateId,
+          revision: 2,
+          parentRevisions: [
+            { candidateId: secondCandidateId, revision: 1 },
+            { candidateId: thirdCandidateId, revision: 1 },
+          ],
+        }),
+      ]),
+    })
+  })
 })
 
 describe('T09 Learning Spec application flow', () => {
@@ -918,6 +1154,10 @@ describe('T09 Learning Spec application flow', () => {
       discoverySessionId: ids.discoverySession,
       expectedSessionRevision: 2,
       expectedSpecRevision: 1,
+      input: {
+        ...discoveryInputFixture,
+        learningGoal: 'Learn runtime validation through a smaller local tool',
+      },
     })
     expect(returned).toMatchObject({ success: true, data: { resourceRevision: 1 } })
 
@@ -929,8 +1169,31 @@ describe('T09 Learning Spec application flow', () => {
       ],
     })
     expect(storage.repository.readDiscoveryAggregateBySession(newSessionId)).toMatchObject({
-      project: { status: 'DISCOVERY' },
-      session: { revision: 1, status: 'ACTIVE', input: discoveryInputFixture },
+      project: {
+        status: 'DISCOVERY',
+        learningGoal: 'Learn runtime validation through a smaller local tool',
+      },
+      session: {
+        revision: 1,
+        status: 'ACTIVE',
+        input: {
+          ...discoveryInputFixture,
+          learningGoal: 'Learn runtime validation through a smaller local tool',
+        },
+      },
+    })
+    await expect(
+      service.executeUi({
+        schemaVersion: 1,
+        kind: 'UI_RESTORE_PROJECT_SESSION',
+        correlationId: ids.correlation,
+        actor: { kind: 'UI' },
+        projectId: ids.project,
+        helperConversationLimit: 10,
+      }),
+    ).resolves.toMatchObject({
+      success: true,
+      data: { selectedCandidate: null, learningSpec: null },
     })
   })
 })

@@ -126,6 +126,26 @@ describe('Candidate revision reducer', () => {
       }).trace.reasonCode,
     ).toBe('CANDIDATE_REGENERATION_LINEAGE_INVALID')
   })
+
+  it('accepts a new MORE Candidate without changing an existing lineage', () => {
+    const added = {
+      ...candidateFixture,
+      id: secondCandidateId,
+      title: 'Typed Event Route Map',
+    }
+    const result = reduceCandidateRevision({
+      existing: [candidateFixture],
+      proposed: added,
+      feedback: {
+        ...discoveryFeedbackFixture,
+        intent: 'MORE',
+        targets: [],
+      },
+    })
+    expect(result.outcome).toBe('APPLIED')
+    if (result.outcome !== 'APPLIED') return
+    expect(result.value).toEqual([candidateFixture, added])
+  })
 })
 
 describe('Learning Spec confirmation reducer', () => {

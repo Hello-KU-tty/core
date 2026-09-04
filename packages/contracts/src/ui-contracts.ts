@@ -87,6 +87,7 @@ export const uiReturnToDiscoveryCommandSchema = z.strictObject({
   discoverySessionId: discoverySessionIdSchema,
   expectedSessionRevision: entityRevisionSchema,
   expectedSpecRevision: z.int().nonnegative(),
+  input: discoveryInputSchema.optional(),
 })
 
 export const uiResolveDecisionCommandSchema = z

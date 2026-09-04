@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture_00000000-0000-4000-8000-000000000115",
+  "name": "Discovery Agent v1.1.3 selection narrowing regression",
+  "description": "Redacted prompt regression fixture in which two selected Candidates merge into one current shortlist result without carrying unselected Candidates.",
+  "kind": "UNSEEN_DISCOVERY",
+  "inputPath": "tests/eval/fixtures/inputs/spring-scheduler.json",
+  "expectedContractDomains": ["DISCOVERY"],
+  "criteria": [
+    {
+      "key": "contract_valid",
+      "dimension": "CONTRACT_INTEGRITY",
+      "reviewMode": "AUTOMATED",
+      "description": "The narrowed Round and merged Candidate satisfy the strict Discovery contract.",
+      "successDefinition": "Runtime validation succeeds with one current reference and two parent revisions."
+    },
+    {
+      "key": "concept_necessity",
+      "dimension": "CONCEPT_NECESSITY",
+      "reviewMode": "HUMAN",
+      "description": "The merged project still requires the selected scheduling and transaction concepts.",
+      "successDefinition": "Removing either selected technical behavior would remove a core product interaction."
+    }
+  ],
+  "scenarioTags": ["prompt regression", "selection narrowing", "merge", "unseen"],
+  "fixtureVersion": "1.1.3",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED"
+}

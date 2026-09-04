@@ -17,6 +17,9 @@ importers:
       '@types/node':
         specifier: 24.13.3
         version: 24.13.3
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
       typescript:
         specifier: 7.0.2
         version: 7.0.2
@@ -57,6 +60,12 @@ importers:
       '@vibe-helper/application':
         specifier: workspace:*
         version: link:../../packages/application
+      '@vibe-helper/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@vibe-helper/mcp-server':
+        specifier: workspace:*
+        version: link:../mcp-server
       '@vibe-helper/storage-sqlite':
         specifier: workspace:*
         version: link:../../packages/storage-sqlite

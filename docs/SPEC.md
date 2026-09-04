@@ -112,15 +112,19 @@ Concept Ledger + Project History
 - `FR-DIS-001`: 시스템은 Learning Goal을 필수 입력으로 받아야 한다.
 - `FR-DIS-002`: Personal Need, 최근 불편, 관심 영역과 현재 수준은 선택 입력이어야 한다.
 - `FR-DIS-003`: 시스템은 available time을 필수·선택 입력으로 요구하지 않아야 한다.
-- `FR-DIS-004`: 첫 round에서 기본적으로 약 10개 후보를 만들 수 있어야 하며 개수는 고정 계약이 아니어야 한다.
+- `FR-DIS-004`: 첫 round는 응답 대기와 첫 판단 부담을 낮추기 위해 빠르게 훑을 수 있는 4~6개 후보를 우선 만들고, 사용자의 `다른 후보 더 보기` 요청은 기존 후보를 보존한 채 누적 약 8~10개로 확장해야 한다. 개수는 고정 계약이 아니며 UI는 이 progressive 방식과 추가 action을 명시해야 한다.
 - `FR-DIS-005`: 고정된 주제 taxonomy에서 후보를 순환하지 않아야 한다.
 - `FR-DIS-006`: 후보는 문제 영역, 대상 사용자, 핵심 상호작용, 데이터 구조와 매력 이유가 실제로 달라야 한다.
 - `FR-DIS-007`: Personal Need가 있으면 관련 후보와 독립 후보를 함께 제안해야 한다.
 - `FR-DIS-008`: DIRECT, EXPAND, DISCOVER, UPGRADE는 생성 tag로만 사용하고 hard routing으로 좋은 후보를 배제하지 않아야 한다.
-- `FR-DIS-009`: 사용자는 후보를 pin, reject, merge, revise, shrink, expand, regenerate할 수 있어야 한다.
+- `FR-DIS-009`: 사용자는 관심 후보를 checkbox로 담거나 빼고, 선택한 후보에 대한 merge, revise, shrink와 expand를 자연어로 요청해 현재 목록을 그 결과로 좁힐 수 있어야 한다. 이때 담지 않은 후보는 immutable history에는 남지만 다음 current round에서는 제외한다. 기존 후보를 보존하며 넓히는 동작은 명시적 `다른 후보 더 보기`로만 수행한다. reject와 regenerate도 지원하되 shrink와 expand는 후보별 버튼으로 노출하지 않는다.
 - `FR-DIS-010`: 모든 후보 수정은 동일 ProjectCandidate의 revision과 lineage로 저장해야 한다.
 - `FR-DIS-011`: 사용자의 명시적 선택 전에는 후보를 Final로 간주하지 않아야 한다.
-- `FR-DIS-012`: Concept Necessity, Personal Utility, Adoption Feasibility, Learner Fit, Scope, Adjacent Complexity, Deployability, Distinctiveness의 평가 근거를 저장해야 한다.
+- `FR-DIS-012`: 첫 스캔용 후보는 화면에 쓰는 간결한 의미 필드만으로 유효해야 한다. Concept Necessity, Personal Utility, Adoption Feasibility, Learner Fit, Scope, Adjacent Complexity, Deployability, Distinctiveness의 상세 평가와 위험은 관심·선택 이후 또는 비교 요청에서 지연 생성할 수 있고, 생성했다면 근거를 저장해야 한다.
+- `FR-DIS-013`: Spec에서 Discovery로 돌아갈 때 Agent를 호출하지 않고 1초 안에 이전 후보와 입력을 복원해야 한다. 입력 수정과 새 후보 생성은 사용자의 명시적 action이어야 한다.
+- `FR-DIS-014`: Candidate는 여러 열의 고정 높이 card grid가 아니라 제목·요약·핵심 경험을 한 줄 흐름으로 비교할 수 있는 목록이어야 한다.
+- `FR-DIS-015`: Candidate checkbox는 선택·비선택 상태를 색상 외에도 check mark, outline과 설명으로 구분하고 모바일에서 충분한 터치 영역을 제공해야 한다.
+- `FR-DIS-016`: Candidate refinement 자유 입력은 목록보다 먼저 보여야 하며 선택된 후보의 제목과 개수를 입력 옆에서 확인할 수 있어야 한다.
 
 완료 관찰:
 
@@ -131,11 +135,14 @@ Concept Ledger + Project History
 ### 5.2 Learning Spec
 
 - `FR-SPEC-001`: Discovery는 선택한 후보에 대한 권장 Learning Spec을 먼저 완성해야 한다.
-- `FR-SPEC-002`: 사용자는 `이대로 시작`, `조금 바꾸기`, `다른 주제로 돌아가기`를 선택할 수 있어야 한다.
+- `FR-SPEC-002`: 사용자는 `이대로 시작`, `조금 바꾸기`, `다른 주제로 돌아가기`를 선택할 수 있어야 하며, 돌아가기 자체는 새 Agent 작업을 시작하지 않아야 한다.
 - `FR-SPEC-003`: Spec은 LEARNER_FOCUS, AGENT_SUPPORT, EXCLUDED를 구분해야 한다.
 - `FR-SPEC-004`: AGENT_SUPPORT는 필수 Evidence 목표 또는 Knowledge Debt로 계산하지 않아야 한다.
 - `FR-SPEC-005`: 사용자가 명시적으로 Spec을 확정하기 전 Builder를 시작하지 않아야 한다.
 - `FR-SPEC-006`: Spec은 제품 목적, 사용자, 성공 순간, MVP 기능, 예상 Decision, TypeScript와 배포 제약을 포함해야 한다.
+- `FR-SPEC-007`: Spec의 기본 UI는 직접 편집 textbox를 제공하지 않고, 사용자·사용 순간·성공 순간·MVP·세 scope와 예상 Decision을 초보자가 읽기 쉬운 시각적 요약으로 보여줘야 한다.
+- `FR-SPEC-008`: 사용자는 하나의 충분히 큰 자유 입력으로 Agent에게 Spec 수정을 반복 요청하고, 새 revision을 다시 검토한 뒤에만 확정해야 한다.
+- `FR-SPEC-009`: Spec 수정 성공은 Agent 설명이 아니라 durable Spec revision 증가로 판정해야 한다. 첫 응답이 tool 없이 끝나면 최신 Core 상태에서 한 번만 자동 복구하고, 두 번째 실패는 현재 revision을 유지한 채 명시적으로 보여줘야 한다.
 
 완료 관찰:
 
@@ -236,8 +243,9 @@ Concept Ledger + Project History
 - `FR-UI-001`: Agent 중심과 Code 중심을 초보·고급 단계로 표시하지 않아야 한다.
 - `FR-UI-002`: Agent 중심은 Builder stream과 Helper를 동시에 볼 수 있어야 한다.
 - `FR-UI-003`: Code 중심 prototype은 Kiro editor에서 Builder/Helper panel과 같은 Core 상태에 접근해야 한다.
-- `FR-UI-004`: Mode 전환 또는 재진입 시 session, Task, Decision과 Context가 유지돼야 한다.
+- `FR-UI-004`: Mode 전환 또는 기존 Project 재진입 시 Core에 저장된 session, Task, Decision과 Context가 유지돼야 한다. 실행 중 Agent stream과 progress의 재연결은 MVP 보장 범위가 아니다.
 - `FR-UI-005`: 완료 화면은 Concept 점수보다 결과물 실행을 먼저 보여줘야 한다.
+- `FR-UI-006`: 업데이트 전 UI protocol은 제거된 Agent를 호출하기 전에 차단해야 한다. exact Session/revision slot 복원은 중복 dispatch를 줄이는 방어 기능으로 유지하지만 MVP acceptance gate로 사용하지 않는다.
 
 ## 6. 비기능 요구사항
 
@@ -249,8 +257,11 @@ Concept Ledger + Project History
 - `NFR-PERF-004`: token, latency와 Agent 호출 횟수를 Episode·Agent별로 관측할 수 있어야 한다.
 - `NFR-PERF-005`: local Analyst dispatch는 UI를 막지 않고 1초 안에 반환하는 것을 초기 목표로 하며, 한 attempt의 soft timeout은 30초로 둔다.
 - `NFR-PERF-006`: Analyst는 Event마다가 아니라 닫힌 Episode마다 한 번 호출한다. 자동 retry는 초기값 1회로 제한하고 이후 재시도는 명시적 상태로 남긴다.
+- `NFR-PERF-007`: Discovery→Spec→Discovery 복귀는 local Core 조회만으로 1초 안에 끝내고 Agent 호출 횟수는 0회여야 한다.
+- `NFR-PERF-008`: 사용자와 직접 상호작용하는 Discovery 첫 Candidate, 단일 refinement와 Spec 초안은 target 환경에서 각각 30초 이내를 목표로 하고, 첫 유용 반응은 3~5초를 지향한다. T15 release gate는 최종 설치본의 대표 end-to-end 실행 한 번에서 세 구간이 모두 30초 이내이고 사용자가 결과를 승인하는 것으로 판정하며, 장기 P95 표본은 T21에서 수집한다. provider/model/config별 latency를 같은 unseen 입력으로 비교하며 30초가 지나면 작업은 백그라운드에서 이어지되 사용자가 저장된 결과를 보거나 다른 화면으로 이동하는 것을 막지 않아야 한다.
+- `NFR-PERF-009`: Agent tool input의 구조적 형식 오류는 transport 경계에서 안전하게 정규화하거나 즉시 표시하고, 같은 의미 내용을 모델이 다시 생성하게 만들지 않아야 한다. tool validation 재시도율의 초기 목표는 1% 미만이다.
 
-T01 macOS probe의 두 실행은 20~37ms에 dispatch가 반환되고 약 12초 안에 결과 validation을 마쳤다. 위 수치는 provider 응답 보장이 아니라 local adapter의 초기 운영 guardrail이며 pilot·quota 관측 후 조정한다. timeout 뒤 늦은 결과는 현재 job attempt/revision과 일치하지 않으면 버린다.
+T01 macOS probe의 두 실행은 20~37ms에 dispatch가 반환되고 약 12초 안에 결과 validation을 마쳤다. T15 model screen에서는 `auto` 첫 Candidate 41.6초, `claude-haiku-4.5` 22.1초였고 Luna는 contract를 지키지 못했다. Haiku 고정, ephemeral Core context, phase별 최소 prompt/tool과 Core-derived MERGE를 적용한 v1.1.5 target 5회에서 first Candidate·MERGE·first Spec의 nearest-rank P95는 각각 26.564초·21.044초·22.900초였고 15개 phase가 모두 durable 저장에 성공했다. v1.1.6 Spec 수정 재검증에서는 Haiku 정상 수정이 19.256~24.903초였지만 raw 2회 중 1회가 no-tool로 끝나 bounded 1회 UI 복구를 추가했다. SPEC만 Terra는 첫 Spec 43.257초, Auto는 첫 Spec 39.240초·수정 36.027초로 30초 gate를 넘겨 Haiku를 유지한다. 사용자 승인에 따른 최종 대표 재실행은 MERGE 13.226초, 첫 Spec 18.860초, Spec 수정 23.097초와 revision 2 저장에 성공했지만 첫 Candidate가 50.132초여서 T15 gate는 실패했다. T15 잔여 범위는 첫 Candidate 30초 달성뿐이며, 3~5초 first-useful은 stretch goal, 장기 P95는 T21로 남긴다. timeout 뒤 늦은 결과는 현재 job attempt/revision과 일치하지 않으면 버린다.
 
 ### 6.2 보안·개인정보
 

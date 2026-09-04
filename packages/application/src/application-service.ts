@@ -427,6 +427,30 @@ export class ApplicationService {
           request.helperConversationLimit,
         )
         .map((aggregate) => this.#helperConversationSummary(aggregate))
+      const discoveryAggregate =
+        recovery.discoverySession === null
+          ? null
+          : repository.readDiscoveryAggregate(request.projectId, recovery.discoverySession.id)
+      const discoveryContext =
+        discoveryAggregate === null
+          ? null
+          : discoveryContextSchema.parse({
+              schemaVersion: 1,
+              correlationId: request.correlationId,
+              project: discoveryAggregate.project,
+              session: discoveryAggregate.session,
+              rounds: discoveryAggregate.rounds,
+              candidates: discoveryAggregate.candidates,
+              feedback: discoveryAggregate.feedback,
+              learningSpec: currentLearningSpec(discoveryAggregate),
+              relevantLedgerEntries: discoveryAggregate.relevantLedgerEntries,
+            })
+      const scopedLearningSpec =
+        discoveryAggregate === null
+          ? recovery.learningSpec
+          : currentLearningSpec(discoveryAggregate)
+      const scopedSelectedCandidate =
+        recovery.discoverySession?.status === 'SELECTED' ? recovery.selectedCandidate : null
 
       return projectSessionSnapshotSchema.parse({
         schemaVersion: 1,
@@ -434,8 +458,9 @@ export class ApplicationService {
         project: recovery.project,
         suggestedSurface: suggestedSurface(recovery.project),
         discoverySession: recovery.discoverySession,
-        selectedCandidate: recovery.selectedCandidate,
-        learningSpec: recovery.learningSpec,
+        discoveryContext,
+        selectedCandidate: scopedSelectedCandidate,
+        learningSpec: scopedLearningSpec,
         activeTask: recovery.activeTask,
         currentTask,
         liveContext: taskAggregate?.liveContext ?? recovery.liveContext,
@@ -1222,13 +1247,14 @@ export class ApplicationService {
           }
           repository.appendLearningSpec(proposed)
         }
+        const nextInput = request.input ?? scoped.session.input
         const newSession = {
           schemaVersion: 1 as const,
           id: newSessionId,
           projectId: scoped.project.id,
           correlationId: request.correlationId,
           revision: 1,
-          input: scoped.session.input,
+          input: nextInput,
           status: 'ACTIVE' as const,
           openedAt: returnedAt,
           updatedAt: returnedAt,
@@ -1239,6 +1265,8 @@ export class ApplicationService {
         repository.appendProject({
           ...scoped.project,
           revision: scoped.project.revision + 1,
+          title: nextInput.learningGoal.slice(0, 120),
+          learningGoal: nextInput.learningGoal,
           status: 'DISCOVERY',
           updatedAt: returnedAt,
           source: { kind: 'USER' },
@@ -1248,8 +1276,9 @@ export class ApplicationService {
           actor: { kind: 'USER' },
           action: 'UPDATED',
           resource: { type: 'DISCOVERY_SESSION', id: newSession.id, revision: 1 },
-          summary: 'Returned to Discovery in a new session without reopening the selected session.',
-          changedFields: ['status'],
+          summary:
+            'Started a new Discovery session from the selected Spec without reopening its session.',
+          changedFields: ['status', 'input', 'learningGoal'],
           occurredAt: returnedAt,
         })
         const response = this.#receipt(request.correlationId, 1)
@@ -3403,6 +3432,15 @@ export class ApplicationService {
       )
     }
     const regeneration = regenerations[0]
+    const additions = pendingFeedback.filter((feedback) => feedback.intent === 'MORE')
+    if (additions.length > 1 || (additions.length > 0 && regeneration !== undefined)) {
+      throw this.#validationError(
+        correlationId,
+        'DISCOVERY_ADDITION_CONFLICT',
+        'A Candidate Round can apply only one addition request and cannot regenerate at the same time.',
+      )
+    }
+    const addition = additions[0]
     const regeneratedIds = new Set(
       regeneration === undefined
         ? []
@@ -3457,6 +3495,7 @@ export class ApplicationService {
     }
 
     let regenerationSubmissionCount = 0
+    let additionSubmissionCount = 0
     for (const [key, candidate] of submittedByKey) {
       const creatingFeedback = feedbackByCandidate.get(key)
       if (creatingFeedback !== undefined) continue
@@ -3470,10 +3509,20 @@ export class ApplicationService {
         regenerationSubmissionCount += 1
         continue
       }
+      if (
+        addition !== undefined &&
+        candidate.revision === 1 &&
+        candidate.parentRevisions.length === 0 &&
+        !previousIds.has(candidate.id)
+      ) {
+        feedbackByCandidate.set(key, addition)
+        additionSubmissionCount += 1
+        continue
+      }
       throw this.#validationError(
         correlationId,
         'CANDIDATE_SUBMISSION_NOT_REQUESTED',
-        'New Candidate revisions must correspond to refinement, merge, or regeneration Feedback.',
+        'New Candidate revisions must correspond to refinement, merge, regeneration, or addition Feedback.',
       )
     }
     if (regeneration !== undefined && regenerationSubmissionCount === 0) {
@@ -3481,6 +3530,13 @@ export class ApplicationService {
         correlationId,
         'CANDIDATE_REGENERATION_EMPTY',
         'Regeneration Feedback must produce at least one new Candidate.',
+      )
+    }
+    if (addition !== undefined && additionSubmissionCount === 0) {
+      throw this.#validationError(
+        correlationId,
+        'CANDIDATE_ADDITION_EMPTY',
+        'MORE Feedback must add at least one new Candidate.',
       )
     }
     for (const expectedKey of feedbackByCandidate.keys()) {
@@ -3494,8 +3550,17 @@ export class ApplicationService {
     }
 
     const expectedRoundKeys = new Set<string>()
+    const narrowsToSelectedResults = pendingFeedback.some((feedback) =>
+      ['MERGE', 'REVISE', 'SHRINK', 'EXPAND'].includes(feedback.intent),
+    )
     for (const reference of previousReferences) {
-      if (!rejectedIds.has(reference.candidateId) && !replacementIds.has(reference.candidateId)) {
+      const keepsUnchangedReference =
+        !narrowsToSelectedResults || pinnedIds.has(reference.candidateId)
+      if (
+        keepsUnchangedReference &&
+        !rejectedIds.has(reference.candidateId) &&
+        !replacementIds.has(reference.candidateId)
+      ) {
         expectedRoundKeys.add(candidateReferenceKey(reference))
       }
     }
@@ -3504,7 +3569,9 @@ export class ApplicationService {
       throw this.#validationError(
         correlationId,
         'CANDIDATE_ROUND_CONTENT_INVALID',
-        'Candidate Round must preserve unaffected revisions and apply every Feedback result.',
+        narrowsToSelectedResults
+          ? 'A selection refinement Round must contain only its results and explicitly pinned Candidates.'
+          : 'Candidate Round must preserve unaffected revisions and apply every Feedback result.',
       )
     }
 

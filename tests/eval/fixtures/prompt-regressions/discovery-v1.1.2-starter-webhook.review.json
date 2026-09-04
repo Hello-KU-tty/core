@@ -1,0 +1,20 @@
+[
+  {
+    "criterionKey": "semantic_diversity",
+    "dimension": "DISCOVERY_DIVERSITY",
+    "reviewMode": "HUMAN",
+    "status": "PASSED",
+    "explanation": "The four concise cards cover configuration gating, webhook event replay, UI state simulation and database-row normalization, with distinct primary users, actions and data shapes despite omitting detailed evaluation matrices.",
+    "evidenceReferences": ["discovery.candidates[*].title", "discovery.candidates[*].coreInteraction", "discovery.candidates[*].mvpFeatures"],
+    "metrics": []
+  },
+  {
+    "criterionKey": "concept_necessity",
+    "dimension": "CONCEPT_NECESSITY",
+    "reviewMode": "HUMAN",
+    "status": "PASSED",
+    "explanation": "Each card receives unknown or variant-shaped data whose central product interaction requires runtime validation and explicit result, event or state discrimination.",
+    "evidenceReferences": ["discovery.candidates[*].technologyNecessity", "discovery.candidates[*].coreConcepts"],
+    "metrics": []
+  }
+]

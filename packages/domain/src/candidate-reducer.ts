@@ -118,7 +118,7 @@ export function reduceCandidateRevision(
 
   if (input.feedback !== undefined) {
     const feedback = input.feedback
-    if (!['MERGE', 'REVISE', 'SHRINK', 'EXPAND', 'REGENERATE'].includes(feedback.intent)) {
+    if (!['MERGE', 'REVISE', 'SHRINK', 'EXPAND', 'REGENERATE', 'MORE'].includes(feedback.intent)) {
       return rejected({
         operation: OPERATION,
         reasonCode: 'CANDIDATE_FEEDBACK_DOES_NOT_CREATE_REVISION',
@@ -168,12 +168,15 @@ export function reduceCandidateRevision(
     }
 
     if (
-      feedback.intent === 'REGENERATE' &&
+      ['REGENERATE', 'MORE'].includes(feedback.intent) &&
       (proposed.revision !== 1 || proposed.parentRevisions.length !== 0)
     ) {
       return rejected({
         operation: OPERATION,
-        reasonCode: 'CANDIDATE_REGENERATION_LINEAGE_INVALID',
+        reasonCode:
+          feedback.intent === 'MORE'
+            ? 'CANDIDATE_ADDITION_LINEAGE_INVALID'
+            : 'CANDIDATE_REGENERATION_LINEAGE_INVALID',
         entityIds,
       })
     }

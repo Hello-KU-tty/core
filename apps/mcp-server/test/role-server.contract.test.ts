@@ -43,8 +43,10 @@ interface ConnectedHarness {
 
 interface ConnectRoleOptions {
   readonly seedDiscovery?: boolean
+  readonly seedMerge?: boolean
   readonly seedSpecReview?: boolean
   readonly seedBuilder?: boolean
+  readonly toolNames?: readonly string[]
   readonly now?: () => Date
   readonly generateId?: (
     prefix: 'candidate' | 'candidate_round' | 'learning_spec' | 'context' | 'completion_report',
@@ -67,6 +69,50 @@ const connectRole = async (
         }),
       )
       repository.appendDiscoverySession(discoverySessionSchema.parse(discoverySessionFixture))
+    })
+  }
+  if (options.seedMerge) {
+    const secondCandidateId = 'candidate_00000000-0000-4000-8000-000000000079'
+    storage.transaction((repository) => {
+      repository.appendProject(
+        projectSchema.parse({
+          ...projectFixture,
+          status: 'DISCOVERY',
+          generatedWorkspacePath: undefined,
+        }),
+      )
+      repository.appendDiscoverySession(discoverySessionSchema.parse(discoverySessionFixture))
+      repository.appendCandidate(projectCandidateRevisionSchema.parse(candidateFixture))
+      repository.appendCandidate(
+        projectCandidateRevisionSchema.parse({
+          ...candidateFixture,
+          id: secondCandidateId,
+          title: 'Second Candidate',
+        }),
+      )
+      repository.appendCandidateRound(
+        candidateRoundSchema.parse({
+          ...candidateRoundFixture,
+          candidates: [
+            { candidateId: ids.candidate, revision: 1 },
+            { candidateId: secondCandidateId, revision: 1 },
+          ],
+        }),
+      )
+      repository.appendDiscoveryFeedback(
+        discoveryFeedbackSchema.parse({
+          ...discoveryFeedbackFixture,
+          intent: 'MERGE',
+          targets: [
+            { candidateId: ids.candidate, revision: 1 },
+            { candidateId: secondCandidateId, revision: 1 },
+          ],
+          message: 'Combine the two directions.',
+        }),
+      )
+      repository.appendDiscoverySession(
+        discoverySessionSchema.parse({ ...discoverySessionFixture, revision: 2 }),
+      )
     })
   }
   if (options.seedSpecReview) {
@@ -119,6 +165,7 @@ const connectRole = async (
   const server = createRoleBoundMcpServer({
     role,
     application,
+    ...(options.toolNames === undefined ? {} : { toolNames: options.toolNames }),
     ...(options.now === undefined ? {} : { now: options.now }),
     ...(options.generateId === undefined ? {} : { generateId: options.generateId }),
   })
@@ -140,7 +187,12 @@ const connectRole = async (
 }
 
 const expectedCatalog: Readonly<Record<AgentRole, readonly string[]>> = {
-  DISCOVERY: ['get_discovery_context', 'submit_candidate_round', 'submit_learning_spec'],
+  DISCOVERY: [
+    'get_discovery_context',
+    'submit_candidate_round',
+    'submit_candidate_merge',
+    'submit_learning_spec',
+  ],
   BUILDER: [
     'get_builder_task',
     'start_task',
@@ -182,6 +234,40 @@ describe('role-bound MCP server', () => {
       } finally {
         await harness.close()
       }
+    }
+  })
+
+  it('narrows Discovery tool schemas to the requested phase allowlist', async () => {
+    const round = await connectRole('DISCOVERY', {
+      toolNames: ['get_discovery_context', 'submit_candidate_round'],
+    })
+    const spec = await connectRole('DISCOVERY', {
+      toolNames: ['get_discovery_context', 'submit_learning_spec'],
+    })
+    const merge = await connectRole('DISCOVERY', {
+      toolNames: ['get_discovery_context', 'submit_candidate_merge'],
+    })
+    try {
+      await expect(round.client.listTools()).resolves.toMatchObject({
+        tools: [{ name: 'get_discovery_context' }, { name: 'submit_candidate_round' }],
+      })
+      await expect(spec.client.listTools()).resolves.toMatchObject({
+        tools: [{ name: 'get_discovery_context' }, { name: 'submit_learning_spec' }],
+      })
+      await expect(merge.client.listTools()).resolves.toMatchObject({
+        tools: [{ name: 'get_discovery_context' }, { name: 'submit_candidate_merge' }],
+      })
+      expect(() =>
+        createRoleBoundMcpServer({
+          role: 'DISCOVERY',
+          application: round.application,
+          toolNames: ['shell'],
+        }),
+      ).toThrow('Unknown DISCOVERY MCP tool selection')
+    } finally {
+      await round.close()
+      await spec.close()
+      await merge.close()
     }
   })
 
@@ -285,7 +371,7 @@ describe('role-bound MCP server', () => {
     }
   })
 
-  it('expands a concise Discovery proposal with trusted metadata before application', async () => {
+  it('normalizes a stringified concise Discovery proposal before strict application validation', async () => {
     const generatedCandidateId = 'candidate_00000000-0000-4000-8000-000000000071'
     const generatedRoundId = 'candidate_round_00000000-0000-4000-8000-000000000072'
     const harness = await connectRole('DISCOVERY', {
@@ -294,6 +380,21 @@ describe('role-bound MCP server', () => {
       generateId: (prefix) => (prefix === 'candidate' ? generatedCandidateId : generatedRoundId),
     })
     try {
+      const conciseDraft = {
+        lineage: { kind: 'NEW' },
+        title: candidateFixture.title,
+        summary: candidateFixture.summary,
+        targetUsers: candidateFixture.targetUsers,
+        coreInteraction: candidateFixture.coreInteraction,
+        usageMoment: candidateFixture.usageMoment,
+        appeal: candidateFixture.appeal,
+        personalNeedRelationship: candidateFixture.personalNeedRelationship,
+        technologyNecessity: candidateFixture.technologyNecessity,
+        coreConcepts: candidateFixture.coreConcepts,
+        mvpFeatures: candidateFixture.mvpFeatures,
+        suggestedScope: candidateFixture.suggestedScope,
+        generationTags: candidateFixture.generationTags,
+      } as const
       const result = await harness.client.callTool({
         name: 'submit_candidate_round',
         arguments: {
@@ -306,25 +407,7 @@ describe('role-bound MCP server', () => {
           expectedSessionRevision: 1,
           appliedFeedbackIds: [],
           carriedCandidates: [],
-          candidates: [
-            {
-              lineage: { kind: 'NEW' },
-              title: candidateFixture.title,
-              summary: candidateFixture.summary,
-              targetUsers: candidateFixture.targetUsers,
-              coreInteraction: candidateFixture.coreInteraction,
-              usageMoment: candidateFixture.usageMoment,
-              appeal: candidateFixture.appeal,
-              personalNeedRelationship: candidateFixture.personalNeedRelationship,
-              technologyNecessity: candidateFixture.technologyNecessity,
-              coreConcepts: candidateFixture.coreConcepts,
-              mvpFeatures: candidateFixture.mvpFeatures,
-              suggestedScope: candidateFixture.suggestedScope,
-              risks: candidateFixture.risks,
-              generationTags: candidateFixture.generationTags,
-              evaluation: candidateFixture.evaluation,
-            },
-          ],
+          candidates: JSON.stringify([conciseDraft]),
           generationRationale: candidateRoundFixture.generationRationale,
           diversityCheck: candidateRoundFixture.diversityCheck,
         },
@@ -349,6 +432,75 @@ describe('role-bound MCP server', () => {
             source: { kind: 'AGENT', role: 'DISCOVERY' },
           },
         ],
+      })
+      expect(
+        harness.storage.repository.readDiscoveryAggregate(ids.project)?.candidates[0],
+      ).not.toHaveProperty('evaluation')
+    } finally {
+      await harness.close()
+    }
+  })
+
+  it('derives MERGE feedback, lineage, and revision around one semantic Candidate', async () => {
+    const generatedRoundId = 'candidate_round_00000000-0000-4000-8000-000000000078'
+    const harness = await connectRole('DISCOVERY', {
+      seedMerge: true,
+      now: () => new Date(timestamp),
+      generateId: () => generatedRoundId,
+      toolNames: ['get_discovery_context', 'submit_candidate_merge'],
+    })
+    try {
+      const result = await harness.client.callTool({
+        name: 'submit_candidate_merge',
+        arguments: {
+          schemaVersion: 1,
+          projectId: ids.project,
+          discoverySessionId: ids.discoverySession,
+          correlationId: ids.correlation,
+          idempotencyKey: 'idem_00000000-0000-4000-8000-000000000078',
+          expectedSessionRevision: 2,
+          candidate: {
+            title: 'Merged Candidate',
+            summary: candidateFixture.summary,
+            targetUsers: candidateFixture.targetUsers,
+            coreInteraction: candidateFixture.coreInteraction,
+            usageMoment: candidateFixture.usageMoment,
+            appeal: candidateFixture.appeal,
+            personalNeedRelationship: candidateFixture.personalNeedRelationship,
+            technologyNecessity: candidateFixture.technologyNecessity,
+            coreConcepts: candidateFixture.coreConcepts,
+            mvpFeatures: candidateFixture.mvpFeatures,
+            suggestedScope: candidateFixture.suggestedScope,
+            generationTags: candidateFixture.generationTags,
+          },
+          generationRationale: 'Combined the requested strengths.',
+          diversityCheck: candidateRoundFixture.diversityCheck,
+        },
+      })
+      expect(result).toMatchObject({
+        structuredContent: { accepted: true, resourceRevision: 3 },
+      })
+      const aggregate = harness.storage.repository.readDiscoveryAggregate(ids.project)
+      expect(aggregate?.rounds.at(-1)).toMatchObject({
+        id: generatedRoundId,
+        appliedFeedbackIds: [ids.feedback],
+        candidates: [{ candidateId: ids.candidate, revision: 2 }],
+      })
+      expect(
+        aggregate?.candidates.find(
+          (candidate) => candidate.id === ids.candidate && candidate.revision === 2,
+        ),
+      ).toMatchObject({
+        id: ids.candidate,
+        revision: 2,
+        parentRevisions: [
+          { candidateId: ids.candidate, revision: 1 },
+          {
+            candidateId: 'candidate_00000000-0000-4000-8000-000000000079',
+            revision: 1,
+          },
+        ],
+        title: 'Merged Candidate',
       })
     } finally {
       await harness.close()

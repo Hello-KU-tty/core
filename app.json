@@ -1,20 +1,40 @@
 {
   "name": "vibe-helper",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "displayName": "Vibe Helper",
   "description": "Learn unfamiliar development concepts by building a project you personally need.",
   "author": "hurdoo",
   "tags": ["learning", "developer-tools", "projects"],
   "defaultEnabled": false,
   "ui": {
-    "entry": "apps/crew-app/dist/index.mjs",
+    "entry": "dist/index-0.1.1.mjs",
     "pages": [{ "route": "/apps/vibe-helper", "label": "Vibe Helper", "icon": "Sprout" }]
   },
   "permissions": {
-    "api": ["/apps/vibe-helper/api", "/api/chat/slots", "/api/chat/slots/*"],
+    "api": ["/apps/vibe-helper/api", "/api/chat", "/api/chat/slots", "/api/chat/slots/*"],
     "storage": false,
     "network": false,
     "events": []
+  },
+  "agents": [
+    "agents/vibe-helper-discovery-round.json",
+    "agents/vibe-helper-discovery-merge.json",
+    "agents/vibe-helper-discovery-spec.json",
+    "agents/vibe-helper-discovery-spec-recovery.json"
+  ],
+  "mcpServers": {
+    "discovery-round-core": {
+      "url": "http://127.0.0.1:9100/mcp/discovery-round"
+    },
+    "discovery-merge-core": {
+      "url": "http://127.0.0.1:9100/mcp/discovery-merge"
+    },
+    "discovery-spec-core": {
+      "url": "http://127.0.0.1:9100/mcp/discovery-spec"
+    },
+    "discovery-spec-recovery-core": {
+      "url": "http://127.0.0.1:9100/mcp/discovery-spec-recovery"
+    }
   },
   "backend": {
     "entryPoint": "apps/crew-backend/dist/main.js",

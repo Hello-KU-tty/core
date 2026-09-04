@@ -1,33 +1,56 @@
+import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
 
-import { McpServer, type JSONObject } from '@modelcontextprotocol/server'
+import {
+  createMcpHandler,
+  type JSONObject,
+  type McpHttpHandler,
+  McpServer,
+} from '@modelcontextprotocol/server'
 import type { ApplicationService } from '@vibe-helper/application'
 import {
+  type AgentRole,
   analystGetEpisodeContextQuerySchema,
   analystSubmitEvidenceProposalsCommandSchema,
   builderApplyDecisionCommandSchema,
   builderApplyDecisionToolInputSchema,
-  builderCompleteTaskToolInputSchema,
   builderCompleteTaskCommandSchema,
+  builderCompleteTaskToolInputSchema,
   builderGetDecisionResultQuerySchema,
   builderGetTaskQuerySchema,
   builderRequestDecisionCommandSchema,
   builderRequestDecisionToolInputSchema,
   builderStartTaskCommandSchema,
   builderTaskContextSchema,
-  builderUpdateLiveContextToolInputSchema,
   builderUpdateLiveContextCommandSchema,
-  discoveryGetContextQuerySchema,
+  builderUpdateLiveContextToolInputSchema,
+  candidateDraftSchema,
   discoveryContextSchema,
+  discoveryGetContextQuerySchema,
+  discoverySubmitCandidateMergeToolInputSchema,
   discoverySubmitCandidateRoundCommandSchema,
   discoverySubmitCandidateRoundToolInputSchema,
   discoverySubmitLearningSpecCommandSchema,
   discoverySubmitLearningSpecToolInputSchema,
   helperGetContextQuerySchema,
   helperRequestContextRefreshCommandSchema,
-  type AgentRole,
 } from '@vibe-helper/contracts'
-import type { z } from 'zod'
+import { z } from 'zod'
+
+const MAX_STRINGIFIED_CANDIDATES_BYTES = 512 * 1024
+const discoverySubmitCandidateRoundTransportInputSchema =
+  discoverySubmitCandidateRoundToolInputSchema.omit({ candidates: true }).extend({
+    candidates: z.union([
+      z.array(candidateDraftSchema).max(30),
+      z
+        .string()
+        .max(MAX_STRINGIFIED_CANDIDATES_BYTES)
+        .refine(
+          (value) => Buffer.byteLength(value, 'utf8') <= MAX_STRINGIFIED_CANDIDATES_BYTES,
+          'Stringified Candidate array exceeds the 512 KiB transport limit',
+        ),
+    ]),
+  })
 
 interface RoleToolDefinition {
   readonly name: string
@@ -50,8 +73,16 @@ export const ROLE_TOOL_CATALOG: Readonly<Record<AgentRole, readonly RoleToolDefi
       name: 'submit_candidate_round',
       title: 'Submit Candidate Round',
       description:
-        'Submit Candidate meaning and lineage; the role-bound adapter supplies trusted record metadata.',
-      inputSchema: discoverySubmitCandidateRoundToolInputSchema,
+        'Submit Candidate meaning and lineage. Every Candidate requires lineage, suggestedScope with all three arrays, and generationTags; the adapter supplies trusted record metadata.',
+      inputSchema: discoverySubmitCandidateRoundTransportInputSchema,
+      readOnly: false,
+    },
+    {
+      name: 'submit_candidate_merge',
+      title: 'Submit merged Candidate',
+      description:
+        'Submit one merged Candidate meaning; Core derives pending feedback, lineage, revision, and round metadata.',
+      inputSchema: discoverySubmitCandidateMergeToolInputSchema,
       readOnly: false,
     },
     {
@@ -150,10 +181,19 @@ export const ROLE_TOOL_CATALOG: Readonly<Record<AgentRole, readonly RoleToolDefi
 export interface RoleBoundMcpServerOptions {
   readonly role: AgentRole
   readonly application: ApplicationService
+  readonly toolNames?: readonly string[]
   readonly now?: () => Date
   readonly generateId?: (
     prefix: 'candidate' | 'candidate_round' | 'learning_spec' | 'context' | 'completion_report',
   ) => string
+}
+
+export function createRoleBoundMcpHttpHandler(options: RoleBoundMcpServerOptions): McpHttpHandler {
+  return createMcpHandler(() => createRoleBoundMcpServer(options), {
+    legacy: 'stateless',
+    keepAliveMs: 10_000,
+    onerror: () => undefined,
+  })
 }
 
 function toJsonObject(value: unknown): JSONObject {
@@ -171,7 +211,19 @@ function deterministicId(prefix: 'context' | 'completion_report', idempotencyKey
 }
 
 async function submitCandidateRoundFromTool(options: RoleBoundMcpServerOptions, input: unknown) {
-  const toolInput = discoverySubmitCandidateRoundToolInputSchema.parse(input)
+  const transportInput = discoverySubmitCandidateRoundTransportInputSchema.parse(input)
+  let normalizedCandidates: unknown = transportInput.candidates
+  if (typeof normalizedCandidates === 'string') {
+    try {
+      normalizedCandidates = JSON.parse(normalizedCandidates)
+    } catch {
+      normalizedCandidates = null
+    }
+  }
+  const toolInput = discoverySubmitCandidateRoundToolInputSchema.parse({
+    ...transportInput,
+    candidates: normalizedCandidates,
+  })
   const contextResult = await options.application.executeAgent('DISCOVERY', {
     schemaVersion: 1,
     kind: 'DISCOVERY_GET_CONTEXT',
@@ -247,6 +299,56 @@ async function submitCandidateRoundFromTool(options: RoleBoundMcpServerOptions, 
       candidates,
     }),
   )
+}
+
+async function submitCandidateMergeFromTool(options: RoleBoundMcpServerOptions, input: unknown) {
+  const toolInput = discoverySubmitCandidateMergeToolInputSchema.parse(input)
+  const contextResult = await options.application.executeAgent('DISCOVERY', {
+    schemaVersion: 1,
+    kind: 'DISCOVERY_GET_CONTEXT',
+    correlationId: toolInput.correlationId,
+    actor: { kind: 'AGENT', role: 'DISCOVERY' },
+    projectId: toolInput.projectId,
+    discoverySessionId: toolInput.discoverySessionId,
+  })
+  if (!contextResult.success) return contextResult
+  const context = discoveryContextSchema.parse(contextResult.data)
+  const appliedFeedbackIds = new Set(context.rounds.flatMap((round) => round.appliedFeedbackIds))
+  const pendingFeedback = context.feedback.filter(
+    (feedback) => !appliedFeedbackIds.has(feedback.id),
+  )
+  const merge = pendingFeedback.length === 1 ? pendingFeedback[0] : undefined
+  if (merge?.intent !== 'MERGE') {
+    return options.application.executeAgent('DISCOVERY', {
+      schemaVersion: 1,
+      kind: 'DISCOVERY_SUBMIT_CANDIDATE_ROUND',
+      correlationId: toolInput.correlationId,
+      actor: { kind: 'AGENT', role: 'DISCOVERY' },
+      idempotencyKey: toolInput.idempotencyKey,
+      expectedSessionRevision: toolInput.expectedSessionRevision,
+      round: {},
+      candidates: [],
+    })
+  }
+  const firstTarget = merge.targets[0]
+  if (firstTarget === undefined) throw new TypeError('MERGE feedback has no first target')
+  const { candidate, ...roundInput } = toolInput
+  return submitCandidateRoundFromTool(options, {
+    ...roundInput,
+    appliedFeedbackIds: [merge.id],
+    carriedCandidates: [],
+    candidates: [
+      {
+        lineage: {
+          kind: 'REVISION',
+          candidateId: firstTarget.candidateId,
+          revision: firstTarget.revision + 1,
+          parentRevisions: merge.targets,
+        },
+        ...candidate,
+      },
+    ],
+  })
 }
 
 async function submitLearningSpecFromTool(options: RoleBoundMcpServerOptions, input: unknown) {
@@ -466,7 +568,18 @@ export function createRoleBoundMcpServer(options: RoleBoundMcpServerOptions): Mc
     version: '0.0.0',
   })
 
-  for (const tool of ROLE_TOOL_CATALOG[options.role]) {
+  const roleTools = ROLE_TOOL_CATALOG[options.role]
+  const selectedToolNames = options.toolNames === undefined ? null : new Set(options.toolNames)
+  if (
+    selectedToolNames !== null &&
+    [...selectedToolNames].some((name) => !roleTools.some((tool) => tool.name === name))
+  ) {
+    throw new TypeError(`Unknown ${options.role} MCP tool selection`)
+  }
+
+  for (const tool of roleTools.filter(
+    (candidate) => selectedToolNames === null || selectedToolNames.has(candidate.name),
+  )) {
     server.registerTool(
       tool.name,
       {
@@ -484,17 +597,19 @@ export function createRoleBoundMcpServer(options: RoleBoundMcpServerOptions): Mc
         const result =
           options.role === 'DISCOVERY' && tool.name === 'submit_candidate_round'
             ? await submitCandidateRoundFromTool(options, input)
-            : options.role === 'DISCOVERY' && tool.name === 'submit_learning_spec'
-              ? await submitLearningSpecFromTool(options, input)
-              : options.role === 'BUILDER' && tool.name === 'update_build_context'
-                ? await updateLiveContextFromTool(options, input)
-                : options.role === 'BUILDER' && tool.name === 'request_user_decision'
-                  ? await requestDecisionFromTool(options, input)
-                  : options.role === 'BUILDER' && tool.name === 'apply_decision_result'
-                    ? await applyDecisionFromTool(options, input)
-                    : options.role === 'BUILDER' && tool.name === 'complete_task'
-                      ? await completeTaskFromTool(options, input)
-                      : await options.application.executeAgent(options.role, input)
+            : options.role === 'DISCOVERY' && tool.name === 'submit_candidate_merge'
+              ? await submitCandidateMergeFromTool(options, input)
+              : options.role === 'DISCOVERY' && tool.name === 'submit_learning_spec'
+                ? await submitLearningSpecFromTool(options, input)
+                : options.role === 'BUILDER' && tool.name === 'update_build_context'
+                  ? await updateLiveContextFromTool(options, input)
+                  : options.role === 'BUILDER' && tool.name === 'request_user_decision'
+                    ? await requestDecisionFromTool(options, input)
+                    : options.role === 'BUILDER' && tool.name === 'apply_decision_result'
+                      ? await applyDecisionFromTool(options, input)
+                      : options.role === 'BUILDER' && tool.name === 'complete_task'
+                        ? await completeTaskFromTool(options, input)
+                        : await options.application.executeAgent(options.role, input)
         const payload = toJsonObject(result.success ? result.data : result.error)
         return {
           content: [{ type: 'text', text: JSON.stringify(payload) }],

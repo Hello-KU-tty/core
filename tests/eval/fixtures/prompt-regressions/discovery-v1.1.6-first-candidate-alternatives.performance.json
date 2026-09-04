@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "promptVersion": "1.1.6",
+  "target": "Kiro Crew 0.3.0",
+  "inputPath": "tests/eval/fixtures/inputs/t15-realtime-practice.json",
+  "gateMilliseconds": 30000,
+  "baseline": {
+    "variant": "haiku-4-current-detail",
+    "durableMilliseconds": 50132,
+    "candidateCount": 4,
+    "payloadBytes": 6949,
+    "durable": true
+  },
+  "singleBatchVariants": [
+    {
+      "variant": "haiku-6-compact",
+      "candidateCount": 6,
+      "terminalMilliseconds": 35533,
+      "durable": false,
+      "failure": "invalid top-level tool envelope"
+    },
+    {
+      "variant": "haiku-10-compact",
+      "candidateCount": 10,
+      "durableMilliseconds": 33940,
+      "payloadBytes": 12406,
+      "uniqueTitles": 10,
+      "uniqueCoreInteractions": 10,
+      "requiredDetailsComplete": true,
+      "durable": true
+    },
+    {
+      "variant": "haiku-4-ultra",
+      "candidateCount": 4,
+      "terminalMilliseconds": 25972,
+      "durable": false,
+      "failure": "non-executable generic tool-call text"
+    },
+    {
+      "variant": "luna-6-compact-explicit-envelope",
+      "candidateCount": 6,
+      "attempts": 4,
+      "durableSuccesses": 3,
+      "durableFailures": 1,
+      "successfulDurableMilliseconds": [16063, 15123, 14420],
+      "requiredDetailsCompleteOnSuccess": true
+    },
+    {
+      "variant": "luna-10-compact-explicit-envelope",
+      "candidateCount": 10,
+      "firstDurableMilliseconds": 19991,
+      "firstPayloadBytes": 13506,
+      "additionalRepeatAttempts": 2,
+      "additionalRepeatsHadDurableFailure": true,
+      "requiredDetailsCompleteOnSuccess": true
+    }
+  ],
+  "otherStrategies": [
+    {
+      "variant": "haiku-5x2-parallel-unpartitioned",
+      "requestedCandidates": 10,
+      "durableMilliseconds": [24561, 22727],
+      "bothBatchesDurable": true,
+      "humanReviewedSemanticOverlaps": 4,
+      "atomicCombinedRound": false
+    },
+    {
+      "variant": "minimal-initial-prompts",
+      "results": [
+        { "model": "claude-haiku-4.5", "candidateCount": 10, "durable": false },
+        {
+          "model": "gpt-5.6-luna",
+          "candidateCount": 10,
+          "durable": true,
+          "durableMilliseconds": 70837
+        },
+        { "model": "gpt-5.6-luna", "candidateCount": 6, "durable": false }
+      ]
+    },
+    {
+      "variant": "luna-haiku-6-hedged",
+      "terminalMilliseconds": 43194,
+      "durable": false,
+      "agentCalls": 2
+    },
+    {
+      "variant": "haiku-5x2-partitioned",
+      "terminalMilliseconds": 38841,
+      "bothBatchesDurable": false,
+      "atomicCombinedRound": false
+    }
+  ],
+  "conclusion": {
+    "existingSingleRoundVariantMeetsLatencyAndReliability": false,
+    "recommendedNextDesign": "TEN_PREVIEWS_THEN_FIXED_PREVIEW_ENRICHMENT",
+    "recommendationDirectlyValidated": false,
+    "requiresContractAndStorageChange": true,
+    "productionVariantChanged": false,
+    "stablePackageRestored": true
+  },
+  "containsPersonalData": false
+}

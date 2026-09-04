@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "promptVersion": "1.1.4",
+  "model": "claude-haiku-4.5",
+  "inputPath": "tests/eval/fixtures/inputs/realtime-rehearsal.json",
+  "providedContext": true,
+  "durableMilliseconds": 23289,
+  "turnMilliseconds": 26017,
+  "candidateCount": 4,
+  "candidatePayloadBytes": 6456,
+  "getContextCalls": 0,
+  "submitCalls": 1,
+  "containsPersonalData": false
+}

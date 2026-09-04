@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "discovery": {
+    "round": {
+      "schemaVersion": 1,
+      "id": "candidate_round_00000000-0000-4000-8000-000000000911",
+      "discoverySessionId": "discovery_session_00000000-0000-4000-8000-000000000912",
+      "correlationId": "corr_00000000-0000-4000-8000-000000000913",
+      "roundIndex": 2,
+      "inputSnapshot": {
+        "learningGoal": "Spring Framework에서 배운 scheduling과 transaction boundary를 TypeScript backend 프로젝트에 적용하고 싶다",
+        "currentLevel": "BEGINNER"
+      },
+      "appliedFeedbackIds": ["feedback_00000000-0000-4000-8000-000000000914"],
+      "candidates": [
+        { "candidateId": "candidate_00000000-0000-4000-8000-000000000915", "revision": 2 }
+      ],
+      "generationRationale": "선택한 자동 실행과 실용적인 예약 경험을 하나의 작은 backend 흐름으로 좁혔다.",
+      "diversityCheck": {
+        "dimensionsReviewed": ["CORE_INTERACTION", "DATA_SHAPE", "USER_APPEAL"],
+        "modeCollapseDetected": false,
+        "rationale": "선택한 두 방향의 장점만 결합한 단일 shortlist 결과다."
+      },
+      "createdAt": "2026-09-03T14:00:00.000Z",
+      "source": { "kind": "AGENT", "role": "DISCOVERY" },
+      "redactionStatus": "VERIFIED_REDACTED"
+    },
+    "candidates": [
+      {
+        "schemaVersion": 1,
+        "id": "candidate_00000000-0000-4000-8000-000000000915",
+        "discoverySessionId": "discovery_session_00000000-0000-4000-8000-000000000912",
+        "correlationId": "corr_00000000-0000-4000-8000-000000000913",
+        "revision": 2,
+        "parentRevisions": [
+          { "candidateId": "candidate_00000000-0000-4000-8000-000000000915", "revision": 1 },
+          { "candidateId": "candidate_00000000-0000-4000-8000-000000000916", "revision": 1 }
+        ],
+        "title": "자동으로 챙겨주는 팀 자원 예약 서비스",
+        "summary": "팀 자원을 예약하면 중복을 막고 정해진 시점에 확인과 알림 작업을 자동 실행하는 backend 서비스.",
+        "targetUsers": ["회의실과 공용 장비를 함께 쓰는 소규모 팀"],
+        "coreInteraction": "자원과 시간대를 예약하고 서버가 중복을 거절한 뒤 예정된 시점에 후속 작업을 실행한다.",
+        "usageMoment": "팀원이 공용 자원을 예약하거나 예약 시각이 다가올 때",
+        "appeal": "실제 팀 불편을 해결하면서 서버가 스스로 움직이는 자동화를 눈으로 확인할 수 있다.",
+        "technologyNecessity": "transaction boundary가 동시 예약 충돌을 막고 scheduler가 저장된 예약의 후속 작업을 독립적으로 실행해야 한다.",
+        "coreConcepts": ["transaction boundary", "scheduler", "dependency boundary"],
+        "mvpFeatures": ["자원·시간대 예약", "중복 예약 거절", "예약 시각 후속 작업"],
+        "suggestedScope": {
+          "learnerFocus": ["예약 transaction", "scheduled job과 저장 상태 연결"],
+          "agentSupport": ["한 화면 예약 UI"],
+          "excluded": ["실제 메일 발송", "조직별 권한 관리"]
+        },
+        "generationTags": ["DIRECT"],
+        "createdAt": "2026-09-03T14:00:00.000Z",
+        "source": { "kind": "AGENT", "role": "DISCOVERY" },
+        "redactionStatus": "VERIFIED_REDACTED"
+      }
+    ]
+  }
+}
