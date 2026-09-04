@@ -760,68 +760,87 @@ export function VibeHelperApp({ coreClient, sessionClient, discoveryClient }: Vi
           detail: `저장된 10개 방향 중 남은 ${String(10 - enrichedIds.size)}개의 상세 작업을 준비하고 있습니다.`,
           retry: null,
         })
-        const receipts = await Promise.all(
-          phases.map((phase) => {
-            const batch = phase === 'ENRICH_FIRST' ? 'FIRST' : 'SECOND'
-            return discoveryClient.dispatch(
-              session.id,
-              session.revision,
-              `Candidate preview의 ${batch} batch를 상세화해 주세요. previewRoundId=${previewRound.id}, batch=${batch}. Candidate ID와 preview의 의미 필드는 그대로 복사하고 지정된 5개만 submit_candidate_enrichments로 제출하세요.\n\nCore tool identifiers: schemaVersion=1, projectId=${projectId}, discoverySessionId=${session.id}, correlationId=${session.correlationId}, expectedSessionRevision=${session.revision}, idempotencyKey=${entityId('idem')}.`,
-              createDiscoveryEphemeralContext(restored, phase),
-              phase,
-            )
-          }),
-        )
-        if (agentRunSequence.current !== runSequence) return
-        setAgentRun({
-          status: 'RUNNING',
-          startedAt,
-          detail: `미리보기는 저장됐습니다. ${String(phases.length)}개 상세 batch를 background에서 채우고 있어요.`,
-          retry: null,
-        })
-
-        void Promise.all(receipts.map((receipt) => receipt.completion))
-          .then(async (outcomes) => {
-            await delay(TARGET_DISCOVERY_COMPLETION_GRACE_MS)
-            if (agentRunSequence.current !== runSequence) return
-            const current = await coreClient.restoreProjectSession(correlationId(), projectId)
-            setSnapshot(current)
-            if ((current.discoveryContext?.rounds.length ?? 0) > 0) return
-            agentRunSequence.current += 1
-            const stored = current.discoveryContext?.candidateEnrichments.length ?? 0
-            setAgentRun({
-              status: 'TOOL_REJECTED',
-              startedAt: null,
-              detail: outcomes.includes('TOOL_VALIDATION_FAILED')
-                ? `상세 형식이 거절됐습니다. 저장된 ${String(stored)}/10개는 유지되며 누락된 batch만 다시 시도할 수 있어요.`
-                : `상세 작업이 끝났지만 ${String(stored)}/10개만 저장됐습니다. 누락된 batch만 다시 시도할 수 있어요.`,
-              retry,
-            })
-          })
-          .catch(() => undefined)
-
         let backgroundShown = false
         const deadline = startedAt + TARGET_DISCOVERY_TIMEOUT_MS
-        while (Date.now() < deadline && agentRunSequence.current === runSequence) {
-          await delay(900)
-          const next = await coreClient.restoreProjectSession(correlationId(), projectId)
+        let currentSnapshot = restored
+        for (const [phaseIndex, phase] of phases.entries()) {
+          const batch = phase === 'ENRICH_FIRST' ? 'FIRST' : 'SECOND'
+          const requestedIds = new Set(
+            previewRound.previews
+              .filter((preview) =>
+                phase === 'ENRICH_FIRST' ? preview.position <= 5 : preview.position > 5,
+              )
+              .map((preview) => preview.candidateId),
+          )
+          setAgentRun({
+            status: 'RUNNING',
+            startedAt,
+            detail: `상세 batch ${String(phaseIndex + 1)}/${String(phases.length)}를 순서대로 저장하고 있어요.`,
+            retry: null,
+          })
+          const receipt = await discoveryClient.dispatch(
+            session.id,
+            session.revision,
+            `Candidate preview의 ${batch} batch를 상세화해 주세요. previewRoundId=${previewRound.id}, batch=${batch}. Candidate ID와 preview의 의미 필드는 그대로 복사하고 지정된 5개만 submit_candidate_enrichments로 제출하세요.\n\nCore tool identifiers: schemaVersion=1, projectId=${projectId}, discoverySessionId=${session.id}, correlationId=${session.correlationId}, expectedSessionRevision=${session.revision}, idempotencyKey=${entityId('idem')}.`,
+            createDiscoveryEphemeralContext(currentSnapshot, phase),
+            phase,
+          )
+          const terminal: {
+            outcome: 'DONE' | 'TOOL_VALIDATION_FAILED' | 'STREAM_FAILED' | null
+            observedAt: number
+          } = { outcome: null, observedAt: 0 }
+          void receipt.completion.then((outcome) => {
+            terminal.outcome = outcome
+            terminal.observedAt = Date.now()
+          })
+
+          let batchStored = false
+          while (Date.now() < deadline && agentRunSequence.current === runSequence) {
+            await delay(900)
+            const next = await coreClient.restoreProjectSession(correlationId(), projectId)
+            if (agentRunSequence.current !== runSequence) return
+            setSnapshot(next)
+            if ((next.discoveryContext?.rounds.length ?? 0) > 0) {
+              setAgentRun(idleAgentRun)
+              setRefresh((value) => value + 1)
+              return
+            }
+            const storedIds = new Set(
+              next.discoveryContext?.candidateEnrichments.map(
+                (enrichment) => enrichment.candidate.id,
+              ) ?? [],
+            )
+            if ([...requestedIds].every((candidateId) => storedIds.has(candidateId))) {
+              currentSnapshot = next
+              batchStored = true
+              break
+            }
+            if (
+              terminal.outcome !== null &&
+              Date.now() >= terminal.observedAt + TARGET_DISCOVERY_COMPLETION_GRACE_MS
+            ) {
+              throw new CrewAppClientError(
+                'OPERATION',
+                'CANDIDATE_ENRICHMENT_NOT_STORED',
+                terminal.outcome === 'TOOL_VALIDATION_FAILED'
+                  ? `상세 형식이 거절됐습니다. 저장된 ${String(storedIds.size)}/10개는 유지되며 누락된 batch만 다시 시도할 수 있어요.`
+                  : `상세 작업이 끝났지만 ${String(storedIds.size)}/10개만 저장됐습니다. 누락된 batch만 다시 시도할 수 있어요.`,
+              )
+            }
+            if (!backgroundShown && Date.now() >= startedAt + TARGET_DISCOVERY_FOREGROUND_MS) {
+              backgroundShown = true
+              setAgentRun({
+                status: 'BACKGROUND',
+                startedAt,
+                detail:
+                  '10개 방향은 이미 저장됐습니다. 화면을 보면서 기다릴 수 있고 상세는 background에서 순서대로 이어집니다.',
+                retry: null,
+              })
+            }
+          }
           if (agentRunSequence.current !== runSequence) return
-          setSnapshot(next)
-          if ((next.discoveryContext?.rounds.length ?? 0) > 0) {
-            setAgentRun(idleAgentRun)
-            setRefresh((value) => value + 1)
-            return
-          }
-          if (!backgroundShown && Date.now() >= startedAt + TARGET_DISCOVERY_FOREGROUND_MS) {
-            backgroundShown = true
-            setAgentRun({
-              status: 'BACKGROUND',
-              startedAt,
-              detail:
-                '10개 방향은 이미 저장됐습니다. 화면을 보면서 기다릴 수 있고 상세는 background에서 이어집니다.',
-              retry: null,
-            })
-          }
+          if (!batchStored) break
+          await Promise.race([receipt.completion, delay(5_000)])
         }
         if (agentRunSequence.current !== runSequence) return
         setAgentRun({
@@ -834,7 +853,10 @@ export function VibeHelperApp({ coreClient, sessionClient, discoveryClient }: Vi
       } catch (error) {
         if (agentRunSequence.current !== runSequence) return
         setAgentRun({
-          status: 'HOST_DISCONNECTED',
+          status:
+            error instanceof CrewAppClientError && error.category === 'OPERATION'
+              ? 'TOOL_REJECTED'
+              : 'HOST_DISCONNECTED',
           startedAt: null,
           detail: actionErrorMessage(error),
           retry,

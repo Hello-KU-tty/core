@@ -112,6 +112,13 @@ export function createDiscoveryEphemeralContext(
       : previewRound.previews.filter((preview) =>
           requestedEnrichmentBatch === 'FIRST' ? preview.position <= 5 : preview.position > 5,
         )
+  const injectedPreviewRound =
+    requestedEnrichmentBatch === null || previewRound === null
+      ? previewRound
+      : {
+          id: previewRound.id,
+          finalRoundId: previewRound.finalRoundId,
+        }
 
   return JSON.stringify({
     schemaVersion: 1,
@@ -141,7 +148,7 @@ export function createDiscoveryEphemeralContext(
             candidates: latestRound.candidates,
           },
     currentCandidates,
-    previewRound,
+    previewRound: injectedPreviewRound,
     candidateEnrichments: (context.candidateEnrichments ?? []).map((enrichment) => ({
       candidateId: enrichment.candidate.id,
       previewRoundId: enrichment.previewRoundId,

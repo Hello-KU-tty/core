@@ -364,6 +364,15 @@
 - **복구:** 구현 전 안정 상태를 git commit `09edb18`로 보존한다. SQLite 변경은 기존 Candidate·Round table을 수정하지 않는 additive preview/enrichment table과 자동 검증 backup migration으로 제한한다. preview 전 실패는 preview만, 일부 enrichment 실패는 누락 batch만 재시도한다. 사용자가 기존 방식으로 전환하면 같은 Session revision에서 v1.1.6-compatible atomic `submit_candidate_round`를 허용하고, 그 뒤 도착한 staged 결과는 revision/round existence 검사로 거절한다. 새 UI가 staged 상태를 읽지 못하더라도 기존 저장 구조와 complete Round는 손상되지 않는다.
 - **tradeoff:** 사용자는 10개 제목·핵심 방향을 먼저 볼 수 있고 전체 상세도 결국 받지만 일부 행은 잠시 loading 상태가 된다. Candidate preview 상태, staging/finalize transaction, enrichment 실패·재시도와 UI projection이 새로 필요하다. background run 두 개는 호출 수를 늘리지만 서로 다른 고정 identity만 처리해 중복 생성 위험을 줄이고, 실패 범위를 절반으로 제한한다. 이 구조의 실제 preview latency와 최종 수렴 시간은 target 설치본에서 별도로 검증한다.
 
+## 2026-09-05: T15 compact preview·순차 enrichment로 최종 gate 통과
+
+- **상태:** 사용자 조건부 승인에 따른 완료
+- **맥락:** v1.1.7 preview는 29.595초와 31.723초로 30초 경계에서 흔들렸고, 두 enrichment를 동시에 실행하면 한 batch가 durable submit 없이 끝나는 편차가 재현됐다. v1.1.8은 preview prompt와 출력 길이를 줄여 21.635초에 10개를 저장했지만 순차 enrichment 완료에 217.934초가 걸렸다. 사용자는 최종 성능 gate를 한 번 더 실행해 통과하면 기존 UI/UX·Spec revision 2→Builder 승인과 합쳐 T15를 승인하도록 했다.
+- **결정:** prompt v1.1.9와 `claude-haiku-4.5`를 유지한다. PREVIEW는 10개 제목·핵심 방향을 보존하되 문장과 tag 수를 제한한다. ENRICHMENT는 FIRST 저장 확인 뒤 SECOND를 시작하고, ephemeral context에는 Preview Round identity와 요청된 5개만 넣는다. 상세 의미 필드는 유지하면서 대표 사용자 1명, 핵심 개념·MVP 기능 2개, scope별 1개로 제한한다. preview·각 batch의 독립 idempotency, 부분 저장, 누락 batch 재시도, legacy atomic fallback과 additive migration은 유지한다.
+- **검증:** 최종 Kiro 설치본의 unseen synthetic WebRTC 입력에서 preview 10개는 23.241초에 durable 저장됐고 FIRST 5개는 107.273초, complete Round는 enrichment 시작 후 148.371초에 저장됐다. identity 10개와 Session revision 1→2가 보존됐으며 v1.1.8보다 background 완료가 약 31.9% 단축됐다. 기존 MERGE 13.226초, 첫 Spec 18.860초와 Spec 수정 23.097초를 합쳐 T15 대표 interaction gate는 모두 30초 이내다. 설치 전후 기존 56 project·57 Discovery Session·23 Learning Spec과 SQLite `quick_check=ok`가 보존됐고 설치 Agent/UI hash가 source package와 일치했다.
+- **복구:** 구현 전 기준점은 `09edb18`, staged storage·UI 기준점은 `9866670`이다. 기존 Candidate/Round schema와 atomic fallback은 제거하지 않았고, migration은 additive다. preview 전 실패는 preview만, 일부 enrichment 실패는 누락 batch만 다시 실행한다. 늦은 staged submit은 current revision/round 검증에서 거절된다.
+- **tradeoff:** 첫 유용 목록은 23초에 나타나 checkbox와 basket을 쓸 수 있지만 SELECT·refinement는 complete Round까지 최종 관측 148초 잠긴다. 이는 T15가 정의한 background 수렴 조건에는 부합하지만 이상적인 3~5초 상호작용은 아니다. T21에서 장기 P95, background 완료 분포와 선택 후보 우선 상세화 가능성을 평가한다.
+
 ## 2026-08-24: 구현 세부 선택 위임
 
 - **상태:** 승인

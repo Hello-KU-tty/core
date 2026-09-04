@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "promptVersion": "1.1.8",
+  "selectedModel": "claude-haiku-4.5",
+  "previewCount": 10,
+  "previewLimits": {
+    "titleCharacters": 16,
+    "summaryCharacters": 45,
+    "coreInteractionCharacters": 45,
+    "appealCharacters": 35,
+    "technologyNecessityCharacters": 45,
+    "generationTags": 1,
+    "generationRationaleCharacters": 60
+  },
+  "enrichmentBatches": [
+    { "name": "FIRST", "positions": [1, 2, 3, 4, 5] },
+    { "name": "SECOND", "positions": [6, 7, 8, 9, 10] }
+  ],
+  "v117TargetObservations": {
+    "projectToPreviewMilliseconds": [29595, 32479, 31723],
+    "overlappingSampleIndexes": [1],
+    "parallelEnrichmentSecondBatchNoDurableObserved": true,
+    "partialFiveEnrichmentsPreserved": true,
+    "eventualTenCandidateRoundObserved": true
+  },
+  "automatedVerification": {
+    "previewStoredWithoutSessionRevisionAdvance": true,
+    "partialEnrichmentStoredWithoutCandidateRound": true,
+    "allEnrichmentsMaterializeAtomicRound": true,
+    "previewMeaningImmutable": true,
+    "legacyAtomicFallbackAvailable": true,
+    "lateEnrichmentRejectedAfterFallback": true,
+    "mobilePreviewBasketUsableDuringEnrichment": true,
+    "basketSelectionPreservedAfterFinalization": true
+  },
+  "targetMeasurement": {
+    "status": "PASSED_WITH_SLOW_BACKGROUND_ENRICHMENT",
+    "previewDurableMilliseconds": 21635,
+    "firstEnrichmentMilliseconds": 168382,
+    "completeRoundMilliseconds": 217934,
+    "previewWithinThirtySecondGate": true,
+    "completeCandidateCount": 10,
+    "identityPreserved": true,
+    "previewSessionRevision": 1,
+    "completeSessionRevision": 2
+  },
+  "containsPersonalData": false
+}

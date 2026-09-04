@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 const workspaceRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 const sourcePath = join(workspaceRoot, 'docs', 'agent-prompts', 'discovery.md')
 const agentsDirectory = join(workspaceRoot, 'agents')
-const expectedVersion = '1.1.7'
+const expectedVersion = '1.1.9'
 const discoveryModel = process.env.VIBE_HELPER_DISCOVERY_MODEL ?? 'claude-haiku-4.5'
 const specModel = process.env.VIBE_HELPER_SPEC_MODEL ?? discoveryModel
 for (const model of [discoveryModel, specModel]) {
@@ -36,15 +36,14 @@ const learningSpecStart = sectionStart('## Learning Spec')
 const specFastStart = sectionStart('## 빠른 SPEC turn')
 const specRecoveryStart = sectionStart('## SPEC recovery turn')
 const expressionStart = sectionStart('## 표현 방식')
-const shared = prompt.slice(0, previewStart).trimEnd()
 const identity = prompt.slice(0, sectionStart('## 최우선 원칙')).trimEnd()
 const specQuality = prompt.slice(learningSpecStart, specFastStart).trim()
 const expressionAndSafety = prompt.slice(expressionStart).trim()
 const phasePrompts = {
-  preview: `${shared}\n\n${prompt.slice(previewStart, enrichmentStart).trim()}\n\n${expressionAndSafety}\n`,
-  enrichment: `${shared}\n\n${prompt.slice(enrichmentStart, candidateStart).trim()}\n\n${expressionAndSafety}\n`,
-  round: `${shared}\n\n${prompt.slice(candidateStart, learningSpecStart).trim()}\n\n${expressionAndSafety}\n`,
-  merge: `${shared}\n\n${prompt.slice(mergeStart, learningSpecStart).trim()}\n\n${expressionAndSafety}\n`,
+  preview: `${identity}\n\n${prompt.slice(previewStart, enrichmentStart).trim()}\n`,
+  enrichment: `${identity}\n\n${prompt.slice(enrichmentStart, candidateStart).trim()}\n`,
+  round: `${prompt.slice(0, previewStart).trimEnd()}\n\n${prompt.slice(candidateStart, learningSpecStart).trim()}\n\n${expressionAndSafety}\n`,
+  merge: `${prompt.slice(0, previewStart).trimEnd()}\n\n${prompt.slice(mergeStart, learningSpecStart).trim()}\n\n${expressionAndSafety}\n`,
   spec: `${identity}\n\n${specQuality}\n\n${prompt.slice(specFastStart, specRecoveryStart).trim()}\n\n모든 구조화된 결과는 제공된 Core tool로 제출하라.\n`,
   specRecovery: `${identity}\n\n${specQuality}\n\n${prompt.slice(specRecoveryStart, expressionStart).trim()}\n\n모든 구조화된 결과는 제공된 Core tool로 제출하라.\n`,
 }

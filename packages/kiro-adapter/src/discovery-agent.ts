@@ -12,7 +12,7 @@ import {
   type LearningSpecRevision,
 } from '@vibe-helper/contracts'
 
-export const DISCOVERY_PROMPT_VERSION = '1.1.7' as const
+export const DISCOVERY_PROMPT_VERSION = '1.1.9' as const
 export const DISCOVERY_PROMPT_SOURCE = 'docs/agent-prompts/discovery.md' as const
 export const DISCOVERY_AGENT_NAME = 'vibe-helper-discovery' as const
 export const DISCOVERY_MCP_SERVER_NAME = 'vibe-helper-discovery-core' as const

@@ -513,6 +513,76 @@ describe('Crew browser-safe clients', () => {
     expect(context).not.toContain('historical detail must not be injected')
   })
 
+  it('injects only the requested five previews for enrichment', () => {
+    const discoverySessionId = 'discovery_session_00000000-0000-4000-8000-000000000014'
+    const previewRoundId = 'candidate_preview_round_00000000-0000-4000-8000-000000000018'
+    const finalRoundId = 'candidate_round_00000000-0000-4000-8000-000000000019'
+    const previews = Array.from({ length: 10 }, (_, index) => ({
+      candidateId: `candidate_00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+      position: index + 1,
+      title: `Preview ${String(index + 1)}`,
+      summary: `Summary ${String(index + 1)}`,
+      coreInteraction: `Interaction ${String(index + 1)}`,
+      appeal: `Appeal ${String(index + 1)}`,
+      technologyNecessity: `Necessity ${String(index + 1)}`,
+      generationTags: ['DIRECT'],
+    }))
+    const session = {
+      id: discoverySessionId,
+      correlationId,
+      revision: 1,
+      status: 'ACTIVE',
+      input: { learningGoal: 'Understand validation' },
+    }
+    const context = createDiscoveryEphemeralContext(
+      {
+        project: {
+          id: projectId,
+          title: 'Validation',
+          learningGoal: 'Understand validation',
+          status: 'DISCOVERY',
+        },
+        discoverySession: session,
+        discoveryContext: {
+          project: {
+            id: projectId,
+            title: 'Validation',
+            learningGoal: 'Understand validation',
+            status: 'DISCOVERY',
+          },
+          session,
+          rounds: [],
+          candidates: [],
+          feedback: [],
+          learningSpec: null,
+          relevantLedgerEntries: [],
+          previewRound: {
+            id: previewRoundId,
+            finalRoundId,
+            previews,
+          },
+          candidateEnrichments: [],
+        },
+        selectedCandidate: null,
+      } as never,
+      'ENRICH_SECOND',
+    )
+    const parsed = JSON.parse(context) as {
+      previewRound: Record<string, unknown>
+      requestedPreviews: { position: number; title: string }[]
+    }
+
+    expect(parsed.previewRound).toEqual({ id: previewRoundId, finalRoundId })
+    expect(parsed.requestedPreviews.map((preview) => preview.position)).toEqual([6, 7, 8, 9, 10])
+    expect(parsed.requestedPreviews.map((preview) => preview.title)).toEqual([
+      'Preview 6',
+      'Preview 7',
+      'Preview 8',
+      'Preview 9',
+      'Preview 10',
+    ])
+  })
+
   it('classifies a completed stream tool validation failure without exposing its body', async () => {
     const discoverySessionId = 'discovery_session_00000000-0000-4000-8000-000000000014'
     const slot = discoveryRunSlotKey(discoverySessionId, 3)

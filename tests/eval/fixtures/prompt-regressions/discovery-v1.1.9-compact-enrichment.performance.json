@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "promptVersion": "1.1.9",
+  "selectedModel": "claude-haiku-4.5",
+  "previewCount": 10,
+  "previewLimits": {
+    "titleCharacters": 16,
+    "summaryCharacters": 45,
+    "coreInteractionCharacters": 45,
+    "appealCharacters": 35,
+    "technologyNecessityCharacters": 45,
+    "generationTags": 1,
+    "generationRationaleCharacters": 60
+  },
+  "enrichmentLimits": {
+    "targetUsers": 1,
+    "usageMomentCharacters": 45,
+    "personalNeedRelationshipCharacters": 45,
+    "coreConcepts": 2,
+    "mvpFeatures": 2,
+    "scopeItemsPerCategory": 1,
+    "arrayItemCharacters": 30
+  },
+  "enrichmentBatches": [
+    { "name": "FIRST", "positions": [1, 2, 3, 4, 5] },
+    { "name": "SECOND", "positions": [6, 7, 8, 9, 10] }
+  ],
+  "v118TargetObservation": {
+    "previewDurableMilliseconds": 21635,
+    "firstEnrichmentMilliseconds": 168382,
+    "completeRoundMilliseconds": 217934,
+    "previewWithinThirtySecondGate": true,
+    "identityPreserved": true
+  },
+  "automatedVerification": {
+    "previewStoredWithoutSessionRevisionAdvance": true,
+    "partialEnrichmentStoredWithoutCandidateRound": true,
+    "allEnrichmentsMaterializeAtomicRound": true,
+    "previewMeaningImmutable": true,
+    "enrichmentContextContainsOnlyRequestedFivePreviews": true,
+    "legacyAtomicFallbackAvailable": true,
+    "lateEnrichmentRejectedAfterFallback": true,
+    "mobilePreviewBasketUsableDuringEnrichment": true,
+    "basketSelectionPreservedAfterFinalization": true
+  },
+  "targetMeasurement": {
+    "status": "PASSED",
+    "previewDurableMilliseconds": 23241,
+    "firstEnrichmentMilliseconds": 107273,
+    "completeRoundMilliseconds": 148371,
+    "totalInteractionMilliseconds": 171642,
+    "previewWithinThirtySecondGate": true,
+    "completeCandidateCount": 10,
+    "identityPreserved": true,
+    "previewSessionRevision": 1,
+    "completeSessionRevision": 2
+  },
+  "containsPersonalData": false
+}

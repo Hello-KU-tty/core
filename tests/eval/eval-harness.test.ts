@@ -413,7 +413,7 @@ describe('T15 Discovery Agent Spec persistence recovery', () => {
       readonly containsPersonalData: boolean
     }
 
-    expect(prompt).toContain('Prompt version: `1.1.7`')
+    expect(prompt).toContain('Prompt version: `1.1.9`')
     expect(prompt).toContain('확인 질문이나 설명으로 끝내지 마라')
     expect(performance).toMatchObject({
       promptVersion: '1.1.6',
@@ -499,14 +499,14 @@ describe('T15 first-Candidate performance alternatives', () => {
   })
 })
 
-describe('T15 Discovery Agent v1.1.7 preview enrichment', () => {
+describe('T15 Discovery Agent v1.1.9 compact preview enrichment', () => {
   it('fixes ten preview identities before two recoverable enrichment batches', async () => {
     const prompt = await readFile(
       path.join(workspaceRoot, 'docs/agent-prompts/discovery.md'),
       'utf8',
     )
     const performance = (await loadInput(
-      'tests/eval/fixtures/prompt-regressions/discovery-v1.1.7-preview-enrichment.performance.json',
+      'tests/eval/fixtures/prompt-regressions/discovery-v1.1.9-compact-enrichment.performance.json',
     )) as {
       readonly promptVersion: string
       readonly previewCount: number
@@ -516,14 +516,18 @@ describe('T15 Discovery Agent v1.1.7 preview enrichment', () => {
       readonly containsPersonalData: boolean
     }
 
-    expect(prompt).toContain('Prompt version: `1.1.7`')
+    expect(prompt).toContain('Prompt version: `1.1.9`')
     expect(prompt).toContain('lightweight preview를 정확히 10개')
+    expect(prompt).toContain('summary·coreInteraction·technologyNecessity는 각각 45자')
+    expect(prompt).toContain('가장 잘 맞는 하나만 사용')
     expect(prompt).toContain('Candidate identity 정확히 5개만 완성')
     expect(prompt).toContain('글자 하나도 바꾸지 말고 그대로 복사')
+    expect(prompt).toContain('coreConcepts` 정확히 2개')
+    expect(prompt).toContain('각각 정확히 1개')
     expect(performance).toMatchObject({
-      promptVersion: '1.1.7',
+      promptVersion: '1.1.9',
       previewCount: 10,
-      targetMeasurement: { status: 'PENDING' },
+      targetMeasurement: { status: 'PASSED', previewWithinThirtySecondGate: true },
       containsPersonalData: false,
     })
     expect(performance.enrichmentBatches).toEqual([

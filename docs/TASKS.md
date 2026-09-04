@@ -511,7 +511,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - Kiro 연결이 끊겨도 이미 저장한 결과와 history는 볼 수 있고 재시도 방법이 보인다.
 - 임의 mock state가 production flow에 섞이지 않는다.
 
-### [~] T15. Discovery와 Spec 사용자 경험
+### [x] T15. Discovery와 Spec 사용자 경험
 
 **승인·검증 기록**
 
@@ -587,12 +587,17 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 3. `[x]` preview와 1~5·6~10 enrichment 전용 MCP tool/Agent를 prompt v1.1.7로 추가하고 legacy ROUND·MERGE·SPEC 경로를 유지한다.
 4. `[x]` UI protocol v3에서 preview를 즉시 목록으로 보여주고 상세 loading, checkbox basket, complete 전 SELECT 차단, 누락 batch 재시도와 `기존 방식으로 생성` 복구 action을 구현한다.
 5. `[x]` unit·contract·storage integration·prompt fixture/eval·mobile E2E와 전체 `pnpm check`를 통과시킨다.
-6. `[-]` data-preserving target update 뒤 unseen 입력으로 preview durable ≤30초, 10개 complete Round 수렴, 실패 구간 재시도와 legacy fallback을 실측한다. 성공하면 기존 UI/UX·Spec revision 2→Builder 사용자 승인과 합쳐 T15 완료 승인을 요청한다. Kiro 인증 파일이 raw token이 아닌 구조화 형식이라 첫 update 요청이 적용 전 HTTP 403으로 거절됐고, 비밀 형식 확인에 대한 사용자 승인을 기다린다.
+6. `[x]` data-preserving target update 뒤 unseen 입력으로 preview durable ≤30초, 10개 complete Round 수렴, 실패 구간 재시도와 legacy fallback을 실측한다. v1.1.8 preview 21.635초와 v1.1.9 preview 23.241초가 gate를 통과했고, 두 실행 모두 identity 10개와 Session revision 1→2를 보존한 complete Round로 수렴했다. 기존 UI/UX·Spec revision 2→Builder 사용자 승인과 사용자의 조건부 최종 승인에 따라 T15를 완료한다.
 - preview 화면은 10개 lightweight 행을 먼저 표시하고 enrichment 0~10 진행 상태를 보여준다. background 중 checkbox와 basket은 사용할 수 있지만 refinement·SELECT는 final Round 뒤에만 활성화된다. 같은 project의 background refresh는 화면 component를 unmount하지 않아 preview에서 담은 Candidate ID와 스크롤 맥락이 complete Round 전환 뒤에도 유지된다.
 - Node.js 24.19.0에서 `better-sqlite3` statement finalizer와 Vitest fork worker 종료가 충돌하는 재현 가능한 cleanup-hook assertion을 확인했다. 격리는 유지하면서 child-process teardown race가 없는 thread pool로 test runner를 고정했고, 단일·병렬 integration 188개가 모두 통과했다.
 - 최종 `pnpm check`가 format/lint 148 files, typecheck, Drizzle check, unit 2개, package/app integration 188개, eval 17개, build, smoke 6개와 Chromium E2E 11개를 통과했다. 390x844 E2E는 preview 10개·상세 0/10 상태, background checkbox/basket, complete 전 action 차단, 10개 final Round 전환과 선택 보존을 실제 Core/SQLite 경계에서 검증한다.
-- 모든 실험 package는 `/private/tmp`에 보존했고 target 설치본은 최종 Haiku v1.1.6·Agent 4개로 복원했다. 설치 Agent hash가 stable package와 일치하며 자동 할당 backend `127.0.0.1:9101` health가 정상이다.
-- 대안 spike 기록을 포함한 최종 `pnpm check`가 format/lint 147 files, typecheck, Drizzle check, unit 2개, package/app integration 185개, eval 16개, build, smoke 6개와 Chromium E2E 10개를 통과했다.
+- prompt v1.1.8은 preview Agent의 prompt와 출력 길이를 줄이고 두 enrichment batch를 순차 실행해 동시 Agent 중 하나가 durable submit 없이 끝나는 편차를 제거했다. target preview는 21.635초, complete enrichment는 217.934초였고 identity 10개와 revision 1→2를 보존했다.
+- prompt v1.1.9는 enrichment context에서 전체 preview 10개와 요청 batch의 중복을 제거하고 상세 배열 수를 제한했다. 최종 target의 unseen synthetic WebRTC 입력에서 preview 10개는 23.241초에 durable 저장돼 30초 gate를 통과했고, FIRST 5개는 107.273초, complete Round는 enrichment 시작 후 148.371초에 저장됐다. v1.1.8보다 background 완료가 약 31.9% 단축됐으며 complete Candidate 10개의 identity가 모두 보존됐다.
+- Kiro 공식 short-lived dashboard token과 app-secret exchange로 data-preserving update를 수행했다. 설치 전후 56 project·57 Discovery Session·23 Learning Spec과 SQLite `quick_check=ok`가 유지됐고, 설치된 v1.1.9 Agent와 versioned UI hash가 source package와 일치했다. 최종 synthetic 측정은 project/session을 하나씩 추가했으며 기존 사용자 데이터는 삭제하거나 수정하지 않았다.
+- T15의 대표 gate는 앞서 통과한 MERGE 13.226초·첫 Spec 18.860초·Spec 수정 23.097초와 최종 preview 23.241초를 합쳐 모두 30초 이내로 닫는다. preview 이후 checkbox/basket은 바로 사용할 수 있지만 SELECT·refinement는 complete Round까지 최대 관측 148.371초 기다리는 제한이 있으며, 이는 background 수렴 분포와 3~5초 first-useful stretch goal과 함께 T21에서 계속 측정한다.
+- 최종 `pnpm check`가 format/lint 149 files, typecheck, Drizzle check, unit 2개, package/app integration 189개, eval 17개, build, smoke 6개와 Chromium E2E 11개를 통과했다.
+- First Candidate 대안 spike 종료 시점에는 모든 실험 package를 `/private/tmp`에 보존하고 target을 Haiku v1.1.6·Agent 4개로 복원했다. 이후 승인된 preview 구현은 이 stable 기준 위에서만 진행했다.
+- 대안 spike 시점의 `pnpm check`는 format/lint 147 files, typecheck, Drizzle check, unit 2개, package/app integration 185개, eval 16개, build, smoke 6개와 Chromium E2E 10개를 통과했다.
 
 첫 유용 반응 3~5초는 stretch goal이라 T15 종료 blocker가 아니다. 느린 Candidate submit의 연결 종료 대응도 target Crew에서 다시 재현될 때만 조건부로 수행한다.
 
@@ -603,7 +608,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 3. `[x]` 승자 model을 명시적으로 고정하고, App이 이미 복원한 compact Core snapshot을 app-owned Crew slot의 ephemeral context로 주입해 정상 경로의 선행 `get_discovery_context` Agent 왕복을 제거한다. stale·누락·복구 상황에서는 read-only context tool을 fallback으로 유지한다.
 4. `[x]` 최초 Candidate, 단일 refinement와 첫 Spec을 target에서 다시 측정하고 각 P95 30초 조건을 판정한다.
 5. `[x]` 30초를 넘은 MERGE에 Candidate/Spec phase별 prompt·tool allowlist 분리와 Core가 계산할 수 있는 metadata 축소를 적용한다.
-6. `[x]` 5단계 후 세 구간이 모두 30초 gate를 통과했으므로 preview/lazy enrichment 저장 계약 변경은 불필요하다고 판정했다. 3~5초 목표는 durable 결과와 구분된 first-useful preview 지표로 후속 평가한다.
+6. `[x]` 당시 5단계 후 세 구간이 모두 30초 gate를 통과해 preview/lazy enrichment 저장 계약은 보류했다. 이후 사용자 재검증의 50.132초 first Candidate outlier로 판단을 다시 열었고, 위 승인된 preview 구현 순서에서 staged 계약과 최종 gate를 완료했다.
 
 **범위**
 
@@ -633,11 +638,11 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - `이렇게 확정하기` 같은 권장 기본 action이 사용자에게 시험이나 어려운 사전 판단처럼 보이지 않는다.
 - 사용자가 만족할 때까지 refine candidate와 final candidate 사이를 반복할 수 있다.
 - Spec→Discovery 복귀는 1초 이내 Agent 호출 없이 이전 후보를 보여주고, 새 후보 생성은 명시적 action 뒤에만 시작한다.
-- prompt v1.1.2 starter, v1.1.3 narrowing, v1.1.4 ephemeral context, v1.1.5 phase split, v1.1.6 Spec recovery와 v1.1.7 preview/enrichment fixture/eval, stringified transport 복구 contract, MORE carry·selection narrowing lineage, background UI와 Core revision E2E가 통과한다. in-flight 화면 재진입 복원은 MVP gate가 아니다.
+- prompt v1.1.2 starter, v1.1.3 narrowing, v1.1.4 ephemeral context, v1.1.5 phase split, v1.1.6 Spec recovery, v1.1.7 preview/enrichment, v1.1.8 compact preview와 v1.1.9 compact enrichment fixture/eval, stringified transport 복구 contract, MORE carry·selection narrowing lineage, background UI와 Core revision E2E가 통과한다. in-flight 화면 재진입 복원은 MVP gate가 아니다.
 - target 환경의 대표 최종 실행 한 번에서 10개 첫 preview, 단일 refinement와 Spec 초안이 각각 30초 이내이고 preview 10개가 complete Round로 수렴하며 사용자가 결과를 승인해야 한다. 첫 유용 반응 3~5초는 stretch goal로 관측하고 model/config별 품질·latency 근거를 함께 남긴다. 장기 P95는 T21에서 검증한다.
 - target Crew host에서 느린 모델의 Candidate submit 연결 종료가 재현되면 T08 atomic round invariant를 보존하는 staged draft batch 또는 지원되는 persistent transport 중 하나를 결정 기록으로 승인하고 구현한다.
 
-### [ ] T16. Agent 중심 Build·Helper 동시 UI와 Decision UI
+### [>] T16. Agent 중심 Build·Helper 동시 UI와 Decision UI
 
 **범위**
 
