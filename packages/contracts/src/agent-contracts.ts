@@ -15,6 +15,9 @@ import {
 } from './build.js'
 import {
   candidateRoundSchema,
+  candidateEnrichmentBatchSchema,
+  candidateEnrichmentSchema,
+  candidatePreviewRoundSchema,
   discoveryFeedbackSchema,
   discoverySessionSchema,
   projectCandidateRevisionSchema,
@@ -114,6 +117,7 @@ export const discoverySubmitCandidateRoundCommandSchema = z
     round: candidateRoundSchema,
     candidates: z.array(projectCandidateRevisionSchema).max(30),
   })
+
   .superRefine((command, context) => {
     if (command.round.correlationId !== command.correlationId) {
       context.addIssue({
@@ -156,6 +160,29 @@ export const discoverySubmitCandidateRoundCommandSchema = z
       }
     }
   })
+
+export const discoverySubmitCandidatePreviewsCommandSchema = z
+  .strictObject({
+    ...discoveryQueryMetadata,
+    kind: z.literal('DISCOVERY_SUBMIT_CANDIDATE_PREVIEWS'),
+    idempotencyKey: idempotencyKeySchema,
+    expectedSessionRevision: expectedRevisionSchema,
+    previewRound: candidatePreviewRoundSchema,
+  })
+  .refine((command) => command.previewRound.correlationId === command.correlationId, {
+    path: ['previewRound', 'correlationId'],
+    message: 'Candidate Preview Round correlation ID must match its command',
+  })
+
+export const discoverySubmitCandidateEnrichmentsCommandSchema = z.strictObject({
+  ...discoveryQueryMetadata,
+  kind: z.literal('DISCOVERY_SUBMIT_CANDIDATE_ENRICHMENTS'),
+  idempotencyKey: idempotencyKeySchema,
+  expectedSessionRevision: expectedRevisionSchema,
+  previewRoundId: candidatePreviewRoundSchema.shape.id,
+  batch: candidateEnrichmentBatchSchema,
+  enrichments: z.array(candidateEnrichmentSchema).length(5),
+})
 
 export const discoverySubmitLearningSpecCommandSchema = z
   .strictObject({
@@ -288,6 +315,8 @@ export const analystSubmitEvidenceProposalsCommandSchema = z
 
 export const discoveryAgentRequestSchema = z.discriminatedUnion('kind', [
   discoveryGetContextQuerySchema,
+  discoverySubmitCandidatePreviewsCommandSchema,
+  discoverySubmitCandidateEnrichmentsCommandSchema,
   discoverySubmitCandidateRoundCommandSchema,
   discoverySubmitLearningSpecCommandSchema,
 ])
@@ -314,6 +343,8 @@ export const evidenceAnalystRequestSchema = z.discriminatedUnion('kind', [
 
 export const agentRequestSchema = z.discriminatedUnion('kind', [
   discoveryGetContextQuerySchema,
+  discoverySubmitCandidatePreviewsCommandSchema,
+  discoverySubmitCandidateEnrichmentsCommandSchema,
   discoverySubmitCandidateRoundCommandSchema,
   discoverySubmitLearningSpecCommandSchema,
   builderGetTaskQuerySchema,
@@ -338,6 +369,8 @@ export const discoveryContextSchema = z.strictObject({
   candidates: z.array(projectCandidateRevisionSchema).max(1_000),
   feedback: z.array(discoveryFeedbackSchema).max(1_000),
   learningSpec: learningSpecRevisionSchema.nullable(),
+  previewRound: candidatePreviewRoundSchema.nullable().default(null),
+  candidateEnrichments: z.array(candidateEnrichmentSchema).max(10).default([]),
   relevantLedgerEntries: z.array(conceptLedgerEntrySchema).max(20),
 })
 

@@ -70,7 +70,8 @@ Learning Goal 입력
 - 필수 입력은 배우고 싶은 기술 또는 개념이다.
 - Personal Need, 최근 불편, 관심 영역, 현재 수준은 선택 입력이다.
 - available time 입력은 받지 않는다.
-- 첫 응답은 빠르게 훑을 수 있는 4~6개의 간결한 후보를 보여주고, 사용자가 `다른 후보 더 보기`를 선택하면 기존 후보를 보존한 채 누적 약 8~10개까지 확장한다. 개수는 고정 계약이 아니다.
+- 첫 응답은 제목, 요약, 매력 이유, 핵심 상호작용과 기술 필요성을 담은 가벼운 후보 미리보기 10개를 빠르게 보여준다. 미리보기 identity를 durable 저장한 뒤 같은 후보의 핵심 개념, MVP와 권장 범위를 background에서 보강한다.
+- 미리보기 또는 상세 보강이 실패하면 이미 저장된 결과를 유지한 채 실패 구간만 재시도한다. 사용자는 새 staged 경로를 포기하고 기존 4~6개 완성 Candidate Round를 원자적으로 생성하는 복구 경로를 선택할 수 있다.
 - 고정된 프로젝트 카테고리나 10개 주제 목록을 사용하지 않는다.
 - 같은 CRUD 구조에 테마만 바꾼 후보를 다양하다고 판단하지 않는다.
 - Personal Need가 있으면 관련 후보와 독립 탐색 후보를 자연스럽게 섞는다.
@@ -78,7 +79,7 @@ Learning Goal 입력
 - 후보는 같은 ProjectCandidate의 revision으로 반복 수정한다.
 - RefinedCandidate와 FinalCandidate 별도 타입은 만들지 않는다.
 - 사용자가 명시적으로 선택할 때까지 pin, reject, merge, revise, shrink, regenerate와 추가 후보 생성을 반복할 수 있다.
-- 첫 스캔에는 제목, 요약, 매력 이유, 핵심 상호작용, 기술 필요성, 핵심 개념과 권장 범위를 우선한다. Concept Necessity, Personal Utility, Adoption Feasibility, Learner Fit, Scope Feasibility, Adjacent Complexity, Deployability, Distinctiveness의 상세 평가는 관심·선택 이후 또는 비교가 필요할 때 지연 생성할 수 있다.
+- 첫 미리보기에는 제목, 요약, 매력 이유, 핵심 상호작용과 기술 필요성을 우선한다. 같은 identity의 background 보강이 핵심 개념, MVP와 권장 범위를 완성한다. Concept Necessity, Personal Utility, Adoption Feasibility, Learner Fit, Scope Feasibility, Adjacent Complexity, Deployability, Distinctiveness의 상세 평가는 관심·선택 이후 또는 비교가 필요할 때 지연 생성할 수 있다.
 - 후보는 여러 열의 큰 카드가 아니라 한 줄씩 빠르게 훑는 목록으로 보여준다. 눈에 띄는 checkbox로 관심 후보를 담고 빼며, 선택 상태와 선택 개수를 즉시 확인할 수 있어야 한다.
 - 자유 조정 입력은 후보 목록보다 위에 둔다. 사용자는 아래 목록에서 관심 후보를 담은 뒤 위 입력으로 돌아와 생각을 적으며, 범위 축소·확장 같은 조정은 후보별 버튼 대신 입력 예시와 자연어 요청으로 제공한다.
 

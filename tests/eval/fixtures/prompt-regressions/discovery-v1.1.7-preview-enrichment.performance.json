@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "promptVersion": "1.1.7",
+  "selectedModel": "claude-haiku-4.5",
+  "previewCount": 10,
+  "enrichmentBatches": [
+    { "name": "FIRST", "positions": [1, 2, 3, 4, 5] },
+    { "name": "SECOND", "positions": [6, 7, 8, 9, 10] }
+  ],
+  "automatedVerification": {
+    "previewStoredWithoutSessionRevisionAdvance": true,
+    "partialEnrichmentStoredWithoutCandidateRound": true,
+    "allEnrichmentsMaterializeAtomicRound": true,
+    "previewMeaningImmutable": true,
+    "legacyAtomicFallbackAvailable": true,
+    "lateEnrichmentRejectedAfterFallback": true,
+    "mobilePreviewBasketUsableDuringEnrichment": true
+  },
+  "targetMeasurement": {
+    "status": "PENDING",
+    "previewDurableMilliseconds": null,
+    "completeRoundMilliseconds": null,
+    "previewWithinThirtySecondGate": false,
+    "completeCandidateCount": null
+  },
+  "containsPersonalData": false
+}

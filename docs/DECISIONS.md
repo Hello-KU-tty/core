@@ -354,14 +354,15 @@
 - **tradeoff:** MVP는 앱 이탈 중 진행 표시의 연속성을 보장하지 않으며 단일 대표 성능 실행은 장기 tail latency를 증명하지 않는다. 대신 저장된 결과의 정합성과 핵심 Discovery→Spec→Builder 흐름에 완료 판단을 집중하고, 더 넓은 성능 분포는 T21 release 검증에서 다룬다.
 - **재검증:** 최종 설치본의 대표 실행은 MERGE 13.226초, 첫 Spec 18.860초, Spec 수정 23.097초에 durable 저장됐고 수정 결과는 revision 2였다. first Candidate만 50.132초로 30초 gate를 넘었으므로 T15는 완료하지 않으며 잔여 범위는 첫 Candidate latency로 좁힌다.
 
-## 2026-09-04: T15 First Candidate 대안 spike
+## 2026-09-04: T15 First Candidate preview와 background enrichment
 
-- **상태:** 검토 완료, 제품 변경 미승인
+- **상태:** 사용자 승인
 - **맥락:** 사용자는 가능하면 상세 Candidate 10개를 유지하되 6개 축소, 설명 축소와 다른 구조까지 같은 target에서 비교하도록 승인했다. 현재 Haiku 4개 상세 baseline은 50.132초였다.
 - **결과:** Haiku 10개 compact는 완전한 상세 필드와 고유 제목·상호작용 10개를 33.940초에 저장했지만 gate를 넘었다. Luna 6개 exact-envelope는 성공 시 14.420~16.063초였으나 4회 중 3회만 저장됐고 Luna 10개도 19.991초 성공 뒤 no-durable 실패가 재현됐다. Haiku 4개 ultra와 6개 compact는 잘못된 tool 표현 또는 envelope로 저장되지 않았다. initial-only 최소 prompt는 최대 70.837초였고 저장 실패도 남았다. Haiku 5×2 병렬은 첫 시도 두 batch가 22.727초·24.561초였지만 10개 중 4개 방향이 의미상 겹쳤으며, partition 지시 재시험은 한 batch가 저장되지 않았다. Luna+Haiku hedge도 두 호출 모두 저장되지 않아 43.194초에 실패했다.
-- **판정:** 기존 single Round contract에서 개수, 설명량, prompt 길이와 model만 바꾸는 저위험안 중 latency와 durable reliability를 함께 충족한 것은 없다. production은 Haiku v1.1.6으로 복원했고 어떤 실험 variant도 채택하지 않는다.
-- **권장 Decision Request:** 10개 lightweight preview를 작은 초기 contract로 먼저 저장하고, 그 10개 identity를 고정한 뒤 상세 필드를 background enrichment하는 계약을 다음 구현안으로 제안한다. 선택된 preview를 우선 상세화하고 Spec은 해당 Candidate의 complete revision 뒤에만 허용한다. 독립 batch가 새 후보를 다시 발명하지 않아 parallel spike의 중복을 피한다.
-- **tradeoff:** 사용자는 10개 제목·핵심 방향을 먼저 볼 수 있고 전체 상세도 결국 받지만 일부 행은 잠시 loading 상태가 된다. Candidate preview 상태, staging/finalize transaction, enrichment 실패·재시도와 UI projection이 새로 필요하며 이 구조 자체의 latency는 아직 직접 측정하지 않았다. 따라서 사용자 승인과 contract 문서 변경 전에는 구현하지 않는다.
+- **판정:** 기존 single Round contract에서 개수, 설명량, prompt 길이와 model만 바꾸는 저위험안 중 latency와 durable reliability를 함께 충족한 것은 없다. production은 Haiku v1.1.6으로 복원했고 실험 variant를 직접 채택하지 않는다.
+- **결정:** prompt v1.1.7에서 10개 lightweight preview를 작은 전용 contract로 먼저 durable 저장하고, Core가 발급한 Candidate identity와 final Round identity를 고정한다. 두 background enrichment run은 각각 preview 1~5와 6~10의 완전한 Candidate 의미 필드만 제출하며 새 후보를 발명하거나 preview 제목·핵심 방향을 바꿀 수 없다. 각 batch는 독립적으로 idempotent 저장하고 마지막 누락 batch가 도착한 transaction에서 기존 ProjectCandidate revision 10개와 Candidate Round를 원자적으로 materialize한 뒤에만 Session revision을 올린다. preview를 보는 동안 checkbox basket은 사용할 수 있지만 SELECT·refinement·Spec은 complete Round 뒤에 허용한다.
+- **복구:** 구현 전 안정 상태를 git commit `09edb18`로 보존한다. SQLite 변경은 기존 Candidate·Round table을 수정하지 않는 additive preview/enrichment table과 자동 검증 backup migration으로 제한한다. preview 전 실패는 preview만, 일부 enrichment 실패는 누락 batch만 재시도한다. 사용자가 기존 방식으로 전환하면 같은 Session revision에서 v1.1.6-compatible atomic `submit_candidate_round`를 허용하고, 그 뒤 도착한 staged 결과는 revision/round existence 검사로 거절한다. 새 UI가 staged 상태를 읽지 못하더라도 기존 저장 구조와 complete Round는 손상되지 않는다.
+- **tradeoff:** 사용자는 10개 제목·핵심 방향을 먼저 볼 수 있고 전체 상세도 결국 받지만 일부 행은 잠시 loading 상태가 된다. Candidate preview 상태, staging/finalize transaction, enrichment 실패·재시도와 UI projection이 새로 필요하다. background run 두 개는 호출 수를 늘리지만 서로 다른 고정 identity만 처리해 중복 생성 위험을 줄이고, 실패 범위를 절반으로 제한한다. 이 구조의 실제 preview latency와 최종 수렴 시간은 target 설치본에서 별도로 검증한다.
 
 ## 2026-08-24: 구현 세부 선택 위임
 

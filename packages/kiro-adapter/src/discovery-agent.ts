@@ -4,18 +4,22 @@ import {
   type DiscoveryContext,
   discoveryContextSchema,
   discoveryGetContextQuerySchema,
+  discoverySubmitCandidateEnrichmentsToolInputSchema,
   discoverySubmitCandidateMergeToolInputSchema,
+  discoverySubmitCandidatePreviewsToolInputSchema,
   discoverySubmitCandidateRoundToolInputSchema,
   discoverySubmitLearningSpecToolInputSchema,
   type LearningSpecRevision,
 } from '@vibe-helper/contracts'
 
-export const DISCOVERY_PROMPT_VERSION = '1.1.6' as const
+export const DISCOVERY_PROMPT_VERSION = '1.1.7' as const
 export const DISCOVERY_PROMPT_SOURCE = 'docs/agent-prompts/discovery.md' as const
 export const DISCOVERY_AGENT_NAME = 'vibe-helper-discovery' as const
 export const DISCOVERY_MCP_SERVER_NAME = 'vibe-helper-discovery-core' as const
 export const DISCOVERY_TOOL_NAMES = [
   'get_discovery_context',
+  'submit_candidate_previews',
+  'submit_candidate_enrichments',
   'submit_candidate_round',
   'submit_candidate_merge',
   'submit_learning_spec',
@@ -110,6 +114,18 @@ export class DiscoveryAgentToolAdapter {
   async submitCandidateRound(input: unknown): Promise<CommandReceipt> {
     const request = discoverySubmitCandidateRoundToolInputSchema.parse(input)
     const response = await this.#caller.callTool('submit_candidate_round', request)
+    return parseToolResponse(response, commandReceiptSchema)
+  }
+
+  async submitCandidatePreviews(input: unknown): Promise<CommandReceipt> {
+    const request = discoverySubmitCandidatePreviewsToolInputSchema.parse(input)
+    const response = await this.#caller.callTool('submit_candidate_previews', request)
+    return parseToolResponse(response, commandReceiptSchema)
+  }
+
+  async submitCandidateEnrichments(input: unknown): Promise<CommandReceipt> {
+    const request = discoverySubmitCandidateEnrichmentsToolInputSchema.parse(input)
+    const response = await this.#caller.callTool('submit_candidate_enrichments', request)
     return parseToolResponse(response, commandReceiptSchema)
   }
 

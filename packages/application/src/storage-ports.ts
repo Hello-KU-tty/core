@@ -5,6 +5,8 @@ import type {
   AuditRecord,
   BaselineResult,
   BuilderTask,
+  CandidateEnrichment,
+  CandidatePreviewRound,
   CandidateRound,
   CanonicalConcept,
   ConceptAliasProposal,
@@ -78,6 +80,8 @@ export interface DiscoveryAggregate {
   readonly project: Project
   readonly session: DiscoverySession
   readonly rounds: readonly CandidateRound[]
+  readonly previewRound: CandidatePreviewRound | null
+  readonly candidateEnrichments: readonly CandidateEnrichment[]
   readonly candidates: readonly ProjectCandidateRevision[]
   readonly feedback: readonly DiscoveryFeedback[]
   readonly learningSpecs: readonly LearningSpecRevision[]
@@ -129,6 +133,8 @@ export interface PersistenceRepository {
   appendProject(record: Project): PersistenceWriteResult
   appendDiscoverySession(record: DiscoverySession): PersistenceWriteResult
   appendCandidate(record: ProjectCandidateRevision): PersistenceWriteResult
+  appendCandidatePreviewRound(record: CandidatePreviewRound): PersistenceWriteResult
+  appendCandidateEnrichment(record: CandidateEnrichment): PersistenceWriteResult
   appendCandidateRound(record: CandidateRound): PersistenceWriteResult
   appendDiscoveryFeedback(record: DiscoveryFeedback): PersistenceWriteResult
   appendLearningSpec(record: LearningSpecRevision): PersistenceWriteResult

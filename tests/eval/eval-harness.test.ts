@@ -374,7 +374,7 @@ describe('T15 Discovery Agent v1.1.5 phase split regression', () => {
   })
 })
 
-describe('T15 Discovery Agent v1.1.6 Spec persistence recovery', () => {
+describe('T15 Discovery Agent Spec persistence recovery', () => {
   it('keeps the normal Spec surface submit-only and records the bounded recovery evidence', async () => {
     const prompt = await readFile(
       path.join(workspaceRoot, 'docs/agent-prompts/discovery.md'),
@@ -413,7 +413,7 @@ describe('T15 Discovery Agent v1.1.6 Spec persistence recovery', () => {
       readonly containsPersonalData: boolean
     }
 
-    expect(prompt).toContain('Prompt version: `1.1.6`')
+    expect(prompt).toContain('Prompt version: `1.1.7`')
     expect(prompt).toContain('확인 질문이나 설명으로 끝내지 마라')
     expect(performance).toMatchObject({
       promptVersion: '1.1.6',
@@ -496,6 +496,41 @@ describe('T15 first-Candidate performance alternatives', () => {
       stablePackageRestored: true,
     })
     expect(performance.containsPersonalData).toBe(false)
+  })
+})
+
+describe('T15 Discovery Agent v1.1.7 preview enrichment', () => {
+  it('fixes ten preview identities before two recoverable enrichment batches', async () => {
+    const prompt = await readFile(
+      path.join(workspaceRoot, 'docs/agent-prompts/discovery.md'),
+      'utf8',
+    )
+    const performance = (await loadInput(
+      'tests/eval/fixtures/prompt-regressions/discovery-v1.1.7-preview-enrichment.performance.json',
+    )) as {
+      readonly promptVersion: string
+      readonly previewCount: number
+      readonly enrichmentBatches: readonly { readonly name: string; readonly positions: number[] }[]
+      readonly automatedVerification: Readonly<Record<string, boolean>>
+      readonly targetMeasurement: { readonly status: string }
+      readonly containsPersonalData: boolean
+    }
+
+    expect(prompt).toContain('Prompt version: `1.1.7`')
+    expect(prompt).toContain('lightweight preview를 정확히 10개')
+    expect(prompt).toContain('Candidate identity 정확히 5개만 완성')
+    expect(prompt).toContain('글자 하나도 바꾸지 말고 그대로 복사')
+    expect(performance).toMatchObject({
+      promptVersion: '1.1.7',
+      previewCount: 10,
+      targetMeasurement: { status: 'PENDING' },
+      containsPersonalData: false,
+    })
+    expect(performance.enrichmentBatches).toEqual([
+      { name: 'FIRST', positions: [1, 2, 3, 4, 5] },
+      { name: 'SECOND', positions: [6, 7, 8, 9, 10] },
+    ])
+    expect(Object.values(performance.automatedVerification).every(Boolean)).toBe(true)
   })
 })
 

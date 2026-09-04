@@ -93,6 +93,7 @@ describe('SQLite initialization and migrations', () => {
       now: () => new Date('2026-08-25T12:34:56.789Z'),
     })
     expect(migrated.repository.recoverProject(projectFixture.id)?.project).toEqual(projectFixture)
+    expect(migrated.repository.readDiscoveryAggregate(projectFixture.id)).toBeNull()
     migrated.close()
 
     const backupDirectory = join(dataDirectory, 'backups')
@@ -109,6 +110,13 @@ describe('SQLite initialization and migrations', () => {
     const original = new Database(databasePath, { fileMustExist: true, readonly: true })
     expect(original.pragma('quick_check')).toEqual([{ quick_check: 'ok' }])
     expect(original.prepare('SELECT count(*) AS count FROM projects').get()).toEqual({ count: 1 })
+    expect(
+      original
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('candidate_preview_rounds', 'candidate_enrichments') ORDER BY name",
+        )
+        .all(),
+    ).toEqual([{ name: 'candidate_enrichments' }, { name: 'candidate_preview_rounds' }])
     original.close()
   })
 

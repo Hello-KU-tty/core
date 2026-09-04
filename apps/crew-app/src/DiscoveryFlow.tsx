@@ -1,5 +1,6 @@
 import type {
   CandidateRevisionReference,
+  CandidatePreview,
   DiscoveryFeedback,
   DiscoveryInput,
   ProjectCandidateRevision,
@@ -39,6 +40,10 @@ function candidateReference(candidate: ProjectCandidateRevision): CandidateRevis
 
 function candidateKey(reference: CandidateRevisionReference): string {
   return `${reference.candidateId}:${reference.revision}`
+}
+
+function previewKey(preview: CandidatePreview): string {
+  return candidateKey({ candidateId: preview.candidateId, revision: 1 })
 }
 
 export function AgentRunBanner({ run }: { readonly run: AgentRunView }) {
@@ -347,6 +352,96 @@ function CandidateCard({
   )
 }
 
+function CandidatePreviewCard({
+  preview,
+  candidate,
+  selected,
+  disabled,
+  onToggle,
+}: {
+  readonly preview: CandidatePreview
+  readonly candidate: ProjectCandidateRevision | null
+  readonly selected: boolean
+  readonly disabled: boolean
+  readonly onToggle: () => void
+}) {
+  return (
+    <li className={`candidate-card${selected ? ' candidate-card-selected' : ''}`}>
+      <label className="candidate-check">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onToggle}
+          disabled={disabled}
+          aria-label={`${preview.title} 관심 목록에 담기`}
+        />
+        <span className="candidate-checkmark" aria-hidden="true" />
+        <span>{selected ? '관심 목록에 담았어요' : '관심 목록에 담기'}</span>
+      </label>
+      <div className="candidate-copy">
+        <div className="candidate-title-row">
+          <div>
+            <p className="candidate-tags">{preview.generationTags.join(' · ')}</p>
+            <h3>{preview.title}</h3>
+          </div>
+          <span className="candidate-revision">
+            {candidate === null ? '상세 준비 중' : '상세 준비됨'}
+          </span>
+        </div>
+        <p className="candidate-summary">{preview.summary}</p>
+      </div>
+      <dl className="candidate-facts">
+        <div>
+          <dt>끌리는 이유</dt>
+          <dd>{preview.appeal}</dd>
+        </div>
+        <div>
+          <dt>핵심 경험</dt>
+          <dd>{preview.coreInteraction}</dd>
+        </div>
+      </dl>
+      {candidate === null ? (
+        <div className="candidate-enrichment-pending" role="status">
+          <span aria-hidden="true" />
+          핵심 개념과 MVP 범위를 background에서 채우고 있어요.
+        </div>
+      ) : (
+        <>
+          <div className="candidate-footer">
+            <ul className="concept-chips" aria-label="핵심 개념">
+              {candidate.coreConcepts.map((concept) => (
+                <li key={concept}>{concept}</li>
+              ))}
+            </ul>
+            <span className="candidate-ready-label">선택 준비됨</span>
+          </div>
+          <details className="candidate-details">
+            <summary>세부 범위 미리 보기</summary>
+            <div className="candidate-scope">
+              <p>
+                <strong>내가 집중할 것</strong>
+                {candidate.suggestedScope.learnerFocus.join(' · ')}
+              </p>
+              <p>
+                <strong>Agent가 도울 것</strong>
+                {candidate.suggestedScope.agentSupport.join(' · ')}
+              </p>
+              <p>
+                <strong>MVP에서 뺄 것</strong>
+                {candidate.suggestedScope.excluded.join(' · ')}
+              </p>
+            </div>
+            <p className="candidate-technology">
+              <strong>기술이 필요한 이유</strong>
+              {preview.technologyNecessity}
+            </p>
+          </details>
+        </>
+      )}
+    </li>
+  )
+}
+
 export function DiscoveryWorkspace({
   snapshot,
   run,
@@ -354,6 +449,8 @@ export function DiscoveryWorkspace({
   actionError,
   onFeedback,
   onGenerate,
+  onResumeEnrichment,
+  onLegacyFallback,
   onRestart,
   onBackToSpec,
 }: {
@@ -363,11 +460,14 @@ export function DiscoveryWorkspace({
   readonly actionError: string | null
   readonly onFeedback: (action: DiscoveryFeedbackAction) => Promise<void>
   readonly onGenerate: () => Promise<void>
+  readonly onResumeEnrichment: () => Promise<void>
+  readonly onLegacyFallback: () => Promise<void>
   readonly onRestart: (input: DiscoveryInput) => Promise<void>
   readonly onBackToSpec: () => void
 }) {
   const context = snapshot.discoveryContext
   const latestRound = context?.rounds.at(-1)
+  const previewRound = context?.previewRound ?? null
   const [selectedKeys, setSelectedKeys] = useState<ReadonlySet<string>>(new Set())
   const [message, setMessage] = useState('')
 
@@ -413,6 +513,20 @@ export function DiscoveryWorkspace({
   const selectedTargets = candidates
     .filter((candidate) => selectedKeys.has(candidateKey(candidateReference(candidate))))
     .map(candidateReference)
+  const enrichedPreviewCandidates = new Map(
+    context?.candidateEnrichments.map((enrichment) => [
+      enrichment.candidate.id,
+      enrichment.candidate,
+    ]) ?? [],
+  )
+  const basketItems =
+    latestRound === undefined && previewRound !== null
+      ? previewRound.previews.map((preview) => ({ key: previewKey(preview), title: preview.title }))
+      : candidates.map((candidate) => ({
+          key: candidateKey(candidateReference(candidate)),
+          title: candidate.title,
+        }))
+  const selectedBasketItems = basketItems.filter((item) => selectedKeys.has(item.key))
   const selectedArchive = snapshot.discoverySession?.status === 'SELECTED'
   const inactive =
     selectedArchive ||
@@ -420,6 +534,10 @@ export function DiscoveryWorkspace({
     run.status === 'DISPATCHING' ||
     run.status === 'RUNNING' ||
     run.status === 'BACKGROUND'
+  const previewToggleDisabled = selectedArchive || busy
+  const enrichmentActive =
+    run.status === 'DISPATCHING' || run.status === 'RUNNING' || run.status === 'BACKGROUND'
+  const legacyFallbackDisabled = run.status === 'DISPATCHING' || run.status === 'RUNNING'
 
   const submitFreeFeedback = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault()
@@ -447,12 +565,20 @@ export function DiscoveryWorkspace({
           </p>
         </div>
         <div className="round-summary">
-          <strong>{latestRound === undefined ? '준비 중' : `${candidates.length}개 후보`}</strong>
+          <strong>
+            {latestRound === undefined
+              ? previewRound === null
+                ? '준비 중'
+                : `${String(previewRound.previews.length)}개 미리보기`
+              : `${candidates.length}개 후보`}
+          </strong>
           <span>
             {latestRound === undefined
-              ? '첫 round를 기다리는 중'
+              ? previewRound === null
+                ? '첫 미리보기를 기다리는 중'
+                : `상세 ${String(context?.candidateEnrichments.length ?? 0)}/10 준비됨`
               : latestRound.roundIndex === 1
-                ? '빠르게 고르는 첫 묶음 · 더 볼 수 있어요'
+                ? '10개 상세 후보가 모두 준비됐어요'
                 : `Discovery round ${latestRound.roundIndex}`}
           </span>
         </div>
@@ -475,16 +601,16 @@ export function DiscoveryWorkspace({
           {actionError}
         </p>
       )}
-      {latestRound === undefined ? (
+      {latestRound === undefined && previewRound === null ? (
         run.status === 'IDLE' ? (
           <section className="state-card compact-state">
             <span className="state-mark" aria-hidden="true">
               ◌
             </span>
             <h3>아직 저장된 후보가 없어요.</h3>
-            <p>사용자가 요청할 때만 첫 후보 round를 만듭니다.</p>
+            <p>사용자가 요청할 때만 첫 미리보기 10개를 만듭니다.</p>
             <button type="button" className="primary-button" onClick={() => void onGenerate()}>
-              첫 후보 받기
+              첫 미리보기 받기
             </button>
           </section>
         ) : null
@@ -497,42 +623,39 @@ export function DiscoveryWorkspace({
                   <p className="eyebrow">내 방향 만들기</p>
                   <h3 id="refinement-title">관심 주제를 담고, 생각을 더해보세요.</h3>
                   <p>
-                    아래 목록에서 고른 뒤 이곳으로 돌아오세요. 요청하면 담은 방향만 다듬거나 합치고,
-                    담지 않은 후보는 현재 목록에서 빠져요. 기록은 그대로 남습니다.
+                    {latestRound === undefined
+                      ? '아래 미리보기에서 끌리는 방향을 먼저 담아두세요. 상세가 모두 준비되면 이곳에서 바로 좁히거나 합칠 수 있어요.'
+                      : '아래 목록에서 고른 뒤 이곳으로 돌아오세요. 요청하면 담은 방향만 다듬거나 합치고, 담지 않은 후보는 현재 목록에서 빠져요. 기록은 그대로 남습니다.'}
                   </p>
                 </div>
-                <strong>{selectedTargets.length}개 담음</strong>
+                <strong>{selectedBasketItems.length}개 담음</strong>
               </div>
               <div className="selection-basket" aria-live="polite">
-                {selectedTargets.length === 0 ? (
+                {selectedBasketItems.length === 0 ? (
                   <p>아직 담은 주제가 없어요. 주제를 담지 않고 새 방향을 요청해도 됩니다.</p>
                 ) : (
                   <ul aria-label="관심 목록에 담은 주제">
-                    {candidates
-                      .filter((candidate) =>
-                        selectedKeys.has(candidateKey(candidateReference(candidate))),
+                    {selectedBasketItems.map((item) => {
+                      const key = item.key
+                      return (
+                        <li key={key}>
+                          <span>{item.title}</span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSelectedKeys((current) => {
+                                const next = new Set(current)
+                                next.delete(key)
+                                return next
+                              })
+                            }
+                            aria-label={`${item.title} 관심 목록에서 빼기`}
+                          >
+                            ×
+                          </button>
+                        </li>
                       )
-                      .map((candidate) => {
-                        const key = candidateKey(candidateReference(candidate))
-                        return (
-                          <li key={key}>
-                            <span>{candidate.title}</span>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setSelectedKeys((current) => {
-                                  const next = new Set(current)
-                                  next.delete(key)
-                                  return next
-                                })
-                              }
-                              aria-label={`${candidate.title} 관심 목록에서 빼기`}
-                            >
-                              ×
-                            </button>
-                          </li>
-                        )
-                      })}
+                    })}
                   </ul>
                 )}
               </div>
@@ -547,14 +670,14 @@ export function DiscoveryWorkspace({
                     }
                     maxLength={4_000}
                     rows={4}
-                    disabled={inactive}
+                    disabled={inactive || latestRound === undefined}
                   />
                 </label>
                 <div className="refinement-actions">
                   <button
                     type="button"
                     className="secondary-button"
-                    disabled={inactive}
+                    disabled={inactive || latestRound === undefined}
                     onClick={() =>
                       void onFeedback({
                         intent: 'MORE',
@@ -568,7 +691,7 @@ export function DiscoveryWorkspace({
                   <button
                     type="submit"
                     className="primary-button"
-                    disabled={inactive || message.trim().length === 0}
+                    disabled={inactive || latestRound === undefined || message.trim().length === 0}
                   >
                     {selectedTargets.length === 0
                       ? '새 방향 요청'
@@ -580,32 +703,85 @@ export function DiscoveryWorkspace({
               </form>
             </section>
           )}
+          {latestRound === undefined && previewRound !== null ? (
+            <section className="enrichment-status" aria-labelledby="enrichment-status-title">
+              <div>
+                <p className="eyebrow">미리보기 저장 완료</p>
+                <h3 id="enrichment-status-title">
+                  상세 {String(context?.candidateEnrichments.length ?? 0)}/10 준비됨
+                </h3>
+                <p>
+                  제목과 핵심 방향은 이미 안전하게 저장됐어요. 준비된 상세는 바로 펼쳐볼 수 있고,
+                  나머지는 같은 후보 ID에만 추가됩니다.
+                </p>
+              </div>
+              <div className="enrichment-actions">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={enrichmentActive}
+                  onClick={() => void onResumeEnrichment()}
+                >
+                  누락된 상세만 다시 시도
+                </button>
+                <button
+                  type="button"
+                  className="text-button"
+                  disabled={legacyFallbackDisabled}
+                  onClick={() => void onLegacyFallback()}
+                >
+                  기존 방식으로 후보 생성
+                </button>
+              </div>
+            </section>
+          ) : null}
           <div className="round-note">
             <strong>이번 구성의 기준</strong>
-            <p>{latestRound.generationRationale}</p>
+            <p>{latestRound?.generationRationale ?? previewRound?.generationRationale}</p>
           </div>
           <ol className="candidate-list" aria-label="프로젝트 후보 목록">
-            {candidates.map((candidate) => {
-              const key = candidateKey(candidateReference(candidate))
-              return (
-                <CandidateCard
-                  key={key}
-                  candidate={candidate}
-                  currentRoundIndex={latestRound.roundIndex}
-                  selected={selectedKeys.has(key)}
-                  disabled={inactive}
-                  onToggle={() =>
-                    setSelectedKeys((current) => {
-                      const next = new Set(current)
-                      if (next.has(key)) next.delete(key)
-                      else next.add(key)
-                      return next
-                    })
-                  }
-                  onFeedback={(action) => void onFeedback(action)}
-                />
-              )
-            })}
+            {latestRound === undefined
+              ? previewRound?.previews.map((preview) => {
+                  const key = previewKey(preview)
+                  return (
+                    <CandidatePreviewCard
+                      key={key}
+                      preview={preview}
+                      candidate={enrichedPreviewCandidates.get(preview.candidateId) ?? null}
+                      selected={selectedKeys.has(key)}
+                      disabled={previewToggleDisabled}
+                      onToggle={() =>
+                        setSelectedKeys((current) => {
+                          const next = new Set(current)
+                          if (next.has(key)) next.delete(key)
+                          else next.add(key)
+                          return next
+                        })
+                      }
+                    />
+                  )
+                })
+              : candidates.map((candidate) => {
+                  const key = candidateKey(candidateReference(candidate))
+                  return (
+                    <CandidateCard
+                      key={key}
+                      candidate={candidate}
+                      currentRoundIndex={latestRound.roundIndex}
+                      selected={selectedKeys.has(key)}
+                      disabled={inactive}
+                      onToggle={() =>
+                        setSelectedKeys((current) => {
+                          const next = new Set(current)
+                          if (next.has(key)) next.delete(key)
+                          else next.add(key)
+                          return next
+                        })
+                      }
+                      onFeedback={(action) => void onFeedback(action)}
+                    />
+                  )
+                })}
           </ol>
           {selectedArchive ? (
             <DiscoveryStartView

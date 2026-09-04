@@ -201,6 +201,8 @@ describe('SQLite persistence repository', () => {
       project: records.project,
       session: records.session,
       rounds: [records.round],
+      previewRound: null,
+      candidateEnrichments: [],
       candidates: [records.candidate],
       feedback: [records.selection],
       learningSpecs: [records.draftSpec, records.confirmedSpec],

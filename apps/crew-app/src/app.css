@@ -1144,6 +1144,43 @@ h4 {
   justify-self: start;
 }
 
+.enrichment-status {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--color-brand-border);
+  border-radius: 13px;
+  background: var(--color-brand-weak);
+}
+
+.enrichment-status h3,
+.enrichment-status p {
+  margin: 0;
+}
+
+.enrichment-status h3 {
+  margin-top: 3px;
+  font-size: 15px;
+}
+
+.enrichment-status > div:first-child > p:last-child {
+  margin-top: 6px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.enrichment-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
+}
+
 .refinement-dock {
   display: grid;
   gap: 18px;
@@ -1440,6 +1477,32 @@ h4 {
   flex: 0 0 auto;
   min-height: 40px;
   padding: 9px 15px;
+}
+
+.candidate-enrichment-pending {
+  display: flex;
+  grid-column: 2 / -1;
+  gap: 9px;
+  align-items: center;
+  margin-top: 14px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.candidate-enrichment-pending span {
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--color-brand-border);
+  border-top-color: var(--color-brand);
+  border-radius: 50%;
+  animation: spin 900ms linear infinite;
+}
+
+.candidate-ready-label {
+  flex: 0 0 auto;
+  color: var(--color-positive);
+  font-size: 11px;
+  font-weight: 750;
 }
 
 .candidate-details {
@@ -1807,6 +1870,15 @@ h4 {
 
   .app-header {
     grid-template-columns: 1fr;
+  }
+
+  .enrichment-status {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .enrichment-actions {
+    width: 100%;
   }
 
   .app-header nav a {

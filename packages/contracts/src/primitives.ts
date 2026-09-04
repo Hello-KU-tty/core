@@ -25,6 +25,7 @@ export const stableEntityIdSchema = z
 export const projectIdSchema = prefixedUuidSchema('project')
 export const discoverySessionIdSchema = prefixedUuidSchema('discovery_session')
 export const candidateRoundIdSchema = prefixedUuidSchema('candidate_round')
+export const candidatePreviewRoundIdSchema = prefixedUuidSchema('candidate_preview_round')
 export const candidateIdSchema = prefixedUuidSchema('candidate')
 export const feedbackIdSchema = prefixedUuidSchema('feedback')
 export const learningSpecIdSchema = prefixedUuidSchema('learning_spec')

@@ -49,7 +49,13 @@ interface ConnectRoleOptions {
   readonly toolNames?: readonly string[]
   readonly now?: () => Date
   readonly generateId?: (
-    prefix: 'candidate' | 'candidate_round' | 'learning_spec' | 'context' | 'completion_report',
+    prefix:
+      | 'candidate'
+      | 'candidate_preview_round'
+      | 'candidate_round'
+      | 'learning_spec'
+      | 'context'
+      | 'completion_report',
   ) => string
 }
 
@@ -189,6 +195,8 @@ const connectRole = async (
 const expectedCatalog: Readonly<Record<AgentRole, readonly string[]>> = {
   DISCOVERY: [
     'get_discovery_context',
+    'submit_candidate_previews',
+    'submit_candidate_enrichments',
     'submit_candidate_round',
     'submit_candidate_merge',
     'submit_learning_spec',
@@ -238,6 +246,12 @@ describe('role-bound MCP server', () => {
   })
 
   it('narrows Discovery tool schemas to the requested phase allowlist', async () => {
+    const preview = await connectRole('DISCOVERY', {
+      toolNames: ['get_discovery_context', 'submit_candidate_previews'],
+    })
+    const enrichment = await connectRole('DISCOVERY', {
+      toolNames: ['get_discovery_context', 'submit_candidate_enrichments'],
+    })
     const round = await connectRole('DISCOVERY', {
       toolNames: ['get_discovery_context', 'submit_candidate_round'],
     })
@@ -248,6 +262,12 @@ describe('role-bound MCP server', () => {
       toolNames: ['get_discovery_context', 'submit_candidate_merge'],
     })
     try {
+      await expect(preview.client.listTools()).resolves.toMatchObject({
+        tools: [{ name: 'get_discovery_context' }, { name: 'submit_candidate_previews' }],
+      })
+      await expect(enrichment.client.listTools()).resolves.toMatchObject({
+        tools: [{ name: 'get_discovery_context' }, { name: 'submit_candidate_enrichments' }],
+      })
       await expect(round.client.listTools()).resolves.toMatchObject({
         tools: [{ name: 'get_discovery_context' }, { name: 'submit_candidate_round' }],
       })
@@ -265,6 +285,8 @@ describe('role-bound MCP server', () => {
         }),
       ).toThrow('Unknown DISCOVERY MCP tool selection')
     } finally {
+      await preview.close()
+      await enrichment.close()
       await round.close()
       await spec.close()
       await merge.close()
@@ -436,6 +458,115 @@ describe('role-bound MCP server', () => {
       expect(
         harness.storage.repository.readDiscoveryAggregate(ids.project)?.candidates[0],
       ).not.toHaveProperty('evaluation')
+    } finally {
+      await harness.close()
+    }
+  })
+
+  it('stages ten previews and materializes them only after two fixed enrichment tool calls', async () => {
+    let candidateSequence = 600
+    const generatedPreviewRoundId = 'candidate_preview_round_00000000-0000-4000-8000-000000000601'
+    const generatedFinalRoundId = 'candidate_round_00000000-0000-4000-8000-000000000602'
+    const harness = await connectRole('DISCOVERY', {
+      seedDiscovery: true,
+      now: () => new Date(timestamp),
+      generateId: (prefix) => {
+        if (prefix === 'candidate_preview_round') return generatedPreviewRoundId
+        if (prefix === 'candidate_round') return generatedFinalRoundId
+        if (prefix === 'candidate') {
+          candidateSequence += 1
+          return `candidate_00000000-0000-4000-8000-${String(candidateSequence).padStart(12, '0')}`
+        }
+        return `${prefix}_00000000-0000-4000-8000-000000000699`
+      },
+    })
+    try {
+      const previewDrafts = Array.from({ length: 10 }, (_, index) => ({
+        title: `Preview Tool ${String(index + 1)}`,
+        summary: `Distinct preview direction ${String(index + 1)}.`,
+        coreInteraction: `Run interaction ${String(index + 1)} and inspect the result.`,
+        appeal: `Makes direction ${String(index + 1)} tangible.`,
+        technologyNecessity: `The target type controls direction ${String(index + 1)}.`,
+        generationTags: ['DIRECT'],
+      }))
+      const previewResult = await harness.client.callTool({
+        name: 'submit_candidate_previews',
+        arguments: {
+          schemaVersion: 1,
+          projectId: ids.project,
+          discoverySessionId: ids.discoverySession,
+          correlationId: ids.correlation,
+          idempotencyKey: 'idem_00000000-0000-4000-8000-000000000601',
+          expectedSessionRevision: 1,
+          previews: JSON.stringify(previewDrafts),
+          generationRationale: 'Ten distinct tool-contract previews were staged.',
+        },
+      })
+      expect(previewResult).toMatchObject({
+        structuredContent: { accepted: true, resourceRevision: 1 },
+      })
+      const staged = harness.storage.repository.readDiscoveryAggregate(ids.project)
+      expect(staged?.previewRound?.id).toBe(generatedPreviewRoundId)
+      expect(staged?.previewRound?.previews).toHaveLength(10)
+      expect(staged?.rounds).toHaveLength(0)
+
+      const submitBatch = async (batch: 'FIRST' | 'SECOND', start: number, key: string) => {
+        const previews = staged?.previewRound?.previews.slice(start, start + 5) ?? []
+        const candidates = previews.map((preview) => ({
+          candidateId: preview.candidateId,
+          title: preview.title,
+          summary: preview.summary,
+          targetUsers: candidateFixture.targetUsers,
+          coreInteraction: preview.coreInteraction,
+          usageMoment: candidateFixture.usageMoment,
+          appeal: preview.appeal,
+          personalNeedRelationship: candidateFixture.personalNeedRelationship,
+          technologyNecessity: preview.technologyNecessity,
+          coreConcepts: candidateFixture.coreConcepts,
+          mvpFeatures: candidateFixture.mvpFeatures,
+          suggestedScope: candidateFixture.suggestedScope,
+          generationTags: preview.generationTags,
+        }))
+        return harness.client.callTool({
+          name: 'submit_candidate_enrichments',
+          arguments: {
+            schemaVersion: 1,
+            projectId: ids.project,
+            discoverySessionId: ids.discoverySession,
+            correlationId: ids.correlation,
+            idempotencyKey: key,
+            expectedSessionRevision: 1,
+            previewRoundId: generatedPreviewRoundId,
+            batch,
+            candidates: batch === 'SECOND' ? JSON.stringify(candidates) : candidates,
+          },
+        })
+      }
+
+      await expect(
+        submitBatch('FIRST', 0, 'idem_00000000-0000-4000-8000-000000000602'),
+      ).resolves.toMatchObject({ structuredContent: { resourceRevision: 1 } })
+      expect(harness.storage.repository.readDiscoveryAggregate(ids.project)).toMatchObject({
+        session: { revision: 1 },
+        candidateEnrichments: expect.arrayContaining([
+          expect.objectContaining({
+            candidate: expect.objectContaining({ title: 'Preview Tool 1' }),
+          }),
+        ]),
+        rounds: [],
+      })
+
+      await expect(
+        submitBatch('SECOND', 5, 'idem_00000000-0000-4000-8000-000000000603'),
+      ).resolves.toMatchObject({ structuredContent: { resourceRevision: 2 } })
+      const completed = harness.storage.repository.readDiscoveryAggregate(ids.project)
+      expect(completed?.session.revision).toBe(2)
+      expect(completed?.candidateEnrichments).toHaveLength(10)
+      expect(completed?.candidates).toHaveLength(10)
+      expect(completed?.rounds).toMatchObject([
+        { id: generatedFinalRoundId, candidates: expect.arrayContaining([]) },
+      ])
+      expect(completed?.rounds[0]?.candidates).toHaveLength(10)
     } finally {
       await harness.close()
     }

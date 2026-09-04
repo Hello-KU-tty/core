@@ -24,10 +24,16 @@ import {
   builderTaskContextSchema,
   builderUpdateLiveContextCommandSchema,
   builderUpdateLiveContextToolInputSchema,
+  candidateEnrichmentDraftSchema,
   candidateDraftSchema,
+  candidatePreviewDraftSchema,
   discoveryContextSchema,
   discoveryGetContextQuerySchema,
+  discoverySubmitCandidateEnrichmentsCommandSchema,
+  discoverySubmitCandidateEnrichmentsToolInputSchema,
   discoverySubmitCandidateMergeToolInputSchema,
+  discoverySubmitCandidatePreviewsCommandSchema,
+  discoverySubmitCandidatePreviewsToolInputSchema,
   discoverySubmitCandidateRoundCommandSchema,
   discoverySubmitCandidateRoundToolInputSchema,
   discoverySubmitLearningSpecCommandSchema,
@@ -38,6 +44,7 @@ import {
 import { z } from 'zod'
 
 const MAX_STRINGIFIED_CANDIDATES_BYTES = 512 * 1024
+const MAX_STRINGIFIED_PREVIEWS_BYTES = 128 * 1024
 const discoverySubmitCandidateRoundTransportInputSchema =
   discoverySubmitCandidateRoundToolInputSchema.omit({ candidates: true }).extend({
     candidates: z.union([
@@ -48,6 +55,32 @@ const discoverySubmitCandidateRoundTransportInputSchema =
         .refine(
           (value) => Buffer.byteLength(value, 'utf8') <= MAX_STRINGIFIED_CANDIDATES_BYTES,
           'Stringified Candidate array exceeds the 512 KiB transport limit',
+        ),
+    ]),
+  })
+const discoverySubmitCandidatePreviewsTransportInputSchema =
+  discoverySubmitCandidatePreviewsToolInputSchema.omit({ previews: true }).extend({
+    previews: z.union([
+      z.array(candidatePreviewDraftSchema).length(10),
+      z
+        .string()
+        .max(MAX_STRINGIFIED_PREVIEWS_BYTES)
+        .refine(
+          (value) => Buffer.byteLength(value, 'utf8') <= MAX_STRINGIFIED_PREVIEWS_BYTES,
+          'Stringified Candidate previews exceed the 128 KiB transport limit',
+        ),
+    ]),
+  })
+const discoverySubmitCandidateEnrichmentsTransportInputSchema =
+  discoverySubmitCandidateEnrichmentsToolInputSchema.omit({ candidates: true }).extend({
+    candidates: z.union([
+      z.array(candidateEnrichmentDraftSchema).length(5),
+      z
+        .string()
+        .max(MAX_STRINGIFIED_CANDIDATES_BYTES)
+        .refine(
+          (value) => Buffer.byteLength(value, 'utf8') <= MAX_STRINGIFIED_CANDIDATES_BYTES,
+          'Stringified Candidate enrichments exceed the 512 KiB transport limit',
         ),
     ]),
   })
@@ -68,6 +101,22 @@ export const ROLE_TOOL_CATALOG: Readonly<Record<AgentRole, readonly RoleToolDefi
       description: 'Read the current validated Discovery aggregate.',
       inputSchema: discoveryGetContextQuerySchema,
       readOnly: true,
+    },
+    {
+      name: 'submit_candidate_previews',
+      title: 'Submit Candidate previews',
+      description:
+        'Submit exactly ten lightweight Candidate previews. Core supplies fixed Candidate and eventual Round identities.',
+      inputSchema: discoverySubmitCandidatePreviewsTransportInputSchema,
+      readOnly: false,
+    },
+    {
+      name: 'submit_candidate_enrichments',
+      title: 'Submit Candidate enrichments',
+      description:
+        'Complete exactly one assigned batch of five fixed Candidate preview identities.',
+      inputSchema: discoverySubmitCandidateEnrichmentsTransportInputSchema,
+      readOnly: false,
     },
     {
       name: 'submit_candidate_round',
@@ -184,7 +233,13 @@ export interface RoleBoundMcpServerOptions {
   readonly toolNames?: readonly string[]
   readonly now?: () => Date
   readonly generateId?: (
-    prefix: 'candidate' | 'candidate_round' | 'learning_spec' | 'context' | 'completion_report',
+    prefix:
+      | 'candidate'
+      | 'candidate_preview_round'
+      | 'candidate_round'
+      | 'learning_spec'
+      | 'context'
+      | 'completion_report',
   ) => string
 }
 
@@ -210,19 +265,20 @@ function deterministicId(prefix: 'context' | 'completion_report', idempotencyKey
   return `${prefix}_${uuid}`
 }
 
-async function submitCandidateRoundFromTool(options: RoleBoundMcpServerOptions, input: unknown) {
-  const transportInput = discoverySubmitCandidateRoundTransportInputSchema.parse(input)
-  let normalizedCandidates: unknown = transportInput.candidates
-  if (typeof normalizedCandidates === 'string') {
-    try {
-      normalizedCandidates = JSON.parse(normalizedCandidates)
-    } catch {
-      normalizedCandidates = null
-    }
+function parseStringifiedArray(value: unknown): unknown {
+  if (typeof value !== 'string') return value
+  try {
+    return JSON.parse(value)
+  } catch {
+    return null
   }
-  const toolInput = discoverySubmitCandidateRoundToolInputSchema.parse({
+}
+
+async function submitCandidatePreviewsFromTool(options: RoleBoundMcpServerOptions, input: unknown) {
+  const transportInput = discoverySubmitCandidatePreviewsTransportInputSchema.parse(input)
+  const toolInput = discoverySubmitCandidatePreviewsToolInputSchema.parse({
     ...transportInput,
-    candidates: normalizedCandidates,
+    previews: parseStringifiedArray(transportInput.previews),
   })
   const contextResult = await options.application.executeAgent('DISCOVERY', {
     schemaVersion: 1,
@@ -237,9 +293,107 @@ async function submitCandidateRoundFromTool(options: RoleBoundMcpServerOptions, 
   const createdAt = (options.now ?? (() => new Date()))().toISOString()
   const generateId =
     options.generateId ??
-    ((
-      prefix: 'candidate' | 'candidate_round' | 'learning_spec' | 'context' | 'completion_report',
-    ) => `${prefix}_${randomUUID()}`)
+    ((prefix: Parameters<NonNullable<RoleBoundMcpServerOptions['generateId']>>[0]) =>
+      `${prefix}_${randomUUID()}`)
+  const previewRound = {
+    schemaVersion: 1 as const,
+    id: generateId('candidate_preview_round'),
+    finalRoundId: generateId('candidate_round'),
+    discoverySessionId: toolInput.discoverySessionId,
+    correlationId: toolInput.correlationId,
+    inputSnapshot: context.session.input,
+    previews: toolInput.previews.map((preview, index) => ({
+      candidateId: generateId('candidate'),
+      position: index + 1,
+      ...preview,
+    })),
+    generationRationale: toolInput.generationRationale,
+    createdAt,
+    source: { kind: 'AGENT' as const, role: 'DISCOVERY' as const },
+    redactionStatus: 'NOT_REQUIRED' as const,
+  }
+  return options.application.executeAgent(
+    'DISCOVERY',
+    discoverySubmitCandidatePreviewsCommandSchema.parse({
+      schemaVersion: 1,
+      kind: 'DISCOVERY_SUBMIT_CANDIDATE_PREVIEWS',
+      correlationId: toolInput.correlationId,
+      actor: { kind: 'AGENT', role: 'DISCOVERY' },
+      idempotencyKey: toolInput.idempotencyKey,
+      expectedSessionRevision: toolInput.expectedSessionRevision,
+      previewRound,
+    }),
+  )
+}
+
+async function submitCandidateEnrichmentsFromTool(
+  options: RoleBoundMcpServerOptions,
+  input: unknown,
+) {
+  const transportInput = discoverySubmitCandidateEnrichmentsTransportInputSchema.parse(input)
+  const toolInput = discoverySubmitCandidateEnrichmentsToolInputSchema.parse({
+    ...transportInput,
+    candidates: parseStringifiedArray(transportInput.candidates),
+  })
+  const createdAt = (options.now ?? (() => new Date()))().toISOString()
+  const enrichments = toolInput.candidates.map(({ candidateId, ...content }) => ({
+    schemaVersion: 1 as const,
+    previewRoundId: toolInput.previewRoundId,
+    discoverySessionId: toolInput.discoverySessionId,
+    correlationId: toolInput.correlationId,
+    candidate: {
+      schemaVersion: 1 as const,
+      id: candidateId,
+      discoverySessionId: toolInput.discoverySessionId,
+      correlationId: toolInput.correlationId,
+      revision: 1,
+      parentRevisions: [],
+      ...content,
+      createdAt,
+      source: { kind: 'AGENT' as const, role: 'DISCOVERY' as const },
+      redactionStatus: 'NOT_REQUIRED' as const,
+    },
+    createdAt,
+    source: { kind: 'AGENT' as const, role: 'DISCOVERY' as const },
+    redactionStatus: 'NOT_REQUIRED' as const,
+  }))
+  return options.application.executeAgent(
+    'DISCOVERY',
+    discoverySubmitCandidateEnrichmentsCommandSchema.parse({
+      schemaVersion: 1,
+      kind: 'DISCOVERY_SUBMIT_CANDIDATE_ENRICHMENTS',
+      correlationId: toolInput.correlationId,
+      actor: { kind: 'AGENT', role: 'DISCOVERY' },
+      idempotencyKey: toolInput.idempotencyKey,
+      expectedSessionRevision: toolInput.expectedSessionRevision,
+      previewRoundId: toolInput.previewRoundId,
+      batch: toolInput.batch,
+      enrichments,
+    }),
+  )
+}
+
+async function submitCandidateRoundFromTool(options: RoleBoundMcpServerOptions, input: unknown) {
+  const transportInput = discoverySubmitCandidateRoundTransportInputSchema.parse(input)
+  const toolInput = discoverySubmitCandidateRoundToolInputSchema.parse({
+    ...transportInput,
+    candidates: parseStringifiedArray(transportInput.candidates),
+  })
+  const contextResult = await options.application.executeAgent('DISCOVERY', {
+    schemaVersion: 1,
+    kind: 'DISCOVERY_GET_CONTEXT',
+    correlationId: toolInput.correlationId,
+    actor: { kind: 'AGENT', role: 'DISCOVERY' },
+    projectId: toolInput.projectId,
+    discoverySessionId: toolInput.discoverySessionId,
+  })
+  if (!contextResult.success) return contextResult
+  const context = discoveryContextSchema.parse(contextResult.data)
+  const createdAt = (options.now ?? (() => new Date()))().toISOString()
+  const generateId =
+    options.generateId ??
+    ((prefix: Parameters<NonNullable<RoleBoundMcpServerOptions['generateId']>>[0]) =>
+      `${prefix}_${randomUUID()}`)
   const candidates = toolInput.candidates.map((draft) => {
     const { lineage, ...content } = draft
     const identity =
@@ -595,21 +749,25 @@ export function createRoleBoundMcpServer(options: RoleBoundMcpServerOptions): Mc
       },
       async (input) => {
         const result =
-          options.role === 'DISCOVERY' && tool.name === 'submit_candidate_round'
-            ? await submitCandidateRoundFromTool(options, input)
-            : options.role === 'DISCOVERY' && tool.name === 'submit_candidate_merge'
-              ? await submitCandidateMergeFromTool(options, input)
-              : options.role === 'DISCOVERY' && tool.name === 'submit_learning_spec'
-                ? await submitLearningSpecFromTool(options, input)
-                : options.role === 'BUILDER' && tool.name === 'update_build_context'
-                  ? await updateLiveContextFromTool(options, input)
-                  : options.role === 'BUILDER' && tool.name === 'request_user_decision'
-                    ? await requestDecisionFromTool(options, input)
-                    : options.role === 'BUILDER' && tool.name === 'apply_decision_result'
-                      ? await applyDecisionFromTool(options, input)
-                      : options.role === 'BUILDER' && tool.name === 'complete_task'
-                        ? await completeTaskFromTool(options, input)
-                        : await options.application.executeAgent(options.role, input)
+          options.role === 'DISCOVERY' && tool.name === 'submit_candidate_previews'
+            ? await submitCandidatePreviewsFromTool(options, input)
+            : options.role === 'DISCOVERY' && tool.name === 'submit_candidate_enrichments'
+              ? await submitCandidateEnrichmentsFromTool(options, input)
+              : options.role === 'DISCOVERY' && tool.name === 'submit_candidate_round'
+                ? await submitCandidateRoundFromTool(options, input)
+                : options.role === 'DISCOVERY' && tool.name === 'submit_candidate_merge'
+                  ? await submitCandidateMergeFromTool(options, input)
+                  : options.role === 'DISCOVERY' && tool.name === 'submit_learning_spec'
+                    ? await submitLearningSpecFromTool(options, input)
+                    : options.role === 'BUILDER' && tool.name === 'update_build_context'
+                      ? await updateLiveContextFromTool(options, input)
+                      : options.role === 'BUILDER' && tool.name === 'request_user_decision'
+                        ? await requestDecisionFromTool(options, input)
+                        : options.role === 'BUILDER' && tool.name === 'apply_decision_result'
+                          ? await applyDecisionFromTool(options, input)
+                          : options.role === 'BUILDER' && tool.name === 'complete_task'
+                            ? await completeTaskFromTool(options, input)
+                            : await options.application.executeAgent(options.role, input)
         const payload = toJsonObject(result.success ? result.data : result.error)
         return {
           content: [{ type: 'text', text: JSON.stringify(payload) }],

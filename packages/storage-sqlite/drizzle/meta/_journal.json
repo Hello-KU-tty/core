@@ -43,6 +43,13 @@
       "when": 1788278732216,
       "tag": "0005_overrated_vapor",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1788530637440,
+      "tag": "0006_freezing_wolf_cub",
+      "breakpoints": true
     }
   ]
 }

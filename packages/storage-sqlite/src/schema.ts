@@ -93,6 +93,45 @@ export const discoverySessionRevisions = sqliteTable(
   ],
 )
 
+export const candidatePreviewRounds = sqliteTable(
+  'candidate_preview_rounds',
+  {
+    id: text('id').primaryKey(),
+    sessionId: text('session_id')
+      .notNull()
+      .references(() => discoverySessions.id, { onDelete: 'restrict' }),
+    finalRoundId: text('final_round_id').notNull().unique(),
+    correlationId: text('correlation_id').notNull(),
+    createdAt: text('created_at').notNull(),
+    ...payloadColumns(),
+  },
+  (table) => [
+    uniqueIndex('candidate_preview_rounds_session_unique').on(table.sessionId),
+    check('candidate_preview_rounds_payload_json_valid', sql`json_valid(${table.payloadJson})`),
+  ],
+)
+
+export const candidateEnrichments = sqliteTable(
+  'candidate_enrichments',
+  {
+    candidateId: text('candidate_id').primaryKey(),
+    previewRoundId: text('preview_round_id')
+      .notNull()
+      .references(() => candidatePreviewRounds.id, { onDelete: 'restrict' }),
+    sessionId: text('session_id')
+      .notNull()
+      .references(() => discoverySessions.id, { onDelete: 'restrict' }),
+    correlationId: text('correlation_id').notNull(),
+    createdAt: text('created_at').notNull(),
+    ...payloadColumns(),
+  },
+  (table) => [
+    index('candidate_enrichments_preview_round_idx').on(table.previewRoundId),
+    index('candidate_enrichments_session_idx').on(table.sessionId),
+    check('candidate_enrichments_payload_json_valid', sql`json_valid(${table.payloadJson})`),
+  ],
+)
+
 export const candidates = sqliteTable(
   'candidates',
   {

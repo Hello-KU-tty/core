@@ -1,13 +1,13 @@
 {
   "name": "vibe-helper",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "displayName": "Vibe Helper",
   "description": "Learn unfamiliar development concepts by building a project you personally need.",
   "author": "hurdoo",
   "tags": ["learning", "developer-tools", "projects"],
   "defaultEnabled": false,
   "ui": {
-    "entry": "dist/index-0.1.1.mjs",
+    "entry": "dist/index-0.1.2.mjs",
     "pages": [{ "route": "/apps/vibe-helper", "label": "Vibe Helper", "icon": "Sprout" }]
   },
   "permissions": {
@@ -17,12 +17,20 @@
     "events": []
   },
   "agents": [
+    "agents/vibe-helper-discovery-preview.json",
+    "agents/vibe-helper-discovery-enrichment.json",
     "agents/vibe-helper-discovery-round.json",
     "agents/vibe-helper-discovery-merge.json",
     "agents/vibe-helper-discovery-spec.json",
     "agents/vibe-helper-discovery-spec-recovery.json"
   ],
   "mcpServers": {
+    "discovery-preview-core": {
+      "url": "http://127.0.0.1:9100/mcp/discovery-preview"
+    },
+    "discovery-enrichment-core": {
+      "url": "http://127.0.0.1:9100/mcp/discovery-enrichment"
+    },
     "discovery-round-core": {
       "url": "http://127.0.0.1:9100/mcp/discovery-round"
     },

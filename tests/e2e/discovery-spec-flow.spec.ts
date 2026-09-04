@@ -38,7 +38,7 @@ async function executeBackend(
 }
 
 async function executeUi(request: APIRequestContext, input: Readonly<Record<string, unknown>>) {
-  return executeBackend(request, applicationPath, { ...input, clientProtocolVersion: 2 })
+  return executeBackend(request, applicationPath, { ...input, clientProtocolVersion: 3 })
 }
 
 async function executeDiscoveryAgent(
@@ -234,6 +234,116 @@ async function submitCandidateRound(
   expect(await response.json()).toMatchObject({ success: true })
 }
 
+const initialPreviewDirections = [
+  [
+    'Safe Config Lab',
+    '잘못된 설정을 직접 넣어 보며 runtime validation의 역할을 확인하는 로컬 실험실',
+  ],
+  ['API Shape Detective', '여러 API 응답 모양을 비교하고 안전하게 좁히는 탐정형 playground'],
+  ['Webhook Replay Desk', '서로 다른 webhook payload를 재생하고 분기 결과를 비교하는 도구'],
+  ['Form State Theater', '복잡한 폼 상태를 명시적 variant로 바꾸며 흐름을 확인하는 도구'],
+  ['CLI Result Sorter', '명령 결과를 성공과 실패 상태로 분류하며 안전한 분기를 연습하는 도구'],
+  ['Import Guard', '가져온 JSON의 모양을 검사하고 유효한 데이터만 여는 작은 도구'],
+  ['Plugin Signal Map', 'plugin message 종류별 처리 흐름을 눈으로 따라가는 도구'],
+  ['Nullable Row Lab', '비어 있을 수 있는 query 결과를 명시적 상태로 바꾸는 실험실'],
+  ['Event Variant Board', '여러 event variant가 화면 상태로 바뀌는 과정을 비교하는 보드'],
+  ['Schema Error Coach', '검증 오류를 초보자용 설명으로 바꾸는 로컬 코치'],
+] as const
+
+async function submitCandidatePreviews(
+  request: APIRequestContext,
+  snapshot: ProjectSessionSnapshot,
+): Promise<void> {
+  const session = snapshot.discoverySession
+  if (session === null) throw new TypeError('Discovery session is missing')
+  const response = await executeDiscoveryAgent(request, {
+    schemaVersion: 1,
+    kind: 'DISCOVERY_SUBMIT_CANDIDATE_PREVIEWS',
+    correlationId: session.correlationId,
+    actor: { kind: 'AGENT', role: 'DISCOVERY' },
+    idempotencyKey: id('idem'),
+    expectedSessionRevision: session.revision,
+    previewRound: {
+      schemaVersion: 1,
+      id: id('candidate_preview_round'),
+      finalRoundId: id('candidate_round'),
+      discoverySessionId: session.id,
+      correlationId: session.correlationId,
+      inputSnapshot: session.input,
+      previews: initialPreviewDirections.map(([title, summary], index) => ({
+        candidateId: id('candidate'),
+        position: index + 1,
+        title,
+        summary,
+        coreInteraction: `샘플 ${String(index + 1)}을 입력하고 타입이 좁혀지는 결과를 비교한다.`,
+        appeal: `보이지 않던 경계 ${String(index + 1)}을 직접 깨뜨리고 고칠 수 있다.`,
+        technologyNecessity: '실행 시점 입력을 TypeScript의 안전한 상태로 바꿔야 한다.',
+        generationTags: ['DIRECT'],
+      })),
+      generationRationale: '서로 다른 입력과 상호작용을 가진 10개 방향을 먼저 비교했다.',
+      createdAt: new Date().toISOString(),
+      source: { kind: 'AGENT', role: 'DISCOVERY' },
+      redactionStatus: 'NOT_REQUIRED',
+    },
+  })
+  expect(await response.json()).toMatchObject({ success: true })
+}
+
+async function submitCandidateEnrichment(
+  request: APIRequestContext,
+  snapshot: ProjectSessionSnapshot,
+  batch: 'FIRST' | 'SECOND',
+): Promise<void> {
+  const session = snapshot.discoverySession
+  const previewRound = snapshot.discoveryContext?.previewRound
+  if (session === null || previewRound === null || previewRound === undefined) {
+    throw new TypeError('Candidate preview context is missing')
+  }
+  const previews = previewRound.previews.filter((preview) =>
+    batch === 'FIRST' ? preview.position <= 5 : preview.position > 5,
+  )
+  const now = new Date().toISOString()
+  const response = await executeDiscoveryAgent(request, {
+    schemaVersion: 1,
+    kind: 'DISCOVERY_SUBMIT_CANDIDATE_ENRICHMENTS',
+    correlationId: session.correlationId,
+    actor: { kind: 'AGENT', role: 'DISCOVERY' },
+    idempotencyKey: id('idem'),
+    expectedSessionRevision: session.revision,
+    previewRoundId: previewRound.id,
+    batch,
+    enrichments: previews.map((preview) => {
+      const details = candidateContent(preview.title, preview.summary)
+      return {
+        schemaVersion: 1,
+        previewRoundId: previewRound.id,
+        discoverySessionId: session.id,
+        correlationId: session.correlationId,
+        candidate: {
+          schemaVersion: 1,
+          id: preview.candidateId,
+          discoverySessionId: session.id,
+          correlationId: session.correlationId,
+          revision: 1,
+          parentRevisions: [],
+          ...details,
+          coreInteraction: preview.coreInteraction,
+          appeal: preview.appeal,
+          technologyNecessity: preview.technologyNecessity,
+          generationTags: preview.generationTags,
+          createdAt: now,
+          source: { kind: 'AGENT', role: 'DISCOVERY' },
+          redactionStatus: 'NOT_REQUIRED',
+        },
+        createdAt: now,
+        source: { kind: 'AGENT', role: 'DISCOVERY' },
+        redactionStatus: 'NOT_REQUIRED',
+      }
+    }),
+  })
+  expect(await response.json()).toMatchObject({ success: true })
+}
+
 async function submitLearningSpec(
   request: APIRequestContext,
   snapshot: ProjectSessionSnapshot,
@@ -324,13 +434,28 @@ async function fulfillAgentTurn(
     `expectedSessionRevision=${snapshot.discoverySession.revision}`,
   )
   expect(dispatch.message).toMatch(/idempotencyKey=idem_[0-9a-f-]{36}/)
-  const agentPhase = String(dispatch.agent).replace('vibe-helper-discovery-', '')
-  expect(['round', 'merge', 'spec']).toContain(agentPhase)
+  const agentName = String(dispatch.agent)
+  const slot = String(dispatch.slot)
+  const agentPhase = agentName.replace('vibe-helper-discovery-', '')
+  expect(['preview', 'enrichment', 'round', 'merge', 'spec']).toContain(agentPhase)
+  const slotPhase = slot.includes('-enrich-first-')
+    ? 'enrich-first'
+    : slot.includes('-enrich-second-')
+      ? 'enrich-second'
+      : agentPhase
   expect(dispatch.slot).toBe(
-    `vibe-helper-discovery-${agentPhase}-${snapshot.discoverySession.id}-${snapshot.discoverySession.revision}`,
+    `vibe-helper-discovery-${slotPhase}-${snapshot.discoverySession.id}-${snapshot.discoverySession.revision}`,
   )
   if (snapshot.discoverySession.status === 'SELECTED') {
     await submitLearningSpec(request, snapshot)
+  } else if (agentPhase === 'preview') {
+    await submitCandidatePreviews(request, snapshot)
+  } else if (agentPhase === 'enrichment') {
+    await submitCandidateEnrichment(
+      request,
+      snapshot,
+      slotPhase === 'enrich-first' ? 'FIRST' : 'SECOND',
+    )
   } else {
     await submitCandidateRound(request, snapshot)
   }
@@ -380,7 +505,7 @@ test('runs list selection, Agent refinement, visual Spec review, and Builder pre
     has: page.getByRole('heading', { name: 'Safe Config Lab', exact: true }),
   })
   await expect(firstCandidate).toBeVisible()
-  await expect(page.getByText('4개 후보')).toBeVisible()
+  await expect(page.getByText('10개 후보')).toBeVisible()
   const composerBox = await page.locator('.refinement-dock').boundingBox()
   const candidateListBox = await page.locator('.candidate-list').boundingBox()
   expect(composerBox).not.toBeNull()
@@ -459,7 +584,7 @@ test('runs list selection, Agent refinement, visual Spec review, and Builder pre
   await page.setViewportSize({ width: 1280, height: 720 })
 
   await page.getByRole('button', { name: '다른 후보 4개 더 보기' }).click()
-  await expect(page.getByText('8개 후보')).toBeVisible()
+  await expect(page.getByText('14개 후보')).toBeVisible()
   await interestCheckbox.focus()
   await page.keyboard.press('Space')
   await expect(interestCheckbox).toBeChecked()
@@ -505,9 +630,9 @@ test('runs list selection, Agent refinement, visual Spec review, and Builder pre
     page.getByRole('heading', { name: 'Safe Config Lab · 작은 MVP', exact: true }),
   ).toBeVisible()
   await expect(page.getByRole('button', { name: '새 후보 받기' })).toBeVisible()
-  expect(agentDispatches).toBe(5)
+  expect(agentDispatches).toBe(7)
   await page.getByRole('button', { name: 'Spec으로 돌아가기' }).click()
-  expect(agentDispatches).toBe(5)
+  expect(agentDispatches).toBe(7)
   const prepare = page.getByRole('button', { name: '이대로 시작' })
   await expect(prepare).toBeVisible()
   await expect(prepare).toBeEnabled()
@@ -519,6 +644,51 @@ test('runs list selection, Agent refinement, visual Spec review, and Builder pre
   ).toBeVisible()
   await expect(page.getByText('PENDING', { exact: true })).toBeVisible()
   expect(pageErrors).toEqual([])
+})
+
+test('shows durable previews and keeps the basket usable while fixed Candidate details are still loading', async ({
+  page,
+  request,
+}) => {
+  await page.route('**/api/chat', async (route) => {
+    const dispatch = route.request().postDataJSON()
+    const projectId = projectIdFromRoute(route)
+    if (dispatch.agent !== 'vibe-helper-discovery-enrichment') {
+      await fulfillAgentTurn(route, request, projectId)
+      return
+    }
+    await new Promise<void>((resolve) => setTimeout(resolve, 1_200))
+    const snapshot = await restoreProject(request, projectId)
+    const slot = String(dispatch.slot)
+    await submitCandidateEnrichment(
+      request,
+      snapshot,
+      slot.includes('-enrich-first-') ? 'FIRST' : 'SECOND',
+    )
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/event-stream',
+      body: 'data: {"type":"done"}\n\n',
+    })
+  })
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/#/discovery')
+  await startFromKeyboard(page)
+  await expect(page.getByText('10개 미리보기')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '상세 0/10 준비됨' })).toBeVisible()
+  const previewCheckbox = page.getByRole('checkbox', {
+    name: 'Safe Config Lab 관심 목록에 담기',
+  })
+  await previewCheckbox.click()
+  await expect(previewCheckbox).toBeChecked()
+  await expect(page.getByText('1개 담음')).toBeVisible()
+  await expect(page.getByLabel('Agent에게 원하는 방향 말하기')).toBeDisabled()
+  await expect(page.getByRole('button', { name: '이 방향 선택' })).toHaveCount(0)
+
+  await expect(page.getByText('10개 후보')).toBeVisible()
+  await expect(previewCheckbox).toBeChecked()
+  await expect(page.getByRole('button', { name: '이 방향 선택' }).first()).toBeEnabled()
 })
 
 test('distinguishes a Crew host disconnect from saved Core state and retries safely', async ({
@@ -541,7 +711,7 @@ test('distinguishes a Crew host disconnect from saved Core state and retries saf
   await expect(page.getByText(/이미 Core에 저장된 프로젝트와 피드백은 유지/)).toBeVisible()
   await page.getByRole('button', { name: '상태 확인 후 다시 시도' }).click()
   await expect(page.getByRole('heading', { name: 'Safe Config Lab', exact: true })).toBeVisible()
-  expect(attempts).toBe(2)
+  expect(attempts).toBeGreaterThanOrEqual(2)
 })
 
 test('starts a new Discovery only after the user edits or confirms the restored input', async ({
@@ -564,18 +734,18 @@ test('starts a new Discovery only after the user edits or confirms the restored 
   await expect(
     page.getByRole('heading', { name: '이 범위라면 바로 시작할 수 있어요.' }),
   ).toBeVisible()
-  expect(agentDispatches).toBe(2)
+  expect(agentDispatches).toBe(4)
 
   await page.getByRole('button', { name: /다른 주제로 돌아가기/ }).click()
   await expect(page.getByText('이전 후보를 그대로 보고 있어요.')).toBeVisible()
-  expect(agentDispatches).toBe(2)
+  expect(agentDispatches).toBe(4)
 
   const nextGoal = 'TypeScript runtime validation으로 로컬 CSV 검사기 만들기'
   await page.getByLabel(/무엇을 배우고 싶나요/).fill(nextGoal)
   await page.getByRole('button', { name: '새 후보 받기' }).click()
   await expect(page.getByRole('heading', { name: nextGoal, exact: true })).toBeVisible()
-  await expect(page.getByText('4개 후보')).toBeVisible()
-  expect(agentDispatches).toBe(3)
+  await expect(page.getByText('10개 후보')).toBeVisible()
+  expect(agentDispatches).toBe(7)
 
   const projectMatch = page.url().match(/project=(project_[0-9a-f-]{36})/)
   expect(projectMatch?.[1]).toBeDefined()
@@ -594,11 +764,15 @@ test('releases the UI after the foreground budget while Core completion continue
     const projectId = projectIdFromRoute(route)
     const snapshot = await restoreProject(request, projectId)
     const dispatch = route.request().postDataJSON()
+    if (dispatch.agent !== 'vibe-helper-discovery-preview') {
+      await fulfillAgentTurn(route, request, projectId)
+      return
+    }
     expect(dispatch.slot).toBe(
-      `vibe-helper-discovery-round-${snapshot.discoverySession?.id}-${snapshot.discoverySession?.revision}`,
+      `vibe-helper-discovery-preview-${snapshot.discoverySession?.id}-${snapshot.discoverySession?.revision}`,
     )
     void new Promise<void>((resolve) => setTimeout(resolve, 1_600))
-      .then(() => submitCandidateRound(request, snapshot))
+      .then(() => submitCandidatePreviews(request, snapshot))
       .catch((error: unknown) => {
         delayedFailure = error
       })
@@ -687,15 +861,15 @@ test('restores an in-flight Discovery run after re-entry without dispatching it 
       )
     },
     {
-      key: `vibe-helper-discovery-round-${initial.discoverySession?.id}-${initial.discoverySession?.revision}`,
-      agent: 'vibe-helper-discovery-round',
+      key: `vibe-helper-discovery-preview-${initial.discoverySession?.id}-${initial.discoverySession?.revision}`,
+      agent: 'vibe-helper-discovery-preview',
     },
   )
   await page.goto(`/#/discovery?project=${projectId}`)
 
   await expect(page.getByText('이전에 시작한 Agent 작업을 다시 연결했습니다.')).toBeVisible()
   expect(agentDispatches).toBe(0)
-  await submitCandidateRound(request, initial)
+  await submitCandidatePreviews(request, initial)
   await expect(page.getByRole('heading', { name: 'Safe Config Lab', exact: true })).toBeVisible()
   expect(agentDispatches).toBe(0)
 })
@@ -707,7 +881,7 @@ test('retries one Spec refinement when the first response skips its submit tool'
   let agentDispatches = 0
   await page.route('**/api/chat', async (route) => {
     agentDispatches += 1
-    if (agentDispatches !== 3) {
+    if (agentDispatches !== 5) {
       await fulfillAgentTurn(route, request, projectIdFromRoute(route))
       return
     }
@@ -733,7 +907,7 @@ test('retries one Spec refinement when the first response skips its submit tool'
   await page.getByRole('button', { name: 'Agent에게 다시 정리해달라고 하기' }).click()
 
   await expect(page.getByText('권장 Learning Spec · revision 2')).toBeVisible()
-  expect(agentDispatches).toBe(4)
+  expect(agentDispatches).toBe(6)
 })
 
 test('shows a refresh instruction when the backend rejects a stale UI protocol', async ({
@@ -743,7 +917,7 @@ test('shows a refresh instruction when the backend rejects a stale UI protocol',
     await route.fulfill({
       status: 409,
       contentType: 'application/json',
-      body: JSON.stringify({ error: 'ui protocol mismatch', expectedProtocolVersion: 2 }),
+      body: JSON.stringify({ error: 'ui protocol mismatch', expectedProtocolVersion: 3 }),
     })
   })
 

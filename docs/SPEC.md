@@ -112,7 +112,7 @@ Concept Ledger + Project History
 - `FR-DIS-001`: 시스템은 Learning Goal을 필수 입력으로 받아야 한다.
 - `FR-DIS-002`: Personal Need, 최근 불편, 관심 영역과 현재 수준은 선택 입력이어야 한다.
 - `FR-DIS-003`: 시스템은 available time을 필수·선택 입력으로 요구하지 않아야 한다.
-- `FR-DIS-004`: 첫 round는 응답 대기와 첫 판단 부담을 낮추기 위해 빠르게 훑을 수 있는 4~6개 후보를 우선 만들고, 사용자의 `다른 후보 더 보기` 요청은 기존 후보를 보존한 채 누적 약 8~10개로 확장해야 한다. 개수는 고정 계약이 아니며 UI는 이 progressive 방식과 추가 action을 명시해야 한다.
+- `FR-DIS-004`: 첫 round는 응답 대기와 첫 판단 부담을 낮추기 위해 제목, 요약, 매력 이유, 핵심 상호작용과 기술 필요성을 담은 lightweight preview 10개를 먼저 durable 저장해야 한다. 같은 preview identity의 핵심 개념, MVP와 권장 범위는 background enrichment로 완성하고, UI는 준비된 필드와 보강 중인 필드를 구분해야 한다.
 - `FR-DIS-005`: 고정된 주제 taxonomy에서 후보를 순환하지 않아야 한다.
 - `FR-DIS-006`: 후보는 문제 영역, 대상 사용자, 핵심 상호작용, 데이터 구조와 매력 이유가 실제로 달라야 한다.
 - `FR-DIS-007`: Personal Need가 있으면 관련 후보와 독립 후보를 함께 제안해야 한다.
@@ -125,6 +125,9 @@ Concept Ledger + Project History
 - `FR-DIS-014`: Candidate는 여러 열의 고정 높이 card grid가 아니라 제목·요약·핵심 경험을 한 줄 흐름으로 비교할 수 있는 목록이어야 한다.
 - `FR-DIS-015`: Candidate checkbox는 선택·비선택 상태를 색상 외에도 check mark, outline과 설명으로 구분하고 모바일에서 충분한 터치 영역을 제공해야 한다.
 - `FR-DIS-016`: Candidate refinement 자유 입력은 목록보다 먼저 보여야 하며 선택된 후보의 제목과 개수를 입력 옆에서 확인할 수 있어야 한다.
+- `FR-DIS-017`: preview identity가 저장된 뒤 enrichment Agent는 새 후보를 발명하거나 제목·핵심 방향을 바꾸지 않고 지정된 preview만 완성해야 한다. 모든 preview가 완성될 때 기존 ProjectCandidate revision과 Candidate Round를 한 transaction에서 materialize해야 한다.
+- `FR-DIS-018`: preview와 enrichment는 독립적인 idempotency 경계를 가져야 한다. 실패 시 저장된 preview와 성공한 enrichment를 보존하고 누락된 batch만 재시도하며, 사용자는 같은 Session revision에서 기존 atomic Candidate Round 생성으로 전환할 수 있어야 한다. 늦게 도착한 staged 결과는 이미 생성된 Round를 덮어쓰지 않아야 한다.
+- `FR-DIS-019`: preview는 상세 보강 중에도 checkbox 관심 목록에 담을 수 있지만, SELECT·refinement와 Spec 생성은 참조하는 Candidate가 complete revision으로 materialize된 뒤에만 허용해야 한다.
 
 완료 관찰:
 
@@ -258,10 +261,10 @@ Concept Ledger + Project History
 - `NFR-PERF-005`: local Analyst dispatch는 UI를 막지 않고 1초 안에 반환하는 것을 초기 목표로 하며, 한 attempt의 soft timeout은 30초로 둔다.
 - `NFR-PERF-006`: Analyst는 Event마다가 아니라 닫힌 Episode마다 한 번 호출한다. 자동 retry는 초기값 1회로 제한하고 이후 재시도는 명시적 상태로 남긴다.
 - `NFR-PERF-007`: Discovery→Spec→Discovery 복귀는 local Core 조회만으로 1초 안에 끝내고 Agent 호출 횟수는 0회여야 한다.
-- `NFR-PERF-008`: 사용자와 직접 상호작용하는 Discovery 첫 Candidate, 단일 refinement와 Spec 초안은 target 환경에서 각각 30초 이내를 목표로 하고, 첫 유용 반응은 3~5초를 지향한다. T15 release gate는 최종 설치본의 대표 end-to-end 실행 한 번에서 세 구간이 모두 30초 이내이고 사용자가 결과를 승인하는 것으로 판정하며, 장기 P95 표본은 T21에서 수집한다. provider/model/config별 latency를 같은 unseen 입력으로 비교하며 30초가 지나면 작업은 백그라운드에서 이어지되 사용자가 저장된 결과를 보거나 다른 화면으로 이동하는 것을 막지 않아야 한다.
+- `NFR-PERF-008`: 사용자와 직접 상호작용하는 Discovery 첫 durable Candidate preview, 단일 refinement와 Spec 초안은 target 환경에서 각각 30초 이내를 목표로 하고, 첫 유용 반응은 3~5초를 지향한다. T15 release gate는 최종 설치본의 대표 end-to-end 실행 한 번에서 10개 preview 저장, refinement와 Spec 구간이 모두 30초 이내이고 background enrichment가 complete Round로 수렴하며 사용자가 결과를 승인하는 것으로 판정한다. 장기 P95 표본은 T21에서 수집한다. provider/model/config별 latency를 같은 unseen 입력으로 비교하며 30초가 지나면 작업은 백그라운드에서 이어지되 사용자가 저장된 결과를 보거나 다른 화면으로 이동하는 것을 막지 않아야 한다.
 - `NFR-PERF-009`: Agent tool input의 구조적 형식 오류는 transport 경계에서 안전하게 정규화하거나 즉시 표시하고, 같은 의미 내용을 모델이 다시 생성하게 만들지 않아야 한다. tool validation 재시도율의 초기 목표는 1% 미만이다.
 
-T01 macOS probe의 두 실행은 20~37ms에 dispatch가 반환되고 약 12초 안에 결과 validation을 마쳤다. T15 model screen에서는 `auto` 첫 Candidate 41.6초, `claude-haiku-4.5` 22.1초였고 Luna는 contract를 지키지 못했다. Haiku 고정, ephemeral Core context, phase별 최소 prompt/tool과 Core-derived MERGE를 적용한 v1.1.5 target 5회에서 first Candidate·MERGE·first Spec의 nearest-rank P95는 각각 26.564초·21.044초·22.900초였고 15개 phase가 모두 durable 저장에 성공했다. v1.1.6 Spec 수정 재검증에서는 Haiku 정상 수정이 19.256~24.903초였지만 raw 2회 중 1회가 no-tool로 끝나 bounded 1회 UI 복구를 추가했다. SPEC만 Terra는 첫 Spec 43.257초, Auto는 첫 Spec 39.240초·수정 36.027초로 30초 gate를 넘겨 Haiku를 유지한다. 사용자 승인에 따른 최종 대표 재실행은 MERGE 13.226초, 첫 Spec 18.860초, Spec 수정 23.097초와 revision 2 저장에 성공했지만 첫 Candidate가 50.132초여서 T15 gate는 실패했다. T15 잔여 범위는 첫 Candidate 30초 달성뿐이며, 3~5초 first-useful은 stretch goal, 장기 P95는 T21로 남긴다. timeout 뒤 늦은 결과는 현재 job attempt/revision과 일치하지 않으면 버린다.
+T01 macOS probe의 두 실행은 20~37ms에 dispatch가 반환되고 약 12초 안에 결과 validation을 마쳤다. T15 model screen에서는 `auto` 첫 Candidate 41.6초, `claude-haiku-4.5` 22.1초였고 Luna는 contract를 지키지 못했다. Haiku 고정, ephemeral Core context, phase별 최소 prompt/tool과 Core-derived MERGE를 적용한 v1.1.5 target 5회에서 first Candidate·MERGE·first Spec의 nearest-rank P95는 각각 26.564초·21.044초·22.900초였고 15개 phase가 모두 durable 저장에 성공했다. v1.1.6 Spec 수정 재검증에서는 Haiku 정상 수정이 19.256~24.903초였지만 raw 2회 중 1회가 no-tool로 끝나 bounded 1회 UI 복구를 추가했다. SPEC만 Terra는 첫 Spec 43.257초, Auto는 첫 Spec 39.240초·수정 36.027초로 30초 gate를 넘겨 Haiku를 유지한다. 사용자 승인에 따른 최종 대표 재실행은 MERGE 13.226초, 첫 Spec 18.860초, Spec 수정 23.097초와 revision 2 저장에 성공했지만 첫 Candidate가 50.132초여서 T15 gate는 실패했다. 기존 single Round 대안도 latency와 durable reliability를 함께 충족하지 못해, 승인된 v1.1.7 staged 경로는 10개 preview의 durable 저장을 first Candidate 성능 기준으로 삼고 같은 identity의 상세 enrichment를 별도로 관측한다. 3~5초 first-useful은 stretch goal, 장기 P95는 T21로 남긴다. timeout 뒤 늦은 결과는 현재 Session revision과 staged identity가 일치하지 않으면 버린다.
 
 ### 6.2 보안·개인정보
 

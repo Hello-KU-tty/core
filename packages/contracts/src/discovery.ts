@@ -3,6 +3,7 @@ import { z } from 'zod'
 import {
   actorSchema,
   candidateIdSchema,
+  candidatePreviewRoundIdSchema,
   candidateRoundIdSchema,
   correlationIdSchema,
   discoverySessionIdSchema,
@@ -132,6 +133,56 @@ const projectCandidateContentShape = {
   evaluation: candidateEvaluationSchema.optional(),
 } as const
 
+const candidatePreviewContentShape = {
+  title: labelSchema,
+  summary: shortTextSchema,
+  coreInteraction: nonEmptyTextSchema,
+  appeal: nonEmptyTextSchema,
+  technologyNecessity: nonEmptyTextSchema,
+  generationTags: z.array(candidateGenerationTagSchema).min(1).max(4),
+} as const
+
+export const candidatePreviewDraftSchema = z.strictObject(candidatePreviewContentShape)
+
+export const candidatePreviewSchema = z.strictObject({
+  candidateId: candidateIdSchema,
+  position: z.int().min(1).max(10),
+  ...candidatePreviewContentShape,
+})
+
+export const candidatePreviewRoundSchema = z
+  .strictObject({
+    schemaVersion: schemaVersionSchema,
+    id: candidatePreviewRoundIdSchema,
+    finalRoundId: candidateRoundIdSchema,
+    discoverySessionId: discoverySessionIdSchema,
+    correlationId: correlationIdSchema,
+    inputSnapshot: discoveryInputSchema,
+    previews: z.array(candidatePreviewSchema).length(10),
+    generationRationale: nonEmptyTextSchema,
+    createdAt: utcTimestampSchema,
+    source: z.strictObject({ kind: z.literal('AGENT'), role: z.literal('DISCOVERY') }),
+    redactionStatus: redactionStatusSchema,
+  })
+  .superRefine((round, context) => {
+    const candidateIds = round.previews.map((preview) => preview.candidateId)
+    if (new Set(candidateIds).size !== candidateIds.length) {
+      context.addIssue({
+        code: 'custom',
+        path: ['previews'],
+        message: 'Candidate preview identities must be unique',
+      })
+    }
+    const positions = round.previews.map((preview) => preview.position).sort((a, b) => a - b)
+    if (positions.some((position, index) => position !== index + 1)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['previews'],
+        message: 'Candidate preview positions must contain every position from 1 through 10',
+      })
+    }
+  })
+
 export const projectCandidateRevisionSchema = z
   .strictObject({
     schemaVersion: schemaVersionSchema,
@@ -222,6 +273,49 @@ export const discoverySubmitCandidateMergeToolInputSchema =
   discoverySubmitCandidateRoundToolInputSchema
     .omit({ appliedFeedbackIds: true, carriedCandidates: true, candidates: true })
     .extend({ candidate: candidateDraftSchema.omit({ lineage: true }) })
+
+export const discoverySubmitCandidatePreviewsToolInputSchema = z.strictObject({
+  __tool_use_purpose: nonEmptyTextSchema.optional(),
+  schemaVersion: schemaVersionSchema,
+  projectId: projectIdSchema,
+  discoverySessionId: discoverySessionIdSchema,
+  correlationId: correlationIdSchema,
+  idempotencyKey: idempotencyKeySchema,
+  expectedSessionRevision: expectedRevisionSchema,
+  previews: z.array(candidatePreviewDraftSchema).length(10),
+  generationRationale: nonEmptyTextSchema,
+})
+
+export const candidateEnrichmentBatchSchema = z.enum(['FIRST', 'SECOND'])
+
+export const candidateEnrichmentDraftSchema = z.strictObject({
+  candidateId: candidateIdSchema,
+  ...projectCandidateContentShape,
+})
+
+export const candidateEnrichmentSchema = z.strictObject({
+  schemaVersion: schemaVersionSchema,
+  previewRoundId: candidatePreviewRoundIdSchema,
+  discoverySessionId: discoverySessionIdSchema,
+  correlationId: correlationIdSchema,
+  candidate: projectCandidateRevisionSchema,
+  createdAt: utcTimestampSchema,
+  source: z.strictObject({ kind: z.literal('AGENT'), role: z.literal('DISCOVERY') }),
+  redactionStatus: redactionStatusSchema,
+})
+
+export const discoverySubmitCandidateEnrichmentsToolInputSchema = z.strictObject({
+  __tool_use_purpose: nonEmptyTextSchema.optional(),
+  schemaVersion: schemaVersionSchema,
+  projectId: projectIdSchema,
+  discoverySessionId: discoverySessionIdSchema,
+  correlationId: correlationIdSchema,
+  idempotencyKey: idempotencyKeySchema,
+  expectedSessionRevision: expectedRevisionSchema,
+  previewRoundId: candidatePreviewRoundIdSchema,
+  batch: candidateEnrichmentBatchSchema,
+  candidates: z.array(candidateEnrichmentDraftSchema).length(5),
+})
 
 export const candidateRoundSchema = z
   .strictObject({
@@ -340,6 +434,10 @@ export type CandidateRound = z.infer<typeof candidateRoundSchema>
 export type DiscoveryFeedback = z.infer<typeof discoveryFeedbackSchema>
 export type CandidateRevisionReference = z.infer<typeof candidateRevisionReferenceSchema>
 export type CandidateDraft = z.infer<typeof candidateDraftSchema>
+export type CandidatePreview = z.infer<typeof candidatePreviewSchema>
+export type CandidatePreviewRound = z.infer<typeof candidatePreviewRoundSchema>
+export type CandidateEnrichment = z.infer<typeof candidateEnrichmentSchema>
+export type CandidateEnrichmentBatch = z.infer<typeof candidateEnrichmentBatchSchema>
 export type DiscoverySubmitCandidateRoundToolInput = z.infer<
   typeof discoverySubmitCandidateRoundToolInputSchema
 >

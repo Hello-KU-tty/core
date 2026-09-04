@@ -310,6 +310,10 @@ export class ApplicationService {
     switch (request.kind) {
       case 'DISCOVERY_GET_CONTEXT':
         return this.#getDiscoveryContext(request)
+      case 'DISCOVERY_SUBMIT_CANDIDATE_PREVIEWS':
+        return this.#submitCandidatePreviews(request)
+      case 'DISCOVERY_SUBMIT_CANDIDATE_ENRICHMENTS':
+        return this.#submitCandidateEnrichments(request)
       case 'DISCOVERY_SUBMIT_CANDIDATE_ROUND':
         return this.#submitCandidateRound(request)
       case 'DISCOVERY_SUBMIT_LEARNING_SPEC':
@@ -443,6 +447,8 @@ export class ApplicationService {
               candidates: discoveryAggregate.candidates,
               feedback: discoveryAggregate.feedback,
               learningSpec: currentLearningSpec(discoveryAggregate),
+              previewRound: discoveryAggregate.previewRound,
+              candidateEnrichments: discoveryAggregate.candidateEnrichments,
               relevantLedgerEntries: discoveryAggregate.relevantLedgerEntries,
             })
       const scopedLearningSpec =
@@ -580,8 +586,276 @@ export class ApplicationService {
       candidates: aggregate.candidates,
       feedback: aggregate.feedback,
       learningSpec: currentLearningSpec(aggregate),
+      previewRound: aggregate.previewRound,
+      candidateEnrichments: aggregate.candidateEnrichments,
       relevantLedgerEntries: aggregate.relevantLedgerEntries,
     })
+  }
+
+  #submitCandidatePreviews(
+    request: Extract<AgentRequest, { kind: 'DISCOVERY_SUBMIT_CANDIDATE_PREVIEWS' }>,
+  ): CommandReceipt {
+    return this.#storage.transaction((repository) =>
+      this.#idempotent(
+        repository,
+        request,
+        'discovery.submit_candidate_previews',
+        commandReceiptSchema,
+        () => {
+          const scoped = this.#readDiscoveryBySession(
+            repository,
+            request.previewRound.discoverySessionId,
+            request.correlationId,
+          )
+          this.#assertRevision(
+            request.expectedSessionRevision,
+            scoped.session.revision,
+            request.correlationId,
+            'DISCOVERY_SESSION_STALE',
+          )
+          if (scoped.session.status !== 'ACTIVE' || scoped.project.status !== 'DISCOVERY') {
+            throw this.#validationError(
+              request.correlationId,
+              'DISCOVERY_SESSION_NOT_ACTIVE',
+              'Candidate previews can be submitted only while Discovery is active.',
+            )
+          }
+          if (scoped.rounds.length > 0) {
+            throw this.#validationError(
+              request.correlationId,
+              'CANDIDATE_ROUND_ALREADY_EXISTS',
+              'Candidate previews cannot replace an existing Candidate Round.',
+            )
+          }
+          if (scoped.previewRound !== null) {
+            throw this.#validationError(
+              request.correlationId,
+              'CANDIDATE_PREVIEW_ALREADY_EXISTS',
+              'A Candidate Preview Round is already staged for this Session.',
+            )
+          }
+          if (
+            request.previewRound.correlationId !== request.correlationId ||
+            canonicalJson(request.previewRound.inputSnapshot) !==
+              canonicalJson(scoped.session.input)
+          ) {
+            throw this.#validationError(
+              request.correlationId,
+              'CANDIDATE_PREVIEW_SCOPE_INVALID',
+              'Candidate previews must match the current Discovery Session and input.',
+            )
+          }
+          repository.appendCandidatePreviewRound(request.previewRound)
+          this.#appendAudit(repository, {
+            correlationId: request.correlationId,
+            actor: request.actor,
+            action: 'SUBMITTED',
+            resource: {
+              type: 'CANDIDATE_PREVIEW_ROUND',
+              id: request.previewRound.id,
+              revision: 1,
+            },
+            summary: 'Stored ten fixed Candidate preview identities for background enrichment.',
+            changedFields: ['previews'],
+            occurredAt: request.previewRound.createdAt,
+          })
+          const response = this.#receipt(request.correlationId, scoped.session.revision)
+          return {
+            response,
+            resourceId: request.previewRound.id,
+            resourceRevision: scoped.session.revision,
+          }
+        },
+      ),
+    )
+  }
+
+  #submitCandidateEnrichments(
+    request: Extract<AgentRequest, { kind: 'DISCOVERY_SUBMIT_CANDIDATE_ENRICHMENTS' }>,
+  ): CommandReceipt {
+    const completedAt = this.#timestamp()
+    return this.#storage.transaction((repository) =>
+      this.#idempotent(
+        repository,
+        request,
+        'discovery.submit_candidate_enrichments',
+        commandReceiptSchema,
+        () => {
+          const firstEnrichment = request.enrichments[0]
+          if (firstEnrichment === undefined) {
+            throw this.#validationError(
+              request.correlationId,
+              'CANDIDATE_ENRICHMENT_EMPTY',
+              'Candidate enrichment batch cannot be empty.',
+            )
+          }
+          const scoped = this.#readDiscoveryBySession(
+            repository,
+            firstEnrichment.discoverySessionId,
+            request.correlationId,
+          )
+          this.#assertRevision(
+            request.expectedSessionRevision,
+            scoped.session.revision,
+            request.correlationId,
+            'DISCOVERY_SESSION_STALE',
+          )
+          if (
+            scoped.session.status !== 'ACTIVE' ||
+            scoped.project.status !== 'DISCOVERY' ||
+            scoped.rounds.length > 0
+          ) {
+            throw this.#validationError(
+              request.correlationId,
+              'DISCOVERY_ENRICHMENT_NOT_ACTIVE',
+              'Candidate enrichment requires an active Session without a completed Round.',
+            )
+          }
+          const previewRound = scoped.previewRound
+          if (previewRound === null || previewRound.id !== request.previewRoundId) {
+            throw this.#validationError(
+              request.correlationId,
+              'CANDIDATE_PREVIEW_NOT_FOUND',
+              'Candidate enrichment must reference the staged Preview Round.',
+            )
+          }
+          const requestedPreviews = previewRound.previews.filter((preview) =>
+            request.batch === 'FIRST' ? preview.position <= 5 : preview.position > 5,
+          )
+          const enrichmentsByCandidate = new Map(
+            request.enrichments.map((enrichment) => [enrichment.candidate.id, enrichment]),
+          )
+          if (
+            enrichmentsByCandidate.size !== 5 ||
+            requestedPreviews.some((preview) => !enrichmentsByCandidate.has(preview.candidateId))
+          ) {
+            throw this.#validationError(
+              request.correlationId,
+              'CANDIDATE_ENRICHMENT_BATCH_INVALID',
+              'Candidate enrichment must contain exactly the five identities assigned to its batch.',
+            )
+          }
+          for (const preview of requestedPreviews) {
+            const enrichment = enrichmentsByCandidate.get(preview.candidateId)
+            if (enrichment === undefined) continue
+            const candidate = enrichment.candidate
+            const previewMeaning = {
+              title: preview.title,
+              summary: preview.summary,
+              coreInteraction: preview.coreInteraction,
+              appeal: preview.appeal,
+              technologyNecessity: preview.technologyNecessity,
+              generationTags: preview.generationTags,
+            }
+            const candidateMeaning = {
+              title: candidate.title,
+              summary: candidate.summary,
+              coreInteraction: candidate.coreInteraction,
+              appeal: candidate.appeal,
+              technologyNecessity: candidate.technologyNecessity,
+              generationTags: candidate.generationTags,
+            }
+            if (
+              enrichment.previewRoundId !== previewRound.id ||
+              enrichment.discoverySessionId !== scoped.session.id ||
+              enrichment.correlationId !== request.correlationId ||
+              candidate.discoverySessionId !== scoped.session.id ||
+              candidate.correlationId !== request.correlationId ||
+              candidate.revision !== 1 ||
+              candidate.parentRevisions.length !== 0 ||
+              canonicalJson(previewMeaning) !== canonicalJson(candidateMeaning)
+            ) {
+              throw this.#validationError(
+                request.correlationId,
+                'CANDIDATE_ENRICHMENT_IDENTITY_CHANGED',
+                'Candidate enrichment cannot change its preview identity or core meaning.',
+              )
+            }
+            repository.appendCandidateEnrichment(enrichment)
+          }
+
+          const updated = this.#readDiscoveryBySession(
+            repository,
+            scoped.session.id,
+            request.correlationId,
+          )
+          const completeByCandidate = new Map(
+            updated.candidateEnrichments.map((enrichment) => [enrichment.candidate.id, enrichment]),
+          )
+          const orderedEnrichments = previewRound.previews.flatMap((preview) => {
+            const enrichment = completeByCandidate.get(preview.candidateId)
+            return enrichment === undefined ? [] : [enrichment]
+          })
+          if (orderedEnrichments.length === 10) {
+            for (const enrichment of orderedEnrichments) {
+              repository.appendCandidate(enrichment.candidate)
+            }
+            const round: CandidateRound = {
+              schemaVersion: 1,
+              id: previewRound.finalRoundId,
+              discoverySessionId: scoped.session.id,
+              correlationId: request.correlationId,
+              roundIndex: 1,
+              inputSnapshot: scoped.session.input,
+              appliedFeedbackIds: [],
+              candidates: orderedEnrichments.map((enrichment) => ({
+                candidateId: enrichment.candidate.id,
+                revision: enrichment.candidate.revision,
+              })),
+              generationRationale: previewRound.generationRationale,
+              diversityCheck: {
+                dimensionsReviewed: [
+                  'PROBLEM_DOMAIN',
+                  'TARGET_USER',
+                  'CORE_INTERACTION',
+                  'DATA_SHAPE',
+                  'USER_APPEAL',
+                ],
+                modeCollapseDetected: false,
+                rationale:
+                  'Fixed preview identities were checked before their details were enriched.',
+              },
+              createdAt: completedAt,
+              source: { kind: 'AGENT', role: 'DISCOVERY' },
+              redactionStatus: 'NOT_REQUIRED',
+            }
+            repository.appendCandidateRound(round)
+            const nextSession = {
+              ...scoped.session,
+              revision: scoped.session.revision + 1,
+              updatedAt: completedAt,
+            }
+            repository.appendDiscoverySession(nextSession)
+            this.#appendAudit(repository, {
+              correlationId: request.correlationId,
+              actor: request.actor,
+              action: 'SUBMITTED',
+              resource: {
+                type: 'CANDIDATE_REVISION',
+                id: orderedEnrichments[0]?.candidate.id ?? previewRound.finalRoundId,
+                revision: 1,
+              },
+              summary: 'Materialized ten enriched Candidates and their Round atomically.',
+              changedFields: ['revision'],
+              occurredAt: completedAt,
+            })
+            const response = this.#receipt(request.correlationId, nextSession.revision)
+            return {
+              response,
+              resourceId: scoped.session.id,
+              resourceRevision: nextSession.revision,
+            }
+          }
+
+          const response = this.#receipt(request.correlationId, scoped.session.revision)
+          return {
+            response,
+            resourceId: previewRound.id,
+            resourceRevision: scoped.session.revision,
+          }
+        },
+      ),
+    )
   }
 
   #submitCandidateRound(

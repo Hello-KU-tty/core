@@ -25,12 +25,20 @@ import {
 
 export const CREW_CORE_APPLICATION_PATH = '/apps/vibe-helper/api/application'
 export const CREW_CHAT_STREAM_PATH = '/api/chat'
+export const DISCOVERY_PREVIEW_AGENT_NAME = 'vibe-helper-discovery-preview'
+export const DISCOVERY_ENRICHMENT_AGENT_NAME = 'vibe-helper-discovery-enrichment'
 export const DISCOVERY_ROUND_AGENT_NAME = 'vibe-helper-discovery-round'
 export const DISCOVERY_MERGE_AGENT_NAME = 'vibe-helper-discovery-merge'
 export const DISCOVERY_SPEC_AGENT_NAME = 'vibe-helper-discovery-spec'
 export const DISCOVERY_SPEC_RECOVERY_AGENT_NAME = 'vibe-helper-discovery-spec-recovery'
 export const DISCOVERY_AGENT_NAME = DISCOVERY_ROUND_AGENT_NAME
-export type DiscoveryAgentPhase = 'ROUND' | 'MERGE' | 'SPEC'
+export type DiscoveryAgentPhase =
+  | 'PREVIEW'
+  | 'ENRICH_FIRST'
+  | 'ENRICH_SECOND'
+  | 'ROUND'
+  | 'MERGE'
+  | 'SPEC'
 export type DiscoveryAgentMode = DiscoveryAgentPhase | 'SPEC_RECOVERY'
 
 const CHAT_SLOT_COLLECTION_PATH = '/api/chat/slots'
@@ -95,6 +103,15 @@ export function createDiscoveryEphemeralContext(
       ...(feedback.message === undefined ? {} : { message: feedback.message }),
     }))
   const learningSpec = context.learningSpec
+  const previewRound = context.previewRound
+  const requestedEnrichmentBatch =
+    purpose === 'ENRICH_FIRST' ? 'FIRST' : purpose === 'ENRICH_SECOND' ? 'SECOND' : null
+  const requestedPreviews =
+    requestedEnrichmentBatch === null || previewRound === null
+      ? []
+      : previewRound.previews.filter((preview) =>
+          requestedEnrichmentBatch === 'FIRST' ? preview.position <= 5 : preview.position > 5,
+        )
 
   return JSON.stringify({
     schemaVersion: 1,
@@ -124,6 +141,13 @@ export function createDiscoveryEphemeralContext(
             candidates: latestRound.candidates,
           },
     currentCandidates,
+    previewRound,
+    candidateEnrichments: (context.candidateEnrichments ?? []).map((enrichment) => ({
+      candidateId: enrichment.candidate.id,
+      previewRoundId: enrichment.previewRoundId,
+    })),
+    requestedEnrichmentBatch,
+    requestedPreviews,
     pendingFeedback,
     selectedCandidate:
       snapshot.selectedCandidate === null ? null : compactCandidate(snapshot.selectedCandidate),
@@ -342,6 +366,10 @@ export function discoveryRunSlotKey(
 }
 
 function discoveryAgentName(phase: DiscoveryAgentMode): string {
+  if (phase === 'PREVIEW') return DISCOVERY_PREVIEW_AGENT_NAME
+  if (phase === 'ENRICH_FIRST' || phase === 'ENRICH_SECOND') {
+    return DISCOVERY_ENRICHMENT_AGENT_NAME
+  }
   if (phase === 'ROUND') return DISCOVERY_ROUND_AGENT_NAME
   if (phase === 'MERGE') return DISCOVERY_MERGE_AGENT_NAME
   return phase === 'SPEC' ? DISCOVERY_SPEC_AGENT_NAME : DISCOVERY_SPEC_RECOVERY_AGENT_NAME

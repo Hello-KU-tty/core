@@ -34,6 +34,7 @@ export const auditRecordSchema = z.strictObject({
     type: z.enum([
       'PROJECT',
       'DISCOVERY_SESSION',
+      'CANDIDATE_PREVIEW_ROUND',
       'CANDIDATE_REVISION',
       'LEARNING_SPEC',
       'BUILDER_TASK',

@@ -41,11 +41,13 @@ describe('Discovery Agent adapter', () => {
     expect(definition.prompt).toContain('사용자가 UI에서 직접 기록하는 action')
     expect(definition.prompt).toContain('expectedSpecRevision')
     expect(definition.prompt).toContain('Spec ID, selected Candidate reference')
-    expect(definition.prompt).toContain('간결한 후보 4개를 우선')
+    expect(definition.prompt).toContain('lightweight preview를 정확히 10개')
     expect(definition.prompt).toContain('각 권장 범위 1~2개')
     expect(definition.prompt).toContain('JSON 문자열이 아니라 실제 배열')
     expect(DISCOVERY_TOOL_NAMES).toEqual([
       'get_discovery_context',
+      'submit_candidate_previews',
+      'submit_candidate_enrichments',
       'submit_candidate_round',
       'submit_candidate_merge',
       'submit_learning_spec',

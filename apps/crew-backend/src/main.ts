@@ -7,7 +7,9 @@ import { openSqliteStorage } from '@vibe-helper/storage-sqlite'
 
 import {
   createCrewBackendServer,
+  DISCOVERY_ENRICHMENT_MCP_PATH,
   DISCOVERY_MERGE_MCP_PATH,
+  DISCOVERY_PREVIEW_MCP_PATH,
   DISCOVERY_ROUND_MCP_PATH,
   DISCOVERY_SPEC_MCP_PATH,
   DISCOVERY_SPEC_RECOVERY_MCP_PATH,
@@ -69,6 +71,16 @@ export async function runCrewBackend(): Promise<void> {
   const workspacePolicy = await WorkspacePathPolicy.create(directories.workspaces)
   const application = new ApplicationService({ storage, workspacePolicy })
   const discoveryMcpHandlers = {
+    [DISCOVERY_PREVIEW_MCP_PATH]: createRoleBoundMcpHttpHandler({
+      role: 'DISCOVERY',
+      application,
+      toolNames: ['get_discovery_context', 'submit_candidate_previews'],
+    }),
+    [DISCOVERY_ENRICHMENT_MCP_PATH]: createRoleBoundMcpHttpHandler({
+      role: 'DISCOVERY',
+      application,
+      toolNames: ['get_discovery_context', 'submit_candidate_enrichments'],
+    }),
     [DISCOVERY_ROUND_MCP_PATH]: createRoleBoundMcpHttpHandler({
       role: 'DISCOVERY',
       application,

@@ -30,6 +30,8 @@ await build({
 await rm(packageRoot, { recursive: true, force: true })
 
 const runtimeFiles = [
+  ['agents/vibe-helper-discovery-preview.json', 'agents/vibe-helper-discovery-preview.json'],
+  ['agents/vibe-helper-discovery-enrichment.json', 'agents/vibe-helper-discovery-enrichment.json'],
   ['app.json', 'app.json'],
   ['agents/vibe-helper-discovery-round.json', 'agents/vibe-helper-discovery-round.json'],
   ['agents/vibe-helper-discovery-merge.json', 'agents/vibe-helper-discovery-merge.json'],
@@ -38,7 +40,7 @@ const runtimeFiles = [
     'agents/vibe-helper-discovery-spec-recovery.json',
     'agents/vibe-helper-discovery-spec-recovery.json',
   ],
-  ['apps/crew-app/dist/index.mjs', 'ui/dist/index-0.1.1.mjs'],
+  ['apps/crew-app/dist/index.mjs', 'ui/dist/index-0.1.2.mjs'],
   ['apps/crew-backend/dist/main.bundle.js', 'apps/crew-backend/dist/main.js'],
 ]
 
@@ -68,7 +70,7 @@ if (typeof drizzleVersion !== 'string' || !/^\d+\.\d+\.\d+$/.test(drizzleVersion
 
 const runtimeManifest = {
   name: 'vibe-helper-runtime',
-  version: '0.1.1',
+  version: '0.1.2',
   private: true,
   type: 'module',
   engines: { node: '>=24 <27' },

@@ -97,7 +97,7 @@ describe('artifact and local-data hygiene', () => {
       type: 'node',
       healthCheck: '/health',
     })
-    expect(manifest.ui.entry).toBe('dist/index-0.1.1.mjs')
+    expect(manifest.ui.entry).toBe('dist/index-0.1.2.mjs')
     expect(manifest.permissions).toEqual({
       api: ['/apps/vibe-helper/api', '/api/chat', '/api/chat/slots', '/api/chat/slots/*'],
       storage: false,
@@ -105,6 +105,10 @@ describe('artifact and local-data hygiene', () => {
       events: [],
     })
     expect(manifest.mcpServers).toEqual({
+      'discovery-preview-core': { url: 'http://127.0.0.1:9100/mcp/discovery-preview' },
+      'discovery-enrichment-core': {
+        url: 'http://127.0.0.1:9100/mcp/discovery-enrichment',
+      },
       'discovery-round-core': { url: 'http://127.0.0.1:9100/mcp/discovery-round' },
       'discovery-merge-core': { url: 'http://127.0.0.1:9100/mcp/discovery-merge' },
       'discovery-spec-core': { url: 'http://127.0.0.1:9100/mcp/discovery-spec' },
@@ -112,11 +116,29 @@ describe('artifact and local-data hygiene', () => {
         url: 'http://127.0.0.1:9100/mcp/discovery-spec-recovery',
       },
     })
-    expect(discoveryAgents).toHaveLength(4)
+    expect(discoveryAgents).toHaveLength(6)
+    const previewAgent = discoveryAgents.find((agent) => agent.name.endsWith('-preview'))
+    const enrichmentAgent = discoveryAgents.find((agent) => agent.name.endsWith('-enrichment'))
     const roundAgent = discoveryAgents.find((agent) => agent.name.endsWith('-round'))
     const mergeAgent = discoveryAgents.find((agent) => agent.name.endsWith('-merge'))
     const specAgent = discoveryAgents.find((agent) => agent.name.endsWith('-spec'))
     const specRecoveryAgent = discoveryAgents.find((agent) => agent.name.endsWith('-spec-recovery'))
+    expect(previewAgent).toMatchObject({
+      name: 'vibe-helper-discovery-preview',
+      tools: ['@vibe-helper:discovery-preview-core'],
+      allowedTools: ['@vibe-helper:discovery-preview-core'],
+      includeMcpJson: false,
+    })
+    expect(previewAgent?.prompt).toContain('submit_candidate_previews')
+    expect(previewAgent?.prompt).not.toContain('submit_candidate_enrichments')
+    expect(enrichmentAgent).toMatchObject({
+      name: 'vibe-helper-discovery-enrichment',
+      tools: ['@vibe-helper:discovery-enrichment-core'],
+      allowedTools: ['@vibe-helper:discovery-enrichment-core'],
+      includeMcpJson: false,
+    })
+    expect(enrichmentAgent?.prompt).toContain('submit_candidate_enrichments')
+    expect(enrichmentAgent?.prompt).not.toContain('submit_candidate_previews')
     expect(roundAgent).toMatchObject({
       name: 'vibe-helper-discovery-round',
       tools: ['@vibe-helper:discovery-round-core'],
@@ -172,6 +194,8 @@ describe('artifact and local-data hygiene', () => {
     const backend = await readFile(path.join(packageRoot, 'apps/crew-backend/dist/main.js'), 'utf8')
 
     expect(files).toContain('agents/vibe-helper-discovery-round.json')
+    expect(files).toContain('agents/vibe-helper-discovery-preview.json')
+    expect(files).toContain('agents/vibe-helper-discovery-enrichment.json')
     expect(files).toContain('agents/vibe-helper-discovery-merge.json')
     expect(files).toContain('agents/vibe-helper-discovery-spec.json')
     expect(files).toContain('agents/vibe-helper-discovery-spec-recovery.json')

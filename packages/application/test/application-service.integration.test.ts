@@ -72,6 +72,82 @@ const createHarness = async (
   return { service, storage, workspaceRoot, workspacePolicy }
 }
 
+const previewRoundId = 'candidate_preview_round_00000000-0000-4000-8000-000000000501'
+const previewFinalRoundId = 'candidate_round_00000000-0000-4000-8000-000000000502'
+const previewCandidateId = (position: number): string =>
+  `candidate_00000000-0000-4000-8000-${String(510 + position).padStart(12, '0')}`
+const previewFor = (position: number) => ({
+  candidateId: previewCandidateId(position),
+  position,
+  title: `Preview ${String(position)}`,
+  summary: `Distinct project direction ${String(position)} for the learning goal.`,
+  coreInteraction: `Complete interaction ${String(position)} and inspect its typed result.`,
+  appeal: `Direction ${String(position)} makes an invisible concept tangible.`,
+  technologyNecessity: `The target technology controls interaction ${String(position)}.`,
+  generationTags: ['DIRECT'] as const,
+})
+
+const enrichmentFor = (position: number) => {
+  const preview = previewFor(position)
+  return {
+    schemaVersion: 1 as const,
+    previewRoundId,
+    discoverySessionId: ids.discoverySession,
+    correlationId: ids.correlation,
+    candidate: {
+      schemaVersion: 1 as const,
+      id: preview.candidateId,
+      discoverySessionId: ids.discoverySession,
+      correlationId: ids.correlation,
+      revision: 1,
+      parentRevisions: [],
+      title: preview.title,
+      summary: preview.summary,
+      targetUsers: [`Learner ${String(position)}`],
+      coreInteraction: preview.coreInteraction,
+      usageMoment: `While practicing direction ${String(position)}.`,
+      appeal: preview.appeal,
+      technologyNecessity: preview.technologyNecessity,
+      coreConcepts: ['runtime validation', `concept ${String(position)}`],
+      mvpFeatures: ['Enter one example', 'Inspect one result'],
+      suggestedScope: {
+        learnerFocus: ['Model the core state'],
+        agentSupport: ['Prepare the local shell'],
+        excluded: ['Cloud sync'],
+      },
+      generationTags: preview.generationTags,
+      createdAt: timestamp,
+      source: { kind: 'AGENT' as const, role: 'DISCOVERY' as const },
+      redactionStatus: 'NOT_REQUIRED' as const,
+    },
+    createdAt: timestamp,
+    source: { kind: 'AGENT' as const, role: 'DISCOVERY' as const },
+    redactionStatus: 'NOT_REQUIRED' as const,
+  }
+}
+
+const previewCommand = {
+  schemaVersion: 1 as const,
+  kind: 'DISCOVERY_SUBMIT_CANDIDATE_PREVIEWS' as const,
+  correlationId: ids.correlation,
+  actor: { kind: 'AGENT' as const, role: 'DISCOVERY' as const },
+  idempotencyKey: 'idem_00000000-0000-4000-8000-000000000501',
+  expectedSessionRevision: 1,
+  previewRound: {
+    schemaVersion: 1 as const,
+    id: previewRoundId,
+    finalRoundId: previewFinalRoundId,
+    discoverySessionId: ids.discoverySession,
+    correlationId: ids.correlation,
+    inputSnapshot: discoveryInputFixture,
+    previews: Array.from({ length: 10 }, (_, index) => previewFor(index + 1)),
+    generationRationale: 'Ten distinct interaction directions were selected before enrichment.',
+    createdAt: timestamp,
+    source: { kind: 'AGENT' as const, role: 'DISCOVERY' as const },
+    redactionStatus: 'NOT_REQUIRED' as const,
+  },
+}
+
 const seedSpecReview = (
   storage: Awaited<ReturnType<typeof openInMemorySqliteStorage>>,
   includeDraft = false,
@@ -124,6 +200,141 @@ const seedBuilderGraph = (storage: Awaited<ReturnType<typeof openInMemorySqliteS
 }
 
 describe('ApplicationService boundary', () => {
+  it('keeps preview identity durable and materializes the full Candidate Round only after both enrichment batches', async () => {
+    const { service, storage } = await createHarness()
+    storage.transaction((repository) => {
+      repository.appendProject(
+        projectSchema.parse({
+          ...projectFixture,
+          status: 'DISCOVERY',
+          generatedWorkspacePath: undefined,
+        }),
+      )
+      repository.appendDiscoverySession(discoverySessionSchema.parse(discoverySessionFixture))
+    })
+
+    await expect(service.executeAgent('DISCOVERY', previewCommand)).resolves.toMatchObject({
+      success: true,
+      data: { resourceRevision: 1 },
+    })
+    expect(storage.repository.readDiscoveryAggregate(ids.project)).toMatchObject({
+      session: { revision: 1 },
+      previewRound: {
+        id: previewRoundId,
+        previews: expect.arrayContaining([expect.objectContaining({ position: 10 })]),
+      },
+      candidateEnrichments: [],
+      candidates: [],
+      rounds: [],
+    })
+
+    const submitBatch = (batch: 'FIRST' | 'SECOND', start: number, idempotencyKey: string) =>
+      service.executeAgent('DISCOVERY', {
+        schemaVersion: 1,
+        kind: 'DISCOVERY_SUBMIT_CANDIDATE_ENRICHMENTS',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'DISCOVERY' },
+        idempotencyKey,
+        expectedSessionRevision: 1,
+        previewRoundId,
+        batch,
+        enrichments: Array.from({ length: 5 }, (_, index) => enrichmentFor(start + index)),
+      })
+
+    await expect(
+      submitBatch('FIRST', 1, 'idem_00000000-0000-4000-8000-000000000502'),
+    ).resolves.toMatchObject({ success: true, data: { resourceRevision: 1 } })
+    expect(storage.repository.readDiscoveryAggregate(ids.project)).toMatchObject({
+      session: { revision: 1 },
+      candidateEnrichments: expect.arrayContaining([
+        expect.objectContaining({
+          candidate: expect.objectContaining({ id: previewCandidateId(1) }),
+        }),
+      ]),
+      candidates: [],
+      rounds: [],
+    })
+
+    await expect(
+      submitBatch('SECOND', 6, 'idem_00000000-0000-4000-8000-000000000503'),
+    ).resolves.toMatchObject({ success: true, data: { resourceRevision: 2 } })
+    const completed = storage.repository.readDiscoveryAggregate(ids.project)
+    expect(completed).toMatchObject({
+      session: { revision: 2 },
+      previewRound: { id: previewRoundId },
+      candidateEnrichments: expect.arrayContaining([
+        expect.objectContaining({
+          candidate: expect.objectContaining({ id: previewCandidateId(10) }),
+        }),
+      ]),
+      rounds: [
+        {
+          id: previewFinalRoundId,
+          roundIndex: 1,
+          candidates: expect.arrayContaining([
+            expect.objectContaining({ candidateId: previewCandidateId(1), revision: 1 }),
+            expect.objectContaining({ candidateId: previewCandidateId(10), revision: 1 }),
+          ]),
+        },
+      ],
+    })
+    expect(completed?.candidateEnrichments).toHaveLength(10)
+    expect(completed?.candidates).toHaveLength(10)
+    expect(completed?.rounds[0]?.candidates).toHaveLength(10)
+  })
+
+  it('keeps the atomic Candidate Round fallback available after previews and rejects late enrichment', async () => {
+    const { service, storage } = await createHarness()
+    storage.transaction((repository) => {
+      repository.appendProject(
+        projectSchema.parse({
+          ...projectFixture,
+          status: 'DISCOVERY',
+          generatedWorkspacePath: undefined,
+        }),
+      )
+      repository.appendDiscoverySession(discoverySessionSchema.parse(discoverySessionFixture))
+    })
+    await service.executeAgent('DISCOVERY', previewCommand)
+
+    await expect(
+      service.executeAgent('DISCOVERY', {
+        schemaVersion: 1,
+        kind: 'DISCOVERY_SUBMIT_CANDIDATE_ROUND',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'DISCOVERY' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000504',
+        expectedSessionRevision: 1,
+        round: candidateRoundFixture,
+        candidates: [candidateFixture],
+      }),
+    ).resolves.toMatchObject({ success: true, data: { resourceRevision: 2 } })
+
+    await expect(
+      service.executeAgent('DISCOVERY', {
+        schemaVersion: 1,
+        kind: 'DISCOVERY_SUBMIT_CANDIDATE_ENRICHMENTS',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'DISCOVERY' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000505',
+        expectedSessionRevision: 1,
+        previewRoundId,
+        batch: 'FIRST',
+        enrichments: Array.from({ length: 5 }, (_, index) => enrichmentFor(index + 1)),
+      }),
+    ).resolves.toMatchObject({
+      success: false,
+      error: { code: 'DISCOVERY_SESSION_STALE', category: 'STALE_CONTEXT' },
+    })
+    expect(storage.repository.readDiscoveryAggregate(ids.project)).toMatchObject({
+      session: { revision: 2 },
+      previewRound: { id: previewRoundId },
+      candidateEnrichments: [],
+      rounds: [{ id: candidateRoundFixture.id }],
+      candidates: [{ id: candidateFixture.id }],
+    })
+  })
+
   it('lists durable Project History and restores the current session read model', async () => {
     const { service, storage } = await createHarness()
     seedBuilderGraph(storage)

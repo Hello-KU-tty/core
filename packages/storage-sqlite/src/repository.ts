@@ -17,6 +17,8 @@ import {
   baselineResultIdSchema,
   baselineResultSchema,
   builderTaskSchema,
+  candidateEnrichmentSchema,
+  candidatePreviewRoundSchema,
   candidateRoundSchema,
   canonicalConceptSchema,
   conceptAliasProposalSchema,
@@ -48,6 +50,8 @@ import {
   type AuditRecord,
   type BaselineResult,
   type BuilderTask,
+  type CandidateEnrichment,
+  type CandidatePreviewRound,
   type CandidateRound,
   type CanonicalConcept,
   type ConceptAliasProposal,
@@ -292,6 +296,62 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
       }
       return result
     })
+  }
+
+  appendCandidatePreviewRound(input: CandidatePreviewRound): PersistenceWriteResult {
+    const prepared = prepareRecord(candidatePreviewRoundSchema, input)
+    const record = prepared.record
+    return this.#write(record.id, () =>
+      this.#appendImmutable(
+        record.id,
+        prepared,
+        'SELECT payload_json, payload_hash FROM candidate_preview_rounds WHERE id = ?',
+        [record.id],
+        () => {
+          this.#sqlite
+            .prepare(
+              'INSERT INTO candidate_preview_rounds (id, session_id, final_round_id, correlation_id, created_at, payload_json, payload_hash) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            )
+            .run(
+              record.id,
+              record.discoverySessionId,
+              record.finalRoundId,
+              record.correlationId,
+              record.createdAt,
+              prepared.payloadJson,
+              prepared.payloadHash,
+            )
+        },
+      ),
+    )
+  }
+
+  appendCandidateEnrichment(input: CandidateEnrichment): PersistenceWriteResult {
+    const prepared = prepareRecord(candidateEnrichmentSchema, input)
+    const record = prepared.record
+    return this.#write(record.candidate.id, () =>
+      this.#appendImmutable(
+        record.candidate.id,
+        prepared,
+        'SELECT payload_json, payload_hash FROM candidate_enrichments WHERE candidate_id = ?',
+        [record.candidate.id],
+        () => {
+          this.#sqlite
+            .prepare(
+              'INSERT INTO candidate_enrichments (candidate_id, preview_round_id, session_id, correlation_id, created_at, payload_json, payload_hash) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            )
+            .run(
+              record.candidate.id,
+              record.previewRoundId,
+              record.discoverySessionId,
+              record.correlationId,
+              record.createdAt,
+              prepared.payloadJson,
+              prepared.payloadHash,
+            )
+        },
+      ),
+    )
   }
 
   appendCandidateRound(input: CandidateRound): PersistenceWriteResult {
@@ -1519,6 +1579,16 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
         [session.id],
         candidateRoundSchema,
       )
+      const previewRound = this.#headRecord(
+        'SELECT payload_json, payload_hash FROM candidate_preview_rounds WHERE session_id = ? LIMIT 1',
+        [session.id],
+        candidatePreviewRoundSchema,
+      )
+      const candidateEnrichments = this.#recordList(
+        'SELECT payload_json, payload_hash FROM candidate_enrichments WHERE session_id = ? ORDER BY created_at ASC, candidate_id ASC',
+        [session.id],
+        candidateEnrichmentSchema,
+      )
       const candidates = this.#recordList(
         'SELECT payload_json, payload_hash FROM candidate_revisions WHERE session_id = ? ORDER BY candidate_id ASC, revision ASC',
         [session.id],
@@ -1541,6 +1611,8 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
         project,
         session,
         rounds,
+        previewRound,
+        candidateEnrichments,
         candidates,
         feedback,
         learningSpecs,
