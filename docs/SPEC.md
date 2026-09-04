@@ -157,8 +157,8 @@ Concept Ledger + Project History
 
 - `FR-BLD-001`: Learning Spec을 acceptance criteria가 있는 Builder Task로 변환해야 한다.
 - `FR-BLD-002`: Builder는 생성 workspace에서 실제 파일 수정, 명령, 테스트와 디버깅을 수행해야 한다.
-- `FR-BLD-003`: 사용자에게 보이는 실제 메시지, ToolCall, 파일 변경, 테스트, 오류 수정 흐름을 의도적으로 숨기지 않아야 한다.
-- `FR-BLD-004`: Live Progress는 작업 stream을 대체하지 않고 현재 위치만 보조해야 한다.
+- `FR-BLD-003`: Agent 중심 Build는 app이 재구성한 이벤트 로그가 아니라 Builder의 실제 Crew 채팅 session을 주 작업 surface로 사용해야 한다. 사용자 메시지, Agent 메시지, ToolCall, 파일 변경, diff, 테스트와 오류 수정 흐름을 session의 native renderer로 표시하고 의도적으로 숨기지 않아야 한다.
+- `FR-BLD-004`: Live Progress는 실제 채팅 session을 대체하거나 위에서 밀어내는 별도 dashboard가 아니라 현재 위치만 알리는 compact 보조 상태여야 한다.
 - `FR-BLD-005`: Builder는 예상 Concept와 실제 사용 Concept를 보고하되 사용자 이해를 판정하지 않아야 한다.
 - `FR-BLD-006`: Task 완료 시 구현, 테스트, Concept, Decision, Spec 이탈, 제한과 코드 참조를 보고해야 한다.
 
@@ -245,11 +245,15 @@ Concept Ledger + Project History
 ### 5.9 UI Mode
 
 - `FR-UI-001`: Agent 중심과 Code 중심을 초보·고급 단계로 표시하지 않아야 한다.
-- `FR-UI-002`: Agent 중심은 Builder stream과 Helper를 동시에 볼 수 있어야 한다.
+- `FR-UI-002`: Agent 중심은 persistent composer를 가진 실제 Builder 채팅 session을 주 surface로, 별도의 read-only Helper 채팅 session을 보조 surface로 동시에 볼 수 있어야 한다. 좁은 화면에서는 같은 두 session을 tab으로 전환한다.
 - `FR-UI-003`: Code 중심 prototype은 Kiro editor에서 Builder/Helper panel과 같은 Core 상태에 접근해야 한다.
 - `FR-UI-004`: Mode 전환 또는 기존 Project 재진입 시 Core에 저장된 session, Task, Decision과 Context가 유지돼야 한다. 실행 중 Agent stream과 progress의 재연결은 MVP 보장 범위가 아니다.
-- `FR-UI-005`: 완료 화면은 Concept 점수보다 결과물 실행을 먼저 보여줘야 한다.
+- `FR-UI-005`: 완료 결과는 Concept 점수보다 결과물 실행을 먼저 보여주되 Builder transcript를 교체하지 않고 session 안의 보조 결과 card로 주입돼야 한다.
 - `FR-UI-006`: 업데이트 전 UI protocol은 제거된 Agent를 호출하기 전에 차단해야 한다. exact Session/revision slot 복원은 중복 dispatch를 줄이는 방어 기능으로 유지하지만 MVP acceptance gate로 사용하지 않는다.
+- `FR-UI-007`: Decision, Helper handoff와 완료 결과는 필요한 시점에만 채팅 주변에 주입하고 평상시 transcript와 composer의 연속성을 유지해야 한다.
+- `FR-UI-008`: Core 식별자와 transport 지시는 visible user message에 합치지 않고 ephemeral slot context로 전달해야 한다. Helper 화면은 전체 redaction된 응답을 보여주고 durable Evidence/Event에는 별도의 bounded summary만 저장해야 한다.
+- `FR-UI-009`: `[OPTIONS: ...]`, Markdown fence와 diff source marker를 평문으로 노출하지 않고 host renderer가 suggestion, Markdown과 diff UI로 해석해야 한다.
+- `FR-UI-010`: 실행 중 Agent turn은 해당 Builder 또는 Helper session composer에서 중지할 수 있어야 하며 transport stop payload를 raw JSON으로 노출하지 않아야 한다.
 
 ## 6. 비기능 요구사항
 

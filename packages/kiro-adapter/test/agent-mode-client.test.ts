@@ -26,6 +26,62 @@ function sseResponse(payloads: readonly string[]) {
 }
 
 describe('Crew Agent Mode client', () => {
+  it('returns a redacted structured session for the host-native renderer', async () => {
+    const client = new CrewAgentModeClient({
+      get: vi.fn(async (path: string) =>
+        path === '/api/chat/slots'
+          ? [{ key: helperSlot }]
+          : {
+              running: true,
+              messages: [
+                {
+                  role: 'user',
+                  content:
+                    '현재 작업을 이어서 구현해줘.\n\nCore tool identifiers: schemaVersion=1, projectId=project_internal, taskId=task_internal. Read Core before acting.',
+                },
+                {
+                  role: 'assistant',
+                  content:
+                    'Changed /Users/example/private/file.ts token=synthetic-secret\n[OPTIONS: keep | change]',
+                  toolCall: { path: '/Users/example/private/file.ts' },
+                },
+                {
+                  role: 'system',
+                  content: JSON.stringify({ kind: 'stop_event', state: 'stopped' }),
+                },
+              ],
+            },
+      ),
+      post: vi.fn(),
+    })
+
+    const session = await client.readRenderableSession(helperSlot)
+
+    expect(session.running).toBe(true)
+    expect(JSON.stringify(session.messages)).toContain('[REDACTED_PATH]')
+    expect(JSON.stringify(session.messages)).toContain('token=[REDACTED]')
+    expect(JSON.stringify(session.messages)).toContain('[OPTIONS: keep | change]')
+    expect(JSON.stringify(session.messages)).toContain('현재 작업을 이어서 구현해줘.')
+    expect(JSON.stringify(session.messages)).not.toContain('Core tool identifiers')
+    expect(JSON.stringify(session.messages)).not.toContain('project_internal')
+    expect(JSON.stringify(session.messages)).not.toContain('/Users/example/private/file.ts')
+    expect(JSON.stringify(session.messages)).not.toContain('synthetic-secret')
+    expect(JSON.stringify(session.messages)).not.toContain('stop_event')
+    expect(JSON.stringify(session.messages)).toContain('Agent 실행이 중지되었습니다.')
+  })
+
+  it('stops only a bounded Vibe Helper Agent session', async () => {
+    const post = vi.fn(async () => ({ ok: true }))
+    const client = new CrewAgentModeClient({ get: vi.fn(), post })
+
+    await client.stopSession(builderSlot)
+
+    expect(post).toHaveBeenCalledWith(`/api/chat/slots/${builderSlot}/stop`, {})
+    await expect(
+      client.stopSession('another-app-project_00000000-0000-4000-8000-000000000001'),
+    ).rejects.toThrow('outside the Vibe Helper session boundary')
+  })
+
   it('binds the exact Core workspace before Builder dispatch and streams redacted progress', async () => {
     const calls: string[] = []
     const post = vi.fn(async (path: string, body: Readonly<Record<string, unknown>>) => {
@@ -76,6 +132,7 @@ describe('Crew Agent Mode client', () => {
       taskId,
       workspaceDirectory,
       message: 'Continue the Builder task.',
+      context: 'Private Core context for the Builder.',
       onEvent: (event) => events.push(event),
     })
     const completion = await receipt.completion
@@ -84,6 +141,7 @@ describe('Crew Agent Mode client', () => {
     expect(calls).toEqual([
       '/api/chat/slots',
       `/api/chat/slots/${builderSlot}/project`,
+      `/api/chat/slots/${builderSlot}/context`,
       '/api/chat',
     ])
     expect(post).toHaveBeenNthCalledWith(1, '/api/chat/slots', {
@@ -93,6 +151,12 @@ describe('Crew Agent Mode client', () => {
     })
     expect(post).toHaveBeenNthCalledWith(2, `/api/chat/slots/${builderSlot}/project`, {
       project: workspaceDirectory,
+    })
+    expect(post).toHaveBeenNthCalledWith(3, `/api/chat/slots/${builderSlot}/context`, {
+      content: 'Private Core context for the Builder.',
+      source: 'vibe-helper-core',
+      ephemeral: true,
+      maxAge: 300,
     })
     expect(streamingFetch).toHaveBeenCalledWith('/api/chat', {
       method: 'POST',
@@ -127,6 +191,7 @@ describe('Crew Agent Mode client', () => {
     expect(events[1]?.summary).toContain('[WORKSPACE]')
     expect(completion).toEqual({
       status: 'DONE',
+      assistantText: 'Finished [WORKSPACE]/src/index.ts',
       assistantSummary: 'Finished [WORKSPACE]/src/index.ts',
     })
   })
@@ -155,6 +220,7 @@ describe('Crew Agent Mode client', () => {
         taskId,
         workspaceDirectory,
         message: 'Continue.',
+        context: 'Private Core context.',
         onEvent: vi.fn(),
       }),
     ).rejects.toThrow('Builder slot workspace cannot be verified before dispatch.')
@@ -163,12 +229,15 @@ describe('Crew Agent Mode client', () => {
   })
 
   it('keeps Helper in a separate read-only slot and returns its redacted answer', async () => {
-    const post = vi.fn(async () => ({ key: helperSlot }))
+    const longAnswer = `The recommendation catches invalid input. token=synthetic-secret ${'and keeps the full explanation visible. '.repeat(10)}\n[OPTIONS: compare again | show code]`
+    const post = vi.fn(async (path: string) =>
+      path === '/api/chat/slots' ? { key: helperSlot } : { ok: true },
+    )
     const streamingFetch = vi.fn(async () =>
       sseResponse([
         JSON.stringify({
           type: 'message',
-          content: 'The recommendation catches invalid input. token=synthetic-secret',
+          content: longAnswer,
         }),
         '[DONE]',
       ]),
@@ -182,16 +251,23 @@ describe('Crew Agent Mode client', () => {
     const receipt = await client.dispatchHelper({
       projectId,
       message: '추천 이유 설명해줘',
+      context: 'Private Core context for the Helper.',
       onText: (text) => chunks.push(text),
     })
     const completion = await receipt.completion
 
     expect(receipt.slotKey).toBe(helperSlot)
-    expect(post).toHaveBeenCalledTimes(1)
-    expect(post).toHaveBeenCalledWith('/api/chat/slots', {
+    expect(post).toHaveBeenCalledTimes(2)
+    expect(post).toHaveBeenNthCalledWith(1, '/api/chat/slots', {
       name: helperSlot,
       agent: 'vibe-helper-helper',
       memory_mode: 'temporary',
+    })
+    expect(post).toHaveBeenNthCalledWith(2, `/api/chat/slots/${helperSlot}/context`, {
+      content: 'Private Core context for the Helper.',
+      source: 'vibe-helper-core',
+      ephemeral: true,
+      maxAge: 300,
     })
     expect(streamingFetch).toHaveBeenCalledWith(
       '/api/chat',
@@ -204,9 +280,34 @@ describe('Crew Agent Mode client', () => {
       }),
     )
     expect(chunks.join('')).not.toContain('synthetic-secret')
-    expect(completion).toEqual({
-      assistantSummary: 'The recommendation catches invalid input. token=[REDACTED]',
-      status: 'DONE',
-    })
+    expect(completion.status).toBe('DONE')
+    expect(completion.assistantText.length).toBeGreaterThan(240)
+    expect(completion.assistantText).not.toContain('synthetic-secret')
+    expect(completion.assistantText).toContain('and keeps the full explanation visible.')
+    expect(completion.assistantSummary).toHaveLength(240)
+    expect(completion.assistantSummary).not.toContain('[OPTIONS:')
+    expect(completion.assistantText.startsWith(completion.assistantSummary)).toBe(true)
+  })
+
+  it('fails closed when private Core context cannot be injected', async () => {
+    const streamingFetch = vi.fn()
+    const client = new CrewAgentModeClient(
+      {
+        get: vi.fn(async () => []),
+        post: vi.fn(async (path: string) =>
+          path === '/api/chat/slots' ? { key: helperSlot } : { ok: false },
+        ),
+      },
+      { fetch: streamingFetch },
+    )
+
+    await expect(
+      client.dispatchHelper({
+        projectId,
+        message: '설명해줘',
+        context: 'Private Core context.',
+      }),
+    ).rejects.toThrow('Crew did not accept the private Core session context.')
+    expect(streamingFetch).not.toHaveBeenCalled()
   })
 })

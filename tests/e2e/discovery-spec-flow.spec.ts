@@ -38,7 +38,7 @@ async function executeBackend(
 }
 
 async function executeUi(request: APIRequestContext, input: Readonly<Record<string, unknown>>) {
-  return executeBackend(request, applicationPath, { ...input, clientProtocolVersion: 4 })
+  return executeBackend(request, applicationPath, { ...input, clientProtocolVersion: 5 })
 }
 
 async function executeDiscoveryAgent(
@@ -707,10 +707,38 @@ async function fulfillResumedBuilderTurn(
 
 function projectIdFromRoute(route: Route): string {
   const body = route.request().postDataJSON()
+  const slot = typeof body.slot === 'string' ? body.slot : ''
   const message = typeof body.message === 'string' ? body.message : ''
-  const match = message.match(/projectId=(project_[0-9a-f-]{36})/)
+  const match = `${slot}\n${message}`.match(/(project_[0-9a-f-]{36})/)
   if (match?.[1] === undefined) throw new TypeError('Discovery tool context project is invalid')
   return match[1]
+}
+
+async function appendTestCrewMessage(
+  page: Page,
+  slotKey: string,
+  role: 'user' | 'assistant',
+  content: string,
+): Promise<void> {
+  await page.evaluate(
+    ({ slotKey, role, content }) => {
+      const storageKey = 'vibe-helper.test.slots'
+      const parsed: unknown = JSON.parse(localStorage.getItem(storageKey) ?? '[]')
+      const slots = Array.isArray(parsed) ? parsed : []
+      const next = slots.map((slot) => {
+        if (typeof slot !== 'object' || slot === null || !('key' in slot) || slot.key !== slotKey) {
+          return slot
+        }
+        const messages = 'messages' in slot && Array.isArray(slot.messages) ? slot.messages : []
+        return {
+          ...slot,
+          messages: [...messages, { id: `test-${role}-${crypto.randomUUID()}`, role, content }],
+        }
+      })
+      localStorage.setItem(storageKey, JSON.stringify(next))
+    },
+    { slotKey, role, content },
+  )
 }
 
 function projectIdFromUrl(url: string): string {
@@ -747,27 +775,53 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
     const dispatch = route.request().postDataJSON()
     const agent = String(dispatch.agent)
     const dispatchedProjectId = projectIdFromRoute(route)
+    const slotKey = String(dispatch.slot)
     if (agent === 'vibe-helper-builder') {
       builderDispatches += 1
       if (builderDispatches === 1) {
         firstBuilderMessage = String(dispatch.message)
         await fulfillInitialBuilderTurn(route, request, dispatchedProjectId)
+        await appendTestCrewMessage(page, slotKey, 'user', firstBuilderMessage)
+        await appendTestCrewMessage(
+          page,
+          slotKey,
+          'assistant',
+          [
+            'parser 흐름을 만들고 실제 Decision이 필요한 지점까지 진행했습니다.',
+            '```diff',
+            '--- a/src/parser.ts',
+            '+++ b/src/parser.ts',
+            '+export const parseInput = (value: unknown) => value',
+            '```',
+            '[OPTIONS: 오류를 한 번에 표시 | 첫 오류부터 단계별 표시]',
+          ].join('\n'),
+        )
       } else {
         await builderResumeGate
         await fulfillResumedBuilderTurn(route, request, dispatchedProjectId)
+        await appendTestCrewMessage(page, slotKey, 'user', String(dispatch.message))
+        await appendTestCrewMessage(
+          page,
+          slotKey,
+          'assistant',
+          '선택한 결과 표시 방식을 반영했고 모든 검증을 통과했습니다.',
+        )
       }
       return
     }
     if (agent === 'vibe-helper-helper') {
       helperDispatches += 1
+      const longHelperAnswer = `한 번에 표시하면 모든 오류를 함께 고칠 수 있지만 처음에는 정보가 더 많습니다. ${'각 오류는 같은 입력에서 독립적으로 발견되며 사용자는 수정 우선순위를 직접 정할 수 있습니다. '.repeat(8)}이 문장이 240자 뒤에도 온전히 보이면 전체 답변 렌더링이 정상입니다.`
       await route.fulfill({
         status: 200,
         contentType: 'text/event-stream',
         body: [
-          'data: {"type":"message","content":"한 번에 표시하면 모든 오류를 함께 고칠 수 있지만 처음에는 정보가 더 많습니다."}',
+          `data: ${JSON.stringify({ type: 'message', content: longHelperAnswer })}`,
           'data: [DONE]',
         ].join('\n\n'),
       })
+      await appendTestCrewMessage(page, slotKey, 'user', String(dispatch.message))
+      await appendTestCrewMessage(page, slotKey, 'assistant', longHelperAnswer)
       return
     }
     agentDispatches += 1
@@ -928,7 +982,12 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
   await expect(
     page.getByRole('heading', { name: 'TypeScript runtime validation', exact: true }),
   ).toBeVisible()
-  await expect(page.getByText('PENDING', { exact: true })).toBeVisible()
+  await expect(page.locator('.builder-pane')).toBeVisible()
+  await expect
+    .poll(() => firstBuilderMessage)
+    .toContain('확정한 Learning Spec을 기준으로 구현을 시작해줘.')
+  expect(firstBuilderMessage).not.toContain('projectId=')
+  expect(firstBuilderMessage).not.toContain('correlationId=')
 
   const preparedProjectId = projectIdFromUrl(page.url())
   await page.goto('/#/history')
@@ -938,17 +997,20 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
   await expect(preparedProject).toContainText('Open Build →')
   await preparedProject.click()
   await expect(page).toHaveURL(new RegExp(`#\\/build\\?project=${preparedProjectId}$`))
-  await expect(page.getByRole('button', { name: 'Builder 시작' })).toBeVisible()
 
   await expect(page.locator('.builder-pane')).toBeVisible()
   await expect(page.locator('.helper-pane')).toBeVisible()
+  await expect(page.getByRole('log', { name: 'Builder transcript' })).toBeVisible()
+  await expect(page.getByLabel('Builder message')).toBeVisible()
+  await expect(page.locator('[data-native-diff]')).toBeVisible()
+  await expect(page.locator('body')).not.toContainText('[OPTIONS:')
   await page.setViewportSize({ width: 390, height: 844 })
   await expect(page.locator('.helper-pane')).toBeHidden()
   await page.getByRole('tab', { name: 'Helper' }).click()
   await expect(page.locator('.helper-pane')).toBeVisible()
   await expect(page.locator('.builder-pane')).toBeHidden()
   const mobileBuildMetrics = await page.evaluate(() => {
-    const title = document.querySelector<HTMLElement>('.build-heading h2')
+    const title = document.querySelector<HTMLElement>('.build-session-bar h2')
     const quickActions = document.querySelector<HTMLElement>('.quick-actions')
     return {
       titleFontSize:
@@ -964,15 +1026,9 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
   await page.getByRole('tab', { name: 'Builder' }).click()
   await page.setViewportSize({ width: 1280, height: 720 })
 
-  await page
-    .getByLabel('Builder에게 답하거나 추가 지시하기')
-    .fill('현재 Task와 Context를 읽고 구현을 시작해줘.')
-  await page.getByRole('button', { name: 'Builder에게 보내기' }).click()
-  await expect
-    .poll(() => firstBuilderMessage)
-    .toContain('User follow-up: 현재 Task와 Context를 읽고 구현을 시작해줘.')
-  await expect(page.getByText('Updated src/parser.ts')).toBeVisible()
-  await expect(page.getByText('token=[REDACTED] was rejected and fixed')).toBeVisible()
+  await expect(
+    page.getByText('parser 흐름을 만들고 실제 Decision이 필요한 지점까지 진행했습니다.'),
+  ).toBeVisible()
   await expect(page.locator('body')).not.toContainText('synthetic-e2e-secret')
   await expect(page.locator('body')).not.toContainText('noisy-fragment')
   await expect(page.locator('body')).not.toContainText('used_tokens')
@@ -1000,6 +1056,9 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
   await expect(
     page.getByText('한 번에 표시하면 모든 오류를 함께 고칠 수 있지만 처음에는 정보가 더 많습니다.'),
   ).toBeVisible()
+  await expect(
+    page.getByText('이 문장이 240자 뒤에도 온전히 보이면 전체 답변 렌더링이 정상입니다.'),
+  ).toBeVisible()
   await expect
     .poll(async () => {
       const restored = await restoreProject(request, projectIdFromUrl(page.url()))
@@ -1014,6 +1073,10 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
   await expect(
     page.getByRole('heading', { name: 'TypeScript runtime validation 완성' }),
   ).toBeVisible()
+  await expect(page.getByRole('log', { name: 'Builder transcript' })).toContainText(
+    '선택한 결과 표시 방식을 반영했고 모든 검증을 통과했습니다.',
+  )
+  await expect(page.getByLabel('Builder message')).toBeVisible()
   await expect(page.getByText('Unknown input validation and result comparison flow')).toBeVisible()
   await expect(page.getByText('Build Agent E2E')).toBeVisible()
   await page.getByRole('button', { name: '생성 결과 열기' }).click()

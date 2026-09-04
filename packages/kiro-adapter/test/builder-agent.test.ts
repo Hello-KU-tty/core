@@ -35,7 +35,7 @@ describe('Builder Agent adapter', () => {
       promptVersion: BUILDER_PROMPT_VERSION,
       promptSource: BUILDER_PROMPT_SOURCE,
       tools: ['fs_read', 'fs_write', 'execute_bash', '@vibe-helper-builder-core'],
-      allowedTools: ['fs_read', 'fs_write', '@vibe-helper-builder-core'],
+      allowedTools: ['fs_read', 'fs_write', 'execute_bash', '@vibe-helper-builder-core'],
       toolsSettings: {
         read: { allowedPaths: ['./**'], deniedPaths: ['.kiro/**'] },
         write: { allowedPaths: ['./**'], deniedPaths: ['.kiro/**'] },

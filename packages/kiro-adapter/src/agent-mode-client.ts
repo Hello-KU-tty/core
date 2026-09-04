@@ -14,12 +14,18 @@ interface AgentModeApi {
   post(path: string, body: Readonly<Record<string, unknown>>): Promise<unknown>
 }
 
+export interface RenderableChatSession {
+  readonly messages: readonly unknown[]
+  readonly running: boolean
+}
+
 export type AgentModeFetch = (
   input: string,
   init: RequestInit,
 ) => Promise<Pick<Response, 'body' | 'ok' | 'status' | 'text'>>
 
 export interface AgentModeCompletion {
+  readonly assistantText: string
   readonly assistantSummary: string
   readonly status: 'DONE' | 'STREAM_FAILED'
 }
@@ -34,12 +40,14 @@ export interface BuilderDispatchInput {
   readonly taskId: string
   readonly workspaceDirectory: string
   readonly message: string
+  readonly context: string
   readonly onEvent: (event: BuilderStreamEvent) => void
 }
 
 export interface HelperDispatchInput {
   readonly projectId: string
   readonly message: string
+  readonly context: string
   readonly onText?: (text: string) => void
 }
 
@@ -111,6 +119,61 @@ function assistantText(payload: string): string {
   return assistantTextPart(payload)?.text ?? ''
 }
 
+function summarizeAssistantText(text: string): string {
+  return text
+    .replace(/\n?\[OPTIONS:\s*[\s\S]*?\]\s*$/i, '')
+    .trim()
+    .slice(0, 240)
+}
+
+function sanitizeRenderableText(text: string): string {
+  const redacted = redactSensitiveText(text)
+  const sanitized = redacted.replace(/(?:^|\n{1,2})Core tool identifiers:[^\n]*(?=\n|$)/g, '')
+  return sanitized === redacted ? redacted : sanitized.replace(/\n{3,}/g, '\n\n').trim()
+}
+
+function redactRenderableValue(value: unknown): unknown {
+  if (typeof value === 'string') return sanitizeRenderableText(value)
+  if (Array.isArray(value)) return value.map(redactRenderableValue)
+  if (!isRecord(value)) return value
+  return Object.fromEntries(
+    Object.entries(value).map(([key, nested]) => [key, redactRenderableValue(nested)]),
+  )
+}
+
+function isStopEvent(value: unknown): boolean {
+  if (!isRecord(value)) return false
+  const marker =
+    `${String(value.kind ?? '')} ${String(value.type ?? '')} ${String(value.cls ?? '')}`
+      .toLocaleLowerCase('en-US')
+      .replaceAll('-', '_')
+  if (marker.includes('stop_event')) return true
+  if (typeof value.content !== 'string') return false
+  try {
+    return isStopEvent(JSON.parse(value.content) as unknown)
+  } catch {
+    return false
+  }
+}
+
+function sanitizeRenderableMessage(value: unknown): unknown {
+  const sanitized = redactRenderableValue(value)
+  if (!isStopEvent(sanitized) || !isRecord(sanitized)) return sanitized
+  return {
+    ...sanitized,
+    role: 'assistant',
+    type: 'message',
+    cls: 'message',
+    content: 'Agent 실행이 중지되었습니다.',
+  }
+}
+
+function assertRenderableSlotKey(slotKey: string): void {
+  if (!/^vibe-helper-(?:builder(?:-v\d+)?|helper)-project_[0-9a-f-]{36}$/.test(slotKey)) {
+    throw new Error('Crew chat slot is outside the Vibe Helper session boundary.')
+  }
+}
+
 async function consumeSse(
   response: Pick<Response, 'body' | 'text'>,
   onPayload: (payload: string) => void,
@@ -178,6 +241,31 @@ export class CrewAgentModeClient {
     this.#fetch = options.fetch ?? ((input, init) => fetch(input, init))
   }
 
+  async readRenderableSession(slotKey: string): Promise<RenderableChatSession> {
+    assertRenderableSlotKey(slotKey)
+    const slots = await this.#api.get(SLOT_PATH)
+    if (!Array.isArray(slots)) throw new Error('Crew returned an invalid slot list.')
+    if (!slots.some((slot) => isRecord(slot) && slot.key === slotKey)) {
+      return { messages: [], running: false }
+    }
+    const detail = await this.#api.get(`${SLOT_PATH}/${slotKey}?limit=100`)
+    if (!isRecord(detail) || !Array.isArray(detail.messages)) {
+      throw new Error('Crew returned an invalid chat session.')
+    }
+    return {
+      messages: detail.messages.slice(-100).map(sanitizeRenderableMessage),
+      running: detail.running === true || detail.status === 'running' || detail.state === 'running',
+    }
+  }
+
+  async stopSession(slotKey: string): Promise<void> {
+    assertRenderableSlotKey(slotKey)
+    const result = await this.#api.post(`${SLOT_PATH}/${slotKey}/stop`, {})
+    if (!isRecord(result) || result.ok !== true) {
+      throw new Error('Crew did not stop the active Agent turn.')
+    }
+  }
+
   async dispatchBuilder(input: BuilderDispatchInput): Promise<AgentModeDispatchReceipt> {
     const key = builderSlotKey(input.projectId)
     const existing = await this.#ensureSlot(key, BUILDER_AGENT)
@@ -195,6 +283,8 @@ export class CrewAgentModeClient {
       }
     }
 
+    await this.#injectContext(key, input.context)
+
     const response = await this.#dispatch(key, BUILDER_AGENT, input.message)
     let sequence = this.#streamSequenceBySlot.get(key) ?? 0
     const completion = consumeSse(response, (payload) => {
@@ -203,27 +293,44 @@ export class CrewAgentModeClient {
       const event = normalizeBuilderStreamLine(payload, sequence, input.workspaceDirectory)
       if (event !== null) input.onEvent(event)
     })
-      .then((summary) => ({
-        assistantSummary: redactSensitiveText(summary, input.workspaceDirectory),
-        status: 'DONE' as const,
+      .then((text) => {
+        const assistantText = redactSensitiveText(text, input.workspaceDirectory).trim()
+        return {
+          assistantText,
+          assistantSummary: summarizeAssistantText(assistantText),
+          status: 'DONE' as const,
+        }
+      })
+      .catch(() => ({
+        assistantText: '',
+        assistantSummary: '',
+        status: 'STREAM_FAILED' as const,
       }))
-      .catch(() => ({ assistantSummary: '', status: 'STREAM_FAILED' as const }))
     return { slotKey: key, completion }
   }
 
   async dispatchHelper(input: HelperDispatchInput): Promise<AgentModeDispatchReceipt> {
     const key = helperSlotKey(input.projectId)
     await this.#ensureSlot(key, HELPER_AGENT)
+    await this.#injectContext(key, input.context)
     const response = await this.#dispatch(key, HELPER_AGENT, input.message)
     const completion = consumeSse(response, (payload) => {
       const text = redactSensitiveText(assistantText(payload))
       if (text.length > 0) input.onText?.(text)
     })
-      .then((summary) => ({
-        assistantSummary: redactSensitiveText(summary).trim().slice(0, 240),
-        status: 'DONE' as const,
+      .then((text) => {
+        const assistantText = redactSensitiveText(text).trim()
+        return {
+          assistantText,
+          assistantSummary: summarizeAssistantText(assistantText),
+          status: 'DONE' as const,
+        }
+      })
+      .catch(() => ({
+        assistantText: '',
+        assistantSummary: '',
+        status: 'STREAM_FAILED' as const,
       }))
-      .catch(() => ({ assistantSummary: '', status: 'STREAM_FAILED' as const }))
     return { slotKey: key, completion }
   }
 
@@ -240,6 +347,18 @@ export class CrewAgentModeClient {
     })
     if (!response.ok) throw new Error(`Crew Agent dispatch failed with HTTP ${response.status}.`)
     return response
+  }
+
+  async #injectContext(slot: string, content: string): Promise<void> {
+    const result = await this.#api.post(`${SLOT_PATH}/${slot}/context`, {
+      content,
+      source: 'vibe-helper-core',
+      ephemeral: true,
+      maxAge: 300,
+    })
+    if (!isRecord(result) || result.ok !== true) {
+      throw new Error('Crew did not accept the private Core session context.')
+    }
   }
 
   async #ensureSlot(key: string, agent: string): Promise<Readonly<Record<string, unknown>>> {

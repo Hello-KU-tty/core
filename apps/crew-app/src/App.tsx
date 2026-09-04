@@ -427,8 +427,15 @@ export function VibeHelperApp({
   const navigate = (name: RouteName, projectId = selectedProjectId): void => {
     window.location.hash = href(name, name === 'history' ? null : projectId).slice(1)
   }
-  const openProject = (projectId: string, surface: CrewAppSurface): void =>
-    navigate(surfaceRoute[surface], projectId)
+  const openProject = (projectId: string, fallbackSurface: CrewAppSurface): void => {
+    void coreClient
+      .restoreProjectSession(correlationId(), projectId)
+      .then((current) => {
+        setSnapshot(current)
+        navigate(current.currentTask === null ? surfaceRoute[fallbackSurface] : 'build', projectId)
+      })
+      .catch(() => navigate(surfaceRoute[fallbackSurface], projectId))
+  }
 
   const performAgentRequest = useCallback(
     async function perform(request: AgentRequest): Promise<void> {
@@ -1185,7 +1192,10 @@ export function VibeHelperApp({
         crewError={crewError}
         coreClient={coreClient}
         agentClient={agentClient}
-        onSnapshot={setSnapshot}
+        onSnapshot={(next) => {
+          setSnapshot(next)
+          setRefresh((value) => value + 1)
+        }}
       />
     )
 

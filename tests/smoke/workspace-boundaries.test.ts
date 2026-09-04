@@ -103,13 +103,14 @@ describe('workspace package boundaries', () => {
     expect(findBoundaryViolations(manifests, dependencyRules)).toEqual([])
   })
 
-  it('keeps storage and Kiro transport details out of Crew UI source', async () => {
+  it('keeps storage and direct Kiro transport details out of Crew UI source', async () => {
     const sources = await readSourceFiles(path.join(workspaceRoot, 'apps/crew-app/src'))
     const combinedSource = sources.join('\n')
 
     expect(combinedSource).not.toMatch(/@vibe-helper\/storage-sqlite/)
     expect(combinedSource).not.toMatch(/better-sqlite3|drizzle-orm/)
-    expect(combinedSource).not.toMatch(/\/api\/chat|ChatEmbed/)
+    expect(combinedSource).not.toMatch(/\/api\/chat/)
+    expect(combinedSource).toContain('const HostChatMessageList')
     expect(combinedSource).not.toMatch(/\.\.\/\.\.\/\.\.\/packages\//)
   })
 })

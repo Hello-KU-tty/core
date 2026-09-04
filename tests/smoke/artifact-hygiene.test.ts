@@ -100,7 +100,7 @@ describe('artifact and local-data hygiene', () => {
       type: 'node',
       healthCheck: '/health',
     })
-    expect(manifest.ui.entry).toBe('dist/index-0.2.0.mjs')
+    expect(manifest.ui.entry).toBe('dist/index-0.2.1.mjs')
     expect(manifest.permissions).toEqual({
       api: ['/apps/vibe-helper/api', '/api/chat', '/api/chat/slots', '/api/chat/slots/*'],
       storage: false,
@@ -182,7 +182,7 @@ describe('artifact and local-data hygiene', () => {
     expect(specRecoveryAgent?.prompt).toContain('submit_learning_spec')
     expect(builderAgent).toMatchObject({
       tools: ['fs_read', 'fs_write', 'execute_bash', '@vibe-helper:builder-core'],
-      allowedTools: ['fs_read', 'fs_write', '@vibe-helper:builder-core'],
+      allowedTools: ['fs_read', 'fs_write', 'execute_bash', '@vibe-helper:builder-core'],
       includeMcpJson: false,
       toolsSettings: { shell: { deniedCommands: [], denyByDefault: true } },
     })

@@ -1814,44 +1814,58 @@ h4 {
   font-size: 14px;
 }
 
-.live-progress {
-  display: grid;
-  grid-template-columns: minmax(180px, 0.35fr) minmax(0, 1fr);
-  gap: 22px;
+.build-session-bar {
+  display: flex;
+  gap: 20px;
   align-items: center;
-  margin-bottom: 16px;
-  padding: 14px 18px;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.build-session-bar h2 {
+  max-width: 760px;
+  margin: 3px 0 0;
+  font-size: clamp(24px, 3vw, 34px);
+  line-height: 1.16;
+}
+
+.session-status-cluster,
+.live-progress {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.session-status-cluster {
+  flex: 0 0 auto;
+}
+
+.live-progress {
+  max-width: 330px;
+  min-height: 30px;
+  padding: 5px 9px;
   border: 1px solid var(--color-brand-border);
-  border-radius: 14px;
+  border-radius: 999px;
+  color: var(--color-brand);
   background: var(--color-brand-weak);
 }
 
-.progress-label {
-  display: grid;
-  gap: 4px;
-}
-
-.progress-label span,
-.live-progress small {
-  color: var(--color-brand);
+.live-progress strong {
+  overflow: hidden;
   font-size: 10px;
-  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.live-progress p,
 .live-progress small {
-  display: block;
-  margin: 0;
-  line-height: 1.5;
-}
-
-.live-progress p {
-  font-size: 13px;
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+  font-size: 9px;
 }
 
 .agent-mode-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+  grid-template-columns: minmax(0, 1.7fr) minmax(300px, 0.7fr);
   gap: 14px;
   align-items: stretch;
 }
@@ -1859,7 +1873,7 @@ h4 {
 .agent-pane {
   display: flex;
   min-width: 0;
-  min-height: 590px;
+  min-height: 680px;
   overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: 16px;
@@ -1906,16 +1920,47 @@ h4 {
   background: var(--color-critical-weak);
 }
 
-.builder-stream,
-.helper-messages {
+.native-chat-frame {
   display: flex;
-  min-height: 300px;
-  max-height: 520px;
-  padding: 16px;
-  overflow: auto;
+  min-width: 0;
+  min-height: 360px;
+  overflow: hidden;
   flex: 1;
   flex-direction: column;
-  gap: 10px;
+  background: #15131a;
+}
+
+.native-chat-frame > * {
+  min-width: 0;
+}
+
+.native-message-list {
+  min-height: 280px;
+  padding: 4px;
+  overflow: auto;
+  flex: 1;
+  overscroll-behavior: contain;
+}
+
+.native-chat-unavailable {
+  display: grid;
+  max-width: 360px;
+  margin: auto;
+  padding: 20px;
+  color: var(--color-critical);
+  text-align: center;
+}
+
+.native-chat-unavailable p {
+  margin-bottom: 0;
+}
+
+.intervention-stack {
+  display: grid;
+  gap: 8px;
+  max-height: 330px;
+  overflow: auto;
+  border-bottom: 1px solid var(--color-border);
   overscroll-behavior: contain;
 }
 
@@ -1995,56 +2040,6 @@ h4 {
   margin-bottom: 0;
 }
 
-.agent-composer {
-  display: grid;
-  gap: 9px;
-  padding: 14px 16px;
-  border-top: 1px solid var(--color-border);
-  background: var(--color-surface-subtle);
-}
-
-.builder-composer {
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-}
-
-.builder-composer p {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: 10px;
-}
-
-.builder-followup {
-  display: grid;
-  grid-column: 1 / -1;
-  gap: 5px;
-}
-
-.builder-followup label {
-  color: var(--color-text-muted);
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.builder-followup > div {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 7px;
-  align-items: stretch;
-}
-
-.builder-followup textarea {
-  width: 100%;
-  min-height: 54px;
-  padding: 9px 10px;
-  resize: vertical;
-  border: 1px solid var(--color-border-strong);
-  border-radius: 9px;
-  color: var(--color-text);
-  background: var(--color-surface);
-}
-
-.helper-composer label,
 .custom-decision label,
 .decision-support-row label span {
   color: var(--color-text-muted);
@@ -2052,7 +2047,6 @@ h4 {
   font-weight: 700;
 }
 
-.helper-composer textarea,
 .decision-support-row textarea,
 .custom-decision input {
   width: 100%;
@@ -2062,7 +2056,6 @@ h4 {
   background: var(--color-surface);
 }
 
-.helper-composer textarea,
 .decision-support-row textarea {
   resize: vertical;
   padding: 10px;
@@ -2075,6 +2068,11 @@ h4 {
   border-bottom: 1px solid var(--color-brand-border);
   background: var(--color-brand-weak);
   font-size: 11px;
+}
+
+.helper-tools {
+  display: grid;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .helper-focus span {
@@ -2124,7 +2122,7 @@ h4 {
   gap: 7px;
   min-width: 0;
   margin: 0;
-  padding: 0 16px 14px;
+  padding: 10px 12px;
   overflow-x: auto;
   border: 0;
 }
@@ -2161,7 +2159,7 @@ h4 {
 }
 
 .decision-stack {
-  margin-bottom: 16px;
+  margin: 8px;
 }
 
 .decision-card.decision-card {
@@ -2169,7 +2167,7 @@ h4 {
   grid-template-columns: 1fr;
   gap: 14px;
   align-items: stretch;
-  padding: 19px;
+  padding: 14px;
 }
 
 .decision-resolved {
@@ -2305,8 +2303,9 @@ h4 {
 
 .completion-view {
   display: grid;
-  grid-template-columns: minmax(300px, 0.8fr) minmax(0, 1.2fr);
-  gap: 16px;
+  grid-template-columns: minmax(230px, 0.8fr) minmax(0, 1.2fr);
+  gap: 8px;
+  margin: 8px;
 }
 
 .completion-primary,
@@ -2317,12 +2316,12 @@ h4 {
 }
 
 .completion-primary {
-  padding: 30px;
+  padding: 16px;
 }
 
 .completion-primary h2 {
   margin: 5px 0 9px;
-  font-size: 30px;
+  font-size: 20px;
 }
 
 .completion-primary > p:not(.eyebrow, .result-ready, .pane-error) {
@@ -2345,7 +2344,7 @@ h4 {
 }
 
 .completion-details section {
-  padding: 22px;
+  padding: 13px;
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -2355,6 +2354,110 @@ h4 {
 
 .completion-details h3 {
   margin: 0 0 10px;
+  font-size: 13px;
+}
+
+.dev-chat-embed {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  background: #15131a;
+}
+
+.dev-chat-messages {
+  display: flex;
+  min-height: 280px;
+  padding: 18px;
+  overflow: auto;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dev-chat-message {
+  max-width: 92%;
+  color: #e9e5ed;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.dev-chat-message-user {
+  align-self: flex-end;
+}
+
+.dev-chat-message > span {
+  display: block;
+  margin-bottom: 4px;
+  color: #a6a0ad;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.dev-chat-message-user .dev-chat-content {
+  padding: 9px 12px;
+  border-radius: 12px 5px 12px 12px;
+  background: #6f48c9;
+}
+
+.dev-chat-content p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.dev-native-diff {
+  margin: 8px 0 0;
+  padding: 10px;
+  overflow: auto;
+  border: 1px solid #45404d;
+  border-radius: 8px;
+  color: #d7f2df;
+  background: #201e25;
+  font: 10px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre;
+}
+
+.dev-chat-composer,
+.native-chat-composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid #39343f;
+}
+
+.dev-chat-composer textarea,
+.native-chat-composer textarea {
+  width: 100%;
+  min-height: 52px;
+  padding: 10px;
+  resize: vertical;
+  border: 1px solid #514b59;
+  border-radius: 10px;
+  color: #f4f1f6;
+  background: #201e25;
+}
+
+.dev-chat-composer button,
+.native-chat-composer button {
+  min-width: 94px;
+  border: 0;
+  border-radius: 10px;
+  color: white;
+  background: var(--color-brand);
+  font-weight: 750;
+}
+
+.native-chat-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.native-chat-composer .chat-stop-button {
+  border: 1px solid #665d6c;
+  color: #e9e4ec;
+  background: #2d2931;
 }
 
 .completion-details li + li {
@@ -2503,15 +2606,30 @@ h4 {
     white-space: normal;
   }
 
-  .builder-composer,
-  .builder-followup > div,
+  .dev-chat-composer,
+  .native-chat-composer,
   .custom-decision > div {
     grid-template-columns: 1fr;
   }
 
-  .builder-composer button,
+  .dev-chat-composer button,
+  .native-chat-composer button,
   .custom-decision button {
     width: 100%;
+  }
+
+  .native-chat-actions {
+    flex-direction: row;
+  }
+
+  .build-session-bar,
+  .session-status-cluster {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .live-progress {
+    max-width: 100%;
   }
 
   .decision-title-row,

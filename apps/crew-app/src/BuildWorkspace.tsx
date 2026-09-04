@@ -4,29 +4,27 @@ import type {
   GeneratedResultDescriptor,
   ProjectSessionSnapshot,
 } from '@vibe-helper/contracts'
-import type {
-  BuilderStreamEvent,
-  CrewAgentModeClient,
-  CrewCoreClient,
-  CrewConversationMessage,
-  CrewProjectSessions,
+import {
+  builderSlotKey,
+  type CrewAgentModeClient,
+  helperSlotKey,
+  type CrewProjectSessions,
+  type CrewCoreClient,
 } from '@vibe-helper/kiro-adapter/crew-app'
-import { useMemo, useState } from 'react'
-
-const MAX_VISIBLE_STREAM_EVENTS = 160
+import * as KiroCrewSdk from '@kirocrew/app-sdk'
+import {
+  type ComponentType,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 
 type Pane = 'BUILDER' | 'HELPER'
 type RuntimeStatus = 'IDLE' | 'BINDING' | 'RUNNING' | 'DONE' | 'FAILED'
 type HelperOrigin = 'FREE_TEXT' | 'QUICK_ACTION'
-
-interface LocalMessage extends CrewConversationMessage {
-  readonly origin?: HelperOrigin
-}
-
-interface StreamState {
-  readonly events: readonly BuilderStreamEvent[]
-  readonly olderCount: number
-}
 
 interface DecisionDraft {
   readonly customProposal: string
@@ -58,149 +56,183 @@ function StatusPill({ value }: { readonly value: string }) {
   )
 }
 
-function StreamIcon({ kind }: { readonly kind: BuilderStreamEvent['kind'] }) {
-  const label = {
-    MESSAGE: '말',
-    TOOL_CALL: '도구',
-    FILE_CHANGE: '파일',
-    TEST_RESULT: '검증',
-    ERROR: '오류',
-    STATUS: '상태',
-  }[kind]
-  return <span className={`stream-kind stream-kind-${kind.toLowerCase()}`}>{label}</span>
+interface HostChatMessageListProps {
+  readonly messages: readonly unknown[]
+  readonly running?: boolean
 }
 
-function BuilderPane({
-  messages,
-  stream,
-  status,
-  error,
-  canDispatch,
-  dispatchLabel,
-  draft,
-  onDraft,
-  onDispatch,
+const HostChatMessageList = (
+  KiroCrewSdk as unknown as {
+    readonly ChatMessageList?: ComponentType<HostChatMessageListProps>
+  }
+).ChatMessageList
+
+function NativeChatSession({
+  slotKey,
+  agent,
+  placeholder,
+  onSend,
+  client,
 }: {
-  readonly messages: readonly CrewConversationMessage[]
-  readonly stream: StreamState
-  readonly status: RuntimeStatus
-  readonly error: string | null
-  readonly canDispatch: boolean
-  readonly dispatchLabel: string
-  readonly draft: string
-  readonly onDraft: (draft: string) => void
-  readonly onDispatch: (purpose?: string) => void
+  readonly slotKey: string
+  readonly agent: string
+  readonly placeholder: string
+  readonly onSend: (message: string) => void | Promise<void>
+  readonly client: CrewAgentModeClient
 }) {
-  const dispatchDisabled = !canDispatch || status === 'BINDING' || status === 'RUNNING'
+  const [messages, setMessages] = useState<readonly unknown[]>([])
+  const [running, setRunning] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [sending, setSending] = useState(false)
+  const [stopping, setStopping] = useState(false)
+  const [sessionError, setSessionError] = useState<string | null>(null)
+  const role = agent.includes('builder') ? 'Builder' : 'Helper'
+
+  useEffect(() => {
+    let active = true
+    let timer: number | undefined
+    const refresh = async (): Promise<void> => {
+      try {
+        const session = await client.readRenderableSession(slotKey)
+        if (!active) return
+        setMessages(session.messages)
+        setRunning(session.running)
+        setSessionError(null)
+      } catch (error) {
+        if (active) setSessionError(actionError(error))
+      } finally {
+        if (active) timer = window.setTimeout(() => void refresh(), running ? 800 : 2_000)
+      }
+    }
+    void refresh()
+    return () => {
+      active = false
+      if (timer !== undefined) window.clearTimeout(timer)
+    }
+  }, [client, running, slotKey])
+
+  if (HostChatMessageList === undefined) {
+    return (
+      <div className="native-chat-unavailable" role="alert">
+        <strong>실제 Crew 채팅을 열 수 없습니다.</strong>
+        <p>현재 Kiro host가 필요한 session renderer를 제공하지 않습니다.</p>
+      </div>
+    )
+  }
   return (
-    <section className="agent-pane builder-pane" aria-labelledby="builder-pane-title">
+    <div className="native-chat-frame">
+      <div className="native-message-list" role="log" aria-label={`${role} transcript`}>
+        <HostChatMessageList messages={messages} running={running || sending} />
+      </div>
+      {sessionError === null ? null : (
+        <p className="pane-error" role="alert">
+          {sessionError}
+        </p>
+      )}
+      <form
+        className="native-chat-composer"
+        onSubmit={(event) => {
+          event.preventDefault()
+          const message = draft.trim()
+          if (message.length === 0 || sending) return
+          setDraft('')
+          setSending(true)
+          void Promise.resolve(onSend(message)).finally(() => setSending(false))
+        }}
+      >
+        <textarea
+          aria-label={`${role} message`}
+          value={draft}
+          rows={2}
+          placeholder={placeholder}
+          disabled={sending}
+          onChange={(event) => setDraft(event.target.value)}
+        />
+        <div className="native-chat-actions">
+          {running || sending ? (
+            <button
+              type="button"
+              className="chat-stop-button"
+              disabled={stopping}
+              onClick={() => {
+                setStopping(true)
+                void client
+                  .stopSession(slotKey)
+                  .then(() => setRunning(false))
+                  .catch((error: unknown) => setSessionError(actionError(error)))
+                  .finally(() => setStopping(false))
+              }}
+            >
+              {stopping ? '중지 중…' : `${role} 중지`}
+            </button>
+          ) : null}
+          <button type="submit" disabled={sending || draft.trim().length === 0}>
+            {sending ? `${role} 응답 중…` : `${role}에게 보내기`}
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+function AgentPane({
+  kind,
+  title,
+  eyebrow,
+  status,
+  children,
+  slotKey,
+  agent,
+  placeholder,
+  error,
+  onSend,
+  client,
+}: {
+  readonly kind: 'builder' | 'helper'
+  readonly title: string
+  readonly eyebrow: string
+  readonly status: ReactNode
+  readonly children?: ReactNode
+  readonly slotKey: string
+  readonly agent: string
+  readonly placeholder: string
+  readonly error: string | null
+  readonly onSend: (message: string) => void | Promise<void>
+  readonly client: CrewAgentModeClient
+}) {
+  return (
+    <section className={`agent-pane ${kind}-pane`} aria-labelledby={`${kind}-pane-title`}>
       <header className="agent-pane-header">
         <div>
-          <p className="eyebrow">Build Agent</p>
-          <h3 id="builder-pane-title">Builder</h3>
+          <p className="eyebrow">{eyebrow}</p>
+          <h3 id={`${kind}-pane-title`}>{title}</h3>
         </div>
-        <span className={`runtime-state runtime-${status.toLowerCase()}`}>{status}</span>
+        {status}
       </header>
-      <div className="builder-stream" role="log" aria-live="polite" aria-relevant="additions">
-        {stream.olderCount > 0 ? (
-          <p className="older-activity">이전 활동 {stream.olderCount}개는 접어 두었습니다.</p>
-        ) : null}
-        {messages.map((message) => (
-          <article className="stream-event stream-message" key={`history-${message.key}`}>
-            <StreamIcon kind="MESSAGE" />
-            <div>
-              <strong>{message.role === 'USER' ? 'You' : 'Builder'}</strong>
-              <p>{message.content}</p>
-            </div>
-          </article>
-        ))}
-        {stream.events.map((event) => (
-          <article
-            className={`stream-event stream-${event.kind.toLowerCase()}`}
-            key={event.sequence}
-          >
-            <StreamIcon kind={event.kind} />
-            <div>
-              <strong>{event.kind.replaceAll('_', ' ')}</strong>
-              <p>{event.summary}</p>
-            </div>
-          </article>
-        ))}
-        {messages.length === 0 && stream.events.length === 0 ? (
-          <div className="stream-empty">
-            <strong>실제 Builder 실행이 여기에 나타납니다.</strong>
-            <p>메시지, tool call, 파일 변경, 테스트와 오류 수정을 순서대로 보여드려요.</p>
-          </div>
-        ) : null}
-      </div>
+      {children}
+      <NativeChatSession
+        slotKey={slotKey}
+        agent={agent}
+        placeholder={placeholder}
+        onSend={onSend}
+        client={client}
+      />
       {error === null ? null : (
         <p className="pane-error" role="alert">
           {error}
         </p>
       )}
-      <footer className="agent-composer builder-composer">
-        <p>Core가 지정한 workspace 바인딩을 확인한 뒤에만 실행합니다.</p>
-        <button
-          className="primary-button"
-          type="button"
-          disabled={dispatchDisabled}
-          onClick={() => onDispatch()}
-        >
-          {status === 'BINDING'
-            ? 'Workspace 확인 중…'
-            : status === 'RUNNING'
-              ? 'Builder 실행 중…'
-              : dispatchLabel}
-        </button>
-        <form
-          className="builder-followup"
-          onSubmit={(event) => {
-            event.preventDefault()
-            const message = draft.trim()
-            if (message.length === 0) return
-            onDraft('')
-            onDispatch(`User follow-up: ${message}`)
-          }}
-        >
-          <label htmlFor="builder-followup">Builder에게 답하거나 추가 지시하기</label>
-          <div>
-            <textarea
-              id="builder-followup"
-              rows={2}
-              value={draft}
-              disabled={dispatchDisabled}
-              placeholder="예: 테스트가 통과했어. 완료 보고를 다시 제출해줘."
-              onChange={(event) => onDraft(event.target.value)}
-            />
-            <button
-              className="secondary-button"
-              type="submit"
-              disabled={dispatchDisabled || draft.trim().length === 0}
-            >
-              Builder에게 보내기
-            </button>
-          </div>
-        </form>
-      </footer>
     </section>
   )
 }
 
-function HelperPane({
-  messages,
-  draft,
+function HelperTools({
   busy,
-  error,
   focusedDecision,
-  onDraft,
   onAsk,
 }: {
-  readonly messages: readonly LocalMessage[]
-  readonly draft: string
   readonly busy: boolean
-  readonly error: string | null
   readonly focusedDecision: DecisionRequest | null
-  readonly onDraft: (value: string) => void
   readonly onAsk: (question: string, origin: HelperOrigin, decisionId?: string) => void
 }) {
   const quickActions = focusedDecision
@@ -215,41 +247,13 @@ function HelperPane({
         '다음 테스트가 확인하는 것을 설명해줘',
       ]
   return (
-    <section className="agent-pane helper-pane" aria-labelledby="helper-pane-title">
-      <header className="agent-pane-header">
-        <div>
-          <p className="eyebrow">Read-only guide</p>
-          <h3 id="helper-pane-title">Helper</h3>
-        </div>
-        <span className="read-only-badge">변경 권한 없음</span>
-      </header>
+    <div className="helper-tools">
       {focusedDecision === null ? null : (
         <div className="helper-focus">
           <span>현재 Decision</span>
           <strong>{focusedDecision.question}</strong>
         </div>
       )}
-      <div className="helper-messages" aria-live="polite">
-        {messages.length === 0 ? (
-          <div className="stream-empty">
-            <strong>Builder를 멈추지 않고 물어보세요.</strong>
-            <p>Helper는 현재 Core context를 읽지만 코드나 결정을 바꿀 수 없습니다.</p>
-          </div>
-        ) : (
-          messages.map((message) => (
-            <article
-              className={`helper-message helper-message-${message.role.toLowerCase()}`}
-              key={message.key}
-            >
-              <span>
-                {message.role === 'USER' ? 'You' : 'Helper'}
-                {message.origin === 'QUICK_ACTION' ? ' · quick action' : ''}
-              </span>
-              <p>{message.content}</p>
-            </article>
-          ))
-        )}
-      </div>
       <fieldset className="quick-actions" aria-label="Helper quick actions">
         {quickActions.map((question) => (
           <button
@@ -262,36 +266,7 @@ function HelperPane({
           </button>
         ))}
       </fieldset>
-      {error === null ? null : (
-        <p className="pane-error" role="alert">
-          {error}
-        </p>
-      )}
-      <form
-        className="agent-composer helper-composer"
-        onSubmit={(event) => {
-          event.preventDefault()
-          if (draft.trim().length > 0) onAsk(draft.trim(), 'FREE_TEXT', focusedDecision?.id)
-        }}
-      >
-        <label htmlFor="helper-question">직접 질문하기</label>
-        <textarea
-          id="helper-question"
-          rows={3}
-          value={draft}
-          disabled={busy}
-          placeholder="예: 왜 여기서 runtime validation이 필요한가요?"
-          onChange={(event) => onDraft(event.target.value)}
-        />
-        <button
-          className="secondary-button"
-          type="submit"
-          disabled={busy || draft.trim().length === 0}
-        >
-          {busy ? 'Helper 답변 중…' : '질문 보내기'}
-        </button>
-      </form>
-    </section>
+    </div>
   )
 }
 
@@ -525,11 +500,6 @@ export function BuildWorkspace({
   const [mobilePane, setMobilePane] = useState<Pane>('BUILDER')
   const [runtimeStatus, setRuntimeStatus] = useState<RuntimeStatus>('IDLE')
   const [runtimeError, setRuntimeError] = useState<string | null>(null)
-  const [stream, setStream] = useState<StreamState>({ events: [], olderCount: 0 })
-  const [helperMessages, setHelperMessages] = useState<readonly LocalMessage[]>(
-    sessions?.helperMessages ?? [],
-  )
-  const [helperDraft, setHelperDraft] = useState('')
   const [helperBusy, setHelperBusy] = useState(false)
   const [helperError, setHelperError] = useState<string | null>(null)
   const [conversationId, setConversationId] = useState<string | undefined>()
@@ -543,10 +513,10 @@ export function BuildWorkspace({
   )
   const [decisionBusyId, setDecisionBusyId] = useState<string | null>(null)
   const [decisionDrafts, setDecisionDrafts] = useState<Readonly<Record<string, DecisionDraft>>>({})
-  const [builderDraft, setBuilderDraft] = useState('')
   const [launchBusy, setLaunchBusy] = useState(false)
   const [launchError, setLaunchError] = useState<string | null>(null)
   const [resultDescriptor, setResultDescriptor] = useState<GeneratedResultDescriptor | null>(null)
+  const autoStartedTasks = useRef(new Set<string>())
 
   const task = snapshot.currentTask
   const focusedDecision =
@@ -559,59 +529,87 @@ export function BuildWorkspace({
       application: null,
     }))
   }, [snapshot.decisions, snapshot.pendingDecisions])
+  const focusedDecisionItem =
+    allDecisionItems.find((item) => item.resolution === null) ?? allDecisionItems.at(-1) ?? null
 
-  const restore = async (): Promise<ProjectSessionSnapshot> => {
+  const restore = useCallback(async (): Promise<ProjectSessionSnapshot> => {
     const restored = await coreClient.restoreProjectSession(entityId('corr'), snapshot.project.id)
     onSnapshot(restored)
     return restored
-  }
+  }, [coreClient, onSnapshot, snapshot.project.id])
 
-  const appendStreamEvent = (event: BuilderStreamEvent): void => {
-    setStream((current) => {
-      const appended = [...current.events, event]
-      const overflow = Math.max(0, appended.length - MAX_VISIBLE_STREAM_EVENTS)
-      return {
-        events: overflow === 0 ? appended : appended.slice(overflow),
-        olderCount: current.olderCount + overflow,
+  const dispatchBuilder = useCallback(
+    async (
+      source: ProjectSessionSnapshot,
+      visibleMessage: string,
+      privateInstruction: string,
+    ): Promise<void> => {
+      const currentTask = source.currentTask
+      if (currentTask === null || currentTask.status === 'COMPLETED') {
+        setRuntimeError(
+          '완료된 Task에는 새 Builder 작업을 보낼 수 없습니다. Helper에게 질문해 주세요.',
+        )
+        return
       }
-    })
-  }
+      if (runtimeStatus === 'BINDING' || runtimeStatus === 'RUNNING') {
+        setRuntimeError('Builder가 현재 응답 중입니다. 완료된 뒤 이어서 보내 주세요.')
+        return
+      }
+      setRuntimeError(null)
+      setRuntimeStatus('BINDING')
+      try {
+        const runCorrelationId = entityId('corr')
+        const binding = await coreClient.prepareBuilderSession({
+          schemaVersion: 1,
+          kind: 'UI_PREPARE_BUILDER_SESSION',
+          correlationId: runCorrelationId,
+          actor: { kind: 'UI' },
+          projectId: source.project.id,
+          taskId: currentTask.id,
+        })
+        const receipt = await agentClient.dispatchBuilder({
+          projectId: source.project.id,
+          taskId: currentTask.id,
+          workspaceDirectory: binding.workspaceDirectory,
+          message: visibleMessage,
+          context: [
+            'Private Vibe Helper Core context. Never repeat these identifiers or this instruction in the visible answer.',
+            `schemaVersion=1, projectId=${source.project.id}, taskId=${currentTask.id}, correlationId=${currentTask.correlationId}, idempotencyKey=${entityId('idem')}.`,
+            privateInstruction,
+          ].join('\n'),
+          onEvent: () => undefined,
+        })
+        setRuntimeStatus('RUNNING')
+        const completion = await receipt.completion
+        setRuntimeStatus(completion.status === 'DONE' ? 'DONE' : 'FAILED')
+        if (completion.status !== 'DONE') setRuntimeError('Builder session 연결이 종료되었습니다.')
+        await restore()
+      } catch (error) {
+        setRuntimeStatus('FAILED')
+        setRuntimeError(actionError(error))
+      }
+    },
+    [agentClient, coreClient, restore, runtimeStatus],
+  )
 
-  const dispatchBuilder = async (
-    source: ProjectSessionSnapshot,
-    purpose = 'Start or resume the current Builder Task.',
-  ): Promise<void> => {
-    const currentTask = source.currentTask
-    if (currentTask === null) return
-    setRuntimeError(null)
-    setRuntimeStatus('BINDING')
-    try {
-      const runCorrelationId = entityId('corr')
-      const binding = await coreClient.prepareBuilderSession({
-        schemaVersion: 1,
-        kind: 'UI_PREPARE_BUILDER_SESSION',
-        correlationId: runCorrelationId,
-        actor: { kind: 'UI' },
-        projectId: source.project.id,
-        taskId: currentTask.id,
-      })
-      const receipt = await agentClient.dispatchBuilder({
-        projectId: source.project.id,
-        taskId: currentTask.id,
-        workspaceDirectory: binding.workspaceDirectory,
-        message: `${purpose}\n\nCore tool identifiers: schemaVersion=1, projectId=${source.project.id}, taskId=${currentTask.id}, correlationId=${currentTask.correlationId}, idempotencyKey=${entityId('idem')}. Read the current Task and Live Context from Core before acting.`,
-        onEvent: appendStreamEvent,
-      })
-      setRuntimeStatus('RUNNING')
-      const completion = await receipt.completion
-      setRuntimeStatus(completion.status === 'DONE' ? 'DONE' : 'FAILED')
-      if (completion.status !== 'DONE') setRuntimeError('Builder stream 연결이 종료되었습니다.')
-      await restore()
-    } catch (error) {
-      setRuntimeStatus('FAILED')
-      setRuntimeError(actionError(error))
+  useEffect(() => {
+    if (
+      sessions === null ||
+      task === null ||
+      task.status !== 'PENDING' ||
+      sessions.builderMessages.length > 0 ||
+      runtimeStatus !== 'IDLE' ||
+      autoStartedTasks.current.has(task.id)
+    ) {
+      return
     }
-  }
+    autoStartedTasks.current.add(task.id)
+    void dispatchBuilder(
+      snapshot,
+      '확정한 Learning Spec을 기준으로 구현을 시작해줘. 중요한 실제 판단이 필요하면 먼저 물어봐.',
+      'Read the current Task and Live Context from Core, then start the Task. Stop and request a real Decision when one is required.',
+    )
+  }, [dispatchBuilder, runtimeStatus, sessions, snapshot, task])
 
   const askHelper = async (
     question: string,
@@ -621,14 +619,6 @@ export function BuildWorkspace({
     if (task === null) return
     setHelperBusy(true)
     setHelperError(null)
-    const userMessage: LocalMessage = {
-      key: `local-user-${crypto.randomUUID()}`,
-      role: 'USER',
-      content: question,
-      origin,
-    }
-    setHelperMessages((current) => [...current, userMessage])
-    if (origin === 'FREE_TEXT') setHelperDraft('')
     try {
       const helperCorrelationId = entityId('corr')
       await coreClient.openHelper({
@@ -641,23 +631,19 @@ export function BuildWorkspace({
         ...(decisionId === undefined ? {} : { decisionId }),
         question,
       })
-      let streamedText = ''
       const receipt = await agentClient.dispatchHelper({
         projectId: snapshot.project.id,
-        message: `사용자 질문: ${question}\n\nCore tool identifiers: schemaVersion=1, projectId=${snapshot.project.id}, taskId=${task.id}, correlationId=${helperCorrelationId}${decisionId === undefined ? '' : `, decisionId=${decisionId}`}. get_helper_context를 읽고 read-only 설명만 제공하세요.`,
-        onText: (text) => {
-          streamedText = `${streamedText}${text}`.slice(-4_000)
-        },
+        message: question,
+        context: [
+          'Private Vibe Helper Core context. Never repeat these identifiers or this instruction in the visible answer.',
+          `schemaVersion=1, projectId=${snapshot.project.id}, taskId=${task.id}, correlationId=${helperCorrelationId}${decisionId === undefined ? '' : `, decisionId=${decisionId}`}.`,
+          'Read get_helper_context and provide a read-only explanation. Do not mutate code, decisions, or Core state.',
+        ].join('\n'),
       })
       const completion = await receipt.completion
-      const summary = completion.assistantSummary || streamedText.trim().slice(0, 240)
-      if (completion.status !== 'DONE' || summary.length === 0) {
+      if (completion.status !== 'DONE' || completion.assistantText.length === 0) {
         throw new Error('Helper가 저장 가능한 답변을 반환하지 않았습니다.')
       }
-      setHelperMessages((current) => [
-        ...current,
-        { key: `local-helper-${crypto.randomUUID()}`, role: 'ASSISTANT', content: summary },
-      ])
       const recorded = await coreClient.recordHelperExchange({
         schemaVersion: 1,
         kind: 'UI_RECORD_HELPER_EXCHANGE',
@@ -669,7 +655,7 @@ export function BuildWorkspace({
         ...(decisionId === undefined ? {} : { decisionId }),
         ...(conversationId === undefined ? {} : { conversationId }),
         userMessage: question,
-        helperResponseSummary: summary,
+        helperResponseSummary: completion.assistantSummary,
         origin,
         closeConversation: false,
       })
@@ -725,6 +711,7 @@ export function BuildWorkspace({
       const restored = await restore()
       await dispatchBuilder(
         restored,
+        '선택한 방향을 정확히 반영해서 구현을 계속해줘.',
         `Decision ${decision.id} was resolved by the user. Read get_decision_result, apply the exact stored resolution, record apply_decision_result, and continue the Task.`,
       )
     } catch (error) {
@@ -755,73 +742,23 @@ export function BuildWorkspace({
     }
   }
 
-  if (snapshot.completionReport !== null) {
-    return (
-      <CompletionView
-        snapshot={snapshot}
-        descriptor={resultDescriptor}
-        busy={launchBusy}
-        error={launchError}
-        onLaunch={() => void launchResult()}
-      />
-    )
-  }
-
-  const hasBlockingDecision = allDecisionItems.some(
-    (item) => item.resolution === null && !item.request.independentWorkCanContinue,
-  )
-  const canDispatch = task !== null && !hasBlockingDecision && task.status !== 'COMPLETED'
-  const dispatchLabel = task?.status === 'PENDING' ? 'Builder 시작' : 'Builder 계속하기'
-
   return (
     <section aria-labelledby="build-title">
-      <div className="section-heading build-heading">
+      <div className="build-session-bar">
         <div>
-          <p className="eyebrow">Current task</p>
+          <p className="eyebrow">Agent session</p>
           <h2 id="build-title">{task?.title ?? 'Build has not started.'}</h2>
         </div>
-        {task === null ? null : <StatusPill value={task.status} />}
+        <div className="session-status-cluster">
+          {snapshot.liveContext === null ? null : (
+            <span className="live-progress" role="status" aria-label="Live Progress">
+              <strong>{snapshot.liveContext.stage}</strong>
+              <small>Context v{snapshot.liveContext.contextVersion}</small>
+            </span>
+          )}
+          {task === null ? null : <StatusPill value={task.status} />}
+        </div>
       </div>
-      {snapshot.liveContext === null ? null : (
-        <article className="live-progress" aria-label="Live Progress">
-          <div className="progress-label">
-            <span>Live Progress · Context v{snapshot.liveContext.contextVersion}</span>
-            <strong>{snapshot.liveContext.stage}</strong>
-          </div>
-          <div>
-            <p>{snapshot.liveContext.currentGoal}</p>
-            <small>
-              {snapshot.liveContext.nextActions[0] ?? '다음 checkpoint를 기다리고 있습니다.'}
-            </small>
-          </div>
-        </article>
-      )}
-      {allDecisionItems.length === 0 ? null : (
-        <section className="decision-stack" aria-label="Task decisions">
-          {allDecisionItems.map((item) => (
-            <DecisionCard
-              key={item.request.id}
-              item={item}
-              draft={decisionDrafts[item.request.id] ?? { customProposal: '', rationale: '' }}
-              busy={decisionBusyId === item.request.id}
-              onDraft={(draft) =>
-                setDecisionDrafts((current) => ({ ...current, [item.request.id]: draft }))
-              }
-              onAskHelper={() => {
-                setMobilePane('HELPER')
-                void askHelper(
-                  '이 선택지들의 영향과 Builder 추천의 tradeoff를 쉬운 말로 비교해줘',
-                  'QUICK_ACTION',
-                  item.request.id,
-                )
-              }}
-              onResolve={(decision, selection, rationale) =>
-                void resolveDecision(decision, selection, rationale)
-              }
-            />
-          ))}
-        </section>
-      )}
       {crewError === null ? null : (
         <div className="inline-notice" role="status">
           <strong>Crew conversation unavailable.</strong> {crewError} Durable Core state remains
@@ -847,26 +784,95 @@ export function BuildWorkspace({
         </button>
       </div>
       <div className="agent-mode-grid" data-mobile-active={mobilePane.toLowerCase()}>
-        <BuilderPane
-          messages={sessions?.builderMessages ?? []}
-          stream={stream}
-          status={runtimeStatus}
+        <AgentPane
+          kind="builder"
+          eyebrow="Build Agent · actual session"
+          title="Builder"
+          status={
+            <span className={`runtime-state runtime-${runtimeStatus.toLowerCase()}`}>
+              {runtimeStatus}
+            </span>
+          }
+          slotKey={sessions?.builderSlotKey ?? builderSlotKey(snapshot.project.id)}
+          agent="vibe-helper-builder"
+          placeholder="Builder에게 구현 방향을 말하거나 질문하세요."
           error={runtimeError}
-          canDispatch={canDispatch}
-          dispatchLabel={dispatchLabel}
-          draft={builderDraft}
-          onDraft={setBuilderDraft}
-          onDispatch={(purpose) => void dispatchBuilder(snapshot, purpose)}
-        />
-        <HelperPane
-          messages={helperMessages}
-          draft={helperDraft}
-          busy={helperBusy}
+          client={agentClient}
+          onSend={(message) =>
+            dispatchBuilder(
+              snapshot,
+              message,
+              focusedDecision === null
+                ? 'Read the current Task and Live Context before acting on the user message.'
+                : `Decision ${focusedDecision.id} is still pending. You may explain, but do not apply a direction until Core contains a user resolution.`,
+            )
+          }
+        >
+          <div className="intervention-stack">
+            {focusedDecisionItem === null ? null : (
+              <section className="decision-stack" aria-label="Current Task decision">
+                <DecisionCard
+                  item={focusedDecisionItem}
+                  draft={
+                    decisionDrafts[focusedDecisionItem.request.id] ?? {
+                      customProposal: '',
+                      rationale: '',
+                    }
+                  }
+                  busy={decisionBusyId === focusedDecisionItem.request.id}
+                  onDraft={(draft) =>
+                    setDecisionDrafts((current) => ({
+                      ...current,
+                      [focusedDecisionItem.request.id]: draft,
+                    }))
+                  }
+                  onAskHelper={() => {
+                    setMobilePane('HELPER')
+                    void askHelper(
+                      '이 선택지들의 영향과 Builder 추천의 tradeoff를 쉬운 말로 비교해줘',
+                      'QUICK_ACTION',
+                      focusedDecisionItem.request.id,
+                    )
+                  }}
+                  onResolve={(decision, selection, rationale) =>
+                    void resolveDecision(decision, selection, rationale)
+                  }
+                />
+              </section>
+            )}
+            {snapshot.completionReport === null ? null : (
+              <CompletionView
+                snapshot={snapshot}
+                descriptor={resultDescriptor}
+                busy={launchBusy}
+                error={launchError}
+                onLaunch={() => void launchResult()}
+              />
+            )}
+          </div>
+        </AgentPane>
+        <AgentPane
+          kind="helper"
+          eyebrow="Read-only guide · actual session"
+          title="Helper"
+          status={
+            <span className={`read-only-badge${helperBusy ? ' helper-busy' : ''}`}>
+              {helperBusy ? '답변 중' : '변경 권한 없음'}
+            </span>
+          }
+          slotKey={sessions?.helperSlotKey ?? helperSlotKey(snapshot.project.id)}
+          agent="vibe-helper-helper"
+          placeholder="현재 코드나 판단에 관해 무엇이든 물어보세요."
           error={helperError}
-          focusedDecision={focusedDecision}
-          onDraft={setHelperDraft}
-          onAsk={(question, origin, decisionId) => void askHelper(question, origin, decisionId)}
-        />
+          client={agentClient}
+          onSend={(question) => askHelper(question, 'FREE_TEXT', focusedDecision?.id)}
+        >
+          <HelperTools
+            busy={helperBusy}
+            focusedDecision={focusedDecision}
+            onAsk={(question, origin, decisionId) => void askHelper(question, origin, decisionId)}
+          />
+        </AgentPane>
       </div>
     </section>
   )

@@ -54,7 +54,12 @@ export interface BuilderAgentDefinition {
     'execute_bash',
     `@${typeof BUILDER_MCP_SERVER_NAME}`,
   ]
-  readonly allowedTools: readonly ['fs_read', 'fs_write', `@${typeof BUILDER_MCP_SERVER_NAME}`]
+  readonly allowedTools: readonly [
+    'fs_read',
+    'fs_write',
+    'execute_bash',
+    `@${typeof BUILDER_MCP_SERVER_NAME}`,
+  ]
   readonly toolsSettings: {
     readonly read: {
       readonly allowedPaths: readonly ['./**']
@@ -127,7 +132,7 @@ export function createBuilderAgentDefinition(
     prompt,
     includeMcpJson: false,
     tools: ['fs_read', 'fs_write', 'execute_bash', `@${BUILDER_MCP_SERVER_NAME}`],
-    allowedTools: ['fs_read', 'fs_write', `@${BUILDER_MCP_SERVER_NAME}`],
+    allowedTools: ['fs_read', 'fs_write', 'execute_bash', `@${BUILDER_MCP_SERVER_NAME}`],
     toolsSettings: {
       read: { allowedPaths: ['./**'], deniedPaths: ['.kiro/**'] },
       write: { allowedPaths: ['./**'], deniedPaths: ['.kiro/**'] },

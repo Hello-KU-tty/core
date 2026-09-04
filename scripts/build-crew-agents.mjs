@@ -124,7 +124,7 @@ const agents = [
     includeMcpJson: false,
     mcpServers: {},
     tools: ['fs_read', 'fs_write', 'execute_bash', '@vibe-helper:builder-core'],
-    allowedTools: ['fs_read', 'fs_write', '@vibe-helper:builder-core'],
+    allowedTools: ['fs_read', 'fs_write', 'execute_bash', '@vibe-helper:builder-core'],
     toolsSettings: {
       read: { allowedPaths: ['./**'], deniedPaths: ['.kiro/**'] },
       write: { allowedPaths: ['./**'], deniedPaths: ['.kiro/**'] },

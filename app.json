@@ -1,13 +1,13 @@
 {
   "name": "vibe-helper",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "displayName": "Vibe Helper",
   "description": "Learn unfamiliar development concepts by building a project you personally need.",
   "author": "hurdoo",
   "tags": ["learning", "developer-tools", "projects"],
   "defaultEnabled": false,
   "ui": {
-    "entry": "dist/index-0.2.0.mjs",
+    "entry": "dist/index-0.2.1.mjs",
     "pages": [{ "route": "/apps/vibe-helper", "label": "Vibe Helper", "icon": "Sprout" }]
   },
   "permissions": {
