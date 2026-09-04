@@ -7,8 +7,8 @@ import type {
 } from '@vibe-helper/contracts'
 import {
   CrewAppClientError,
+  CrewAgentModeClient,
   type DiscoveryAgentPhase,
-  type CrewConversationMessage,
   CrewCoreClient,
   createDiscoveryEphemeralContext,
   CrewDiscoveryClient,
@@ -18,6 +18,7 @@ import {
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import appStyles from './app.css?inline'
+import { BuildWorkspace } from './BuildWorkspace.js'
 import {
   AgentRunBanner,
   type AgentRunView,
@@ -44,6 +45,7 @@ export interface VibeHelperAppProps {
   readonly coreClient: CrewCoreClient
   readonly sessionClient: CrewSessionClient
   readonly discoveryClient: CrewDiscoveryClient
+  readonly agentClient: CrewAgentModeClient
 }
 
 interface AgentExpectationRound {
@@ -301,7 +303,9 @@ function HistoryView({
               </time>
             </span>
             <strong>{item.project.title}</strong>
-            <span className="project-goal">{item.project.learningGoal}</span>
+            {item.project.learningGoal === item.project.title ? null : (
+              <span className="project-goal">{item.project.learningGoal}</span>
+            )}
             <span className="project-metrics">
               <span>{item.pendingDecisionCount} decisions</span>
               <span>
@@ -321,128 +325,12 @@ function HistoryView({
   )
 }
 
-function Conversation({
-  title,
-  messages,
-  empty,
-}: {
-  readonly title: string
-  readonly messages: readonly CrewConversationMessage[]
-  readonly empty: string
-}) {
-  return (
-    <section className="conversation" aria-label={`${title} conversation`}>
-      <header>
-        <div>
-          <p className="eyebrow">Crew runtime</p>
-          <h3>{title}</h3>
-        </div>
-        <span className="live-dot">session</span>
-      </header>
-      <div className="message-list">
-        {messages.length === 0 ? (
-          <p className="conversation-empty">{empty}</p>
-        ) : (
-          messages.map((message) => (
-            <div className={`message message-${message.role.toLowerCase()}`} key={message.key}>
-              <span>{message.role === 'USER' ? 'You' : title}</span>
-              <p>{message.content}</p>
-            </div>
-          ))
-        )}
-      </div>
-    </section>
-  )
-}
-
-function BuildView({
-  snapshot,
-  sessions,
-  crewError,
-}: {
-  readonly snapshot: ProjectSessionSnapshot
-  readonly sessions: CrewProjectSessions | null
-  readonly crewError: string | null
-}) {
-  const task = snapshot.currentTask
-  return (
-    <section aria-labelledby="build-title">
-      <div className="section-heading build-heading">
-        <div>
-          <p className="eyebrow">Current task</p>
-          <h2 id="build-title">{task?.title ?? 'Build has not started.'}</h2>
-        </div>
-        {task === null ? null : <StatusPill value={task.status} />}
-      </div>
-      {snapshot.liveContext === null ? null : (
-        <article className="context-strip">
-          <div>
-            <span>Context v{snapshot.liveContext.contextVersion}</span>
-            <strong>{snapshot.liveContext.stage}</strong>
-          </div>
-          <p>{snapshot.liveContext.currentGoal}</p>
-          <small>{snapshot.liveContext.nextActions[0] ?? 'Waiting for the next checkpoint.'}</small>
-        </article>
-      )}
-      {snapshot.pendingDecisions.length === 0 ? null : (
-        <section className="decision-stack" aria-label="Pending decisions">
-          {snapshot.pendingDecisions.map((decision) => (
-            <article className="decision-card" key={decision.id}>
-              <div>
-                <p className="eyebrow">
-                  Decision needed · {decision.category.replaceAll('_', ' ')}
-                </p>
-                <h3>{decision.question}</h3>
-              </div>
-              <p>{decision.reasonRequiredNow}</p>
-              <span>{decision.options.length} options · Builder is waiting for you</span>
-            </article>
-          ))}
-        </section>
-      )}
-      {crewError === null ? null : (
-        <div className="inline-notice" role="status">
-          <strong>Crew conversation unavailable.</strong> {crewError} Durable Core state remains
-          visible.
-        </div>
-      )}
-      <div className="conversation-grid">
-        <Conversation
-          title="Builder"
-          messages={sessions?.builderMessages ?? []}
-          empty="The project Builder conversation has no restorable messages yet."
-        />
-        <Conversation
-          title="Helper"
-          messages={sessions?.helperMessages ?? []}
-          empty="Open Helper when you want a read-only explanation of the current task."
-        />
-      </div>
-      <section className="durable-history" aria-labelledby="durable-helper-title">
-        <div>
-          <p className="eyebrow">Durable · redacted</p>
-          <h3 id="durable-helper-title">Helper activity</h3>
-        </div>
-        {snapshot.helperConversations.length === 0 ? (
-          <p>No durable Helper summaries have been recorded.</p>
-        ) : (
-          <ol>
-            {snapshot.helperConversations.map((conversation) => (
-              <li key={conversation.episodeId}>
-                <strong>
-                  {conversation.helperResponseSummaries.at(-1) ?? 'Helper exchange recorded'}
-                </strong>
-                <span>{conversation.redactedUserExcerpts.at(-1) ?? 'User excerpt redacted'}</span>
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
-    </section>
-  )
-}
-
-export function VibeHelperApp({ coreClient, sessionClient, discoveryClient }: VibeHelperAppProps) {
+export function VibeHelperApp({
+  coreClient,
+  sessionClient,
+  discoveryClient,
+  agentClient,
+}: VibeHelperAppProps) {
   const [route, setRoute] = useState<AppRoute>(readRoute)
   const [history, setHistory] = useState<ProjectHistory | null>(null)
   const [historyError, setHistoryError] = useState<ViewError | null>(null)
@@ -1288,7 +1176,18 @@ export function VibeHelperApp({ coreClient, sessionClient, discoveryClient }: Vi
         onReturn={returnToDiscovery}
       />
     )
-  else content = <BuildView snapshot={snapshot} sessions={sessions} crewError={crewError} />
+  else
+    content = (
+      <BuildWorkspace
+        key={snapshot.project.id}
+        snapshot={snapshot}
+        sessions={sessions}
+        crewError={crewError}
+        coreClient={coreClient}
+        agentClient={agentClient}
+        onSnapshot={setSnapshot}
+      />
+    )
 
   return (
     <>
@@ -1362,6 +1261,7 @@ export function App() {
       core: new CrewCoreClient(api),
       sessions: new CrewSessionClient(api),
       discovery: new CrewDiscoveryClient(api),
+      agentMode: new CrewAgentModeClient(api),
     }),
     [api],
   )
@@ -1370,6 +1270,7 @@ export function App() {
       coreClient={clients.core}
       sessionClient={clients.sessions}
       discoveryClient={clients.discovery}
+      agentClient={clients.agentMode}
     />
   )
 }

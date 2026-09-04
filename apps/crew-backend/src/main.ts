@@ -6,6 +6,7 @@ import { createRoleBoundMcpHttpHandler } from '@vibe-helper/mcp-server/role-serv
 import { openSqliteStorage } from '@vibe-helper/storage-sqlite'
 
 import {
+  BUILDER_MCP_PATH,
   createCrewBackendServer,
   DISCOVERY_ENRICHMENT_MCP_PATH,
   DISCOVERY_MERGE_MCP_PATH,
@@ -13,6 +14,7 @@ import {
   DISCOVERY_ROUND_MCP_PATH,
   DISCOVERY_SPEC_MCP_PATH,
   DISCOVERY_SPEC_RECOVERY_MCP_PATH,
+  HELPER_MCP_PATH,
 } from './server.js'
 
 function required(name: string): string {
@@ -70,7 +72,7 @@ export async function runCrewBackend(): Promise<void> {
   const storage = await openSqliteStorage({ dataDirectory: directories.data })
   const workspacePolicy = await WorkspacePathPolicy.create(directories.workspaces)
   const application = new ApplicationService({ storage, workspacePolicy })
-  const discoveryMcpHandlers = {
+  const mcpHandlers = {
     [DISCOVERY_PREVIEW_MCP_PATH]: createRoleBoundMcpHttpHandler({
       role: 'DISCOVERY',
       application,
@@ -101,11 +103,29 @@ export async function runCrewBackend(): Promise<void> {
       application,
       toolNames: ['get_discovery_context', 'submit_learning_spec'],
     }),
+    [BUILDER_MCP_PATH]: createRoleBoundMcpHttpHandler({
+      role: 'BUILDER',
+      application,
+      toolNames: [
+        'get_builder_task',
+        'start_task',
+        'update_build_context',
+        'request_user_decision',
+        'get_decision_result',
+        'apply_decision_result',
+        'complete_task',
+      ],
+    }),
+    [HELPER_MCP_PATH]: createRoleBoundMcpHttpHandler({
+      role: 'HELPER',
+      application,
+      toolNames: ['get_helper_context', 'request_builder_context_refresh'],
+    }),
   }
   const server = createCrewBackendServer({
     application,
     proxySecret: required('KIROCREW_PROXY_SECRET'),
-    discoveryMcpHandlers,
+    mcpHandlers,
   })
 
   const close = (): void => {

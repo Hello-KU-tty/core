@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, symlink } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -17,7 +17,7 @@ import {
 import { loadBuilderAgentDefinition } from '../src/builder-prompt-node.js'
 import { BuilderCrewSlotBinding } from '../src/builder-crew-slot.js'
 import { normalizeBuilderStreamLine, redactBuilderStreamText } from '../src/builder-stream.js'
-import { guardBuilderToolInput } from '../src/builder-tool-guard.js'
+import { guardBuilderToolInput, resolveAppGeneratedWorkspace } from '../src/builder-tool-guard.js'
 import {
   builderTaskFixture,
   confirmedLearningSpecFixture,
@@ -45,6 +45,8 @@ describe('Builder Agent adapter', () => {
     })
     expect(definition.tools).not.toContain('web_search')
     expect(definition.tools).not.toContain('use_subagent')
+    expect(definition.toolsSettings.shell.allowedCommands).toContain('pnpm rebuild esbuild')
+    expect(definition.toolsSettings.shell.deniedCommands).toEqual([])
     expect(definition.prompt).toContain('TASK_STARTED')
     expect(definition.prompt).toContain('TASK_COMPLETED')
     expect(definition.prompt).toContain('apply_decision_result')
@@ -232,6 +234,32 @@ describe('Builder Agent adapter', () => {
 })
 
 describe('Builder native tool guard and transient stream', () => {
+  it('derives the app workspace from the host hook cwd instead of the hook process cwd', async () => {
+    const crewHome = await mkdtemp(join(tmpdir(), 'vibe-helper-crew-home-'))
+    const projectsRoot = join(
+      crewHome,
+      'apps',
+      'vibe-helper',
+      'data',
+      'generated-workspaces',
+      'projects',
+    )
+    const workspace = join(projectsRoot, 'project_00000000-0000-4000-8000-000000000001')
+    const hookDirectory = await mkdtemp(join(tmpdir(), 'vibe-helper-hook-process-'))
+    await mkdir(workspace, { recursive: true })
+    const canonicalWorkspace = await realpath(workspace)
+
+    await expect(
+      resolveAppGeneratedWorkspace({ cwd: workspace }, crewHome, hookDirectory),
+    ).resolves.toBe(canonicalWorkspace)
+    await expect(
+      resolveAppGeneratedWorkspace({ cwd: hookDirectory }, crewHome, hookDirectory),
+    ).resolves.toBeNull()
+    await expect(
+      resolveAppGeneratedWorkspace({ cwd: join(workspace, 'src') }, crewHome, hookDirectory),
+    ).resolves.toBeNull()
+  })
+
   it('allows workspace paths but rejects traversal, protected config, symlink escapes, and unsafe shell', async () => {
     const workspace = await mkdtemp(join(tmpdir(), 'vibe-helper-builder-guard-'))
     const outside = await mkdtemp(join(tmpdir(), 'vibe-helper-builder-outside-'))
@@ -282,6 +310,48 @@ describe('Builder native tool guard and transient stream', () => {
       guardBuilderToolInput(
         {
           tool_name: 'execute_bash',
+          tool_input: { command: 'pnpm rebuild esbuild' },
+          cwd: workspace,
+        },
+        workspace,
+      ),
+    ).resolves.toEqual({ allowed: true })
+    await expect(
+      guardBuilderToolInput(
+        {
+          tool_name: 'execute_bash',
+          tool_input: { command: 'pnpm rebuild better-sqlite3' },
+          cwd: workspace,
+        },
+        workspace,
+      ),
+    ).resolves.toMatchObject({ allowed: false, reasonCode: 'GUARD_SHELL_DENIED' })
+    await expect(
+      guardBuilderToolInput(
+        { tool_name: 'execute_bash', tool_input: { command: 'npm install' }, cwd: workspace },
+        workspace,
+      ),
+    ).resolves.toEqual({ allowed: true })
+    await expect(
+      guardBuilderToolInput(
+        { tool_name: 'execute_bash', tool_input: { command: 'npm test' }, cwd: workspace },
+        workspace,
+      ),
+    ).resolves.toEqual({ allowed: true })
+    await expect(
+      guardBuilderToolInput(
+        {
+          tool_name: 'execute_bash',
+          tool_input: { command: 'npm install left-pad' },
+          cwd: workspace,
+        },
+        workspace,
+      ),
+    ).resolves.toMatchObject({ allowed: false, reasonCode: 'GUARD_SHELL_DENIED' })
+    await expect(
+      guardBuilderToolInput(
+        {
+          tool_name: 'execute_bash',
           tool_input: { command: 'node ../../escape.mjs' },
           cwd: workspace,
         },
@@ -312,6 +382,34 @@ describe('Builder native tool guard and transient stream', () => {
       transient: true,
       redactionStatus: 'VERIFIED_REDACTED',
     })
+    expect(
+      normalizeBuilderStreamLine(
+        JSON.stringify({ type: 'chunk', cls: 'chunk', content: 'tiny token' }),
+        5,
+        workspace,
+      ),
+    ).toBeNull()
+    expect(
+      normalizeBuilderStreamLine(
+        JSON.stringify({
+          type: 'message',
+          content: JSON.stringify({
+            slot: 'vibe-helper-builder-project_private',
+            used_tokens: 12,
+            window_tokens: 100,
+          }),
+        }),
+        6,
+        workspace,
+      ),
+    ).toBeNull()
+    expect(
+      normalizeBuilderStreamLine(
+        JSON.stringify({ type: 'message', content: 'The socket error path is complete.' }),
+        7,
+        workspace,
+      ),
+    ).toMatchObject({ kind: 'MESSAGE', summary: 'The socket error path is complete.' })
   })
 })
 

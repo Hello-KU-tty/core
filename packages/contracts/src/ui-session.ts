@@ -2,7 +2,14 @@ import { z } from 'zod'
 
 import { episodeStatusSchema } from './activity.js'
 import { discoveryContextSchema } from './agent-contracts.js'
-import { builderTaskSchema, decisionRequestSchema, liveProjectContextSchema } from './build.js'
+import {
+  builderTaskSchema,
+  decisionApplicationSchema,
+  decisionRequestSchema,
+  decisionResolutionSchema,
+  liveProjectContextSchema,
+  taskCompletionReportSchema,
+} from './build.js'
 import {
   discoverySessionSchema,
   projectCandidateRevisionSchema,
@@ -34,6 +41,12 @@ export const helperConversationSummarySchema = z.strictObject({
   helperResponseSummaries: z.array(nonEmptyTextSchema).max(5),
 })
 
+export const decisionSessionItemSchema = z.strictObject({
+  request: decisionRequestSchema,
+  resolution: decisionResolutionSchema.nullable(),
+  application: decisionApplicationSchema.nullable(),
+})
+
 export const projectHistoryItemSchema = z.strictObject({
   project: projectSchema,
   suggestedSurface: crewAppSurfaceSchema,
@@ -62,11 +75,14 @@ export const projectSessionSnapshotSchema = z.strictObject({
   currentTask: builderTaskSchema.nullable(),
   liveContext: liveProjectContextSchema.nullable(),
   pendingDecisions: z.array(decisionRequestSchema).max(100),
+  decisions: z.array(decisionSessionItemSchema).max(100).default([]),
+  completionReport: taskCompletionReportSchema.nullable().default(null),
   helperConversations: z.array(helperConversationSummarySchema).max(20),
 })
 
 export type CrewAppSurface = z.infer<typeof crewAppSurfaceSchema>
 export type HelperConversationSummary = z.infer<typeof helperConversationSummarySchema>
+export type DecisionSessionItem = z.infer<typeof decisionSessionItemSchema>
 export type ProjectHistoryItem = z.infer<typeof projectHistoryItemSchema>
 export type ProjectHistory = z.infer<typeof projectHistorySchema>
 export type ProjectSessionSnapshot = z.infer<typeof projectSessionSnapshotSchema>

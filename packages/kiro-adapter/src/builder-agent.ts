@@ -68,10 +68,15 @@ export interface BuilderAgentDefinition {
       readonly allowedCommands: readonly [
         'node --test*',
         'pnpm test*',
+        'pnpm rebuild esbuild',
         'pnpm run *',
         'pnpm install --frozen-lockfile',
+        'npm test*',
+        'npm run *',
+        'npm install',
+        'npm install --include=dev',
       ]
-      readonly deniedCommands: readonly ['*../*', '*/Users/*', '*~/*']
+      readonly deniedCommands: readonly []
       readonly denyByDefault: true
     }
   }
@@ -130,10 +135,15 @@ export function createBuilderAgentDefinition(
         allowedCommands: [
           'node --test*',
           'pnpm test*',
+          'pnpm rebuild esbuild',
           'pnpm run *',
           'pnpm install --frozen-lockfile',
+          'npm test*',
+          'npm run *',
+          'npm install',
+          'npm install --include=dev',
         ],
-        deniedCommands: ['*../*', '*/Users/*', '*~/*'],
+        deniedCommands: [],
         denyByDefault: true,
       },
     },

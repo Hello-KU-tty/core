@@ -412,6 +412,67 @@ describe('ApplicationService boundary', () => {
     expect(JSON.stringify(restored)).not.toContain('synthetic-secret')
   })
 
+  it('returns the canonical Builder workspace only for an available matching Task', async () => {
+    const { service, storage, workspacePolicy } = await createHarness()
+    seedBuilderGraph(storage)
+
+    await expect(
+      service.executeUi({
+        schemaVersion: 1,
+        kind: 'UI_PREPARE_BUILDER_SESSION',
+        correlationId: ids.correlation,
+        actor: { kind: 'UI' },
+        projectId: ids.project,
+        taskId: ids.task,
+      }),
+    ).resolves.toEqual({
+      success: true,
+      data: {
+        schemaVersion: 1,
+        correlationId: ids.correlation,
+        projectId: ids.project,
+        taskId: ids.task,
+        workspaceDirectory: join(workspacePolicy.generatedWorkspaceRoot, 'generated/webhook-lens'),
+        status: 'READY',
+      },
+    })
+
+    await expect(
+      service.executeUi({
+        schemaVersion: 1,
+        kind: 'UI_PREPARE_BUILDER_SESSION',
+        correlationId: ids.correlation,
+        actor: { kind: 'UI' },
+        projectId: ids.project,
+        taskId: 'task_00000000-0000-4000-8000-999999999999',
+      }),
+    ).resolves.toMatchObject({
+      success: false,
+      error: { code: 'BUILDER_TASK_NOT_FOUND' },
+    })
+
+    storage.repository.appendTask(
+      builderTaskSchema.parse({
+        ...builderTaskFixture,
+        revision: 2,
+        status: 'COMPLETED',
+      }),
+    )
+    await expect(
+      service.executeUi({
+        schemaVersion: 1,
+        kind: 'UI_PREPARE_BUILDER_SESSION',
+        correlationId: ids.correlation,
+        actor: { kind: 'UI' },
+        projectId: ids.project,
+        taskId: ids.task,
+      }),
+    ).resolves.toMatchObject({
+      success: false,
+      error: { code: 'BUILDER_SESSION_NOT_AVAILABLE' },
+    })
+  })
+
   it('persists and replays an idempotent UI command, but rejects key reuse', async () => {
     const { service, storage } = await createHarness()
     const request = {
@@ -1486,6 +1547,45 @@ describe('T10 Builder Task and Live Context application flow', () => {
       currentTask: { id: ids.task, status: 'PENDING' },
     })
 
+    await expect(
+      service.executeUi({
+        schemaVersion: 1,
+        kind: 'UI_LIST_PROJECTS',
+        correlationId: ids.correlation,
+        actor: { kind: 'UI' },
+        limit: 25,
+      }),
+    ).resolves.toMatchObject({
+      success: true,
+      data: {
+        projects: [
+          {
+            project: { id: ids.project, status: 'SPEC_REVIEW' },
+            suggestedSurface: 'BUILD',
+            activeTask: null,
+          },
+        ],
+      },
+    })
+    await expect(
+      service.executeUi({
+        schemaVersion: 1,
+        kind: 'UI_RESTORE_PROJECT_SESSION',
+        correlationId: ids.correlation,
+        actor: { kind: 'UI' },
+        projectId: ids.project,
+        helperConversationLimit: 10,
+      }),
+    ).resolves.toMatchObject({
+      success: true,
+      data: {
+        project: { id: ids.project, status: 'SPEC_REVIEW' },
+        suggestedSurface: 'BUILD',
+        activeTask: null,
+        currentTask: { id: ids.task, status: 'PENDING' },
+      },
+    })
+
     const duplicate = await service.executeUi({
       ...prepareRequest,
       idempotencyKey: 'idem_00000000-0000-4000-8000-000000000104',
@@ -1667,10 +1767,36 @@ describe('T10 Builder Task and Live Context application flow', () => {
       }),
     ).toMatchObject({ success: true, data: { resourceRevision: 3 } })
     expect(storage.repository.recoverProject(ids.project)).toMatchObject({
-      project: { status: 'BUILDING' },
+      project: {
+        status: 'BUILDING',
+        generatedWorkspacePath: `projects/${ids.project}`,
+      },
       activeTask: null,
       currentTask: null,
       liveContext: null,
+    })
+    expect(storage.repository.readLatestTaskForProject(ids.project)).toMatchObject({
+      id: ids.task,
+      status: 'COMPLETED',
+    })
+    expect(storage.repository.readBuilderTaskAggregate(ids.project, ids.task)).toMatchObject({
+      completionReport: { id: ids.completionReport },
+    })
+    const launch = await service.executeUi({
+      schemaVersion: 1,
+      kind: 'UI_LAUNCH_RESULT',
+      correlationId: ids.correlation,
+      actor: { kind: 'UI' },
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000113',
+      projectId: ids.project,
+    })
+    expect(launch, JSON.stringify(launch)).toMatchObject({
+      success: true,
+      data: {
+        projectId: ids.project,
+        workspacePath: `projects/${ids.project}`,
+        status: 'READY',
+      },
     })
   })
 })
@@ -1773,6 +1899,22 @@ describe('T11 Decision gate and Builder resume application flow', () => {
         },
       ],
     })
+    await expect(
+      service.executeUi({
+        schemaVersion: 1,
+        kind: 'UI_RESTORE_PROJECT_SESSION',
+        correlationId: ids.correlation,
+        actor: { kind: 'UI' },
+        projectId: ids.project,
+        helperConversationLimit: 10,
+      }),
+    ).resolves.toMatchObject({
+      success: true,
+      data: {
+        decisions: [{ request: { id: ids.decision }, resolution: null, application: null }],
+        completionReport: null,
+      },
+    })
 
     expect(
       await service.executeUi({
@@ -1806,6 +1948,27 @@ describe('T11 Decision gate and Builder resume application flow', () => {
     expect(storage.repository.recoverProject(ids.project)).toMatchObject({
       activeTask: { status: 'ACTIVE', revision: 3 },
       pendingDecisions: [],
+    })
+    await expect(
+      service.executeUi({
+        schemaVersion: 1,
+        kind: 'UI_RESTORE_PROJECT_SESSION',
+        correlationId: ids.correlation,
+        actor: { kind: 'UI' },
+        projectId: ids.project,
+        helperConversationLimit: 10,
+      }),
+    ).resolves.toMatchObject({
+      success: true,
+      data: {
+        decisions: [
+          {
+            request: { id: ids.decision },
+            resolution: { id: ids.resolution },
+            application: null,
+          },
+        ],
+      },
     })
     expect(
       await service.executeAgent('BUILDER', {
@@ -1895,6 +2058,27 @@ describe('T11 Decision gate and Builder resume application flow', () => {
       decisionApplications: [{ id: ids.decisionApplication, decisionId: ids.decision }],
       liveContext: { contextVersion: 3, activeDecisionIds: [] },
     })
+    await expect(
+      service.executeUi({
+        schemaVersion: 1,
+        kind: 'UI_RESTORE_PROJECT_SESSION',
+        correlationId: ids.correlation,
+        actor: { kind: 'UI' },
+        projectId: ids.project,
+        helperConversationLimit: 10,
+      }),
+    ).resolves.toMatchObject({
+      success: true,
+      data: {
+        decisions: [
+          {
+            request: { id: ids.decision },
+            resolution: { id: ids.resolution },
+            application: { id: ids.decisionApplication },
+          },
+        ],
+      },
+    })
 
     const completedContext = {
       ...initialContext,
@@ -1936,6 +2120,22 @@ describe('T11 Decision gate and Builder resume application flow', () => {
         report,
       }),
     ).toMatchObject({ success: true, data: { resourceRevision: 4 } })
+    await expect(
+      service.executeUi({
+        schemaVersion: 1,
+        kind: 'UI_RESTORE_PROJECT_SESSION',
+        correlationId: ids.correlation,
+        actor: { kind: 'UI' },
+        projectId: ids.project,
+        helperConversationLimit: 10,
+      }),
+    ).resolves.toMatchObject({
+      success: true,
+      data: {
+        currentTask: { id: ids.task, status: 'COMPLETED' },
+        completionReport: { id: ids.completionReport },
+      },
+    })
     const observationTrace = storage.repository
       .readEvidenceTracesForProject(ids.project)
       .find((trace) => trace.concept.canonicalName === 'discriminated union')
@@ -2166,6 +2366,63 @@ describe('T11 Decision gate and Builder resume application flow', () => {
       result: emptyResult,
     })
     expect(late).toMatchObject({ success: false, error: { code: 'ANALYSIS_JOB_STALE' } })
+  })
+
+  it('keeps a Helper quick action out of user-authored evidence', async () => {
+    const { service, storage } = await createHarness()
+    seedBuilderGraph(storage)
+
+    const recorded = await service.executeUi({
+      schemaVersion: 1,
+      kind: 'UI_RECORD_HELPER_EXCHANGE',
+      correlationId: ids.correlation,
+      actor: { kind: 'UI' },
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000304',
+      projectId: ids.project,
+      taskId: ids.task,
+      conversationId: ids.conversation,
+      userMessage: '추천 이유 설명해줘',
+      helperResponseSummary: 'Strict parsing exposes invalid input at the boundary.',
+      origin: 'QUICK_ACTION',
+      closeConversation: true,
+    })
+    expect(recorded).toMatchObject({
+      success: true,
+      data: { episodeRevision: 2, status: 'PENDING_ANALYSIS' },
+    })
+    if (!recorded.success || !('episodeId' in recorded.data)) throw new Error('missing episode')
+
+    expect(
+      storage.repository.readEpisodeAggregate(ids.project, recorded.data.episodeId),
+    ).toMatchObject({
+      events: [
+        {
+          actor: { kind: 'AGENT', role: 'HELPER' },
+          payload: { type: 'HELPER_RESPONSE' },
+        },
+      ],
+    })
+    await expect(
+      service.executeUi({
+        schemaVersion: 1,
+        kind: 'UI_RESTORE_PROJECT_SESSION',
+        correlationId: ids.correlation,
+        actor: { kind: 'UI' },
+        projectId: ids.project,
+        helperConversationLimit: 10,
+      }),
+    ).resolves.toMatchObject({
+      success: true,
+      data: {
+        helperConversations: [
+          {
+            conversationId: ids.conversation,
+            redactedUserExcerpts: [],
+            helperResponseSummaries: ['Strict parsing exposes invalid input at the boundary.'],
+          },
+        ],
+      },
+    })
   })
 
   it('retries one failed Analyst attempt, dead-letters the second and supports manual retry', async () => {

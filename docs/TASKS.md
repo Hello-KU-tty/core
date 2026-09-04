@@ -643,7 +643,30 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - target 환경의 대표 최종 실행 한 번에서 10개 첫 preview, 단일 refinement와 Spec 초안이 각각 30초 이내이고 preview 10개가 complete Round로 수렴하며 사용자가 결과를 승인해야 한다. 첫 유용 반응 3~5초는 stretch goal로 관측하고 model/config별 품질·latency 근거를 함께 남긴다. 장기 P95는 T21에서 검증한다.
 - target Crew host에서 느린 모델의 Candidate submit 연결 종료가 재현되면 T08 atomic round invariant를 보존하는 staged draft batch 또는 지원되는 persistent transport 중 하나를 결정 기록으로 승인하고 구현한다.
 
-### [>] T16. Agent 중심 Build·Helper 동시 UI와 Decision UI
+### [x] T16. Agent 중심 Build·Helper 동시 UI와 Decision UI
+
+**진행 기록**
+
+- 2026-09-05 local 구현을 완료했다. UI protocol v4·app 0.2.0에 desktop split/mobile tab Agent Mode, bounded incremental Builder SSE, read-only Helper quick/free input, Decision Request→Resolution→Application 표시, same-slot Builder resume와 Completion Report/result-first 화면을 연결했다.
+- Core가 canonicalize한 workspace descriptor를 함수 local에서만 Crew slot에 bind하고 exact 응답 전에는 Builder를 dispatch하지 않는 경계, stream path/credential redaction, Helper 별도 slot, quick action의 user Evidence 제외를 contract/application/adapter integration으로 검증했다.
+- Node.js 24.19.0·pnpm 11.12.0에서 `pnpm check` 전체가 통과했다: format/lint/typecheck/Drizzle check, unit 2개, package/app integration 195개, eval 17개, build, smoke 6개와 Chromium E2E 11개다. E2E는 Discovery→Spec→Builder stream→실제 Decision→Helper quick action→Resolution·적용 대기→같은 Builder resume→Completion Report와 result descriptor까지 통과했다.
+- 2026-09-05 사용자 승인 뒤 Kiro 공식 short-lived dashboard token과 app-secret exchange로 app 0.2.0을 data-preserving update했다. 설치본은 enabled 상태로 8개 Agent를 오류 없이 재등록했고 새 backend PID의 health가 정상이다. backend health 뒤 8개 live-port MCP server가 materialized Agent에 주입됐으며 실제 `initialize`·`tools/list`에서 Builder 7개, Helper 2개의 역할 제한 tool catalog를 확인했다. 설치된 28개 package 파일 SHA-256이 `dist/crew-package`와 모두 일치하며 app secret도 보존됐다.
+- target의 기존 PENDING Builder Task를 protocol v4로 복원하면서 Project status만 보던 History가 `SPEC`을 제안해 재진입 시 중복 준비 오류가 날 수 있음을 확인했다. current Task가 있으면 Project status가 아직 `SPEC_REVIEW`여도 `BUILD`를 제안하도록 수정하고 Application regression과 Task 준비→History→같은 Agent Mode 재진입 E2E를 추가했다. Node.js 24.19.0 전체 `pnpm check`와 최종 data-preserving 재설치 뒤 target Core의 `suggestedSurface=BUILD`를 확인했다.
+- 설치 전후 58 project·59 Discovery Session·24 Learning Spec과 SQLite `quick_check=ok`가 그대로 유지됐다. protocol v4 gateway Core read는 58개 Project History와 기존 PENDING Builder Task projection을 정상 반환했다. 첫 설치 시점에는 브라우저 제어 연결이 없어 split/Decision/completion visual review를 보류했다.
+- 2026-09-05 Chrome으로 target Kiro의 History와 기존 PENDING Task 재진입, desktop split과 390×844 Builder/Helper tab을 직접 검토했다. 첫 설치본에서 투명한 `.app-shell`이 Crew host의 밝은 글자색과 어두운 container 배경을 상속해 흰 card 제목과 breadcrumb 대비가 깨지는 문제를 확인했다. 앱 root의 배경·글자색을 명시하고 긴 Build 제목을 반응형으로 축소했으며, 모바일 Helper quick action을 2열+1열 wrap으로 바꾸고 같은 제목·Learning Goal 중복을 제거했다. host theme 상속을 재현하는 E2E에서 root 색·배경, 제목 26px 이하와 가로 overflow 부재를 검증했다.
+- 수정 뒤 Node.js 24.19.0 `pnpm check` 전체가 다시 통과했고 target app 0.2.0을 data-preserving update했다. 실제 Kiro 계산값은 app root `rgb(246, 246, 248)` 배경·`rgb(32, 33, 38)` 글자, desktop Build 제목 36px, mobile 23.4px이며 document width는 390px를 넘지 않았다. Helper quick action은 158/158/322px로 감싸졌고 History 중복 목표가 사라졌다. 설치된 28개 package hash가 모두 source와 일치하며 backend health `ok`, SQLite `quick_check=ok`, 58 project·59 Discovery Session·24 Learning Spec이 유지됐다. 실제 target Builder를 실행해야 나타나는 Decision/completion은 사용자 project 변경과 credit 사용을 수반하므로 별도 승인 전까지 남은 visual gate로 둔다.
+- 사용자 승인 뒤 실제 target의 기존 Project에서 Builder를 끝까지 실행했다. 기존 설계 Decision의 추천 수락과 적용 record를 복원한 상태에서 생성 workspace의 TypeScript TCP 채팅 앱을 검토하고, `pnpm test`로 `protocol` 11개와 `session` 9개, 총 20개 test가 모두 통과한 것을 Builder가 직접 관찰했다. Completion Report가 Task revision 3을 `COMPLETED`로 전이했고 Chrome completion 화면은 구현 기능 6개, 자동 test PASSED, 외부 typecheck/build PASSED를 구분해 표시하며 result descriptor에는 Core 상대 경로만 노출했다.
+- target 실행에서 발견한 실제 host 차이를 수정했다. Kiro PreToolUse event의 top-level `cwd`를 app-owned generated projects root의 정확한 단일 Project child로 canonicalize하고, hook process cwd나 nested/symlink escape는 거절한다. Kiro shell `deniedCommands`의 `*../*` glob이 안전한 명령까지 차단하므로 이를 비우되 `denyByDefault`, 좁은 host allowlist와 동일한 canonical pre-tool guard를 유지했다. pnpm 11 build gate 복구에 필요한 `pnpm rebuild esbuild` 하나만 추가 허용했으며 다른 rebuild는 거절한다.
+- Agent resource 변경을 이미 생성된 Crew session에 안전하게 반영하기 위해 current Builder slot을 v6으로 회전하고 legacy와 v2~v5 history를 읽기 전용으로 합쳐 표시한다. 중간 세션의 오류·Decision 설명·사용자 follow-up은 보존하면서 새 turn만 최신 Agent definition을 사용한다. Builder composer는 버튼 외 자유 follow-up을 지원하고, stream normalizer는 transport chunk·token metric을 숨기며 실제 assistant message/tool/file/test/error만 bounded 표시한다.
+- pnpm 11은 승인되지 않은 build를 `allowBuilds` placeholder로 기록하므로, 사용자의 esbuild 실행 승인 뒤 생성 workspace의 `pnpm-workspace.yaml`을 `allowBuilds.esbuild: true`로 확정하고 대체된 `onlyBuiltDependencies`를 제거했다. esbuild postinstall이 끝난 같은 `pnpm test` turn에서 Vitest 2 files·20 tests·exit 0을 관찰했다. npm audit의 개발 의존성 취약점 5건(보통 3, 높음 1, 치명적 1)과 실제 다중 terminal TCP 확인 필요는 Completion Report limitations에 남겼다.
+- 최종 Node.js 24.19.0·pnpm 11.12.0 `pnpm check`가 format/lint 153 files, typecheck, Drizzle check, unit 2개, package/app integration 197개, eval 17개, build, smoke 6개와 Chromium E2E 11개를 모두 통과했다. 설치된 28개 package file은 최종 `dist/crew-package`와 SHA-256이 전부 일치하고 Builder Agent는 empty `deniedCommands`·`denyByDefault=true`·exact esbuild rebuild 허용을 가진다. SQLite `quick_check=ok`, 58 project·59 Discovery Session·24 Learning Spec이 유지됐으며 target Task는 revision 3 `COMPLETED`, Completion Report는 정확히 1개다.
+
+> 2026-09-05 승인된 capability gate: Crew는 browser App API의
+> `POST /api/chat/slots/{slot}/project`로만 기존 slot의 project directory를 바꾸며,
+> app backend에는 같은 작업을 위임할 gateway callback credential/endpoint를 제공하지 않는다.
+> 사용자가 승인한 대로 Core가 canonicalize한 절대 workspace를 UI memory에 일회성 전달해
+> 즉시 binding하고 DOM·URL·log·durable storage에는 남기지 않는다. binding 성공 전에는
+> Builder native tool을 활성화하거나 첫 message를 보내지 않는다.
 
 **범위**
 
@@ -667,7 +690,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - 사용자는 실제 Decision에서 판단 책임을 유지하고 Builder 추천과 Helper 설명을 함께 볼 수 있다.
 - 완료 화면은 학습 점수보다 실행 가능한 결과물을 먼저 보여준다.
 
-### [ ] T17. Evidence Trace와 다음 대화 개인화
+### [>] T17. Evidence Trace와 다음 대화 개인화
 
 **범위**
 

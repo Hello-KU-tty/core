@@ -11,6 +11,8 @@ export interface BuilderToolGuardResult {
     | 'GUARD_SHELL_DENIED'
 }
 
+const GENERATED_PROJECT_PATTERN = /^project_[0-9a-f-]+$/
+
 function record(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -68,6 +70,28 @@ function protectedPath(path: string): boolean {
   return path.split('/').some((segment) => segment === '.kiro')
 }
 
+export async function resolveAppGeneratedWorkspace(
+  input: unknown,
+  crewHome: string | undefined,
+  processDirectory: string,
+): Promise<string | null> {
+  if (crewHome === undefined || !isAbsolute(crewHome)) return null
+  try {
+    const root = await realpath(
+      join(crewHome, 'apps', 'vibe-helper', 'data', 'generated-workspaces', 'projects'),
+    )
+    const event = record(input)
+    const candidate = event !== null && typeof event.cwd === 'string' ? event.cwd : processDirectory
+    const current = await realpath(candidate)
+    const scoped = relative(root, current)
+    return scoped.length > 0 && !scoped.includes(sep) && GENERATED_PROJECT_PATTERN.test(scoped)
+      ? current
+      : null
+  } catch {
+    return null
+  }
+}
+
 function shellAllowed(command: string): boolean {
   if (
     command.includes('..') ||
@@ -80,8 +104,13 @@ function shellAllowed(command: string): boolean {
   return [
     /^node --test(?: [A-Za-z0-9._/:=-]+)*$/,
     /^pnpm test(?: [A-Za-z0-9._/:=,-]+)*$/,
+    /^pnpm rebuild esbuild$/,
     /^pnpm run [a-zA-Z0-9:_-]+(?: -- [A-Za-z0-9._/:=,-]+)*$/,
     /^pnpm install --frozen-lockfile$/,
+    /^npm test(?: -- [A-Za-z0-9._/:=,-]+)*$/,
+    /^npm run [a-zA-Z0-9:_-]+(?: -- [A-Za-z0-9._/:=,-]+)*$/,
+    /^npm install$/,
+    /^npm install --include=dev$/,
   ].some((pattern) => pattern.test(command))
 }
 

@@ -17,6 +17,8 @@ import {
   auditRecordSchema,
   type BuilderTaskContext,
   builderTaskContextSchema,
+  type BuilderSessionBindingDescriptor,
+  builderSessionBindingDescriptorSchema,
   type CandidateRound,
   type CanonicalConcept,
   canonicalConceptSchema,
@@ -29,6 +31,7 @@ import {
   decisionCommandReceiptSchema,
   decisionApplicationSchema,
   decisionRequestSchema,
+  decisionResolutionSchema,
   type DecisionResult,
   decisionResultSchema,
   type DiscoveryContext,
@@ -127,6 +130,7 @@ export type UiApplicationResponse =
   | EvidenceTrace
   | readonly EvidenceTrace[]
   | PreparedBuilderTaskDescriptor
+  | BuilderSessionBindingDescriptor
   | GeneratedResultDescriptor
   | ProjectHistory
   | ProjectSessionSnapshot
@@ -243,7 +247,11 @@ function readCorrelationId(input: unknown): string | undefined {
   return parsed.success ? parsed.data : undefined
 }
 
-function suggestedSurface(project: Project): 'DISCOVERY' | 'SPEC' | 'BUILD' {
+function suggestedSurface(
+  project: Project,
+  hasCurrentBuilderTask = false,
+): 'DISCOVERY' | 'SPEC' | 'BUILD' {
+  if (hasCurrentBuilderTask) return 'BUILD'
   if (project.status === 'DISCOVERY') return 'DISCOVERY'
   if (project.status === 'SPEC_REVIEW') return 'SPEC'
   return 'BUILD'
@@ -365,6 +373,8 @@ export class ApplicationService {
         return this.#restoreProjectSession(request)
       case 'UI_OPEN_HELPER':
         return this.#openHelperFromUi(request)
+      case 'UI_PREPARE_BUILDER_SESSION':
+        return this.#prepareBuilderSession(request)
       case 'UI_RECORD_HELPER_EXCHANGE':
         return this.#recordHelperExchange(request)
       case 'UI_RETRY_ANALYSIS':
@@ -400,7 +410,7 @@ export class ApplicationService {
             task === null ? null : repository.readBuilderTaskAggregate(project.id, task.id)
           return {
             project,
-            suggestedSurface: suggestedSurface(project),
+            suggestedSurface: suggestedSurface(project, task !== null),
             activeTask: recovery.activeTask,
             pendingDecisionCount: recovery.pendingDecisions.length,
             currentContextVersion: taskAggregate?.liveContext?.contextVersion ?? null,
@@ -462,7 +472,7 @@ export class ApplicationService {
         schemaVersion: 1,
         correlationId: request.correlationId,
         project: recovery.project,
-        suggestedSurface: suggestedSurface(recovery.project),
+        suggestedSurface: suggestedSurface(recovery.project, currentTask !== null),
         discoverySession: recovery.discoverySession,
         discoveryContext,
         selectedCandidate: scopedSelectedCandidate,
@@ -471,6 +481,19 @@ export class ApplicationService {
         currentTask,
         liveContext: taskAggregate?.liveContext ?? recovery.liveContext,
         pendingDecisions: recovery.pendingDecisions,
+        decisions:
+          taskAggregate?.decisionRequests.map((decision) => ({
+            request: decision,
+            resolution:
+              taskAggregate.decisionResolutions.find(
+                (resolution) => resolution.decisionId === decision.id,
+              ) ?? null,
+            application:
+              taskAggregate.decisionApplications.find(
+                (application) => application.decisionId === decision.id,
+              ) ?? null,
+          })) ?? [],
+        completionReport: taskAggregate?.completionReport ?? null,
         helperConversations,
       })
     })
@@ -2007,14 +2030,24 @@ export class ApplicationService {
   ): CommandReceipt {
     return this.#storage.transaction((repository) =>
       this.#idempotent(repository, request, 'ui.resolve_decision', commandReceiptSchema, () => {
+        const resolution = decisionResolutionSchema.parse({
+          ...request.resolution,
+          ...(request.resolution.customProposal === undefined
+            ? {}
+            : { customProposal: redactSensitiveText(request.resolution.customProposal) }),
+          ...(request.resolution.rationale === undefined
+            ? {}
+            : { rationale: redactSensitiveText(request.resolution.rationale) }),
+          redactionStatus: 'VERIFIED_REDACTED',
+        })
         const aggregate = this.#requireBuilderAggregate(
           repository,
-          request.resolution.projectId,
-          request.resolution.taskId,
+          resolution.projectId,
+          resolution.taskId,
           request.correlationId,
         )
         const decision = aggregate.decisionRequests.find(
-          (item) => item.id === request.resolution.decisionId,
+          (item) => item.id === resolution.decisionId,
         )
         if (decision === undefined)
           throw this.#notFound(request.correlationId, 'DECISION_NOT_FOUND')
@@ -2031,16 +2064,16 @@ export class ApplicationService {
             ...(existingApplication === undefined ? {} : { application: existingApplication }),
           },
           task: aggregate.task,
-          resolution: request.resolution,
+          resolution,
           currentContextVersion: aggregate.liveContext?.contextVersion ?? 0,
         })
         if (reduced.outcome === 'REJECTED') {
           throw this.#domainError(request.correlationId, reduced.reasonCode)
         }
-        repository.appendDecisionResolution(request.resolution)
+        repository.appendDecisionResolution(resolution)
         const resolvedDecisionIds = new Set([
           ...aggregate.decisionResolutions.map((resolution) => resolution.decisionId),
-          request.resolution.decisionId,
+          resolution.decisionId,
         ])
         const hasUnresolvedBlockingDecision = aggregate.decisionRequests.some(
           (item) => !item.independentWorkCanContinue && !resolvedDecisionIds.has(item.id),
@@ -2055,7 +2088,7 @@ export class ApplicationService {
             ...aggregate.task,
             revision: aggregate.task.revision + 1,
             status: 'ACTIVE' as const,
-            updatedAt: request.resolution.resolvedAt,
+            updatedAt: resolution.resolvedAt,
           }
           const taskResult = transitionBuilderTask({
             current: aggregate.task,
@@ -2073,12 +2106,12 @@ export class ApplicationService {
           decisionId: decision.id,
           correlationId: decision.correlationId,
           actor: { kind: 'USER' },
-          occurredAt: request.resolution.resolvedAt,
+          occurredAt: resolution.resolvedAt,
           payload: {
             type: 'DECISION_RESOLVED',
             decisionId: decision.id,
-            resolutionId: request.resolution.id,
-            rationaleProvided: request.resolution.rationale !== undefined,
+            resolutionId: resolution.id,
+            rationaleProvided: resolution.rationale !== undefined,
           },
           sourceReferences: [{ kind: 'USER_DECISION', decisionId: decision.id }],
         })
@@ -2099,14 +2132,14 @@ export class ApplicationService {
         this.#closeEpisodeAndQueue(
           repository,
           currentEpisode,
-          request.resolution.resolvedAt,
+          resolution.resolvedAt,
           'User resolved the Decision.',
         )
         this.#closeHelperEpisodes(
           repository,
           decision.projectId,
           { decisionId: decision.id },
-          request.resolution.resolvedAt,
+          resolution.resolvedAt,
           'Related Decision was resolved.',
           decision.correlationId,
         )
@@ -2117,7 +2150,7 @@ export class ApplicationService {
           resource: { type: 'DECISION', id: decision.id },
           summary: 'Stored a validated user-authored Decision resolution.',
           changedFields: ['status'],
-          occurredAt: request.resolution.resolvedAt,
+          occurredAt: resolution.resolvedAt,
         })
         if (nextTask.revision !== aggregate.task.revision) {
           this.#appendAudit(repository, {
@@ -2834,6 +2867,41 @@ export class ApplicationService {
     })
   }
 
+  async #prepareBuilderSession(
+    request: Extract<UiRequest, { kind: 'UI_PREPARE_BUILDER_SESSION' }>,
+  ): Promise<BuilderSessionBindingDescriptor> {
+    const aggregate = this.#storage.transaction((repository) =>
+      repository.readBuilderTaskAggregate(request.projectId, request.taskId),
+    )
+    if (aggregate === null) throw this.#notFound(request.correlationId, 'BUILDER_TASK_NOT_FOUND')
+    if (!['PENDING', 'ACTIVE', 'BLOCKED'].includes(aggregate.task.status)) {
+      throw this.#validationError(
+        request.correlationId,
+        'BUILDER_SESSION_NOT_AVAILABLE',
+        'Builder session is only available for a pending, active, or blocked Task.',
+      )
+    }
+    if (aggregate.project.generatedWorkspacePath === undefined) {
+      throw this.#validationError(
+        request.correlationId,
+        'BUILDER_WORKSPACE_NOT_ASSIGNED',
+        'Builder Task does not have a generated workspace assignment.',
+      )
+    }
+    const workspaceDirectory = await this.#workspacePolicy.resolveProjectWorkspace(
+      aggregate.project,
+      request.correlationId,
+    )
+    return builderSessionBindingDescriptorSchema.parse({
+      schemaVersion: 1,
+      correlationId: request.correlationId,
+      projectId: aggregate.project.id,
+      taskId: aggregate.task.id,
+      workspaceDirectory,
+      status: 'READY',
+    })
+  }
+
   #recordHelperExchange(
     request: Extract<UiRequest, { kind: 'UI_RECORD_HELPER_EXCHANGE' }>,
   ): HelperExchangeReceipt {
@@ -2854,37 +2922,42 @@ export class ApplicationService {
                 null)
           if (task === null) throw this.#notFound(request.correlationId, 'BUILDER_TASK_NOT_FOUND')
           const conversationId = request.conversationId ?? this.#generateId('conversation')
-          const userMessageId = this.#generateId('message')
           const helperMessageId = this.#generateId('message')
-          const userEvent = this.#appendActivityEvent(repository, {
-            projectId: request.projectId,
-            taskId: task.id,
-            ...(request.decisionId === undefined ? {} : { decisionId: request.decisionId }),
-            conversationId,
-            correlationId: request.correlationId,
-            actor: { kind: 'USER' },
-            occurredAt: recordedAt,
-            payload: {
-              type: 'USER_MESSAGE',
-              conversationId,
-              messageId: userMessageId,
-              redactedExcerpt: redactSensitiveText(request.userMessage),
-            },
-            sourceReferences: [{ kind: 'USER_MESSAGE', conversationId, messageId: userMessageId }],
-          })
           const existing = repository.readOpenEpisode(request.projectId, 'HELPER_CONVERSATION', {
             conversationId,
           })
-          let episode =
-            existing === null
-              ? this.#openEpisode(repository, {
-                  type: 'HELPER_CONVERSATION',
-                  event: userEvent,
-                  taskId: task.id,
-                  ...(request.decisionId === undefined ? {} : { decisionId: request.decisionId }),
-                  conversationId,
-                })
-              : this.#appendEpisodeEvent(repository, existing, userEvent)
+          let episode = existing
+          if (request.origin === 'FREE_TEXT') {
+            const userMessageId = this.#generateId('message')
+            const userEvent = this.#appendActivityEvent(repository, {
+              projectId: request.projectId,
+              taskId: task.id,
+              ...(request.decisionId === undefined ? {} : { decisionId: request.decisionId }),
+              conversationId,
+              correlationId: request.correlationId,
+              actor: { kind: 'USER' },
+              occurredAt: recordedAt,
+              payload: {
+                type: 'USER_MESSAGE',
+                conversationId,
+                messageId: userMessageId,
+                redactedExcerpt: redactSensitiveText(request.userMessage),
+              },
+              sourceReferences: [
+                { kind: 'USER_MESSAGE', conversationId, messageId: userMessageId },
+              ],
+            })
+            episode =
+              episode === null
+                ? this.#openEpisode(repository, {
+                    type: 'HELPER_CONVERSATION',
+                    event: userEvent,
+                    taskId: task.id,
+                    ...(request.decisionId === undefined ? {} : { decisionId: request.decisionId }),
+                    conversationId,
+                  })
+                : this.#appendEpisodeEvent(repository, episode, userEvent)
+          }
           const helperEvent = this.#appendActivityEvent(repository, {
             projectId: request.projectId,
             taskId: task.id,
@@ -2903,7 +2976,16 @@ export class ApplicationService {
               { kind: 'AGENT_MESSAGE', conversationId, messageId: helperMessageId },
             ],
           })
-          episode = this.#appendEpisodeEvent(repository, episode, helperEvent)
+          episode =
+            episode === null
+              ? this.#openEpisode(repository, {
+                  type: 'HELPER_CONVERSATION',
+                  event: helperEvent,
+                  taskId: task.id,
+                  ...(request.decisionId === undefined ? {} : { decisionId: request.decisionId }),
+                  conversationId,
+                })
+              : this.#appendEpisodeEvent(repository, episode, helperEvent)
           if (request.closeConversation) {
             this.#closeEpisodeAndQueue(
               repository,
@@ -3551,23 +3633,37 @@ export class ApplicationService {
   async #getResultDescriptor(
     request: Extract<UiRequest, { kind: 'UI_LAUNCH_RESULT' }>,
   ): Promise<GeneratedResultDescriptor> {
-    const project = this.#storage.transaction(
-      (repository) => repository.recoverProject(request.projectId)?.project ?? null,
-    )
-    if (project === null) throw this.#notFound(request.correlationId, 'PROJECT_NOT_FOUND')
-    if (project.status !== 'COMPLETED' || project.generatedWorkspacePath === undefined) {
+    const result = this.#storage.transaction((repository) => {
+      const recovery = repository.recoverProject(request.projectId)
+      if (recovery === null) return null
+      const task =
+        recovery.currentTask ?? repository.readLatestTaskForProject(request.projectId) ?? null
+      const aggregate =
+        task === null ? null : repository.readBuilderTaskAggregate(request.projectId, task.id)
+      return {
+        project: recovery.project,
+        task,
+        completionReport: aggregate?.completionReport ?? null,
+      }
+    })
+    if (result === null) throw this.#notFound(request.correlationId, 'PROJECT_NOT_FOUND')
+    if (
+      result.project.generatedWorkspacePath === undefined ||
+      result.task?.status !== 'COMPLETED' ||
+      result.completionReport === null
+    ) {
       throw this.#validationError(
         request.correlationId,
         'GENERATED_RESULT_NOT_READY',
         'Generated result is not ready to launch.',
       )
     }
-    await this.#workspacePolicy.resolveProjectWorkspace(project, request.correlationId)
+    await this.#workspacePolicy.resolveProjectWorkspace(result.project, request.correlationId)
     return generatedResultDescriptorSchema.parse({
       schemaVersion: 1,
       correlationId: request.correlationId,
-      projectId: project.id,
-      workspacePath: project.generatedWorkspacePath,
+      projectId: result.project.id,
+      workspacePath: result.project.generatedWorkspacePath,
       status: 'READY',
     })
   }

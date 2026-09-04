@@ -5,12 +5,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CREW_UI_PROTOCOL_VERSION } from '@vibe-helper/contracts'
 
 import {
+  BUILDER_MCP_PATH,
   type CrewBackendOptions,
   createCrewBackendServer,
   createProxySignature,
   DISCOVERY_ROUND_MCP_PATH,
   DISCOVERY_SPEC_MCP_PATH,
   DISCOVERY_SPEC_RECOVERY_MCP_PATH,
+  HELPER_MCP_PATH,
 } from '../src/server.js'
 
 const secret = 'test-proxy-secret-with-at-least-thirty-two-bytes'
@@ -33,13 +35,13 @@ async function start(
     success: true,
     data: input,
   }),
-  discoveryMcpHandlers?: CrewBackendOptions['discoveryMcpHandlers'],
+  mcpHandlers?: CrewBackendOptions['mcpHandlers'],
 ): Promise<string> {
   const server = createCrewBackendServer({
     application: { executeUi } as never,
     proxySecret: secret,
     now: () => Number(timestamp),
-    discoveryMcpHandlers,
+    mcpHandlers,
   })
   servers.push(server)
   server.listen(0, '127.0.0.1')
@@ -161,7 +163,7 @@ describe('Crew Node backend', () => {
     await expect(invalidCore.json()).resolves.toEqual({ error: 'invalid Core response' })
   })
 
-  it('exposes only the configured phase-bound Discovery MCP handlers and closes them with the backend', async () => {
+  it('exposes only configured role-bound MCP handlers and closes them with the backend', async () => {
     const fetchHandler = vi.fn(async (request: Request) => {
       expect(request.url).toBe(`http://127.0.0.1${DISCOVERY_ROUND_MCP_PATH}`)
       expect(request.method).toBe('POST')
@@ -176,6 +178,10 @@ describe('Crew Node backend', () => {
     const specFetchHandler = vi.fn(async () => Response.json({}))
     const specCloseHandler = vi.fn(async () => undefined)
     const specRecoveryCloseHandler = vi.fn(async () => undefined)
+    const builderFetchHandler = vi.fn(async () => Response.json({ role: 'BUILDER' }))
+    const builderCloseHandler = vi.fn(async () => undefined)
+    const helperFetchHandler = vi.fn(async () => Response.json({ role: 'HELPER' }))
+    const helperCloseHandler = vi.fn(async () => undefined)
     const baseUrl = await start(undefined, {
       [DISCOVERY_ROUND_MCP_PATH]: { fetch: fetchHandler, close: closeHandler },
       [DISCOVERY_SPEC_MCP_PATH]: { fetch: specFetchHandler, close: specCloseHandler },
@@ -183,6 +189,8 @@ describe('Crew Node backend', () => {
         fetch: specFetchHandler,
         close: specRecoveryCloseHandler,
       },
+      [BUILDER_MCP_PATH]: { fetch: builderFetchHandler, close: builderCloseHandler },
+      [HELPER_MCP_PATH]: { fetch: helperFetchHandler, close: helperCloseHandler },
     })
 
     const response = await fetch(`${baseUrl}${DISCOVERY_ROUND_MCP_PATH}`, {
@@ -194,6 +202,12 @@ describe('Crew Node backend', () => {
     expect(response.status).toBe(200)
     expect(response.headers.get('mcp-session-id')).toBe('discovery-session')
     expect(fetchHandler).toHaveBeenCalledOnce()
+    await expect((await fetch(`${baseUrl}${BUILDER_MCP_PATH}`)).json()).resolves.toEqual({
+      role: 'BUILDER',
+    })
+    await expect((await fetch(`${baseUrl}${HELPER_MCP_PATH}`)).json()).resolves.toEqual({
+      role: 'HELPER',
+    })
 
     const server = servers.pop()
     expect(server).toBeDefined()
@@ -201,6 +215,8 @@ describe('Crew Node backend', () => {
     expect(closeHandler).toHaveBeenCalledOnce()
     expect(specCloseHandler).toHaveBeenCalledOnce()
     expect(specRecoveryCloseHandler).toHaveBeenCalledOnce()
+    expect(builderCloseHandler).toHaveBeenCalledOnce()
+    expect(helperCloseHandler).toHaveBeenCalledOnce()
 
     const withoutHandler = await start()
     expect((await fetch(`${withoutHandler}${DISCOVERY_ROUND_MCP_PATH}`)).status).toBe(404)

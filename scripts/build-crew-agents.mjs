@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url'
 
 const workspaceRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 const sourcePath = join(workspaceRoot, 'docs', 'agent-prompts', 'discovery.md')
+const builderSourcePath = join(workspaceRoot, 'docs', 'agent-prompts', 'builder.md')
+const helperSourcePath = join(workspaceRoot, 'docs', 'agent-prompts', 'helper.md')
 const agentsDirectory = join(workspaceRoot, 'agents')
 const expectedVersion = '1.1.9'
 const discoveryModel = process.env.VIBE_HELPER_DISCOVERY_MODEL ?? 'claude-haiku-4.5'
@@ -14,12 +16,20 @@ for (const model of [discoveryModel, specModel]) {
   }
 }
 const prompt = await readFile(sourcePath, 'utf8')
+const builderPrompt = await readFile(builderSourcePath, 'utf8')
+const helperPrompt = await readFile(helperSourcePath, 'utf8')
 const version = prompt.match(/^> Prompt version: `([^`]+)`$/m)?.[1]
 
 if (version !== expectedVersion) {
   throw new TypeError(
     `Discovery prompt version mismatch: expected ${expectedVersion}, received ${version ?? 'none'}`,
   )
+}
+if (builderPrompt.match(/^> Prompt version: `([^`]+)`$/m)?.[1] !== '1.1.0') {
+  throw new TypeError('Builder prompt version mismatch: expected 1.1.0')
+}
+if (helperPrompt.match(/^> Prompt version: `([^`]+)`$/m)?.[1] !== '1.0.0') {
+  throw new TypeError('Helper prompt version mismatch: expected 1.0.0')
 }
 
 function sectionStart(heading) {
@@ -106,6 +116,53 @@ const agents = [
     prompt: phasePrompts.specRecovery,
     tools: ['@vibe-helper:discovery-spec-recovery-core'],
     allowedTools: ['@vibe-helper:discovery-spec-recovery-core'],
+  },
+  {
+    name: 'vibe-helper-builder',
+    description: 'Builds the confirmed TypeScript project inside its Core-assigned workspace.',
+    prompt: builderPrompt,
+    includeMcpJson: false,
+    mcpServers: {},
+    tools: ['fs_read', 'fs_write', 'execute_bash', '@vibe-helper:builder-core'],
+    allowedTools: ['fs_read', 'fs_write', '@vibe-helper:builder-core'],
+    toolsSettings: {
+      read: { allowedPaths: ['./**'], deniedPaths: ['.kiro/**'] },
+      write: { allowedPaths: ['./**'], deniedPaths: ['.kiro/**'] },
+      shell: {
+        allowedCommands: [
+          'node --test*',
+          'pnpm test*',
+          'pnpm rebuild esbuild',
+          'pnpm run *',
+          'pnpm install --frozen-lockfile',
+          'npm test*',
+          'npm run *',
+          'npm install',
+          'npm install --include=dev',
+        ],
+        deniedCommands: [],
+        denyByDefault: true,
+      },
+    },
+    hooks: {
+      preToolUse: [
+        {
+          command:
+            'node "$KIROCREW_HOME/apps/vibe-helper/apps/crew-backend/dist/builder-tool-guard.js" --app-generated-workspace',
+        },
+      ],
+    },
+    managedToolPolicy: common.managedToolPolicy,
+  },
+  {
+    name: 'vibe-helper-helper',
+    description: 'Explains the current validated Builder context without changing project state.',
+    prompt: helperPrompt,
+    includeMcpJson: false,
+    mcpServers: {},
+    tools: ['@vibe-helper:helper-core'],
+    allowedTools: ['@vibe-helper:helper-core'],
+    managedToolPolicy: common.managedToolPolicy,
   },
 ]
 

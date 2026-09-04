@@ -1,6 +1,6 @@
-import { stdin, stderr } from 'node:process'
+import { cwd, env, stdin, stderr } from 'node:process'
 
-import { guardBuilderToolInput } from './builder-tool-guard.js'
+import { guardBuilderToolInput, resolveAppGeneratedWorkspace } from './builder-tool-guard.js'
 
 async function readStandardInput(): Promise<string> {
   const chunks: Buffer[] = []
@@ -9,20 +9,24 @@ async function readStandardInput(): Promise<string> {
 }
 
 const workspaceIndex = process.argv.indexOf('--workspace')
-const expectedWorkspace = workspaceIndex < 0 ? undefined : process.argv[workspaceIndex + 1]
-if (expectedWorkspace === undefined) {
-  stderr.write('BUILDER_GUARD_WORKSPACE_REQUIRED\n')
-  process.exitCode = 2
-} else {
-  try {
-    const input: unknown = JSON.parse(await readStandardInput())
+let expectedWorkspace = workspaceIndex < 0 ? undefined : process.argv[workspaceIndex + 1]
+try {
+  const input: unknown = JSON.parse(await readStandardInput())
+  if (process.argv.includes('--app-generated-workspace')) {
+    expectedWorkspace =
+      (await resolveAppGeneratedWorkspace(input, env.KIROCREW_HOME, cwd())) ?? undefined
+  }
+  if (expectedWorkspace === undefined) {
+    stderr.write('BUILDER_GUARD_WORKSPACE_REQUIRED\n')
+    process.exitCode = 2
+  } else {
     const result = await guardBuilderToolInput(input, expectedWorkspace)
     if (!result.allowed) {
       stderr.write(`${result.reasonCode ?? 'BUILDER_TOOL_DENIED'}\n`)
       process.exitCode = 2
     }
-  } catch {
-    stderr.write('GUARD_INPUT_INVALID\n')
-    process.exitCode = 2
   }
+} catch {
+  stderr.write('GUARD_INPUT_INVALID\n')
+  process.exitCode = 2
 }

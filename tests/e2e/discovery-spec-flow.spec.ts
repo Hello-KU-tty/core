@@ -38,7 +38,7 @@ async function executeBackend(
 }
 
 async function executeUi(request: APIRequestContext, input: Readonly<Record<string, unknown>>) {
-  return executeBackend(request, applicationPath, { ...input, clientProtocolVersion: 3 })
+  return executeBackend(request, applicationPath, { ...input, clientProtocolVersion: 4 })
 }
 
 async function executeDiscoveryAgent(
@@ -46,6 +46,17 @@ async function executeDiscoveryAgent(
   input: Readonly<Record<string, unknown>>,
 ) {
   return executeBackend(request, testAgentPath, { role: 'DISCOVERY', request: input })
+}
+
+async function executeBuilderAgent(
+  request: APIRequestContext,
+  input: Readonly<Record<string, unknown>>,
+) {
+  const response = await executeBackend(request, testAgentPath, { role: 'BUILDER', request: input })
+  expect(response.ok()).toBe(true)
+  const payload = await response.json()
+  expect(payload, JSON.stringify(payload)).toMatchObject({ success: true })
+  return payload.data as Readonly<Record<string, unknown>>
 }
 
 const evaluationCriteria = [
@@ -466,11 +477,245 @@ async function fulfillAgentTurn(
   })
 }
 
+async function fulfillInitialBuilderTurn(
+  route: Route,
+  request: APIRequestContext,
+  projectId: string,
+): Promise<void> {
+  const snapshot = await restoreProject(request, projectId)
+  const task = snapshot.currentTask
+  if (task === null) throw new TypeError('Builder Task is missing')
+  await executeBuilderAgent(request, {
+    schemaVersion: 1,
+    kind: 'BUILDER_START_TASK',
+    correlationId: task.correlationId,
+    actor: { kind: 'AGENT', role: 'BUILDER' },
+    idempotencyKey: id('idem'),
+    projectId,
+    taskId: task.id,
+    expectedTaskRevision: task.revision,
+  })
+  const now = new Date().toISOString()
+  await executeBuilderAgent(request, {
+    schemaVersion: 1,
+    kind: 'BUILDER_UPDATE_LIVE_CONTEXT',
+    correlationId: task.correlationId,
+    actor: { kind: 'AGENT', role: 'BUILDER' },
+    idempotencyKey: id('idem'),
+    context: {
+      schemaVersion: 1,
+      id: id('context'),
+      projectId,
+      taskId: task.id,
+      correlationId: task.correlationId,
+      contextVersion: 1,
+      expectedPreviousVersion: 0,
+      checkpoint: 'TASK_STARTED',
+      stage: 'Implementing the local validation flow',
+      currentGoal: 'Render a safe success and failure result from unknown input.',
+      recentChanges: ['Created the parser boundary and result shell.'],
+      activeDecisionIds: [],
+      activeConceptNames: task.expectedConcepts,
+      relatedFiles: [],
+      nextActions: ['Choose how validation failures should be presented.'],
+      updatedAt: now,
+      source: { kind: 'AGENT', role: 'BUILDER' },
+      redactionStatus: 'VERIFIED_REDACTED',
+    },
+  })
+  await executeBuilderAgent(request, {
+    schemaVersion: 1,
+    kind: 'BUILDER_REQUEST_DECISION',
+    correlationId: task.correlationId,
+    actor: { kind: 'AGENT', role: 'BUILDER' },
+    idempotencyKey: id('idem'),
+    projectId,
+    taskId: task.id,
+    expectedTaskRevision: task.revision + 1,
+    expectedContextVersion: 1,
+    decision: {
+      category: 'PRODUCT_BEHAVIOR',
+      question: '검증 오류를 한 번에 보여줄까요, 첫 오류부터 단계별로 보여줄까요?',
+      reasonRequiredNow: '오류 결과 화면과 parser 반환 형식이 이 선택에 따라 달라집니다.',
+      options: [
+        {
+          key: 'all',
+          label: '오류를 한 번에 표시',
+          description: '발견한 모든 validation 오류를 같은 결과 카드에 보여줍니다.',
+          impacts: ['사용자가 입력 전체를 한 번에 고칠 수 있습니다.'],
+          tradeoffs: ['처음 보는 사용자에게 정보가 많을 수 있습니다.'],
+        },
+        {
+          key: 'first',
+          label: '첫 오류부터 단계별 표시',
+          description: '가장 먼저 발견한 오류 하나만 안내합니다.',
+          impacts: ['한 번에 집중할 내용이 줄어듭니다.'],
+          tradeoffs: ['여러 번 수정해야 전체 오류를 확인할 수 있습니다.'],
+        },
+      ],
+      recommendedOptionKey: 'all',
+      recommendationRationale: '작은 설정 파일은 모든 오류를 함께 고치는 흐름이 더 빠릅니다.',
+      relatedConceptNames: ['runtime validation'],
+      sourceReferences: [],
+      independentWorkCanContinue: false,
+    },
+    context: {
+      stage: 'Waiting for validation error presentation',
+      currentGoal: 'Choose the result shape before finishing the parser UI.',
+      recentChanges: ['Created the parser boundary and result shell.'],
+      activeConceptNames: task.expectedConcepts,
+      relatedFiles: [],
+      nextActions: ['Apply the selected presentation.', 'Run the acceptance tests.'],
+      blockingReason: 'The result component depends on the user choice.',
+    },
+  })
+  await route.fulfill({
+    status: 200,
+    contentType: 'text/event-stream',
+    body: [
+      'data: {"type":"chunk","cls":"chunk","content":"noisy-fragment"}',
+      `data: ${JSON.stringify({
+        type: 'message',
+        content: JSON.stringify({
+          slot: `vibe-helper-builder-${projectId}`,
+          used_tokens: 120,
+          window_tokens: 1_000,
+        }),
+      })}`,
+      'data: {"type":"tool_call","command":"get_builder_task"}',
+      'data: {"type":"file_change","summary":"Updated src/parser.ts"}',
+      'data: {"type":"status","command":"pnpm test"}',
+      'data: {"type":"error","summary":"token=synthetic-e2e-secret was rejected and fixed"}',
+      'data: {"type":"message","content":"Decision input is required before continuing."}',
+      'data: [DONE]',
+    ].join('\n\n'),
+  })
+}
+
+async function fulfillResumedBuilderTurn(
+  route: Route,
+  request: APIRequestContext,
+  projectId: string,
+): Promise<void> {
+  const resolved = await restoreProject(request, projectId)
+  const task = resolved.currentTask
+  const context = resolved.liveContext
+  const decision = resolved.decisions.find(
+    (item) => item.resolution !== null && item.application === null,
+  )
+  if (task === null || context === null || decision === undefined || decision.resolution === null) {
+    throw new TypeError('Resolved Builder context is missing')
+  }
+  await executeBuilderAgent(request, {
+    schemaVersion: 1,
+    kind: 'BUILDER_APPLY_DECISION',
+    correlationId: task.correlationId,
+    actor: { kind: 'AGENT', role: 'BUILDER' },
+    idempotencyKey: id('idem'),
+    projectId,
+    taskId: task.id,
+    decisionId: decision.request.id,
+    expectedTaskRevision: task.revision,
+    expectedContextVersion: context.contextVersion,
+    appliedResult: '모든 validation 오류를 한 결과 카드에 표시하도록 적용했습니다.',
+    sourceReferences: [],
+    context: {
+      stage: 'Applied the validation error presentation',
+      currentGoal: 'Validate the completed local result.',
+      recentChanges: ['Rendered all validation errors in one result card.'],
+      activeConceptNames: task.expectedConcepts,
+      relatedFiles: [],
+      nextActions: ['Run the acceptance tests.'],
+    },
+  })
+  const applied = await restoreProject(request, projectId)
+  if (applied.liveContext === null || applied.currentTask === null) {
+    throw new TypeError('Applied Builder context is missing')
+  }
+  const completedAt = new Date().toISOString()
+  await executeBuilderAgent(request, {
+    schemaVersion: 1,
+    kind: 'BUILDER_UPDATE_LIVE_CONTEXT',
+    correlationId: task.correlationId,
+    actor: { kind: 'AGENT', role: 'BUILDER' },
+    idempotencyKey: id('idem'),
+    context: {
+      ...applied.liveContext,
+      contextVersion: applied.liveContext.contextVersion + 1,
+      expectedPreviousVersion: applied.liveContext.contextVersion,
+      checkpoint: 'TASK_COMPLETED',
+      stage: 'Completed and validated',
+      currentGoal: 'Open the generated local result.',
+      recentChanges: ['Implemented the selected error view.', 'Passed all acceptance checks.'],
+      activeDecisionIds: [],
+      nextActions: ['Open the generated result.'],
+      updatedAt: completedAt,
+    },
+  })
+  await executeBuilderAgent(request, {
+    schemaVersion: 1,
+    kind: 'BUILDER_COMPLETE_TASK',
+    correlationId: task.correlationId,
+    actor: { kind: 'AGENT', role: 'BUILDER' },
+    idempotencyKey: id('idem'),
+    report: {
+      schemaVersion: 1,
+      id: id('completion_report'),
+      projectId,
+      taskId: task.id,
+      correlationId: task.correlationId,
+      expectedTaskRevision: applied.currentTask.revision,
+      implementedFeatures: ['Unknown input validation and result comparison flow'],
+      acceptanceResults: applied.currentTask.acceptanceCriteria.map((criterion) => ({
+        criterionKey: criterion.key,
+        status: 'PASSED',
+        evidence: [],
+      })),
+      validationResults: [
+        { name: 'Build Agent E2E', status: 'PASSED', summary: 'The local flow completed.' },
+      ],
+      conceptUsage: task.expectedConcepts.map((conceptName) => ({
+        conceptName,
+        scope: 'LEARNER_FOCUS',
+        importance: 'CORE',
+        usageReason: 'The parser narrows unknown input into safe success and failure states.',
+        codeReferences: [],
+      })),
+      appliedDecisionIds: [decision.request.id],
+      codeReferences: [],
+      diffReferences: [],
+      specDeviations: [],
+      remainingIssues: [],
+      limitations: [],
+      completedAt,
+      source: { kind: 'AGENT', role: 'BUILDER' },
+      redactionStatus: 'VERIFIED_REDACTED',
+    },
+  })
+  await route.fulfill({
+    status: 200,
+    contentType: 'text/event-stream',
+    body: [
+      'data: {"type":"tool_call","command":"get_decision_result"}',
+      'data: {"type":"file_change","summary":"Updated src/result.ts"}',
+      'data: {"type":"status","command":"pnpm test"}',
+      'data: {"type":"message","content":"Implementation and validation completed."}',
+      'data: [DONE]',
+    ].join('\n\n'),
+  })
+}
+
 function projectIdFromRoute(route: Route): string {
   const body = route.request().postDataJSON()
   const message = typeof body.message === 'string' ? body.message : ''
   const match = message.match(/projectId=(project_[0-9a-f-]{36})/)
   if (match?.[1] === undefined) throw new TypeError('Discovery tool context project is invalid')
+  return match[1]
+}
+
+function projectIdFromUrl(url: string): string {
+  const match = url.match(/[?&]project=(project_[0-9a-f-]{36})/)
+  if (match?.[1] === undefined) throw new TypeError('Project URL is invalid')
   return match[1]
 }
 
@@ -484,16 +729,49 @@ async function startFromKeyboard(page: Page): Promise<void> {
   await page.keyboard.press('Enter')
 }
 
-test('runs list selection, Agent refinement, visual Spec review, and Builder preparation through durable Core state', async ({
+test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion through durable Core state', async ({
   page,
   request,
 }) => {
   const pageErrors: Error[] = []
   let agentDispatches = 0
+  let builderDispatches = 0
+  let firstBuilderMessage = ''
+  let helperDispatches = 0
+  let releaseBuilderResume: (() => void) | undefined
+  const builderResumeGate = new Promise<void>((resolve) => {
+    releaseBuilderResume = resolve
+  })
   page.on('pageerror', (error) => pageErrors.push(error))
   await page.route('**/api/chat', async (route) => {
+    const dispatch = route.request().postDataJSON()
+    const agent = String(dispatch.agent)
+    const dispatchedProjectId = projectIdFromRoute(route)
+    if (agent === 'vibe-helper-builder') {
+      builderDispatches += 1
+      if (builderDispatches === 1) {
+        firstBuilderMessage = String(dispatch.message)
+        await fulfillInitialBuilderTurn(route, request, dispatchedProjectId)
+      } else {
+        await builderResumeGate
+        await fulfillResumedBuilderTurn(route, request, dispatchedProjectId)
+      }
+      return
+    }
+    if (agent === 'vibe-helper-helper') {
+      helperDispatches += 1
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: [
+          'data: {"type":"message","content":"한 번에 표시하면 모든 오류를 함께 고칠 수 있지만 처음에는 정보가 더 많습니다."}',
+          'data: [DONE]',
+        ].join('\n\n'),
+      })
+      return
+    }
     agentDispatches += 1
-    await fulfillAgentTurn(route, request, projectIdFromRoute(route))
+    await fulfillAgentTurn(route, request, dispatchedProjectId)
   })
 
   await page.goto('/#/discovery')
@@ -531,6 +809,8 @@ test('runs list selection, Agent refinement, visual Spec review, and Builder pre
     const scroller = document.createElement('div')
     scroller.style.height = '802px'
     scroller.style.overflowY = 'auto'
+    scroller.style.color = 'rgb(220, 218, 223)'
+    scroller.style.backgroundColor = 'rgb(19, 16, 24)'
     const hostStyle = document.createElement('style')
     hostStyle.dataset.testKiroMobileStyle = 'true'
     hostStyle.textContent = 'main { height: 100%; }'
@@ -543,6 +823,8 @@ test('runs list selection, Agent refinement, visual Spec review, and Builder pre
     const mark = document.querySelector('.candidate-checkmark')?.getBoundingClientRect()
     const input = document.querySelector<HTMLInputElement>('.candidate-check input')
     const card = document.querySelector('.candidate-card')?.getBoundingClientRect()
+    const shell = document.querySelector<HTMLElement>('.app-shell')
+    const shellStyle = shell === null ? null : getComputedStyle(shell)
     return {
       documentWidth: document.documentElement.scrollWidth,
       viewportWidth: document.documentElement.clientWidth,
@@ -552,6 +834,8 @@ test('runs list selection, Agent refinement, visual Spec review, and Builder pre
       checkboxPosition: input === null ? '' : getComputedStyle(input).position,
       checkboxWidth: input?.getBoundingClientRect().width ?? 0,
       checkboxHeight: input?.getBoundingClientRect().height ?? 0,
+      shellColor: shellStyle?.color ?? '',
+      shellBackground: shellStyle?.backgroundColor ?? '',
     }
   })
   expect(mobileMetrics.documentWidth).toBeLessThanOrEqual(mobileMetrics.viewportWidth)
@@ -561,6 +845,8 @@ test('runs list selection, Agent refinement, visual Spec review, and Builder pre
   expect(mobileMetrics.checkboxPosition).not.toBe('absolute')
   expect(mobileMetrics.checkboxWidth).toBeGreaterThanOrEqual(24)
   expect(mobileMetrics.checkboxHeight).toBeGreaterThanOrEqual(24)
+  expect(mobileMetrics.shellColor).toBe('rgb(32, 33, 38)')
+  expect(mobileMetrics.shellBackground).toBe('rgb(246, 246, 248)')
   const interestCheckbox = firstCandidate.getByRole('checkbox', {
     name: 'Safe Config Lab 관심 목록에 담기',
   })
@@ -643,6 +929,96 @@ test('runs list selection, Agent refinement, visual Spec review, and Builder pre
     page.getByRole('heading', { name: 'TypeScript runtime validation', exact: true }),
   ).toBeVisible()
   await expect(page.getByText('PENDING', { exact: true })).toBeVisible()
+
+  const preparedProjectId = projectIdFromUrl(page.url())
+  await page.goto('/#/history')
+  const preparedProject = page
+    .getByRole('button', { name: /TypeScript runtime validation.*Open Build →/ })
+    .first()
+  await expect(preparedProject).toContainText('Open Build →')
+  await preparedProject.click()
+  await expect(page).toHaveURL(new RegExp(`#\\/build\\?project=${preparedProjectId}$`))
+  await expect(page.getByRole('button', { name: 'Builder 시작' })).toBeVisible()
+
+  await expect(page.locator('.builder-pane')).toBeVisible()
+  await expect(page.locator('.helper-pane')).toBeVisible()
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(page.locator('.helper-pane')).toBeHidden()
+  await page.getByRole('tab', { name: 'Helper' }).click()
+  await expect(page.locator('.helper-pane')).toBeVisible()
+  await expect(page.locator('.builder-pane')).toBeHidden()
+  const mobileBuildMetrics = await page.evaluate(() => {
+    const title = document.querySelector<HTMLElement>('.build-heading h2')
+    const quickActions = document.querySelector<HTMLElement>('.quick-actions')
+    return {
+      titleFontSize:
+        title === null ? Number.POSITIVE_INFINITY : parseFloat(getComputedStyle(title).fontSize),
+      quickActionClientWidth: quickActions?.clientWidth ?? 0,
+      quickActionScrollWidth: quickActions?.scrollWidth ?? Number.POSITIVE_INFINITY,
+    }
+  })
+  expect(mobileBuildMetrics.titleFontSize).toBeLessThanOrEqual(26)
+  expect(mobileBuildMetrics.quickActionScrollWidth).toBeLessThanOrEqual(
+    mobileBuildMetrics.quickActionClientWidth,
+  )
+  await page.getByRole('tab', { name: 'Builder' }).click()
+  await page.setViewportSize({ width: 1280, height: 720 })
+
+  await page
+    .getByLabel('Builder에게 답하거나 추가 지시하기')
+    .fill('현재 Task와 Context를 읽고 구현을 시작해줘.')
+  await page.getByRole('button', { name: 'Builder에게 보내기' }).click()
+  await expect
+    .poll(() => firstBuilderMessage)
+    .toContain('User follow-up: 현재 Task와 Context를 읽고 구현을 시작해줘.')
+  await expect(page.getByText('Updated src/parser.ts')).toBeVisible()
+  await expect(page.getByText('token=[REDACTED] was rejected and fixed')).toBeVisible()
+  await expect(page.locator('body')).not.toContainText('synthetic-e2e-secret')
+  await expect(page.locator('body')).not.toContainText('noisy-fragment')
+  await expect(page.locator('body')).not.toContainText('used_tokens')
+  const decisionHeading = page.getByRole('heading', {
+    name: '검증 오류를 한 번에 보여줄까요, 첫 오류부터 단계별로 보여줄까요?',
+  })
+  await expect(decisionHeading).toBeVisible()
+  await expect(page.getByText('Builder recommendation')).toBeVisible()
+  await expect(page.getByText('오류를 한 번에 표시', { exact: true }).first()).toBeVisible()
+  const recommendationButtonMetrics = await page
+    .getByRole('button', { name: '추천대로 진행' })
+    .evaluate((button) => {
+      const rect = button.getBoundingClientRect()
+      return {
+        width: rect.width,
+        height: rect.height,
+        whiteSpace: getComputedStyle(button).whiteSpace,
+      }
+    })
+  expect(recommendationButtonMetrics.width).toBeGreaterThanOrEqual(90)
+  expect(recommendationButtonMetrics.height).toBeLessThan(60)
+  expect(recommendationButtonMetrics.whiteSpace).toBe('nowrap')
+
+  await page.getByRole('button', { name: 'Helper에게 비교 요청' }).click()
+  await expect(
+    page.getByText('한 번에 표시하면 모든 오류를 함께 고칠 수 있지만 처음에는 정보가 더 많습니다.'),
+  ).toBeVisible()
+  await expect
+    .poll(async () => {
+      const restored = await restoreProject(request, projectIdFromUrl(page.url()))
+      return restored.helperConversations[0]?.redactedUserExcerpts ?? null
+    })
+    .toEqual([])
+  expect(helperDispatches).toBe(1)
+
+  await page.getByRole('button', { name: '추천대로 진행' }).click()
+  await expect(page.getByText('APPLY PENDING', { exact: true })).toBeVisible()
+  releaseBuilderResume?.()
+  await expect(
+    page.getByRole('heading', { name: 'TypeScript runtime validation 완성' }),
+  ).toBeVisible()
+  await expect(page.getByText('Unknown input validation and result comparison flow')).toBeVisible()
+  await expect(page.getByText('Build Agent E2E')).toBeVisible()
+  await page.getByRole('button', { name: '생성 결과 열기' }).click()
+  await expect(page.getByText(/실행 준비 완료 · projects\/project_/)).toBeVisible()
+  expect(builderDispatches).toBe(2)
   expect(pageErrors).toEqual([])
 })
 

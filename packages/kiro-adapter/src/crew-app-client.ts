@@ -1,10 +1,23 @@
 import { redactSensitiveText } from '@vibe-helper/application/redaction'
+import { builderSlotKey, priorBuilderSlotKeys } from './agent-slots.js'
+
+export * from './agent-mode-client.js'
+export { BUILDER_SESSION_REVISION, builderSlotKey } from './agent-slots.js'
+export * from './builder-stream.js'
 import {
+  type BuilderSessionBindingDescriptor,
+  builderSessionBindingDescriptorSchema,
   type CommandReceipt,
   CREW_UI_PROTOCOL_VERSION,
   type ContractError,
   commandReceiptSchema,
   contractErrorSchema,
+  type GeneratedResultDescriptor,
+  generatedResultDescriptorSchema,
+  type HelperContext,
+  helperContextSchema,
+  type HelperExchangeReceipt,
+  helperExchangeReceiptSchema,
   type OperationError,
   operationErrorSchema,
   type PreparedBuilderTaskDescriptor,
@@ -16,8 +29,13 @@ import {
   projectSessionSnapshotSchema,
   type UiRequest,
   uiConfirmLearningSpecCommandSchema,
+  uiLaunchResultCommandSchema,
+  uiOpenHelperQuerySchema,
+  uiPrepareBuilderSessionQuerySchema,
   uiPrepareBuilderTaskCommandSchema,
   uiRecordDiscoveryFeedbackCommandSchema,
+  uiRecordHelperExchangeCommandSchema,
+  uiResolveDecisionCommandSchema,
   uiReturnToDiscoveryCommandSchema,
   uiStartDiscoveryCommandSchema,
   uiUpdateLearningSpecCommandSchema,
@@ -308,6 +326,40 @@ export class CrewCoreClient {
     return preparedBuilderTaskDescriptorSchema.parse(parseApplicationSuccess(response).data)
   }
 
+  async prepareBuilderSession(
+    request: Extract<UiRequest, { kind: 'UI_PREPARE_BUILDER_SESSION' }>,
+  ): Promise<BuilderSessionBindingDescriptor> {
+    const response = await this.#postCore(uiPrepareBuilderSessionQuerySchema.parse(request))
+    return builderSessionBindingDescriptorSchema.parse(parseApplicationSuccess(response).data)
+  }
+
+  async resolveDecision(
+    request: Extract<UiRequest, { kind: 'UI_RESOLVE_DECISION' }>,
+  ): Promise<CommandReceipt> {
+    return this.#command(uiResolveDecisionCommandSchema.parse(request))
+  }
+
+  async openHelper(
+    request: Extract<UiRequest, { kind: 'UI_OPEN_HELPER' }>,
+  ): Promise<HelperContext> {
+    const response = await this.#postCore(uiOpenHelperQuerySchema.parse(request))
+    return helperContextSchema.parse(parseApplicationSuccess(response).data)
+  }
+
+  async recordHelperExchange(
+    request: Extract<UiRequest, { kind: 'UI_RECORD_HELPER_EXCHANGE' }>,
+  ): Promise<HelperExchangeReceipt> {
+    const response = await this.#postCore(uiRecordHelperExchangeCommandSchema.parse(request))
+    return helperExchangeReceiptSchema.parse(parseApplicationSuccess(response).data)
+  }
+
+  async launchResult(
+    request: Extract<UiRequest, { kind: 'UI_LAUNCH_RESULT' }>,
+  ): Promise<GeneratedResultDescriptor> {
+    const response = await this.#postCore(uiLaunchResultCommandSchema.parse(request))
+    return generatedResultDescriptorSchema.parse(parseApplicationSuccess(response).data)
+  }
+
   async returnToDiscovery(
     request: Extract<UiRequest, { kind: 'UI_RETURN_TO_DISCOVERY' }>,
   ): Promise<CommandReceipt> {
@@ -382,10 +434,6 @@ function discoveryAgentName(phase: DiscoveryAgentMode): string {
   return phase === 'SPEC' ? DISCOVERY_SPEC_AGENT_NAME : DISCOVERY_SPEC_RECOVERY_AGENT_NAME
 }
 
-export function builderSlotKey(projectId: string): string {
-  return `vibe-helper-builder-${projectId}`
-}
-
 export function helperSlotKey(projectId: string): string {
   return `vibe-helper-helper-${projectId}`
 }
@@ -443,14 +491,28 @@ export class CrewSessionClient {
   async restoreProject(projectId: string): Promise<CrewProjectSessions> {
     const discovery = discoverySlotKey(projectId)
     const builder = builderSlotKey(projectId)
+    const builderKeys = [...priorBuilderSlotKeys(projectId), builder]
     const helper = helperSlotKey(projectId)
     try {
       const slots = readSlotKeys(await this.#api.get(CHAT_SLOT_COLLECTION_PATH))
-      const [discoveryMessages, builderMessages, helperMessages] = await Promise.all([
+      const [discoveryMessages, builderMessageGroups, helperMessages] = await Promise.all([
         this.#readHistoryIfPresent(slots, discovery),
-        this.#readHistoryIfPresent(slots, builder),
+        Promise.all(builderKeys.map((key) => this.#readHistoryIfPresent(slots, key))),
         this.#readHistoryIfPresent(slots, helper),
       ])
+      const nonEmptyBuilderMessageGroups = builderMessageGroups.filter(
+        (messages) => messages.length > 0,
+      )
+      const builderMessages =
+        nonEmptyBuilderMessageGroups.length <= 1
+          ? (nonEmptyBuilderMessageGroups[0] ?? [])
+          : nonEmptyBuilderMessageGroups
+              .flat()
+              .slice(-MAX_RESTORED_MESSAGES)
+              .map((message, index) => ({
+                ...message,
+                key: `merged-${String(index)}-${message.key}`,
+              }))
       return {
         discoverySlotKey: discovery,
         builderSlotKey: builder,

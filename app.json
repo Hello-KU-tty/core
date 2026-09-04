@@ -1,13 +1,13 @@
 {
   "name": "vibe-helper",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "displayName": "Vibe Helper",
   "description": "Learn unfamiliar development concepts by building a project you personally need.",
   "author": "hurdoo",
   "tags": ["learning", "developer-tools", "projects"],
   "defaultEnabled": false,
   "ui": {
-    "entry": "dist/index-0.1.3.mjs",
+    "entry": "dist/index-0.2.0.mjs",
     "pages": [{ "route": "/apps/vibe-helper", "label": "Vibe Helper", "icon": "Sprout" }]
   },
   "permissions": {
@@ -22,7 +22,9 @@
     "agents/vibe-helper-discovery-round.json",
     "agents/vibe-helper-discovery-merge.json",
     "agents/vibe-helper-discovery-spec.json",
-    "agents/vibe-helper-discovery-spec-recovery.json"
+    "agents/vibe-helper-discovery-spec-recovery.json",
+    "agents/vibe-helper-builder.json",
+    "agents/vibe-helper-helper.json"
   ],
   "mcpServers": {
     "discovery-preview-core": {
@@ -42,6 +44,12 @@
     },
     "discovery-spec-recovery-core": {
       "url": "http://127.0.0.1:9100/mcp/discovery-spec-recovery"
+    },
+    "builder-core": {
+      "url": "http://127.0.0.1:9100/mcp/builder"
+    },
+    "helper-core": {
+      "url": "http://127.0.0.1:9100/mcp/helper"
     }
   },
   "backend": {

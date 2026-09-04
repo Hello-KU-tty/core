@@ -111,6 +111,13 @@ export const uiOpenHelperQuerySchema = z.strictObject({
   question: nonEmptyTextSchema.optional(),
 })
 
+export const uiPrepareBuilderSessionQuerySchema = z.strictObject({
+  ...uiRequestMetadata,
+  kind: z.literal('UI_PREPARE_BUILDER_SESSION'),
+  projectId: projectIdSchema,
+  taskId: taskIdSchema,
+})
+
 export const uiListProjectsQuerySchema = z.strictObject({
   ...uiRequestMetadata,
   kind: z.literal('UI_LIST_PROJECTS'),
@@ -134,6 +141,7 @@ export const uiRecordHelperExchangeCommandSchema = z.strictObject({
   conversationId: conversationIdSchema.optional(),
   userMessage: nonEmptyTextSchema,
   helperResponseSummary: shortTextSchema,
+  origin: z.enum(['FREE_TEXT', 'QUICK_ACTION']).default('FREE_TEXT'),
   closeConversation: z.boolean(),
 })
 
@@ -176,6 +184,19 @@ export const generatedResultDescriptorSchema = z.strictObject({
   status: z.literal('READY'),
 })
 
+export const builderSessionBindingDescriptorSchema = z.strictObject({
+  schemaVersion: schemaVersionSchema,
+  correlationId: correlationIdSchema,
+  projectId: projectIdSchema,
+  taskId: taskIdSchema,
+  workspaceDirectory: z
+    .string()
+    .min(1)
+    .max(4_096)
+    .refine((value) => value.startsWith('/') && !value.includes('\0'), 'Expected an absolute path'),
+  status: z.literal('READY'),
+})
+
 export const preparedBuilderTaskDescriptorSchema = z.strictObject({
   schemaVersion: schemaVersionSchema,
   correlationId: correlationIdSchema,
@@ -205,6 +226,7 @@ export const uiRequestSchema = z.discriminatedUnion('kind', [
   uiListProjectsQuerySchema,
   uiRestoreProjectSessionQuerySchema,
   uiOpenHelperQuerySchema,
+  uiPrepareBuilderSessionQuerySchema,
   uiRecordHelperExchangeCommandSchema,
   uiRetryAnalysisCommandSchema,
   uiReadAnalysisJobsQuerySchema,
@@ -216,3 +238,4 @@ export type UiRequest = z.infer<typeof uiRequestSchema>
 export type GeneratedResultDescriptor = z.infer<typeof generatedResultDescriptorSchema>
 export type PreparedBuilderTaskDescriptor = z.infer<typeof preparedBuilderTaskDescriptorSchema>
 export type HelperExchangeReceipt = z.infer<typeof helperExchangeReceiptSchema>
+export type BuilderSessionBindingDescriptor = z.infer<typeof builderSessionBindingDescriptorSchema>

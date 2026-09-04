@@ -1,0 +1,212 @@
+import { describe, expect, it, vi } from 'vitest'
+
+import { CrewAgentModeClient } from '../src/agent-mode-client.js'
+
+const projectId = 'project_00000000-0000-4000-8000-000000000001'
+const taskId = 'task_00000000-0000-4000-8000-000000000009'
+const workspaceDirectory =
+  '/private/tmp/vibe-helper/generated-workspaces/projects/project_00000000-0000-4000-8000-000000000001'
+const builderSlot = `vibe-helper-builder-v6-${projectId}`
+const helperSlot = `vibe-helper-helper-${projectId}`
+
+function sseResponse(payloads: readonly string[]) {
+  const encoder = new TextEncoder()
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      payloads.forEach((payload, index) => {
+        const block = `data: ${payload}\n\n`
+        const split = Math.max(1, Math.floor(block.length / 2))
+        controller.enqueue(encoder.encode(block.slice(0, split)))
+        controller.enqueue(encoder.encode(block.slice(split)))
+        if (index === payloads.length - 1) controller.close()
+      })
+    },
+  })
+  return { ok: true, status: 200, body, text: async () => '' }
+}
+
+describe('Crew Agent Mode client', () => {
+  it('binds the exact Core workspace before Builder dispatch and streams redacted progress', async () => {
+    const calls: string[] = []
+    const post = vi.fn(async (path: string, body: Readonly<Record<string, unknown>>) => {
+      calls.push(path)
+      if (path === '/api/chat/slots') return { key: builderSlot }
+      return { ok: true, project: body.project }
+    })
+    const streamingFetch = vi.fn(async () => {
+      calls.push('/api/chat')
+      return sseResponse([
+        JSON.stringify({ type: 'chunk', cls: 'chunk', content: 'Incremental ' }),
+        JSON.stringify({
+          type: 'message',
+          content: JSON.stringify({ type: 'chunk', cls: 'chunk', content: 'transport chunk' }),
+        }),
+        JSON.stringify({ type: 'tool_call', command: 'read src/index.ts' }),
+        JSON.stringify({ type: 'file_change', summary: `${workspaceDirectory}/src/index.ts` }),
+        JSON.stringify({ type: 'status', command: 'pnpm test' }),
+        JSON.stringify({ type: 'error', summary: 'token=synthetic-secret failed' }),
+        JSON.stringify({
+          type: 'message',
+          content: 'The socket error path is implemented as a normal message.',
+        }),
+        JSON.stringify({
+          type: 'message',
+          content: JSON.stringify({
+            slot: builderSlot,
+            pct: 12.5,
+            used_tokens: 125_375,
+            window_tokens: 1_000_000,
+          }),
+        }),
+        JSON.stringify({
+          type: 'message',
+          content: `Finished ${workspaceDirectory}/src/index.ts`,
+        }),
+        '[DONE]',
+      ])
+    })
+    const events: Array<{ kind: string; summary: string }> = []
+    const client = new CrewAgentModeClient(
+      { get: vi.fn(async () => []), post },
+      { fetch: streamingFetch },
+    )
+
+    const receipt = await client.dispatchBuilder({
+      projectId,
+      taskId,
+      workspaceDirectory,
+      message: 'Continue the Builder task.',
+      onEvent: (event) => events.push(event),
+    })
+    const completion = await receipt.completion
+
+    expect(receipt.slotKey).toBe(builderSlot)
+    expect(calls).toEqual([
+      '/api/chat/slots',
+      `/api/chat/slots/${builderSlot}/project`,
+      '/api/chat',
+    ])
+    expect(post).toHaveBeenNthCalledWith(1, '/api/chat/slots', {
+      name: builderSlot,
+      agent: 'vibe-helper-builder',
+      memory_mode: 'temporary',
+    })
+    expect(post).toHaveBeenNthCalledWith(2, `/api/chat/slots/${builderSlot}/project`, {
+      project: workspaceDirectory,
+    })
+    expect(streamingFetch).toHaveBeenCalledWith('/api/chat', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        message: 'Continue the Builder task.',
+        slot: builderSlot,
+        agent: 'vibe-helper-builder',
+      }),
+    })
+    expect(events.map((event) => event.kind)).toEqual([
+      'TOOL_CALL',
+      'FILE_CHANGE',
+      'TEST_RESULT',
+      'ERROR',
+      'MESSAGE',
+      'MESSAGE',
+    ])
+    expect(
+      events
+        .filter((event) => event.kind === 'MESSAGE')
+        .map(({ kind, summary }) => ({ kind, summary })),
+    ).toEqual([
+      { kind: 'MESSAGE', summary: 'The socket error path is implemented as a normal message.' },
+      { kind: 'MESSAGE', summary: 'Finished [WORKSPACE]/src/index.ts' },
+    ])
+    expect(JSON.stringify(events)).not.toContain(workspaceDirectory)
+    expect(JSON.stringify(events)).not.toContain('synthetic-secret')
+    expect(JSON.stringify(events)).not.toContain(builderSlot)
+    expect(JSON.stringify(events)).not.toContain('transport chunk')
+    expect(events[1]?.summary).toContain('[WORKSPACE]')
+    expect(completion).toEqual({
+      status: 'DONE',
+      assistantSummary: 'Finished [WORKSPACE]/src/index.ts',
+    })
+  })
+
+  it('refuses an existing Builder slot whose workspace cannot be verified', async () => {
+    const post = vi.fn()
+    const streamingFetch = vi.fn()
+    const client = new CrewAgentModeClient(
+      {
+        get: vi.fn(async () => [
+          {
+            key: builderSlot,
+            agent: 'vibe-helper-builder',
+            project: '/private/tmp/another-project',
+            messages: [{ role: 'assistant', content: 'Existing run' }],
+          },
+        ]),
+        post,
+      },
+      { fetch: streamingFetch },
+    )
+
+    await expect(
+      client.dispatchBuilder({
+        projectId,
+        taskId,
+        workspaceDirectory,
+        message: 'Continue.',
+        onEvent: vi.fn(),
+      }),
+    ).rejects.toThrow('Builder slot workspace cannot be verified before dispatch.')
+    expect(post).not.toHaveBeenCalled()
+    expect(streamingFetch).not.toHaveBeenCalled()
+  })
+
+  it('keeps Helper in a separate read-only slot and returns its redacted answer', async () => {
+    const post = vi.fn(async () => ({ key: helperSlot }))
+    const streamingFetch = vi.fn(async () =>
+      sseResponse([
+        JSON.stringify({
+          type: 'message',
+          content: 'The recommendation catches invalid input. token=synthetic-secret',
+        }),
+        '[DONE]',
+      ]),
+    )
+    const chunks: string[] = []
+    const client = new CrewAgentModeClient(
+      { get: vi.fn(async () => []), post },
+      { fetch: streamingFetch },
+    )
+
+    const receipt = await client.dispatchHelper({
+      projectId,
+      message: '추천 이유 설명해줘',
+      onText: (text) => chunks.push(text),
+    })
+    const completion = await receipt.completion
+
+    expect(receipt.slotKey).toBe(helperSlot)
+    expect(post).toHaveBeenCalledTimes(1)
+    expect(post).toHaveBeenCalledWith('/api/chat/slots', {
+      name: helperSlot,
+      agent: 'vibe-helper-helper',
+      memory_mode: 'temporary',
+    })
+    expect(streamingFetch).toHaveBeenCalledWith(
+      '/api/chat',
+      expect.objectContaining({
+        body: JSON.stringify({
+          message: '추천 이유 설명해줘',
+          slot: helperSlot,
+          agent: 'vibe-helper-helper',
+        }),
+      }),
+    )
+    expect(chunks.join('')).not.toContain('synthetic-secret')
+    expect(completion).toEqual({
+      assistantSummary: 'The recommendation catches invalid input. token=[REDACTED]',
+      status: 'DONE',
+    })
+  })
+})

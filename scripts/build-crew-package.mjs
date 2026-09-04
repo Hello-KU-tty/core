@@ -27,6 +27,20 @@ await build({
   logLevel: 'warning',
 })
 
+await build({
+  entryPoints: [
+    join(workspaceRoot, 'packages', 'kiro-adapter', 'dist', 'builder-tool-guard-node.js'),
+  ],
+  outfile: join(workspaceRoot, 'apps', 'crew-backend', 'dist', 'builder-tool-guard.bundle.js'),
+  bundle: true,
+  platform: 'node',
+  format: 'esm',
+  target: 'node24',
+  sourcemap: false,
+  legalComments: 'none',
+  logLevel: 'warning',
+})
+
 await rm(packageRoot, { recursive: true, force: true })
 
 const runtimeFiles = [
@@ -40,8 +54,14 @@ const runtimeFiles = [
     'agents/vibe-helper-discovery-spec-recovery.json',
     'agents/vibe-helper-discovery-spec-recovery.json',
   ],
-  ['apps/crew-app/dist/index.mjs', 'ui/dist/index-0.1.3.mjs'],
+  ['agents/vibe-helper-builder.json', 'agents/vibe-helper-builder.json'],
+  ['agents/vibe-helper-helper.json', 'agents/vibe-helper-helper.json'],
+  ['apps/crew-app/dist/index.mjs', 'ui/dist/index-0.2.0.mjs'],
   ['apps/crew-backend/dist/main.bundle.js', 'apps/crew-backend/dist/main.js'],
+  [
+    'apps/crew-backend/dist/builder-tool-guard.bundle.js',
+    'apps/crew-backend/dist/builder-tool-guard.js',
+  ],
 ]
 
 for (const [source, destination] of runtimeFiles) {
@@ -70,7 +90,7 @@ if (typeof drizzleVersion !== 'string' || !/^\d+\.\d+\.\d+$/.test(drizzleVersion
 
 const runtimeManifest = {
   name: 'vibe-helper-runtime',
-  version: '0.1.3',
+  version: '0.2.0',
   private: true,
   type: 'module',
   engines: { node: '>=24 <27' },

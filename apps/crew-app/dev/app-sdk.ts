@@ -73,6 +73,12 @@ const api = {
       }
       return { ok: typeof input.content === 'string' && input.content.length > 0 }
     }
+    if (path.startsWith(`${chatSlotsPath}/`) && path.endsWith('/project')) {
+      if (localStorage.getItem('vibe-helper.test.crew-disconnected') === 'true') {
+        throw new Error('Synthetic Crew disconnect')
+      }
+      return { ok: typeof input.project === 'string', project: input.project }
+    }
     const body = JSON.stringify(input)
     const headers: Record<string, string> = { 'content-type': 'application/json' }
     if (path.startsWith(applicationPrefix)) headers['x-kirocrew-proxy'] = await signature(body)

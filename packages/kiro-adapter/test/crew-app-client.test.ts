@@ -111,6 +111,59 @@ describe('Crew browser-safe clients', () => {
     })
   })
 
+  it('preserves legacy Builder history while using the current session revision', async () => {
+    const currentBuilder = builderSlotKey(projectId)
+    const legacyBuilder = `vibe-helper-builder-${projectId}`
+    const previousBuilderV2 = `vibe-helper-builder-v2-${projectId}`
+    const previousBuilderV3 = `vibe-helper-builder-v3-${projectId}`
+    const previousBuilderV4 = `vibe-helper-builder-v4-${projectId}`
+    const previousBuilderV5 = `vibe-helper-builder-v5-${projectId}`
+    const api: CrewAppApi = {
+      get: vi.fn(async (path: string) => {
+        if (path === '/api/chat/slots') {
+          return [
+            { key: legacyBuilder },
+            { key: previousBuilderV2 },
+            { key: previousBuilderV3 },
+            { key: previousBuilderV4 },
+            { key: previousBuilderV5 },
+            { key: currentBuilder },
+          ]
+        }
+        if (path.includes(currentBuilder)) {
+          return { messages: [{ role: 'assistant', content: 'Current session' }] }
+        }
+        if (path.includes(previousBuilderV2)) {
+          return { messages: [{ role: 'assistant', content: 'Previous session v2' }] }
+        }
+        if (path.includes(previousBuilderV3)) {
+          return { messages: [{ role: 'assistant', content: 'Previous session v3' }] }
+        }
+        if (path.includes(previousBuilderV4)) {
+          return { messages: [{ role: 'assistant', content: 'Previous session v4' }] }
+        }
+        if (path.includes(previousBuilderV5)) {
+          return { messages: [{ role: 'assistant', content: 'Previous session v5' }] }
+        }
+        return { messages: [{ role: 'assistant', content: 'Legacy session' }] }
+      }),
+      post: vi.fn(),
+    }
+
+    const restored = await new CrewSessionClient(api).restoreProject(projectId)
+
+    expect(restored.builderSlotKey).toBe(currentBuilder)
+    expect(restored.builderMessages.map((message) => message.content)).toEqual([
+      'Legacy session',
+      'Previous session v2',
+      'Previous session v3',
+      'Previous session v4',
+      'Previous session v5',
+      'Current session',
+    ])
+    expect(new Set(restored.builderMessages.map((message) => message.key)).size).toBe(6)
+  })
+
   it('keeps missing slots empty and reports disconnected Crew history', async () => {
     const empty = new CrewSessionClient({ get: vi.fn(async () => []), post: vi.fn() })
     await expect(empty.restoreProject(projectId)).resolves.toMatchObject({

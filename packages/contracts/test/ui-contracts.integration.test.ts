@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  builderSessionBindingDescriptorSchema,
+  uiPrepareBuilderSessionQuerySchema,
+  uiRecordHelperExchangeCommandSchema,
   uiRequestSchema,
   uiPrepareBuilderTaskCommandSchema,
   uiListProjectsQuerySchema,
@@ -107,6 +110,58 @@ describe('UI external input contracts', () => {
     expect(uiRequestSchema.safeParse(prepare).success).toBe(true)
     expect(
       uiPrepareBuilderTaskCommandSchema.safeParse({ ...prepare, workspacePath: '/tmp/owned-by-ui' })
+        .success,
+    ).toBe(false)
+  })
+
+  it('keeps the one-time Builder binding and Helper input provenance explicit', () => {
+    const prepareSession = {
+      schemaVersion: 1,
+      kind: 'UI_PREPARE_BUILDER_SESSION',
+      correlationId: ids.correlation,
+      actor: { kind: 'UI' },
+      projectId: ids.project,
+      taskId: ids.task,
+    } as const
+    expect(uiPrepareBuilderSessionQuerySchema.parse(prepareSession)).toEqual(prepareSession)
+    expect(uiRequestSchema.safeParse(prepareSession).success).toBe(true)
+    expect(
+      builderSessionBindingDescriptorSchema.safeParse({
+        schemaVersion: 1,
+        correlationId: ids.correlation,
+        projectId: ids.project,
+        taskId: ids.task,
+        workspaceDirectory: '/private/tmp/vibe-helper/projects/project-safe',
+        status: 'READY',
+      }).success,
+    ).toBe(true)
+    expect(
+      builderSessionBindingDescriptorSchema.safeParse({
+        schemaVersion: 1,
+        correlationId: ids.correlation,
+        projectId: ids.project,
+        taskId: ids.task,
+        workspaceDirectory: 'projects/project-safe',
+        status: 'READY',
+      }).success,
+    ).toBe(false)
+
+    const exchange = {
+      schemaVersion: 1,
+      kind: 'UI_RECORD_HELPER_EXCHANGE',
+      correlationId: ids.correlation,
+      actor: { kind: 'UI' },
+      idempotencyKey: ids.idempotency,
+      projectId: ids.project,
+      taskId: ids.task,
+      userMessage: '선택지를 비교해줘',
+      helperResponseSummary: '두 선택지의 차이를 설명했습니다.',
+      origin: 'QUICK_ACTION',
+      closeConversation: false,
+    } as const
+    expect(uiRecordHelperExchangeCommandSchema.parse(exchange)).toEqual(exchange)
+    expect(
+      uiRecordHelperExchangeCommandSchema.safeParse({ ...exchange, origin: 'AGENT_SUGGESTED' })
         .success,
     ).toBe(false)
   })

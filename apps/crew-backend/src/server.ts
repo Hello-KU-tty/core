@@ -12,6 +12,8 @@ export const DISCOVERY_ENRICHMENT_MCP_PATH = '/mcp/discovery-enrichment'
 export const DISCOVERY_MERGE_MCP_PATH = '/mcp/discovery-merge'
 export const DISCOVERY_SPEC_MCP_PATH = '/mcp/discovery-spec'
 export const DISCOVERY_SPEC_RECOVERY_MCP_PATH = '/mcp/discovery-spec-recovery'
+export const BUILDER_MCP_PATH = '/mcp/builder'
+export const HELPER_MCP_PATH = '/mcp/helper'
 const HEALTH_PATH = '/health'
 const MAX_CLOCK_SKEW_SECONDS = 60
 
@@ -20,7 +22,7 @@ export interface CrewBackendOptions {
   readonly proxySecret: string
   readonly now?: () => number
   readonly testAgentExecutor?: (input: unknown) => Promise<unknown>
-  readonly discoveryMcpHandlers?: Readonly<
+  readonly mcpHandlers?: Readonly<
     Record<
       string,
       {
@@ -109,11 +111,11 @@ function webHeaders(request: IncomingMessage): Headers {
   return headers
 }
 
-async function handleDiscoveryMcpRequest(
+async function handleMcpRequest(
   request: IncomingMessage,
   response: ServerResponse,
   path: string,
-  handler: NonNullable<CrewBackendOptions['discoveryMcpHandlers']>[string],
+  handler: NonNullable<CrewBackendOptions['mcpHandlers']>[string],
 ): Promise<void> {
   const method = request.method ?? 'GET'
   let body: Buffer | undefined
@@ -164,9 +166,9 @@ async function handleRequest(
     json(response, 200, { status: 'ok' })
     return
   }
-  const discoveryMcpHandler = options.discoveryMcpHandlers?.[target]
-  if (discoveryMcpHandler !== undefined) {
-    await handleDiscoveryMcpRequest(request, response, target, discoveryMcpHandler)
+  const mcpHandler = options.mcpHandlers?.[target]
+  if (mcpHandler !== undefined) {
+    await handleMcpRequest(request, response, target, mcpHandler)
     return
   }
   const testAgentExecutor = options.testAgentExecutor
@@ -267,9 +269,9 @@ export function createCrewBackendServer(options: CrewBackendOptions): Server {
       else response.end()
     })
   })
-  if (options.discoveryMcpHandlers !== undefined) {
+  if (options.mcpHandlers !== undefined) {
     server.once('close', () => {
-      for (const handler of Object.values(options.discoveryMcpHandlers ?? {})) {
+      for (const handler of Object.values(options.mcpHandlers ?? {})) {
         void handler.close()
       }
     })
