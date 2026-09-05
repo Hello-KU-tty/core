@@ -147,6 +147,7 @@ Concept Ledger + Project History
 - `FR-SPEC-007`: Spec의 기본 UI는 직접 편집 textbox를 제공하지 않고, 사용자·사용 순간·성공 순간·MVP·세 scope와 예상 Decision을 초보자가 읽기 쉬운 시각적 요약으로 보여줘야 한다.
 - `FR-SPEC-008`: 사용자는 하나의 충분히 큰 자유 입력으로 Agent에게 Spec 수정을 반복 요청하고, 새 revision을 다시 검토한 뒤에만 확정해야 한다.
 - `FR-SPEC-009`: Spec 수정 성공은 Agent 설명이 아니라 durable Spec revision 증가로 판정해야 한다. 첫 응답이 tool 없이 끝나면 최신 Core 상태에서 한 번만 자동 복구하고, 두 번째 실패는 현재 revision을 유지한 채 명시적으로 보여줘야 한다.
+- `FR-SPEC-010`: 확정된 Spec은 Build를 시작하는 durable 기준선이지만 변경 불가능한 권한 경계가 아니다. 사용자는 Build 중에도 제품·기술 선택과 학습 범위를 다시 논의하거나 바꿀 수 있고, 이후의 명시적 Decision과 Completion Report가 변경 영향과 Spec 이탈을 추적해야 한다. `AGENT_SUPPORT`와 `EXCLUDED`도 질문·학습 권한을 제한하지 않으며 안전·권한·데이터 경계만 별도로 강제한다.
 
 완료 관찰:
 
@@ -161,6 +162,7 @@ Concept Ledger + Project History
 - `FR-BLD-004`: Live Progress는 실제 채팅 session을 대체하거나 위에서 밀어내는 별도 dashboard가 아니라 현재 위치만 알리는 compact 보조 상태여야 한다.
 - `FR-BLD-005`: Builder는 예상 Concept와 실제 사용 Concept를 보고하되 사용자 이해를 판정하지 않아야 한다.
 - `FR-BLD-006`: Task 완료 시 구현, 테스트, Concept, Decision, Spec 이탈, 제한과 코드 참조를 보고해야 한다.
+- `FR-BLD-007`: Builder는 최신 사용자 메시지를 실제 작업 지시로 취급해야 한다. 명시된 새 방향이 확정 Spec의 세부사항과 다르면 확정됐다는 이유로 거절하지 않고, 되돌리기 쉬운 변경은 진행하고 의미 있는 영향은 실제 Decision으로 확인한 뒤 Context와 Completion Report에 이탈을 남겨야 한다.
 
 완료 관찰:
 
@@ -202,6 +204,7 @@ Concept Ledger + Project History
 - `FR-HLP-005`: 자유 입력창을 중심으로 빠른 카드를 제공하되 카드 클릭 자체를 Evidence로 보지 않아야 한다.
 - `FR-HLP-006`: 질문형 비유도 claim 단위 대응 관계로 처리해야 한다.
 - `FR-HLP-007`: 설명 후 강제 퀴즈나 다시 말하기를 요구하지 않아야 한다.
+- `FR-HLP-008`: Helper는 Spec과 scope를 현재 기준선으로 설명하되 사용자의 결정·질문·학습 권한의 상한으로 취급하지 않아야 한다. 사용자가 대안을 제안하면 현재 기준과의 차이, tradeoff와 변경 비용을 비교하고 Builder에 전달할 다음 말을 제안해야 하며, `사용자가 결정할 범위가 아니다`라는 식으로 논의를 닫지 않아야 한다.
 
 완료 관찰:
 
@@ -255,6 +258,8 @@ Concept Ledger + Project History
 - `FR-UI-009`: `[OPTIONS: ...]`, Markdown fence와 diff source marker를 평문으로 노출하지 않고 host renderer가 suggestion, Markdown과 diff UI로 해석해야 한다.
 - `FR-UI-010`: 실행 중 Agent turn은 해당 Builder 또는 Helper session composer에서 중지할 수 있어야 하며 transport stop payload를 raw JSON으로 노출하지 않아야 한다.
 - `FR-UI-011`: Builder와 Helper transcript는 viewport에 맞춘 pane 내부에서 독립적으로 스크롤되고, 긴 대화가 전체 페이지 높이를 계속 늘리지 않아야 한다.
+- `FR-UI-012`: Builder와 Helper의 persistent composer는 pane의 기본 조작으로 항상 보여야 한다. Decision option과 Helper quick action은 composer 바로 위의 compact 추천 답장으로 주입하고, 사용자는 같은 composer에 자연어로 직접 답하거나 다른 방향을 제안할 수 있어야 한다.
+- `FR-UI-013`: native transcript와 composer는 host의 light/dark theme에 따라 app surface·text token을 함께 사용해야 하며 한 mode의 고정 배경색 때문에 다른 mode의 글자가 사라지지 않아야 한다.
 
 ## 6. 비기능 요구사항
 

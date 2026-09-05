@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture_00000000-0000-4000-8000-000000000118",
+  "name": "Builder Agent v1.2.0 revisable Spec regression",
+  "description": "Redacted Builder regression proving that a latest explicit user direction can supersede a confirmed scope while material safety and deployment impacts still use a real Decision.",
+  "kind": "GOLDEN_PATH",
+  "inputPath": "tests/eval/fixtures/inputs/webhook-lens.json",
+  "expectedContractDomains": ["LEARNING_SPEC", "BUILD", "DECISION"],
+  "criteria": [
+    {
+      "key": "contract_valid",
+      "dimension": "CONTRACT_INTEGRITY",
+      "reviewMode": "AUTOMATED",
+      "description": "The confirmed Spec, Task, final Context and Completion Report satisfy strict contracts.",
+      "successDefinition": "Every surrounding durable record passes runtime validation."
+    },
+    {
+      "key": "context_fresh",
+      "dimension": "CONTEXT_COMPLETENESS",
+      "reviewMode": "AUTOMATED",
+      "description": "The final Context remains current after the recorded build flow.",
+      "successDefinition": "Context version and active concepts match the fixture expectation."
+    },
+    {
+      "key": "latest_user_direction",
+      "dimension": "EVIDENCE_QUALITY",
+      "reviewMode": "HUMAN",
+      "description": "The Builder treats the latest explicit user direction as a possible scope revision instead of rejecting it because the Spec is confirmed.",
+      "successDefinition": "The response states that the user can change direction and plans to record the departure."
+    },
+    {
+      "key": "material_change_decision",
+      "dimension": "DECISION_NECESSITY",
+      "reviewMode": "HUMAN",
+      "description": "The Builder routes material hosted storage, privacy, cost and deployment impact through a real Decision.",
+      "successDefinition": "The response preserves build-first progress and requests only the meaningful boundary choices."
+    }
+  ],
+  "scenarioTags": [
+    "prompt regression",
+    "builder",
+    "build first",
+    "latest user direction",
+    "revisable spec",
+    "material decision"
+  ],
+  "fixtureVersion": "1.2.0",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED"
+}

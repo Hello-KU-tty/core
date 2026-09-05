@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture_00000000-0000-4000-8000-000000000117",
+  "name": "Helper Agent v1.1.0 revisable Spec regression",
+  "description": "Redacted Helper regression proving that a confirmed database constraint is a revisable baseline rather than a ceiling on user decisions or learning scope.",
+  "kind": "GOLDEN_PATH",
+  "inputPath": "tests/eval/fixtures/inputs/webhook-lens.json",
+  "expectedContractDomains": ["DECISION"],
+  "criteria": [
+    {
+      "key": "contract_valid",
+      "dimension": "CONTRACT_INTEGRITY",
+      "reviewMode": "AUTOMATED",
+      "description": "The surrounding Builder Decision satisfies the strict runtime contract.",
+      "successDefinition": "The current Helper context Decision passes validation."
+    },
+    {
+      "key": "spec_baseline_not_ceiling",
+      "dimension": "CONTEXT_COMPLETENESS",
+      "reviewMode": "HUMAN",
+      "description": "The Helper identifies the confirmed PostgreSQL baseline without treating it as a limit on the user's authority.",
+      "successDefinition": "The answer explicitly says the user can revisit the choice and never says it is outside the user's scope."
+    },
+    {
+      "key": "alternative_tradeoffs",
+      "dimension": "CONTEXT_COMPLETENESS",
+      "reviewMode": "HUMAN",
+      "description": "The Helper compares SQLite and PostgreSQL in the current local MVP context and names migration impact.",
+      "successDefinition": "The answer includes useful advantages, limits and current implementation cost rather than merely deferring to the Spec."
+    },
+    {
+      "key": "builder_handoff",
+      "dimension": "EVIDENCE_QUALITY",
+      "reviewMode": "HUMAN",
+      "description": "The read-only Helper offers a concise message the user can send through the Builder composer.",
+      "successDefinition": "The answer preserves Helper read-only boundaries while giving the user a direct next action."
+    }
+  ],
+  "scenarioTags": [
+    "prompt regression",
+    "helper",
+    "build first",
+    "revisable spec",
+    "user authority",
+    "database tradeoff"
+  ],
+  "fixtureVersion": "1.1.0",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED"
+}

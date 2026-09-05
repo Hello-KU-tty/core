@@ -7,7 +7,7 @@ import {
   helperRequestContextRefreshCommandSchema,
 } from '@vibe-helper/contracts'
 
-export const HELPER_PROMPT_VERSION = '1.0.0' as const
+export const HELPER_PROMPT_VERSION = '1.1.0' as const
 export const HELPER_PROMPT_SOURCE = 'docs/agent-prompts/helper.md' as const
 export const HELPER_AGENT_NAME = 'vibe-helper-helper' as const
 export const HELPER_MCP_SERVER_NAME = 'vibe-helper-helper-core' as const

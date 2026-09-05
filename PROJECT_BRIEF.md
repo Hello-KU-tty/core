@@ -37,6 +37,7 @@
 ## 5. 제품 원칙
 
 - Build-first: 교육을 위해 개발을 반복적으로 중단하지 않는다.
+- 살아 있는 합의: Learning Spec은 빠르게 시작하기 위한 초기 기준선이며, 사용자는 Build 중에도 제품·기술 방향과 학습 범위를 다시 질문하고 바꿀 수 있다. Agent는 비용과 영향을 설명하되 이미 확정됐다는 이유로 변경 논의를 막지 않는다.
 - 실제 판단: 교육용 가짜 선택지를 만들지 않고 실제 제품·기술 Decision만 사용자에게 요청한다.
 - 낮은 부담: Learning Spec은 권장안을 기본으로 쉽게 시작할 수 있게 한다.
 - 익숙한 조작감: UI는 SEED Design의 명확한 정보 위계, 목록형 선택과 모바일 터치 영역을 참고하고 Kiro의 보라색 계열을 대표색으로 사용한다.
@@ -97,6 +98,8 @@ Learning Goal 입력
   - AGENT_SUPPORT: 제품에 필요하지만 Builder가 주로 구현하고 학습을 강요하지 않는 부분
   - EXCLUDED: MVP에서 구현하지 않는 부분
 - Spec에서는 시작 부담을 줄이되 Builder 실행 뒤 실제 Decision은 숨기지 않는다.
+- 확정된 Spec도 Build 중에는 변경 불가능한 권한 경계가 아니다. 이후의 명시적인 사용자 지시나 Decision이 일부 항목을 바꾸면 Builder는 영향과 이탈을 기록하고 새 방향으로 진행한다.
+- `AGENT_SUPPORT`와 `EXCLUDED`는 초기 구현·학습 계획일 뿐 사용자가 질문하거나 학습 범위를 넓히는 일을 금지하지 않는다. 단, workspace·secret·데이터 삭제·외부 비용 같은 안전 경계는 그대로 지킨다.
 
 ## 9. Agent와 Core
 
@@ -146,6 +149,7 @@ Learning Goal 입력
 - 전체 대화와 전체 Ledger를 매번 주입하지 않고 질문과 관련된 최소 맥락을 사용한다.
 - Concept State가 높아도 Helper를 숨기지 않는다.
 - 자유 입력창을 중심으로 빠른 설명 카드를 함께 제공한다.
+- Builder와 Helper 모두 persistent 자유 입력을 기본 조작으로 사용한다. Decision 선택지와 빠른 설명 카드는 해당 입력창 바로 위의 선택적 추천 답장으로만 제공한다.
 
 ## 11. Concept와 Evidence
 
@@ -196,6 +200,7 @@ Prompt Dependence:
 - Code 중심은 Kiro editor와 Builder/Helper panel을 사용하는 얇은 prototype으로 검증한다.
 - 두 Mode는 같은 session, Task, Decision, Context와 Ledger를 사용한다.
 - 실제 Builder stream은 숨기지 않고 Task Progress는 현재 위치만 보조한다.
+- 실제 Builder chat과 composer가 기본 조작면이며, Decision·추천 선택지·Helper quick action은 composer 바로 위에 필요한 동안만 주입한다.
 - 완료 화면은 학습 점수보다 완성된 서비스 실행을 먼저 보여준다.
 
 ## 14. 기술 경계

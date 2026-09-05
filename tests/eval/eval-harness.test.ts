@@ -724,6 +724,49 @@ describe('T11 Builder prompt regression', () => {
       ]),
     )
   })
+
+  it('accepts the latest user direction as a Spec revision and gates only material impact', async () => {
+    const fixture = evaluationFixtureSchema.parse(
+      await loadInput(
+        'tests/eval/fixtures/prompt-regressions/builder-v1.2-revisable-spec.manifest.json',
+      ),
+    )
+    const subject = parseEvaluationSubject(
+      await loadInput('tests/eval/fixtures/prompt-regressions/builder-v1.1-decision-webhook.json'),
+    )
+    const reviews = evaluationCriterionResultSchema
+      .array()
+      .parse(
+        await loadInput(
+          'tests/eval/fixtures/prompt-regressions/builder-v1.2-revisable-spec.review.json',
+        ),
+      )
+    const result = evaluateCalibrationCase({
+      fixture,
+      subject,
+      humanReviews: new Map(reviews.map((review) => [review.criterionKey, review])),
+    })
+    const interaction = subject.specRevisionInteraction
+    const response = String(interaction?.builderResponse ?? '')
+
+    expect(interaction).toMatchObject({
+      userMessage: '팀원과 같이 쓰고 싶으니 hosted 저장도 포함해서 배포해줘.',
+      requiredAction: 'REQUEST_DECISION_AND_RECORD_SPEC_DEVIATION',
+    })
+    expect(response).toContain('사용자가 지금 방향을 바꿀 수 있습니다')
+    expect(response).toMatch(/개인정보.*비용.*배포/u)
+    expect(response).toContain('실제 Decision')
+    expect(response).not.toMatch(/(?:Spec 범위 밖이라 불가|사용자가 결정할 범위가 아니)/u)
+    expect(result.status).toBe('PASSED')
+    expect(result.criterionResults).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ criterionKey: 'contract_valid', status: 'PASSED' }),
+        expect.objectContaining({ criterionKey: 'context_fresh', status: 'PASSED' }),
+        expect.objectContaining({ criterionKey: 'latest_user_direction', status: 'PASSED' }),
+        expect.objectContaining({ criterionKey: 'material_change_decision', status: 'PASSED' }),
+      ]),
+    )
+  })
 })
 
 describe('T12 Helper prompt regression', () => {
@@ -766,6 +809,50 @@ describe('T12 Helper prompt regression', () => {
         expect.objectContaining({ criterionKey: 'helper_relevance', status: 'PASSED' }),
         expect.objectContaining({ criterionKey: 'analogy_claims', status: 'PASSED' }),
         expect.objectContaining({ criterionKey: 'helper_non_coercive', status: 'PASSED' }),
+      ]),
+    )
+  })
+
+  it('treats a confirmed Spec as a revisable baseline and returns control to Builder chat', async () => {
+    const fixture = evaluationFixtureSchema.parse(
+      await loadInput(
+        'tests/eval/fixtures/prompt-regressions/helper-v1.1-revisable-spec.manifest.json',
+      ),
+    )
+    const subject = parseEvaluationSubject(
+      await loadInput('tests/eval/fixtures/prompt-regressions/helper-v1.1-revisable-spec.json'),
+    )
+    const reviews = evaluationCriterionResultSchema
+      .array()
+      .parse(
+        await loadInput(
+          'tests/eval/fixtures/prompt-regressions/helper-v1.1-revisable-spec.review.json',
+        ),
+      )
+    const result = evaluateCalibrationCase({
+      fixture,
+      subject,
+      humanReviews: new Map(reviews.map((review) => [review.criterionKey, review])),
+    })
+    const interaction = subject.helperInteraction
+    const answer = String(interaction?.answer ?? '')
+
+    expect(interaction).toMatchObject({
+      confirmedSpecBaseline: 'PostgreSQL 14+ database required',
+      question: 'PostgreSQL보다 SQLite가 낫지 않나요?',
+    })
+    expect(answer).toContain('변경 권한을 막지는 않습니다')
+    expect(answer).toMatch(/SQLite.*설치.*단순/u)
+    expect(answer).toMatch(/PostgreSQL.*동시 쓰기/u)
+    expect(answer).toContain('Builder 입력창')
+    expect(answer).not.toMatch(/(?:사용자가 결정할 범위가 아니|Spec이므로 바꿀 수 없)/u)
+    expect(result.status).toBe('PASSED')
+    expect(result.criterionResults).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ criterionKey: 'contract_valid', status: 'PASSED' }),
+        expect.objectContaining({ criterionKey: 'spec_baseline_not_ceiling', status: 'PASSED' }),
+        expect.objectContaining({ criterionKey: 'alternative_tradeoffs', status: 'PASSED' }),
+        expect.objectContaining({ criterionKey: 'builder_handoff', status: 'PASSED' }),
       ]),
     )
   })

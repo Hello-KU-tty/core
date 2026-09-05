@@ -45,7 +45,7 @@ T08부터 실제 Kiro 출력은 `fixtures/agent-runs`에서 별도 회귀 사례
 
 T09의 selected-Candidate→Learning Spec 경로는 `pnpm test:eval:live-spec`으로 별도 실행한다. 이 runner는 synthetic selected Candidate를 Application/SQLite에 만든 뒤 Agent에게 semantic draft만 제출하게 하고 Core-owned metadata와 저장 결과를 확인한다. Kiro CLI가 로그아웃 상태면 Agent 결과를 만들지 않고 인증 오류로 실패하며 mock 성공으로 대체하지 않는다.
 
-T12의 실제 Helper 대화는 `pnpm test:eval:live-helper`로 별도 실행한다. runner는 current Decision, `DEMONSTRATED` Concept State, 과거 Episode와 secret이 포함된 source reference를 합성한 뒤, Helper가 role-bound context tool을 한 번만 사용해 redaction된 excerpt에 근거한 답을 하는지 확인한다. CURRENT Context에서 refresh를 만들거나 Builder-owned Task·Context·Decision을 바꾸면 실패한다. `helper-v1.0-analogy` prompt regression은 실제 live 출력과 별도로 첫 답변, claim 단위 비유와 높은 State에서의 비강제적 접근성을 기록된 사람 review로 고정한다.
+T12의 실제 Helper 대화는 `pnpm test:eval:live-helper`로 별도 실행한다. runner는 current Decision, confirmed PostgreSQL 기준, `DEMONSTRATED` Concept State, 과거 Episode와 secret이 포함된 source reference를 합성한 뒤, Helper가 role-bound context tool을 한 번만 사용해 redaction된 excerpt에 근거한 답을 하는지 확인한다. CURRENT Context에서 refresh를 만들거나 Builder-owned Task·Context·Decision을 바꾸면 실패한다. `helper-v1.0-analogy`는 claim 단위 비유와 높은 State에서의 비강제적 접근성을, `helper-v1.1-revisable-spec`은 Spec을 사용자 권한의 상한으로 해석하지 않고 기술 대안과 Builder handoff를 제공하는지를 기록된 사람 review로 고정한다.
 
 T13의 실제 Evidence 분석은 `pnpm test:eval:live-analyst`로 실행한다. runner는 같은 Episode 안의 직접 유도 반복과 독립적인 적용을 함께 제공하고, hidden no-tool Analyst의 strict semantic JSON을 adapter/Application에 제출한다. tool 호출, strict contract, Proposal 채택·거절, Ledger State, durable Job과 Episode 종료 상태가 기대와 다르면 실패한다. `evidence-analyst-v1.0-mixed` prompt regression과 기록된 사람 review는 USER_MESSAGE provenance, `NONE/DIRECTLY_LED`와 `STRONG/INDEPENDENT` 분리를 고정한다.
 

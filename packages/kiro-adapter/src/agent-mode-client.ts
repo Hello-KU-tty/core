@@ -1,6 +1,6 @@
 import { redactSensitiveText } from '@vibe-helper/application/redaction'
 
-import { builderSlotKey } from './agent-slots.js'
+import { builderSlotKey, helperSlotKey } from './agent-slots.js'
 import { type BuilderStreamEvent, normalizeBuilderStreamLine } from './builder-stream.js'
 
 const CHAT_PATH = '/api/chat'
@@ -53,10 +53,6 @@ export interface HelperDispatchInput {
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function helperSlotKey(projectId: string): string {
-  return `vibe-helper-helper-${projectId}`
 }
 
 interface AssistantTextPart {
@@ -169,7 +165,7 @@ function sanitizeRenderableMessage(value: unknown): unknown {
 }
 
 function assertRenderableSlotKey(slotKey: string): void {
-  if (!/^vibe-helper-(?:builder(?:-v\d+)?|helper)-project_[0-9a-f-]{36}$/.test(slotKey)) {
+  if (!/^vibe-helper-(?:builder|helper)(?:-v\d+)?-project_[0-9a-f-]{36}$/.test(slotKey)) {
     throw new Error('Crew chat slot is outside the Vibe Helper session boundary.')
   }
 }

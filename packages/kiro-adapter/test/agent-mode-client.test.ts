@@ -6,8 +6,8 @@ const projectId = 'project_00000000-0000-4000-8000-000000000001'
 const taskId = 'task_00000000-0000-4000-8000-000000000009'
 const workspaceDirectory =
   '/private/tmp/vibe-helper/generated-workspaces/projects/project_00000000-0000-4000-8000-000000000001'
-const builderSlot = `vibe-helper-builder-v6-${projectId}`
-const helperSlot = `vibe-helper-helper-${projectId}`
+const builderSlot = `vibe-helper-builder-v7-${projectId}`
+const helperSlot = `vibe-helper-helper-v2-${projectId}`
 
 function sseResponse(payloads: readonly string[]) {
   const encoder = new TextEncoder()

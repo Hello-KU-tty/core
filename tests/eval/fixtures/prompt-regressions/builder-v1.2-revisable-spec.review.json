@@ -1,0 +1,20 @@
+[
+  {
+    "criterionKey": "latest_user_direction",
+    "dimension": "EVIDENCE_QUALITY",
+    "reviewMode": "HUMAN",
+    "status": "PASSED",
+    "explanation": "The Builder names the confirmed local scope as a starting baseline, explicitly keeps the user's right to revise it, and plans a durable Spec-deviation record rather than refusing the request.",
+    "evidenceReferences": ["specRevisionInteraction.confirmedScope", "specRevisionInteraction.userMessage", "specRevisionInteraction.builderResponse"],
+    "metrics": []
+  },
+  {
+    "criterionKey": "material_change_decision",
+    "dimension": "DECISION_NECESSITY",
+    "reviewMode": "HUMAN",
+    "status": "PASSED",
+    "explanation": "Hosted storage materially changes privacy, cost and deployment boundaries, so a Decision about storage location, retention and cost is warranted while independent work remains build-first.",
+    "evidenceReferences": ["specRevisionInteraction.builderResponse", "specRevisionInteraction.requiredAction"],
+    "metrics": []
+  }
+]

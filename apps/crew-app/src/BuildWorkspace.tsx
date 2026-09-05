@@ -8,6 +8,8 @@ import {
   builderSlotKey,
   type CrewAgentModeClient,
   helperSlotKey,
+  priorBuilderSlotKeys,
+  priorHelperSlotKeys,
   type CrewProjectSessions,
   type CrewCoreClient,
 } from '@vibe-helper/kiro-adapter/crew-app'
@@ -26,11 +28,6 @@ type Pane = 'BUILDER' | 'HELPER'
 type RuntimeStatus = 'IDLE' | 'BINDING' | 'RUNNING' | 'DONE' | 'FAILED'
 type HelperOrigin = 'FREE_TEXT' | 'QUICK_ACTION'
 
-interface DecisionDraft {
-  readonly customProposal: string
-  readonly rationale: string
-}
-
 export interface BuildWorkspaceProps {
   readonly snapshot: ProjectSessionSnapshot
   readonly sessions: CrewProjectSessions | null
@@ -46,6 +43,12 @@ function entityId(prefix: 'corr' | 'idem' | 'decision_resolution'): string {
 
 function actionError(error: unknown): string {
   return error instanceof Error ? error.message : '요청을 완료하지 못했습니다.'
+}
+
+function decodeLegacyUnicodeEscapes(value: string): string {
+  return value.replace(/\\u([0-9a-fA-F]{4})/g, (_match, codePoint: string) =>
+    String.fromCharCode(Number.parseInt(codePoint, 16)),
+  )
 }
 
 function StatusPill({ value }: { readonly value: string }) {
@@ -73,13 +76,18 @@ function NativeChatSession({
   placeholder,
   onSend,
   client,
+  historySlotKeys,
+  composerAccessory,
 }: {
   readonly slotKey: string
   readonly agent: string
   readonly placeholder: string
   readonly onSend: (message: string) => void | Promise<void>
   readonly client: CrewAgentModeClient
+  readonly historySlotKeys: readonly string[]
+  readonly composerAccessory?: ReactNode
 }) {
+  const [historyMessages, setHistoryMessages] = useState<readonly unknown[]>([])
   const [messages, setMessages] = useState<readonly unknown[]>([])
   const [running, setRunning] = useState(false)
   const [draft, setDraft] = useState('')
@@ -87,6 +95,20 @@ function NativeChatSession({
   const [stopping, setStopping] = useState(false)
   const [sessionError, setSessionError] = useState<string | null>(null)
   const role = agent.includes('builder') ? 'Builder' : 'Helper'
+
+  useEffect(() => {
+    let active = true
+    void Promise.all(historySlotKeys.map((key) => client.readRenderableSession(key)))
+      .then((sessions) => {
+        if (active) setHistoryMessages(sessions.flatMap((session) => session.messages))
+      })
+      .catch((error: unknown) => {
+        if (active) setSessionError(actionError(error))
+      })
+    return () => {
+      active = false
+    }
+  }, [client, historySlotKeys])
 
   useEffect(() => {
     let active = true
@@ -119,16 +141,18 @@ function NativeChatSession({
       </div>
     )
   }
+  const renderableMessages = [...historyMessages, ...messages]
   return (
     <div className="native-chat-frame">
       <div className="native-message-list" role="log" aria-label={`${role} transcript`}>
-        <HostChatMessageList messages={messages} running={running || sending} />
+        <HostChatMessageList messages={renderableMessages} running={running || sending} />
       </div>
       {sessionError === null ? null : (
         <p className="pane-error" role="alert">
           {sessionError}
         </p>
       )}
+      {composerAccessory}
       <form
         className="native-chat-composer"
         onSubmit={(event) => {
@@ -187,6 +211,7 @@ function AgentPane({
   error,
   onSend,
   client,
+  historySlotKeys,
 }: {
   readonly kind: 'builder' | 'helper'
   readonly title: string
@@ -199,6 +224,7 @@ function AgentPane({
   readonly error: string | null
   readonly onSend: (message: string) => void | Promise<void>
   readonly client: CrewAgentModeClient
+  readonly historySlotKeys: readonly string[]
 }) {
   return (
     <section className={`agent-pane ${kind}-pane`} aria-labelledby={`${kind}-pane-title`}>
@@ -209,13 +235,14 @@ function AgentPane({
         </div>
         {status}
       </header>
-      {children}
       <NativeChatSession
         slotKey={slotKey}
         agent={agent}
         placeholder={placeholder}
         onSend={onSend}
         client={client}
+        historySlotKeys={historySlotKeys}
+        composerAccessory={children}
       />
       {error === null ? null : (
         <p className="pane-error" role="alert">
@@ -255,6 +282,7 @@ function HelperTools({
         </div>
       )}
       <fieldset className="quick-actions" aria-label="Helper quick actions">
+        <legend>추천 질문</legend>
         {quickActions.map((question) => (
           <button
             type="button"
@@ -272,16 +300,12 @@ function HelperTools({
 
 function DecisionCard({
   item,
-  draft,
   busy,
-  onDraft,
   onAskHelper,
   onResolve,
 }: {
   readonly item: DecisionSessionItem
-  readonly draft: DecisionDraft
   readonly busy: boolean
-  readonly onDraft: (draft: DecisionDraft) => void
   readonly onAskHelper: () => void
   readonly onResolve: (
     decision: DecisionRequest,
@@ -291,7 +315,6 @@ function DecisionCard({
           readonly kind: 'CUSTOM'
           readonly proposal: string
         },
-    rationale: string,
   ) => void
 }) {
   const { request, resolution, application } = item
@@ -312,11 +335,13 @@ function DecisionCard({
             ? resolution.customProposal
             : (selected?.label ?? '선택한 옵션')}
         </p>
-        {resolution.rationale === undefined ? null : <p>{resolution.rationale}</p>}
+        {resolution.rationale === undefined ? null : (
+          <p>{decodeLegacyUnicodeEscapes(resolution.rationale)}</p>
+        )}
         {application === null ? (
           <small>Builder가 저장된 결정을 읽고 적용하기를 기다리고 있습니다.</small>
         ) : (
-          <small>{application.appliedResult}</small>
+          <small>{decodeLegacyUnicodeEscapes(application.appliedResult)}</small>
         )}
       </article>
     )
@@ -332,104 +357,68 @@ function DecisionCard({
         <span className="decision-owner">결정은 사용자가 합니다</span>
       </div>
       <p className="decision-reason">{request.reasonRequiredNow}</p>
-      <div className="decision-options">
-        {request.options.map((option) => (
-          <section
-            className={option.id === request.recommendedOptionId ? 'recommended-option' : ''}
-            key={option.id}
-          >
-            <div>
-              <strong>{option.label}</strong>
-              {option.id === request.recommendedOptionId ? <span>Builder 추천</span> : null}
-            </div>
-            <p>{option.description}</p>
-            <ul>
-              {option.impacts.map((impact) => (
-                <li key={impact}>{impact}</li>
-              ))}
-            </ul>
-            {option.tradeoffs.length === 0 ? null : (
-              <details>
-                <summary>Tradeoffs</summary>
-                <ul>
-                  {option.tradeoffs.map((tradeoff) => (
-                    <li key={tradeoff}>{tradeoff}</li>
-                  ))}
-                </ul>
-              </details>
-            )}
-            <button
-              type="button"
-              className="option-button"
-              disabled={busy}
-              onClick={() =>
-                onResolve(request, { kind: 'OPTION', optionId: option.id }, draft.rationale)
-              }
-            >
-              이 선택으로 진행
-            </button>
-          </section>
-        ))}
-      </div>
       {recommended === undefined ? null : (
         <div className="recommendation-box">
-          <div>
-            <span>Builder recommendation</span>
-            <strong>{recommended.label}</strong>
-            <p>{request.recommendationRationale}</p>
-          </div>
-          <button
-            type="button"
-            className="primary-button"
-            disabled={busy}
-            onClick={() =>
-              onResolve(
-                request,
-                { kind: 'RECOMMENDATION', optionId: recommended.id },
-                draft.rationale,
-              )
-            }
-          >
-            추천대로 진행
-          </button>
+          <span>Builder recommendation</span>
+          <strong>{recommended.label}</strong>
+          <p>{request.recommendationRationale}</p>
         </div>
       )}
-      <div className="decision-support-row">
-        <button type="button" className="secondary-button" disabled={busy} onClick={onAskHelper}>
-          Helper에게 비교 요청
-        </button>
-        <label>
-          <span>선택 이유 (선택)</span>
-          <textarea
-            rows={2}
-            value={draft.rationale}
-            onChange={(event) => onDraft({ ...draft, rationale: event.target.value })}
-          />
-        </label>
-      </div>
-      <form
-        className="custom-decision"
-        onSubmit={(event) => {
-          event.preventDefault()
-          const proposal = draft.customProposal.trim()
-          if (proposal.length > 0) {
-            onResolve(request, { kind: 'CUSTOM', proposal }, draft.rationale)
-          }
-        }}
-      >
-        <label htmlFor={`custom-${request.id}`}>다른 방향을 직접 제안하기</label>
+      <details className="decision-details">
+        <summary>선택지 영향 자세히 보기</summary>
+        <div className="decision-options">
+          {request.options.map((option) => (
+            <section
+              className={option.id === request.recommendedOptionId ? 'recommended-option' : ''}
+              key={option.id}
+            >
+              <div>
+                <strong>{option.label}</strong>
+                {option.id === request.recommendedOptionId ? <span>Builder 추천</span> : null}
+              </div>
+              <p>{option.description}</p>
+              <ul>
+                {option.impacts.map((impact) => (
+                  <li key={impact}>{impact}</li>
+                ))}
+                {option.tradeoffs.map((tradeoff) => (
+                  <li key={tradeoff}>{tradeoff}</li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      </details>
+      <fieldset className="decision-reply-row">
+        <legend>추천 답장</legend>
         <div>
-          <input
-            id={`custom-${request.id}`}
-            value={draft.customProposal}
-            placeholder="원하는 동작이나 제약을 적어 주세요."
-            onChange={(event) => onDraft({ ...draft, customProposal: event.target.value })}
-          />
-          <button type="submit" disabled={busy || draft.customProposal.trim().length === 0}>
-            제안으로 진행
+          {request.options.map((option) => (
+            <button
+              type="button"
+              className={option.id === request.recommendedOptionId ? 'recommended-reply' : ''}
+              disabled={busy}
+              key={option.id}
+              onClick={() =>
+                onResolve(
+                  request,
+                  option.id === request.recommendedOptionId
+                    ? { kind: 'RECOMMENDATION', optionId: option.id }
+                    : { kind: 'OPTION', optionId: option.id },
+                )
+              }
+            >
+              {option.label}
+              {option.id === request.recommendedOptionId ? ' · 추천' : ''}
+            </button>
+          ))}
+          <button type="button" disabled={busy} onClick={onAskHelper}>
+            Helper에게 비교 요청
           </button>
         </div>
-      </form>
+      </fieldset>
+      <p className="decision-composer-hint">
+        아래 Builder 입력창에 선택 이유나 전혀 다른 방향을 직접 적어도 됩니다.
+      </p>
     </article>
   )
 }
@@ -512,7 +501,6 @@ export function BuildWorkspace({
       ),
   )
   const [decisionBusyId, setDecisionBusyId] = useState<string | null>(null)
-  const [decisionDrafts, setDecisionDrafts] = useState<Readonly<Record<string, DecisionDraft>>>({})
   const [launchBusy, setLaunchBusy] = useState(false)
   const [launchError, setLaunchError] = useState<string | null>(null)
   const [resultDescriptor, setResultDescriptor] = useState<GeneratedResultDescriptor | null>(null)
@@ -531,6 +519,14 @@ export function BuildWorkspace({
   }, [snapshot.decisions, snapshot.pendingDecisions])
   const focusedDecisionItem =
     allDecisionItems.find((item) => item.resolution === null) ?? allDecisionItems.at(-1) ?? null
+  const builderHistorySlotKeys = useMemo(
+    () => priorBuilderSlotKeys(snapshot.project.id),
+    [snapshot.project.id],
+  )
+  const helperHistorySlotKeys = useMemo(
+    () => priorHelperSlotKeys(snapshot.project.id),
+    [snapshot.project.id],
+  )
 
   const restore = useCallback(async (): Promise<ProjectSessionSnapshot> => {
     const restored = await coreClient.restoreProjectSession(entityId('corr'), snapshot.project.id)
@@ -676,7 +672,6 @@ export function BuildWorkspace({
     selection:
       | { readonly kind: 'RECOMMENDATION' | 'OPTION'; readonly optionId: string }
       | { readonly kind: 'CUSTOM'; readonly proposal: string },
-    rationale: string,
   ): Promise<void> => {
     const currentTask = snapshot.currentTask
     if (currentTask === null) return
@@ -701,7 +696,6 @@ export function BuildWorkspace({
           ...(selection.kind === 'CUSTOM'
             ? { customProposal: selection.proposal }
             : { selectedOptionId: selection.optionId }),
-          ...(rationale.trim().length === 0 ? {} : { rationale: rationale.trim() }),
           helperUsed: helperUsedDecisionIds.has(decision.id),
           resolvedAt: new Date().toISOString(),
           source: { kind: 'USER' },
@@ -709,9 +703,19 @@ export function BuildWorkspace({
         },
       })
       const restored = await restore()
+      const selectedOption =
+        selection.kind === 'CUSTOM'
+          ? null
+          : decision.options.find((option) => option.id === selection.optionId)
+      const visibleMessage =
+        selection.kind === 'CUSTOM'
+          ? selection.proposal
+          : selection.kind === 'RECOMMENDATION'
+            ? `Builder 추천인 “${selectedOption?.label ?? '선택한 방향'}”으로 진행해줘.`
+            : `“${selectedOption?.label ?? '선택한 방향'}”으로 진행해줘.`
       await dispatchBuilder(
         restored,
-        '선택한 방향을 정확히 반영해서 구현을 계속해줘.',
+        visibleMessage,
         `Decision ${decision.id} was resolved by the user. Read get_decision_result, apply the exact stored resolution, record apply_decision_result, and continue the Task.`,
       )
     } catch (error) {
@@ -795,37 +799,31 @@ export function BuildWorkspace({
           }
           slotKey={sessions?.builderSlotKey ?? builderSlotKey(snapshot.project.id)}
           agent="vibe-helper-builder"
-          placeholder="Builder에게 구현 방향을 말하거나 질문하세요."
+          placeholder={
+            focusedDecision === null
+              ? 'Builder에게 구현 방향을 말하거나 질문하세요.'
+              : '이 선택에 답하거나 전혀 다른 방향을 직접 제안하세요.'
+          }
           error={runtimeError}
           client={agentClient}
-          onSend={(message) =>
-            dispatchBuilder(
+          historySlotKeys={builderHistorySlotKeys}
+          onSend={(message) => {
+            if (focusedDecision !== null) {
+              return resolveDecision(focusedDecision, { kind: 'CUSTOM', proposal: message })
+            }
+            return dispatchBuilder(
               snapshot,
               message,
-              focusedDecision === null
-                ? 'Read the current Task and Live Context before acting on the user message.'
-                : `Decision ${focusedDecision.id} is still pending. You may explain, but do not apply a direction until Core contains a user resolution.`,
+              'Read the current Task and Live Context before acting on the user message. Treat the latest explicit user direction as authoritative within safety and permission boundaries.',
             )
-          }
+          }}
         >
           <div className="intervention-stack">
             {focusedDecisionItem === null ? null : (
               <section className="decision-stack" aria-label="Current Task decision">
                 <DecisionCard
                   item={focusedDecisionItem}
-                  draft={
-                    decisionDrafts[focusedDecisionItem.request.id] ?? {
-                      customProposal: '',
-                      rationale: '',
-                    }
-                  }
                   busy={decisionBusyId === focusedDecisionItem.request.id}
-                  onDraft={(draft) =>
-                    setDecisionDrafts((current) => ({
-                      ...current,
-                      [focusedDecisionItem.request.id]: draft,
-                    }))
-                  }
                   onAskHelper={() => {
                     setMobilePane('HELPER')
                     void askHelper(
@@ -834,9 +832,7 @@ export function BuildWorkspace({
                       focusedDecisionItem.request.id,
                     )
                   }}
-                  onResolve={(decision, selection, rationale) =>
-                    void resolveDecision(decision, selection, rationale)
-                  }
+                  onResolve={(decision, selection) => void resolveDecision(decision, selection)}
                 />
               </section>
             )}
@@ -857,7 +853,7 @@ export function BuildWorkspace({
           title="Helper"
           status={
             <span className={`read-only-badge${helperBusy ? ' helper-busy' : ''}`}>
-              {helperBusy ? '답변 중' : '변경 권한 없음'}
+              {helperBusy ? '답변 중' : '설명 전용'}
             </span>
           }
           slotKey={sessions?.helperSlotKey ?? helperSlotKey(snapshot.project.id)}
@@ -865,6 +861,7 @@ export function BuildWorkspace({
           placeholder="현재 코드나 판단에 관해 무엇이든 물어보세요."
           error={helperError}
           client={agentClient}
+          historySlotKeys={helperHistorySlotKeys}
           onSend={(question) => askHelper(question, 'FREE_TEXT', focusedDecision?.id)}
         >
           <HelperTools

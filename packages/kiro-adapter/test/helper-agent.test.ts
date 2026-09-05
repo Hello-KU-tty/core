@@ -38,6 +38,8 @@ describe('Helper Agent adapter', () => {
     expect(definition.tools).not.toContain('execute_bash')
     expect(definition.prompt).toContain('sourceExcerpts')
     expect(definition.prompt).toContain('MISSING')
+    expect(definition.prompt).toContain('Spec은 변경 가능한 초기 합의')
+    expect(definition.prompt).toContain('사용자의 질문·결정·학습 권한을 제한')
     expect(HELPER_TOOL_NAMES).toEqual(['get_helper_context', 'request_builder_context_refresh'])
   })
 

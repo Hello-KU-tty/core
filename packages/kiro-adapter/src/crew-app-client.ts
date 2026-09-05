@@ -1,8 +1,20 @@
 import { redactSensitiveText } from '@vibe-helper/application/redaction'
-import { builderSlotKey, priorBuilderSlotKeys } from './agent-slots.js'
+import {
+  builderSlotKey,
+  helperSlotKey,
+  priorBuilderSlotKeys,
+  priorHelperSlotKeys,
+} from './agent-slots.js'
 
 export * from './agent-mode-client.js'
-export { BUILDER_SESSION_REVISION, builderSlotKey } from './agent-slots.js'
+export {
+  BUILDER_SESSION_REVISION,
+  HELPER_SESSION_REVISION,
+  builderSlotKey,
+  helperSlotKey,
+  priorBuilderSlotKeys,
+  priorHelperSlotKeys,
+} from './agent-slots.js'
 export * from './builder-stream.js'
 import {
   type BuilderSessionBindingDescriptor,
@@ -445,10 +457,6 @@ function discoveryAgentName(phase: DiscoveryAgentMode): string {
   return phase === 'SPEC' ? DISCOVERY_SPEC_AGENT_NAME : DISCOVERY_SPEC_RECOVERY_AGENT_NAME
 }
 
-export function helperSlotKey(projectId: string): string {
-  return `vibe-helper-helper-${projectId}`
-}
-
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -504,12 +512,13 @@ export class CrewSessionClient {
     const builder = builderSlotKey(projectId)
     const builderKeys = [...priorBuilderSlotKeys(projectId), builder]
     const helper = helperSlotKey(projectId)
+    const helperKeys = [...priorHelperSlotKeys(projectId), helper]
     try {
       const slots = readSlotKeys(await this.#api.get(CHAT_SLOT_COLLECTION_PATH))
-      const [discoveryMessages, builderMessageGroups, helperMessages] = await Promise.all([
+      const [discoveryMessages, builderMessageGroups, helperMessageGroups] = await Promise.all([
         this.#readHistoryIfPresent(slots, discovery),
         Promise.all(builderKeys.map((key) => this.#readHistoryIfPresent(slots, key))),
-        this.#readHistoryIfPresent(slots, helper),
+        Promise.all(helperKeys.map((key) => this.#readHistoryIfPresent(slots, key))),
       ])
       const nonEmptyBuilderMessageGroups = builderMessageGroups.filter(
         (messages) => messages.length > 0,
@@ -518,6 +527,19 @@ export class CrewSessionClient {
         nonEmptyBuilderMessageGroups.length <= 1
           ? (nonEmptyBuilderMessageGroups[0] ?? [])
           : nonEmptyBuilderMessageGroups
+              .flat()
+              .slice(-MAX_RESTORED_MESSAGES)
+              .map((message, index) => ({
+                ...message,
+                key: `merged-${String(index)}-${message.key}`,
+              }))
+      const nonEmptyHelperMessageGroups = helperMessageGroups.filter(
+        (messages) => messages.length > 0,
+      )
+      const helperMessages =
+        nonEmptyHelperMessageGroups.length <= 1
+          ? (nonEmptyHelperMessageGroups[0] ?? [])
+          : nonEmptyHelperMessageGroups
               .flat()
               .slice(-MAX_RESTORED_MESSAGES)
               .map((message, index) => ({

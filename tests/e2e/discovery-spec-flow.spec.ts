@@ -38,7 +38,7 @@ async function executeBackend(
 }
 
 async function executeUi(request: APIRequestContext, input: Readonly<Record<string, unknown>>) {
-  return executeBackend(request, applicationPath, { ...input, clientProtocolVersion: 6 })
+  return executeBackend(request, applicationPath, { ...input, clientProtocolVersion: 7 })
 }
 
 async function executeDiscoveryAgent(
@@ -629,7 +629,8 @@ async function fulfillResumedBuilderTurn(
     decisionId: decision.request.id,
     expectedTaskRevision: task.revision,
     expectedContextVersion: context.contextVersion,
-    appliedResult: '모든 validation 오류를 한 결과 카드에 표시하도록 적용했습니다.',
+    appliedResult:
+      '\\ubaa8\\ub4e0 validation \\uc624\\ub958\\ub97c \\ud55c \\uacb0\\uacfc \\uce74\\ub4dc\\uc5d0 \\ud45c\\uc2dc\\ud558\\ub3c4\\ub85d \\uc801\\uc6a9\\ud588\\uc2b5\\ub2c8\\ub2e4.',
     sourceReferences: [],
     context: {
       stage: 'Applied the validation error presentation',
@@ -1018,6 +1019,26 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
   await expect(page.locator('.helper-pane')).toBeVisible()
   await expect(page.getByRole('log', { name: 'Builder transcript' })).toBeVisible()
   await expect(page.getByLabel('Builder message')).toBeVisible()
+  const lightChatTheme = await page
+    .locator('.builder-pane .native-chat-frame')
+    .evaluate((frame) => {
+      const style = getComputedStyle(frame)
+      return { background: style.backgroundColor, color: style.color }
+    })
+  expect(lightChatTheme).toEqual({
+    background: 'rgb(249, 249, 251)',
+    color: 'rgb(32, 33, 38)',
+  })
+  await page.emulateMedia({ colorScheme: 'dark' })
+  const darkChatTheme = await page.locator('.builder-pane .native-chat-frame').evaluate((frame) => {
+    const style = getComputedStyle(frame)
+    return { background: style.backgroundColor, color: style.color }
+  })
+  expect(darkChatTheme).toEqual({
+    background: 'rgb(21, 19, 26)',
+    color: 'rgb(244, 241, 246)',
+  })
+  await page.emulateMedia({ colorScheme: 'light' })
   const builderScrollMetrics = await page.evaluate(() => {
     const pane = document.querySelector<HTMLElement>('.builder-pane')
     const transcript = pane?.querySelector<HTMLElement>('.native-message-list')
@@ -1075,19 +1096,31 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
   await expect(decisionHeading).toBeVisible()
   await expect(page.getByText('Builder recommendation')).toBeVisible()
   await expect(page.getByText('오류를 한 번에 표시', { exact: true }).first()).toBeVisible()
-  const recommendationButtonMetrics = await page
-    .getByRole('button', { name: '추천대로 진행' })
-    .evaluate((button) => {
-      const rect = button.getBoundingClientRect()
-      return {
-        width: rect.width,
-        height: rect.height,
-        whiteSpace: getComputedStyle(button).whiteSpace,
-      }
-    })
+  const recommendationButton = page.getByRole('button', {
+    name: '오류를 한 번에 표시 · 추천',
+  })
+  const recommendationButtonMetrics = await recommendationButton.evaluate((button) => {
+    const rect = button.getBoundingClientRect()
+    return {
+      width: rect.width,
+      height: rect.height,
+      whiteSpace: getComputedStyle(button).whiteSpace,
+    }
+  })
   expect(recommendationButtonMetrics.width).toBeGreaterThanOrEqual(90)
   expect(recommendationButtonMetrics.height).toBeLessThan(60)
   expect(recommendationButtonMetrics.whiteSpace).toBe('nowrap')
+  const decisionComposerOrder = await page.evaluate(() => {
+    const suggestions = document.querySelector<HTMLElement>('.builder-pane .decision-reply-row')
+    const composer = document.querySelector<HTMLElement>('.builder-pane .native-chat-composer')
+    return {
+      suggestionsBottom: suggestions?.getBoundingClientRect().bottom ?? Number.POSITIVE_INFINITY,
+      composerTop: composer?.getBoundingClientRect().top ?? Number.NEGATIVE_INFINITY,
+    }
+  })
+  expect(decisionComposerOrder.suggestionsBottom).toBeLessThanOrEqual(
+    decisionComposerOrder.composerTop,
+  )
 
   await page.getByRole('button', { name: 'Helper에게 비교 요청' }).click()
   await expect(
@@ -1104,12 +1137,21 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
     .toEqual([])
   expect(helperDispatches).toBe(1)
 
-  await page.getByRole('button', { name: '추천대로 진행' }).click()
+  await page
+    .getByLabel('Builder message')
+    .fill(
+      '첫 오류부터 단계별로 보여주는 방향으로 진행해줘. 초보자가 수정 순서를 따라가기 쉬웠으면 해.',
+    )
+  await page.getByRole('button', { name: 'Builder에게 보내기' }).click()
   await expect(page.getByText('APPLY PENDING', { exact: true })).toBeVisible()
   releaseBuilderResume?.()
   await expect(
     page.getByRole('heading', { name: 'TypeScript runtime validation 완성' }),
   ).toBeVisible()
+  await expect(
+    page.getByText('모든 validation 오류를 한 결과 카드에 표시하도록 적용했습니다.'),
+  ).toBeVisible()
+  await expect(page.locator('body')).not.toContainText('\\ubaa8')
   await expect(page.getByRole('log', { name: 'Builder transcript' })).toContainText(
     '선택한 결과 표시 방식을 반영했고 모든 검증을 통과했습니다.',
   )

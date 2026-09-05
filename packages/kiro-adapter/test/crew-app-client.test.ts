@@ -76,9 +76,12 @@ describe('Crew browser-safe clients', () => {
     const discovery = discoverySlotKey(projectId)
     const builder = builderSlotKey(projectId)
     const helper = helperSlotKey(projectId)
+    const legacyHelper = `vibe-helper-helper-${projectId}`
     const api: CrewAppApi = {
       get: vi.fn(async (path: string) => {
-        if (path === '/api/chat/slots') return [{ key: builder }, { key: helper }]
+        if (path === '/api/chat/slots') {
+          return [{ key: builder }, { key: legacyHelper }, { key: helper }]
+        }
         if (path.includes(builder)) {
           return {
             messages: [
@@ -86,6 +89,9 @@ describe('Crew browser-safe clients', () => {
               { role: 'assistant', content: 'Use /Users/example/private/project.ts.' },
             ],
           }
+        }
+        if (path.includes(legacyHelper)) {
+          return { messages: [{ role: 'assistant', content: 'Earlier Helper explanation.' }] }
         }
         return { messages: [{ role: 'assistant', content: 'Review the pending decision.' }] }
       }),
@@ -103,7 +109,12 @@ describe('Crew browser-safe clients', () => {
       ],
       helperMessages: [
         {
-          key: '0-assistant-28',
+          key: 'merged-0-0-assistant-27',
+          role: 'ASSISTANT',
+          content: 'Earlier Helper explanation.',
+        },
+        {
+          key: 'merged-1-0-assistant-28',
           role: 'ASSISTANT',
           content: 'Review the pending decision.',
         },
@@ -118,6 +129,7 @@ describe('Crew browser-safe clients', () => {
     const previousBuilderV3 = `vibe-helper-builder-v3-${projectId}`
     const previousBuilderV4 = `vibe-helper-builder-v4-${projectId}`
     const previousBuilderV5 = `vibe-helper-builder-v5-${projectId}`
+    const previousBuilderV6 = `vibe-helper-builder-v6-${projectId}`
     const api: CrewAppApi = {
       get: vi.fn(async (path: string) => {
         if (path === '/api/chat/slots') {
@@ -127,6 +139,7 @@ describe('Crew browser-safe clients', () => {
             { key: previousBuilderV3 },
             { key: previousBuilderV4 },
             { key: previousBuilderV5 },
+            { key: previousBuilderV6 },
             { key: currentBuilder },
           ]
         }
@@ -145,6 +158,9 @@ describe('Crew browser-safe clients', () => {
         if (path.includes(previousBuilderV5)) {
           return { messages: [{ role: 'assistant', content: 'Previous session v5' }] }
         }
+        if (path.includes(previousBuilderV6)) {
+          return { messages: [{ role: 'assistant', content: 'Previous session v6' }] }
+        }
         return { messages: [{ role: 'assistant', content: 'Legacy session' }] }
       }),
       post: vi.fn(),
@@ -159,9 +175,10 @@ describe('Crew browser-safe clients', () => {
       'Previous session v3',
       'Previous session v4',
       'Previous session v5',
+      'Previous session v6',
       'Current session',
     ])
-    expect(new Set(restored.builderMessages.map((message) => message.key)).size).toBe(6)
+    expect(new Set(restored.builderMessages.map((message) => message.key)).size).toBe(7)
   })
 
   it('keeps missing slots empty and reports disconnected Crew history', async () => {

@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "decision": {
+    "schemaVersion": 1,
+    "id": "decision_22000000-0000-4000-8000-000000000201",
+    "projectId": "project_22000000-0000-4000-8000-000000000202",
+    "taskId": "task_22000000-0000-4000-8000-000000000203",
+    "correlationId": "corr_22000000-0000-4000-8000-000000000204",
+    "contextVersion": 3,
+    "category": "SECURITY_PRIVACY",
+    "question": "Should an API key be shown only once after creation?",
+    "reasonRequiredNow": "The storage and recovery policy depends on this choice.",
+    "options": [
+      {
+        "id": "decision_option_22000000-0000-4000-8000-000000000205",
+        "label": "Show once",
+        "description": "Return the original key only at creation time.",
+        "impacts": ["The database can keep only a verification hash."],
+        "tradeoffs": ["A lost key must be replaced rather than recovered."]
+      },
+      {
+        "id": "decision_option_22000000-0000-4000-8000-000000000206",
+        "label": "Allow recovery",
+        "description": "Store recoverable encrypted key material.",
+        "impacts": ["An authorized user can reveal an existing key again."],
+        "tradeoffs": ["Encryption key management expands the security boundary."]
+      }
+    ],
+    "recommendedOptionId": "decision_option_22000000-0000-4000-8000-000000000205",
+    "recommendationRationale": "A one-time display keeps the MVP security boundary smaller.",
+    "relatedConceptNames": ["one-way hashing"],
+    "sourceReferences": [],
+    "independentWorkCanContinue": true,
+    "requestedAt": "2026-09-05T05:15:59.097Z",
+    "source": { "kind": "AGENT", "role": "BUILDER" },
+    "redactionStatus": "VERIFIED_REDACTED"
+  },
+  "helperInteraction": {
+    "confirmedSpecBaseline": "PostgreSQL 14+ database required",
+    "question": "PostgreSQL보다 SQLite가 낫지 않나요?",
+    "answer": "현재 확정된 Spec의 시작 기준은 PostgreSQL 14+예요. 하지만 그 합의가 사용자의 변경 권한을 막지는 않습니다. 단일 사용자 로컬 MVP라면 SQLite는 별도 서버 설치가 없고 배포가 단순하다는 장점이 있어 더 잘 맞을 수 있어요. 반대로 여러 프로세스의 동시 쓰기, 원격 운영과 권한 관리가 중요하면 PostgreSQL이 유리합니다. 이미 PostgreSQL schema나 adapter를 작성했다면 SQLite dialect, migration과 테스트를 바꾸는 비용도 확인해야 해요. Helper가 직접 바꾸지는 못하지만 아래 Builder 입력창에 ‘로컬 MVP는 SQLite로 바꾸고 현재 schema, migration과 테스트도 함께 갱신해줘’라고 보내면 Builder가 영향이 큰 부분을 Decision으로 기록한 뒤 진행할 수 있습니다.",
+    "builderMessage": "로컬 MVP는 SQLite로 바꾸고 현재 schema, migration과 테스트도 함께 갱신해줘"
+  }
+}

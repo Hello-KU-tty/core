@@ -187,7 +187,7 @@ const learningSpec = learningSpecRevisionSchema.parse({
     },
   ],
   runtimeConstraint: 'TYPESCRIPT',
-  deploymentConstraints: ['Local execution only'],
+  deploymentConstraints: ['Local execution only', 'PostgreSQL 14+ database required'],
   status: 'CONFIRMED',
   confirmation: { confirmedAt: seededAt, confirmedBy: { kind: 'USER' } },
   createdAt: seededAt,
@@ -465,7 +465,8 @@ const preflight = await application.executeAgent('HELPER', {
   projectId: ids.project,
   taskId: ids.task,
   decisionId: ids.decision,
-  question: 'DB 모델은 엑셀 열이고 실제 데이터는 행이라고 보면 되나요?',
+  question:
+    'DB 모델은 엑셀 열이고 실제 데이터는 행이라고 보면 되나요? 그리고 PostgreSQL보다 SQLite가 낫지 않나요?',
   relatedConceptNames: ['runtime validation'],
   observedContextVersion: 1,
 })
@@ -557,12 +558,13 @@ if (validation.code !== 0) {
 
 const turn = [
   '실제 합성 Helper 회귀를 한 번 실행하세요.',
-  `먼저 get_helper_context를 schemaVersion=1, kind=HELPER_GET_CONTEXT, correlationId=${ids.correlation}, actor={kind:AGENT,role:HELPER}, projectId=${ids.project}, taskId=${ids.task}, decisionId=${ids.decision}, question="DB 모델은 엑셀 열이고 실제 데이터는 행이라고 보면 되나요? 그리고 현재 unknown field 선택지는 어떻게 다른가요?", relatedConceptNames=["runtime validation"], observedContextVersion=1로 정확히 한 번 호출하세요.`,
+  `먼저 get_helper_context를 schemaVersion=1, kind=HELPER_GET_CONTEXT, correlationId=${ids.correlation}, actor={kind:AGENT,role:HELPER}, projectId=${ids.project}, taskId=${ids.task}, decisionId=${ids.decision}, question="DB 모델은 엑셀 열이고 실제 데이터는 행이라고 보면 되나요? 현재 unknown field 선택지는 어떻게 다르고, confirmed Spec의 PostgreSQL보다 SQLite가 낫지 않나요?", relatedConceptNames=["runtime validation"], observedContextVersion=1로 정확히 한 번 호출하세요.`,
   'freshness가 CURRENT이므로 refresh는 요청하지 마세요.',
   '도구가 돌려준 현재 Decision, DEMONSTRATED Concept State, 과거 Episode, 실제 source excerpt만 사용하세요.',
-  '답변은 한국어로 짧게 하고, 아래 네 제목을 정확히 한 번씩 사용하세요: 현재 선택, 비유, 높은 상태에서도 질문 가능, 다음 행동.',
+  '답변은 한국어로 짧게 하고, 아래 다섯 제목을 정확히 한 번씩 사용하세요: 현재 선택, Spec 변경, 비유, 높은 상태에서도 질문 가능, 다음 행동.',
   '현재 선택에서는 reject와 preserve의 실제 차이와 Builder 추천의 이유·한계를 비교하세요.',
   '비유에서는 데이터 한 건=행 대응의 맞는 부분과 모델=열 대응의 틀린 부분을 claim 단위로 나누고, 모델의 필드가 열에 더 가깝다는 한계까지 설명하세요.',
+  'Spec 변경에서는 PostgreSQL이 confirmed 시작 기준이라는 사실과 사용자가 언제든 SQLite로 바꿀 수 있다는 권한을 함께 말하세요. 로컬 MVP의 SQLite 장점, PostgreSQL의 동시 접근·운영 장점과 현재 구현 변경 비용을 비교하고, 사용자가 Builder composer에 보낼 짧은 변경 지시를 제안하세요. 사용자가 결정할 범위가 아니라는 표현은 금지합니다.',
   'DEMONSTRATED 상태여도 질문과 더 깊은 설명이 계속 가능하다고 말하고, 퀴즈나 다시 말하기를 요구하지 마세요.',
   '다음 행동에는 더 쉽게, 더 자세히, 현재 코드로 예시, 선택지 비교를 자유 입력보다 앞세우지 않는 선택지로 제시하세요.',
 ].join('\n')
@@ -630,7 +632,13 @@ for (const line of rawStream.split(/\r?\n/u).filter(Boolean)) {
     answer += update.content.text
   }
 }
-const requiredHeadings = ['현재 선택', '비유', '높은 상태에서도 질문 가능', '다음 행동']
+const requiredHeadings = [
+  '현재 선택',
+  'Spec 변경',
+  '비유',
+  '높은 상태에서도 질문 가능',
+  '다음 행동',
+]
 if (
   getContextCalls !== 1 ||
   refreshCalls !== 0 ||
@@ -641,6 +649,11 @@ if (
   !/(필드|field)/iu.test(answer) ||
   !/열/u.test(answer) ||
   !/(질문|설명)/u.test(answer) ||
+  !/SQLite/iu.test(answer) ||
+  !/PostgreSQL/iu.test(answer) ||
+  !/(바꿀 수|변경할 수|다시 선택|바꿀 권한|변경 권한)/u.test(answer) ||
+  !/(Builder|빌더).*(입력|composer|보내)/iu.test(answer) ||
+  /사용자가 결정할 범위가 아니/u.test(answer) ||
   /(?:퀴즈를 풀|시험을 보|다시 말해 보)/u.test(answer) ||
   answer.includes(secretSentinel)
 ) {

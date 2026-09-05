@@ -45,13 +45,23 @@ export interface EvaluationSubject {
     readonly forbiddenSentinels: readonly string[]
   }
   readonly helperInteraction?: {
-    readonly freshness: 'CURRENT' | 'STALE' | 'MISSING'
-    readonly conceptState: 'OBSERVED' | 'EXPLAINED' | 'DEMONSTRATED' | 'TRANSFERRED'
-    readonly quickActions: readonly string[]
-    readonly firstAnswer: string
-    readonly analogyQuestion: string
-    readonly analogyAnswer: string
-    readonly highStateAnswer: string
+    readonly freshness?: 'CURRENT' | 'STALE' | 'MISSING'
+    readonly conceptState?: 'OBSERVED' | 'EXPLAINED' | 'DEMONSTRATED' | 'TRANSFERRED'
+    readonly quickActions?: readonly string[]
+    readonly firstAnswer?: string
+    readonly analogyQuestion?: string
+    readonly analogyAnswer?: string
+    readonly highStateAnswer?: string
+    readonly confirmedSpecBaseline?: string
+    readonly question?: string
+    readonly answer?: string
+    readonly builderMessage?: string
+  }
+  readonly specRevisionInteraction?: {
+    readonly confirmedScope: string
+    readonly userMessage: string
+    readonly builderResponse: string
+    readonly requiredAction: 'REQUEST_DECISION_AND_RECORD_SPEC_DEVIATION'
   }
   readonly analystInteraction?: {
     readonly result: unknown
