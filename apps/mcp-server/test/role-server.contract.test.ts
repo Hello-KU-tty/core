@@ -14,6 +14,7 @@ import {
   projectCandidateRevisionSchema,
   projectSchema,
   type AgentRole,
+  type CandidatePreview,
 } from '@vibe-helper/contracts'
 import { describe, expect, it } from 'vitest'
 
@@ -510,23 +511,47 @@ describe('role-bound MCP server', () => {
       expect(staged?.previewRound?.previews).toHaveLength(10)
       expect(staged?.rounds).toHaveLength(0)
 
+      const enrichmentDraft = (preview: CandidatePreview) => ({
+        candidateId: preview.candidateId,
+        title: preview.title,
+        summary: preview.summary,
+        targetUsers: candidateFixture.targetUsers,
+        coreInteraction: preview.coreInteraction,
+        usageMoment: candidateFixture.usageMoment,
+        appeal: preview.appeal,
+        personalNeedRelationship: candidateFixture.personalNeedRelationship,
+        technologyNecessity: preview.technologyNecessity,
+        coreConcepts: candidateFixture.coreConcepts,
+        mvpFeatures: candidateFixture.mvpFeatures,
+        suggestedScope: candidateFixture.suggestedScope,
+        generationTags: preview.generationTags,
+      })
+
+      const firstPreview = staged?.previewRound?.previews[0]
+      if (firstPreview === undefined) throw new TypeError('First preview is missing')
+      await expect(
+        harness.client.callTool({
+          name: 'submit_candidate_enrichments',
+          arguments: {
+            schemaVersion: 1,
+            projectId: ids.project,
+            discoverySessionId: ids.discoverySession,
+            correlationId: ids.correlation,
+            idempotencyKey: 'idem_00000000-0000-4000-8000-000000000604',
+            expectedSessionRevision: 1,
+            previewRoundId: generatedPreviewRoundId,
+            batch: 'SELECTED',
+            candidates: [enrichmentDraft(firstPreview)],
+          },
+        }),
+      ).resolves.toMatchObject({ structuredContent: { resourceRevision: 1 } })
+      expect(
+        harness.storage.repository.readDiscoveryAggregate(ids.project)?.candidateEnrichments,
+      ).toHaveLength(1)
+
       const submitBatch = async (batch: 'FIRST' | 'SECOND', start: number, key: string) => {
         const previews = staged?.previewRound?.previews.slice(start, start + 5) ?? []
-        const candidates = previews.map((preview) => ({
-          candidateId: preview.candidateId,
-          title: preview.title,
-          summary: preview.summary,
-          targetUsers: candidateFixture.targetUsers,
-          coreInteraction: preview.coreInteraction,
-          usageMoment: candidateFixture.usageMoment,
-          appeal: preview.appeal,
-          personalNeedRelationship: candidateFixture.personalNeedRelationship,
-          technologyNecessity: preview.technologyNecessity,
-          coreConcepts: candidateFixture.coreConcepts,
-          mvpFeatures: candidateFixture.mvpFeatures,
-          suggestedScope: candidateFixture.suggestedScope,
-          generationTags: preview.generationTags,
-        }))
+        const candidates = previews.map(enrichmentDraft)
         return harness.client.callTool({
           name: 'submit_candidate_enrichments',
           arguments: {

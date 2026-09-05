@@ -566,7 +566,7 @@ describe('Crew browser-safe clients', () => {
     expect(context).not.toContain('historical detail must not be injected')
   })
 
-  it('injects only the requested five previews for enrichment', () => {
+  it('injects only the previews selected by the user for just-in-time enrichment', () => {
     const discoverySessionId = 'discovery_session_00000000-0000-4000-8000-000000000014'
     const previewRoundId = 'candidate_preview_round_00000000-0000-4000-8000-000000000018'
     const finalRoundId = 'candidate_round_00000000-0000-4000-8000-000000000019'
@@ -586,6 +586,11 @@ describe('Crew browser-safe clients', () => {
       revision: 1,
       status: 'ACTIVE',
       input: { learningGoal: 'Understand validation' },
+    }
+    const thirdPreview = previews[2]
+    const eighthPreview = previews[7]
+    if (thirdPreview === undefined || eighthPreview === undefined) {
+      throw new TypeError('Selected enrichment preview fixture is incomplete')
     }
     const context = createDiscoveryEphemeralContext(
       {
@@ -618,7 +623,8 @@ describe('Crew browser-safe clients', () => {
         },
         selectedCandidate: null,
       } as never,
-      'ENRICH_SECOND',
+      'ENRICH_SELECTED',
+      [thirdPreview.candidateId, eighthPreview.candidateId],
     )
     const parsed = JSON.parse(context) as {
       previewRound: Record<string, unknown>
@@ -626,13 +632,10 @@ describe('Crew browser-safe clients', () => {
     }
 
     expect(parsed.previewRound).toEqual({ id: previewRoundId, finalRoundId })
-    expect(parsed.requestedPreviews.map((preview) => preview.position)).toEqual([6, 7, 8, 9, 10])
+    expect(parsed.requestedPreviews.map((preview) => preview.position)).toEqual([3, 8])
     expect(parsed.requestedPreviews.map((preview) => preview.title)).toEqual([
-      'Preview 6',
-      'Preview 7',
+      'Preview 3',
       'Preview 8',
-      'Preview 9',
-      'Preview 10',
     ])
   })
 

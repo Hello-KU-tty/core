@@ -414,3 +414,21 @@
 - **검증:** target KiroCrew에서 Helper 장문 응답의 마지막 문장까지 표시되는 것을 확인했고, structured Builder transcript는 `[OPTIONS]`와 fenced diff 원문 대신 native option/diff control로 렌더링됐다. 두 실제 Decision을 선택·적용한 Builder가 generated WebRTC project에서 TypeScript typecheck와 Vitest 4 files·19 tests를 통과했으며, 허용된 npm 명령은 실행되고 pipe가 포함된 shell 명령은 거절됐다. Core Completion Report가 Task revision 3 `COMPLETED`로 저장됐고 SQLite `quick_check=ok`를 확인했다.
 - **검토한 대안:** 기존 event log에 Markdown parser만 추가, `[OPTIONS]` 정규식 제거만 적용, Helper summary 길이만 확대, 완료 view 유지, native session 전체를 app 고유 renderer로 복제.
 - **tradeoff:** undocumented host export 변화에 대한 capability regression과 test SDK shim이 필요하다. 대신 Kiro가 이미 제공하는 대화·diff·tool·option semantics를 그대로 사용해 이중 renderer의 형식 drift를 없애고, Vibe Helper 고유 UI는 실제 판단과 학습 맥락에만 집중한다.
+
+## 2026-09-05: Discovery background enrichment는 사용자 진행을 막지 않음
+
+- **상태:** 사용자 승인 및 target 검증 완료
+- **맥락:** durable preview는 약 23초에 보이지만 기존 UI는 10개 전체 enrichment가 끝날 때까지 SELECT와 refinement Agent 호출을 막아 최종 관측 148초 동안 사용자의 판단을 실행할 수 없었다. background는 선택지를 더 설명하기 위한 보조 작업이지 사용자의 판단 완료 여부를 결정하는 필수 단계가 아니다.
+- **결정:** complete Round 전에도 preview를 선택하거나 refinement 대상으로 참조할 수 있다. 이때 참조된 identity만 `SELECTED` enrichment로 보강하고 Core가 해당 후보만 포함한 partial Candidate Round를 materialize한 뒤 같은 user-authored Feedback을 적용한다. 이미 보강된 후보는 재사용하며 나머지 background batch를 기다리지 않는다. 늦은 background submit은 current Session revision과 Round 검증에서 거절한다.
+- **검증:** Application·MCP contract와 Chromium E2E에서 background 중 SELECT·refinement 활성, 1개 preview partial Round, late background stale rejection을 확인했다. 설치본 v1.2.0 Haiku 실제 실행은 preview 10개를 20.037초, 선택 후보 1개 enrichment를 10.525초에 저장했고 나머지 9개 없이 273ms의 Core 적용으로 Session revision 2 `SELECTED`, Project `SPEC_REVIEW`가 됐다.
+- **검토한 대안:** 전체 10개 enrichment 완료 유지, preview 의미만으로 Candidate를 Core가 합성, SELECT만 허용하고 refinement는 차단.
+- **tradeoff:** 선택 시 짧은 Agent turn이 추가될 수 있고 partial Round 뒤 나머지 상세는 current 목록에 나타나지 않는다. 대신 Agent-authored 의미와 user-authored 판단 provenance를 분리하면서 사용자가 충분히 안다고 판단한 시점에 즉시 진행할 수 있다.
+
+## 2026-09-05: Agent transcript는 viewport 안에서 독립 스크롤
+
+- **상태:** 사용자 승인 및 구현 검증 완료
+- **맥락:** native message list에 overflow는 있었지만 상위 Agent pane 높이가 정해지지 않아 긴 Builder 대화가 pane과 페이지 전체를 계속 늘렸다.
+- **결정:** Builder와 Helper pane을 viewport 기반의 bounded flex container로 만들고 transcript만 `min-height: 0`과 vertical overflow를 가진 유일한 가변 영역으로 둔다. header, Vibe Helper Decision/completion intervention과 composer는 같은 pane의 고정 sibling으로 유지한다.
+- **검증:** Chromium E2E에서 24개 진행 문장, native diff와 option이 있는 transcript의 `scrollHeight > clientHeight`, pane 높이 760px 이하와 composer가 pane 안에 계속 보이는 것을 확인했다. desktop conversation-first 수직 흐름과 390×844 Builder/Helper tab 회귀도 함께 통과했다.
+- **검토한 대안:** 전체 페이지 스크롤 유지, transcript 고정 pixel 높이, 메시지 virtualization을 즉시 도입.
+- **tradeoff:** 작은 화면에서 transcript가 짧아질 수 있으나 composer와 판단 UI가 계속 보이고, virtualization 없이도 현재 대화 규모의 레이아웃 성장을 차단한다.

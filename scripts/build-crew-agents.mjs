@@ -7,7 +7,7 @@ const sourcePath = join(workspaceRoot, 'docs', 'agent-prompts', 'discovery.md')
 const builderSourcePath = join(workspaceRoot, 'docs', 'agent-prompts', 'builder.md')
 const helperSourcePath = join(workspaceRoot, 'docs', 'agent-prompts', 'helper.md')
 const agentsDirectory = join(workspaceRoot, 'agents')
-const expectedVersion = '1.1.9'
+const expectedVersion = '1.2.0'
 const discoveryModel = process.env.VIBE_HELPER_DISCOVERY_MODEL ?? 'claude-haiku-4.5'
 const specModel = process.env.VIBE_HELPER_SPEC_MODEL ?? discoveryModel
 for (const model of [discoveryModel, specModel]) {

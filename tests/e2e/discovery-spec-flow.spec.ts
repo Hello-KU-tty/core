@@ -38,7 +38,7 @@ async function executeBackend(
 }
 
 async function executeUi(request: APIRequestContext, input: Readonly<Record<string, unknown>>) {
-  return executeBackend(request, applicationPath, { ...input, clientProtocolVersion: 5 })
+  return executeBackend(request, applicationPath, { ...input, clientProtocolVersion: 6 })
 }
 
 async function executeDiscoveryAgent(
@@ -303,16 +303,20 @@ async function submitCandidatePreviews(
 async function submitCandidateEnrichment(
   request: APIRequestContext,
   snapshot: ProjectSessionSnapshot,
-  batch: 'FIRST' | 'SECOND',
+  batch: 'FIRST' | 'SECOND' | 'SELECTED',
+  selectedCandidateIds: readonly string[] = [],
 ): Promise<void> {
   const session = snapshot.discoverySession
   const previewRound = snapshot.discoveryContext?.previewRound
   if (session === null || previewRound === null || previewRound === undefined) {
     throw new TypeError('Candidate preview context is missing')
   }
-  const previews = previewRound.previews.filter((preview) =>
-    batch === 'FIRST' ? preview.position <= 5 : preview.position > 5,
-  )
+  const selectedCandidateIdSet = new Set(selectedCandidateIds)
+  const previews = previewRound.previews.filter((preview) => {
+    if (batch === 'FIRST') return preview.position <= 5
+    if (batch === 'SECOND') return preview.position > 5
+    return selectedCandidateIdSet.has(preview.candidateId)
+  })
   const now = new Date().toISOString()
   const response = await executeDiscoveryAgent(request, {
     schemaVersion: 1,
@@ -453,7 +457,9 @@ async function fulfillAgentTurn(
     ? 'enrich-first'
     : slot.includes('-enrich-second-')
       ? 'enrich-second'
-      : agentPhase
+      : slot.includes('-enrich-selected-')
+        ? 'enrich-selected'
+        : agentPhase
   expect(dispatch.slot).toBe(
     `vibe-helper-discovery-${slotPhase}-${snapshot.discoverySession.id}-${snapshot.discoverySession.revision}`,
   )
@@ -462,10 +468,16 @@ async function fulfillAgentTurn(
   } else if (agentPhase === 'preview') {
     await submitCandidatePreviews(request, snapshot)
   } else if (agentPhase === 'enrichment') {
+    const selectedCandidateId = snapshot.discoveryContext?.previewRound?.previews[0]?.candidateId
     await submitCandidateEnrichment(
       request,
       snapshot,
-      slotPhase === 'enrich-first' ? 'FIRST' : 'SECOND',
+      slotPhase === 'enrich-first'
+        ? 'FIRST'
+        : slotPhase === 'enrich-second'
+          ? 'SECOND'
+          : 'SELECTED',
+      selectedCandidateId === undefined ? [] : [selectedCandidateId],
     )
   } else {
     await submitCandidateRound(request, snapshot)
@@ -788,6 +800,10 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
           'assistant',
           [
             'parser 흐름을 만들고 실제 Decision이 필요한 지점까지 진행했습니다.',
+            ...Array.from(
+              { length: 24 },
+              (_, index) => `진행 로그 ${String(index + 1)}: parser 경계를 검증했습니다.`,
+            ),
             '```diff',
             '--- a/src/parser.ts',
             '+++ b/src/parser.ts',
@@ -1002,6 +1018,27 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
   await expect(page.locator('.helper-pane')).toBeVisible()
   await expect(page.getByRole('log', { name: 'Builder transcript' })).toBeVisible()
   await expect(page.getByLabel('Builder message')).toBeVisible()
+  const builderScrollMetrics = await page.evaluate(() => {
+    const pane = document.querySelector<HTMLElement>('.builder-pane')
+    const transcript = pane?.querySelector<HTMLElement>('.native-message-list')
+    const composer = pane?.querySelector<HTMLElement>('.native-chat-composer')
+    const paneRect = pane?.getBoundingClientRect()
+    const composerRect = composer?.getBoundingClientRect()
+    return {
+      paneHeight: paneRect?.height ?? Number.POSITIVE_INFINITY,
+      transcriptClientHeight: transcript?.clientHeight ?? Number.POSITIVE_INFINITY,
+      transcriptScrollHeight: transcript?.scrollHeight ?? 0,
+      composerInsidePane:
+        paneRect !== undefined && composerRect !== undefined
+          ? composerRect.bottom <= paneRect.bottom + 1
+          : false,
+    }
+  })
+  expect(builderScrollMetrics.paneHeight).toBeLessThanOrEqual(760)
+  expect(builderScrollMetrics.transcriptScrollHeight).toBeGreaterThan(
+    builderScrollMetrics.transcriptClientHeight,
+  )
+  expect(builderScrollMetrics.composerInsidePane).toBe(true)
   await expect(page.locator('[data-native-diff]')).toBeVisible()
   await expect(page.locator('body')).not.toContainText('[OPTIONS:')
   await page.setViewportSize({ width: 390, height: 844 })
@@ -1122,8 +1159,8 @@ test('shows durable previews and keeps the basket usable while fixed Candidate d
   await previewCheckbox.click()
   await expect(previewCheckbox).toBeChecked()
   await expect(page.getByText('1개 담음')).toBeVisible()
-  await expect(page.getByLabel('Agent에게 원하는 방향 말하기')).toBeDisabled()
-  await expect(page.getByRole('button', { name: '이 방향 선택' })).toHaveCount(0)
+  await expect(page.getByLabel('Agent에게 원하는 방향 말하기')).toBeEnabled()
+  await expect(page.getByRole('button', { name: '이 방향 선택' }).first()).toBeEnabled()
 
   await expect(page.getByRole('heading', { name: '상세 5/10 준비됨' })).toBeVisible()
   const firstCandidate = page
@@ -1137,6 +1174,63 @@ test('shows durable previews and keeps the basket usable while fixed Candidate d
   await expect(firstCandidate.getByText('세부 범위와 변경 이력', { exact: true })).toBeVisible()
   await expect(firstCandidate.locator('details')).toHaveAttribute('open', '')
   await expect(page.getByRole('button', { name: '이 방향 선택' }).first()).toBeEnabled()
+})
+
+test('selects a preview immediately by enriching only that direction', async ({
+  page,
+  request,
+}) => {
+  await page.route('**/api/chat', async (route) => {
+    const dispatch = route.request().postDataJSON()
+    const projectId = projectIdFromRoute(route)
+    if (dispatch.agent !== 'vibe-helper-discovery-enrichment') {
+      await fulfillAgentTurn(route, request, projectId)
+      return
+    }
+    const slot = String(dispatch.slot)
+    if (slot.includes('-enrich-selected-')) {
+      const snapshot = await restoreProject(request, projectId)
+      const selectedCandidateId = snapshot.discoveryContext?.previewRound?.previews[0]?.candidateId
+      if (selectedCandidateId === undefined) throw new TypeError('Selected preview is missing')
+      await submitCandidateEnrichment(request, snapshot, 'SELECTED', [selectedCandidateId])
+    } else {
+      await new Promise<void>((resolve) => setTimeout(resolve, 1_200))
+      const snapshot = await restoreProject(request, projectId)
+      if (
+        snapshot.discoverySession?.status === 'ACTIVE' &&
+        (snapshot.discoveryContext?.rounds.length ?? 0) === 0
+      ) {
+        await submitCandidateEnrichment(
+          request,
+          snapshot,
+          slot.includes('-enrich-first-') ? 'FIRST' : 'SECOND',
+        )
+      }
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/event-stream',
+      body: 'data: {"type":"done"}\n\n',
+    })
+  })
+
+  await page.goto('/#/discovery')
+  await startFromKeyboard(page)
+  await expect(page.getByRole('heading', { name: '상세 0/10 준비됨' })).toBeVisible()
+  const firstPreview = page.getByRole('listitem').filter({
+    has: page.getByRole('heading', { name: 'Safe Config Lab', exact: true }),
+  })
+  await firstPreview.getByRole('button', { name: '이 방향 선택' }).click()
+  await expect(
+    page.getByRole('heading', { name: '이 범위라면 바로 시작할 수 있어요.' }),
+  ).toBeVisible()
+
+  const projectId = projectIdFromUrl(page.url())
+  const selected = await restoreProject(request, projectId)
+  expect(selected.discoverySession?.status).toBe('SELECTED')
+  expect(selected.discoveryContext?.candidateEnrichments.length ?? 10).toBeLessThan(10)
+  expect(selected.discoveryContext?.rounds[0]?.candidates).toHaveLength(1)
+  expect(selected.selectedCandidate?.title).toBe('Safe Config Lab')
 })
 
 test('distinguishes a Crew host disconnect from saved Core state and retries safely', async ({
@@ -1182,18 +1276,18 @@ test('starts a new Discovery only after the user edits or confirms the restored 
   await expect(
     page.getByRole('heading', { name: '이 범위라면 바로 시작할 수 있어요.' }),
   ).toBeVisible()
-  expect(agentDispatches).toBe(4)
+  expect(agentDispatches).toBe(3)
 
   await page.getByRole('button', { name: /다른 주제로 돌아가기/ }).click()
   await expect(page.getByText('이전 후보를 그대로 보고 있어요.')).toBeVisible()
-  expect(agentDispatches).toBe(4)
+  expect(agentDispatches).toBe(3)
 
   const nextGoal = 'TypeScript runtime validation으로 로컬 CSV 검사기 만들기'
   await page.getByLabel(/무엇을 배우고 싶나요/).fill(nextGoal)
   await page.getByRole('button', { name: '새 후보 받기' }).click()
   await expect(page.getByRole('heading', { name: nextGoal, exact: true })).toBeVisible()
   await expect(page.getByText('10개 후보')).toBeVisible()
-  expect(agentDispatches).toBe(7)
+  expect(agentDispatches).toBe(6)
 
   const projectMatch = page.url().match(/project=(project_[0-9a-f-]{36})/)
   expect(projectMatch?.[1]).toBeDefined()
@@ -1329,7 +1423,7 @@ test('retries one Spec refinement when the first response skips its submit tool'
   let agentDispatches = 0
   await page.route('**/api/chat', async (route) => {
     agentDispatches += 1
-    if (agentDispatches !== 5) {
+    if (agentDispatches !== 4) {
       await fulfillAgentTurn(route, request, projectIdFromRoute(route))
       return
     }
@@ -1355,7 +1449,7 @@ test('retries one Spec refinement when the first response skips its submit tool'
   await page.getByRole('button', { name: 'Agent에게 다시 정리해달라고 하기' }).click()
 
   await expect(page.getByText('권장 Learning Spec · revision 2')).toBeVisible()
-  expect(agentDispatches).toBe(6)
+  expect(agentDispatches).toBe(5)
 })
 
 test('shows a refresh instruction when the backend rejects a stale UI protocol', async ({

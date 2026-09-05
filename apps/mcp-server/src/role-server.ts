@@ -30,6 +30,7 @@ import {
   discoveryContextSchema,
   discoveryGetContextQuerySchema,
   discoverySubmitCandidateEnrichmentsCommandSchema,
+  discoverySubmitCandidateEnrichmentsToolInputBaseSchema,
   discoverySubmitCandidateEnrichmentsToolInputSchema,
   discoverySubmitCandidateMergeToolInputSchema,
   discoverySubmitCandidatePreviewsCommandSchema,
@@ -72,9 +73,9 @@ const discoverySubmitCandidatePreviewsTransportInputSchema =
     ]),
   })
 const discoverySubmitCandidateEnrichmentsTransportInputSchema =
-  discoverySubmitCandidateEnrichmentsToolInputSchema.omit({ candidates: true }).extend({
+  discoverySubmitCandidateEnrichmentsToolInputBaseSchema.omit({ candidates: true }).extend({
     candidates: z.union([
-      z.array(candidateEnrichmentDraftSchema).length(5),
+      z.array(candidateEnrichmentDraftSchema).min(1).max(10),
       z
         .string()
         .max(MAX_STRINGIFIED_CANDIDATES_BYTES)
@@ -114,7 +115,7 @@ export const ROLE_TOOL_CATALOG: Readonly<Record<AgentRole, readonly RoleToolDefi
       name: 'submit_candidate_enrichments',
       title: 'Submit Candidate enrichments',
       description:
-        'Complete exactly one assigned batch of five fixed Candidate preview identities.',
+        'Complete one assigned fixed Candidate preview batch or only the previews selected by the user.',
       inputSchema: discoverySubmitCandidateEnrichmentsTransportInputSchema,
       readOnly: false,
     },

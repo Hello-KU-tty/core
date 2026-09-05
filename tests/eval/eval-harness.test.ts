@@ -413,7 +413,7 @@ describe('T15 Discovery Agent Spec persistence recovery', () => {
       readonly containsPersonalData: boolean
     }
 
-    expect(prompt).toContain('Prompt version: `1.1.9`')
+    expect(prompt).toContain('Prompt version: `1.2.0`')
     expect(prompt).toContain('확인 질문이나 설명으로 끝내지 마라')
     expect(performance).toMatchObject({
       promptVersion: '1.1.6',
@@ -499,7 +499,7 @@ describe('T15 first-Candidate performance alternatives', () => {
   })
 })
 
-describe('T15 Discovery Agent v1.1.9 compact preview enrichment', () => {
+describe('T15 Discovery Agent v1.1.9 historical compact preview enrichment', () => {
   it('fixes ten preview identities before two recoverable enrichment batches', async () => {
     const prompt = await readFile(
       path.join(workspaceRoot, 'docs/agent-prompts/discovery.md'),
@@ -516,11 +516,11 @@ describe('T15 Discovery Agent v1.1.9 compact preview enrichment', () => {
       readonly containsPersonalData: boolean
     }
 
-    expect(prompt).toContain('Prompt version: `1.1.9`')
+    expect(prompt).toContain('Prompt version: `1.2.0`')
     expect(prompt).toContain('lightweight preview를 정확히 10개')
     expect(prompt).toContain('summary·coreInteraction·technologyNecessity는 각각 45자')
     expect(prompt).toContain('가장 잘 맞는 하나만 사용')
-    expect(prompt).toContain('Candidate identity 정확히 5개만 완성')
+    expect(prompt).toContain('`SELECTED`는 사용자가 지금 선택하거나 수정 대상으로 참조한')
     expect(prompt).toContain('글자 하나도 바꾸지 말고 그대로 복사')
     expect(prompt).toContain('coreConcepts` 정확히 2개')
     expect(prompt).toContain('각각 정확히 1개')
@@ -535,6 +535,53 @@ describe('T15 Discovery Agent v1.1.9 compact preview enrichment', () => {
       { name: 'SECOND', positions: [6, 7, 8, 9, 10] },
     ])
     expect(Object.values(performance.automatedVerification).every(Boolean)).toBe(true)
+  })
+})
+
+describe('T15 Discovery Agent v1.2.0 just-in-time selected enrichment', () => {
+  it('enriches and materializes only user-referenced previews before continuing', async () => {
+    const prompt = await readFile(
+      path.join(workspaceRoot, 'docs/agent-prompts/discovery.md'),
+      'utf8',
+    )
+    const fixture = (await loadInput(
+      'tests/eval/fixtures/prompt-regressions/discovery-v1.2.0-jit-selection.json',
+    )) as {
+      readonly promptVersion: string
+      readonly requestedBatch: string
+      readonly requestedPreviewPositions: number[]
+      readonly materializedCandidatePositions: number[]
+      readonly waitsForRemainingBackground: boolean
+      readonly provenance: Readonly<Record<string, string>>
+      readonly automatedVerification: Readonly<Record<string, boolean>>
+      readonly targetMeasurement: {
+        readonly status: string
+        readonly selectedCandidateCount: number
+        readonly candidateEnrichmentCount: number
+        readonly projectStatus: string
+      }
+      readonly containsPersonalData: boolean
+    }
+
+    expect(prompt).toContain('Prompt version: `1.2.0`')
+    expect(prompt).toContain('`SELECTED`')
+    expect(prompt).toContain('`requestedPreviews`에 있는 수만큼만 완성')
+    expect(fixture).toMatchObject({
+      promptVersion: '1.2.0',
+      requestedBatch: 'SELECTED',
+      requestedPreviewPositions: [3, 8],
+      materializedCandidatePositions: [3, 8],
+      waitsForRemainingBackground: false,
+      provenance: { candidateMeaning: 'AGENT', selectionFeedback: 'USER' },
+      targetMeasurement: {
+        status: 'PASSED',
+        selectedCandidateCount: 1,
+        candidateEnrichmentCount: 1,
+        projectStatus: 'SPEC_REVIEW',
+      },
+      containsPersonalData: false,
+    })
+    expect(Object.values(fixture.automatedVerification).every(Boolean)).toBe(true)
   })
 })
 

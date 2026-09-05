@@ -54,6 +54,7 @@ export type DiscoveryAgentPhase =
   | 'PREVIEW'
   | 'ENRICH_FIRST'
   | 'ENRICH_SECOND'
+  | 'ENRICH_SELECTED'
   | 'ROUND'
   | 'MERGE'
   | 'SPEC'
@@ -97,6 +98,7 @@ function compactCandidate(candidate: ProjectCandidateRevision): Readonly<Record<
 export function createDiscoveryEphemeralContext(
   snapshot: ProjectSessionSnapshot,
   purpose: DiscoveryAgentPhase,
+  selectedCandidateIds: readonly string[] = [],
 ): string {
   const context = snapshot.discoveryContext
   const session = snapshot.discoverySession
@@ -122,14 +124,23 @@ export function createDiscoveryEphemeralContext(
     }))
   const learningSpec = context.learningSpec
   const previewRound = context.previewRound
+  const selectedCandidateIdSet = new Set(selectedCandidateIds)
   const requestedEnrichmentBatch =
-    purpose === 'ENRICH_FIRST' ? 'FIRST' : purpose === 'ENRICH_SECOND' ? 'SECOND' : null
+    purpose === 'ENRICH_FIRST'
+      ? 'FIRST'
+      : purpose === 'ENRICH_SECOND'
+        ? 'SECOND'
+        : purpose === 'ENRICH_SELECTED'
+          ? 'SELECTED'
+          : null
   const requestedPreviews =
     requestedEnrichmentBatch === null || previewRound === null
       ? []
-      : previewRound.previews.filter((preview) =>
-          requestedEnrichmentBatch === 'FIRST' ? preview.position <= 5 : preview.position > 5,
-        )
+      : previewRound.previews.filter((preview) => {
+          if (requestedEnrichmentBatch === 'FIRST') return preview.position <= 5
+          if (requestedEnrichmentBatch === 'SECOND') return preview.position > 5
+          return selectedCandidateIdSet.has(preview.candidateId)
+        })
   const injectedPreviewRound =
     requestedEnrichmentBatch === null || previewRound === null
       ? previewRound
@@ -426,7 +437,7 @@ export function discoveryRunSlotKey(
 
 function discoveryAgentName(phase: DiscoveryAgentMode): string {
   if (phase === 'PREVIEW') return DISCOVERY_PREVIEW_AGENT_NAME
-  if (phase === 'ENRICH_FIRST' || phase === 'ENRICH_SECOND') {
+  if (phase === 'ENRICH_FIRST' || phase === 'ENRICH_SECOND' || phase === 'ENRICH_SELECTED') {
     return DISCOVERY_ENRICHMENT_AGENT_NAME
   }
   if (phase === 'ROUND') return DISCOVERY_ROUND_AGENT_NAME

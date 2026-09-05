@@ -368,6 +368,7 @@ function CandidatePreviewCard({
   disabled,
   onToggle,
   onExpandedChange,
+  onFeedback,
 }: {
   readonly preview: CandidatePreview
   readonly candidate: ProjectCandidateRevision | null
@@ -376,7 +377,9 @@ function CandidatePreviewCard({
   readonly disabled: boolean
   readonly onToggle: () => void
   readonly onExpandedChange: (expanded: boolean) => void
+  readonly onFeedback: (action: DiscoveryFeedbackAction) => void
 }) {
+  const reference = { candidateId: preview.candidateId, revision: 1 }
   return (
     <li className={`candidate-card${selected ? ' candidate-card-selected' : ''}`}>
       <label className="candidate-check">
@@ -418,42 +421,51 @@ function CandidatePreviewCard({
           핵심 개념과 MVP 범위를 background에서 채우고 있어요.
         </div>
       ) : (
-        <>
-          <div className="candidate-footer">
-            <ul className="concept-chips" aria-label="핵심 개념">
-              {candidate.coreConcepts.map((concept) => (
-                <li key={concept}>{concept}</li>
-              ))}
-            </ul>
-            <span className="candidate-ready-label">선택 준비됨</span>
-          </div>
-          <details
-            className="candidate-details"
-            open={expanded}
-            onToggle={(event) => onExpandedChange(event.currentTarget.open)}
-          >
-            <summary>세부 범위 미리 보기</summary>
-            <div className="candidate-scope">
-              <p>
-                <strong>내가 집중할 것</strong>
-                {candidate.suggestedScope.learnerFocus.join(' · ')}
-              </p>
-              <p>
-                <strong>Agent가 도울 것</strong>
-                {candidate.suggestedScope.agentSupport.join(' · ')}
-              </p>
-              <p>
-                <strong>MVP에서 뺄 것</strong>
-                {candidate.suggestedScope.excluded.join(' · ')}
-              </p>
-            </div>
-            <p className="candidate-technology">
-              <strong>기술이 필요한 이유</strong>
-              {preview.technologyNecessity}
+        <details
+          className="candidate-details"
+          open={expanded}
+          onToggle={(event) => onExpandedChange(event.currentTarget.open)}
+        >
+          <summary>세부 범위 미리 보기</summary>
+          <div className="candidate-scope">
+            <p>
+              <strong>내가 집중할 것</strong>
+              {candidate.suggestedScope.learnerFocus.join(' · ')}
             </p>
-          </details>
-        </>
+            <p>
+              <strong>Agent가 도울 것</strong>
+              {candidate.suggestedScope.agentSupport.join(' · ')}
+            </p>
+            <p>
+              <strong>MVP에서 뺄 것</strong>
+              {candidate.suggestedScope.excluded.join(' · ')}
+            </p>
+          </div>
+          <p className="candidate-technology">
+            <strong>기술이 필요한 이유</strong>
+            {preview.technologyNecessity}
+          </p>
+        </details>
       )}
+      <div className="candidate-footer">
+        {candidate === null ? (
+          <span className="candidate-ready-label">선택하면 이 후보만 먼저 준비해요</span>
+        ) : (
+          <ul className="concept-chips" aria-label="핵심 개념">
+            {candidate.coreConcepts.map((concept) => (
+              <li key={concept}>{concept}</li>
+            ))}
+          </ul>
+        )}
+        <button
+          type="button"
+          className="select-button"
+          disabled={disabled}
+          onClick={() => onFeedback({ intent: 'SELECT', targets: [reference] })}
+        >
+          이 방향 선택
+        </button>
+      </div>
     </li>
   )
 }
@@ -537,9 +549,14 @@ export function DiscoveryWorkspace({
       return candidate === undefined ? [] : [candidate]
     })
   }, [context, latestRound])
-  const selectedTargets = candidates
-    .filter((candidate) => selectedKeys.has(candidateKey(candidateReference(candidate))))
-    .map(candidateReference)
+  const selectedTargets =
+    latestRound === undefined && previewRound !== null
+      ? previewRound.previews
+          .filter((preview) => selectedKeys.has(previewKey(preview)))
+          .map((preview) => ({ candidateId: preview.candidateId, revision: 1 }))
+      : candidates
+          .filter((candidate) => selectedKeys.has(candidateKey(candidateReference(candidate))))
+          .map(candidateReference)
   const enrichedPreviewCandidates = new Map(
     context?.candidateEnrichments.map((enrichment) => [
       enrichment.candidate.id,
@@ -562,6 +579,7 @@ export function DiscoveryWorkspace({
     run.status === 'RUNNING' ||
     run.status === 'BACKGROUND'
   const previewToggleDisabled = selectedArchive || busy
+  const interactionInactive = latestRound === undefined ? previewToggleDisabled : inactive
   const enrichmentActive =
     run.status === 'DISPATCHING' || run.status === 'RUNNING' || run.status === 'BACKGROUND'
   const legacyFallbackDisabled = run.status === 'DISPATCHING' || run.status === 'RUNNING'
@@ -569,7 +587,12 @@ export function DiscoveryWorkspace({
   const submitFreeFeedback = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault()
     const trimmed = message.trim()
-    if (trimmed.length === 0 || inactive) return
+    if (
+      trimmed.length === 0 ||
+      interactionInactive ||
+      (latestRound === undefined && selectedTargets.length === 0)
+    )
+      return
     const action: DiscoveryFeedbackAction =
       selectedTargets.length === 0
         ? { intent: 'REGENERATE', targets: [], message: trimmed }
@@ -651,7 +674,7 @@ export function DiscoveryWorkspace({
                   <h3 id="refinement-title">관심 주제를 담고, 생각을 더해보세요.</h3>
                   <p>
                     {latestRound === undefined
-                      ? '아래 미리보기에서 끌리는 방향을 먼저 담아두세요. 상세가 모두 준비되면 이곳에서 바로 좁히거나 합칠 수 있어요.'
+                      ? '아래 미리보기에서 끌리는 방향을 담아두세요. 전체 상세를 기다리지 않고 고른 방향만 바로 좁히거나 합칠 수 있어요.'
                       : '아래 목록에서 고른 뒤 이곳으로 돌아오세요. 요청하면 담은 방향만 다듬거나 합치고, 담지 않은 후보는 현재 목록에서 빠져요. 기록은 그대로 남습니다.'}
                   </p>
                 </div>
@@ -659,7 +682,11 @@ export function DiscoveryWorkspace({
               </div>
               <div className="selection-basket" aria-live="polite">
                 {selectedBasketItems.length === 0 ? (
-                  <p>아직 담은 주제가 없어요. 주제를 담지 않고 새 방향을 요청해도 됩니다.</p>
+                  <p>
+                    {latestRound === undefined
+                      ? '아직 담은 주제가 없어요. 먼저 하나를 담으면 전체 상세를 기다리지 않고 Agent에게 요청할 수 있어요.'
+                      : '아직 담은 주제가 없어요. 주제를 담지 않고 새 방향을 요청해도 됩니다.'}
+                  </p>
                 ) : (
                   <ul aria-label="관심 목록에 담은 주제">
                     {selectedBasketItems.map((item) => {
@@ -697,7 +724,7 @@ export function DiscoveryWorkspace({
                     }
                     maxLength={4_000}
                     rows={4}
-                    disabled={inactive || latestRound === undefined}
+                    disabled={interactionInactive}
                   />
                 </label>
                 <div className="refinement-actions">
@@ -718,13 +745,19 @@ export function DiscoveryWorkspace({
                   <button
                     type="submit"
                     className="primary-button"
-                    disabled={inactive || latestRound === undefined || message.trim().length === 0}
+                    disabled={
+                      interactionInactive ||
+                      message.trim().length === 0 ||
+                      (latestRound === undefined && selectedTargets.length === 0)
+                    }
                   >
-                    {selectedTargets.length === 0
-                      ? '새 방향 요청'
-                      : selectedTargets.length === 1
-                        ? '이 주제로 좁히기'
-                        : '선택한 주제로 합치기'}
+                    {latestRound === undefined && selectedTargets.length === 0
+                      ? '먼저 관심 주제를 담아주세요'
+                      : selectedTargets.length === 0
+                        ? '새 방향 요청'
+                        : selectedTargets.length === 1
+                          ? '이 주제로 좁히기'
+                          : '선택한 주제로 합치기'}
                   </button>
                 </div>
               </form>
@@ -739,7 +772,8 @@ export function DiscoveryWorkspace({
                 </h3>
                 <p>
                   제목과 핵심 방향은 이미 안전하게 저장됐어요. 준비된 상세는 바로 펼쳐볼 수 있고,
-                  나머지는 같은 후보 ID에만 추가됩니다.
+                  지금 선택하면 그 후보만 먼저 준비해 진행합니다. 나머지는 같은 후보 ID에만
+                  추가됩니다.
                 </p>
               </div>
               <div className="enrichment-actions">
@@ -787,6 +821,7 @@ export function DiscoveryWorkspace({
                         })
                       }
                       onExpandedChange={(expanded) => setCandidateExpanded(key, expanded)}
+                      onFeedback={(action) => void onFeedback(action)}
                     />
                   )
                 })

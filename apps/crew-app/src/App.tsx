@@ -774,6 +774,109 @@ export function VibeHelperApp({
     [performAgentRequest],
   )
 
+  const enrichSelectedPreviews = useCallback(
+    async (projectId: string, candidateIds: readonly string[]): Promise<ProjectSessionSnapshot> => {
+      const runSequence = agentRunSequence.current + 1
+      agentRunSequence.current = runSequence
+      let current = await coreClient.restoreProjectSession(correlationId(), projectId)
+      const context = current.discoveryContext
+      const session = current.discoverySession
+      const previewRound = context?.previewRound ?? null
+      if ((context?.rounds.length ?? 0) > 0) return current
+      if (context === null || context === undefined || session === null || previewRound === null) {
+        throw new CrewAppClientError(
+          'CONTRACT',
+          'CANDIDATE_PREVIEW_MISSING',
+          '선택한 Candidate preview를 Core에서 찾을 수 없습니다.',
+        )
+      }
+      const requestedIds = new Set(candidateIds)
+      const previewIds = new Set(previewRound.previews.map((preview) => preview.candidateId))
+      if (
+        requestedIds.size === 0 ||
+        requestedIds.size !== candidateIds.length ||
+        [...requestedIds].some((candidateId) => !previewIds.has(candidateId))
+      ) {
+        throw new CrewAppClientError(
+          'CONTRACT',
+          'CANDIDATE_PREVIEW_SELECTION_INVALID',
+          '현재 화면에 있는 Candidate preview만 선택할 수 있습니다.',
+        )
+      }
+      const storedIds = new Set(
+        context.candidateEnrichments.map((enrichment) => enrichment.candidate.id),
+      )
+      const missingIds = [...requestedIds].filter((candidateId) => !storedIds.has(candidateId))
+      if (missingIds.length === 0) return current
+
+      const startedAt = Date.now()
+      setAgentRun({
+        status: 'DISPATCHING',
+        startedAt,
+        detail: `고른 ${String(missingIds.length)}개 방향만 먼저 준비하고 있습니다. 나머지 background 상세는 기다리지 않아요.`,
+        retry: null,
+      })
+      const receipt = await discoveryClient.dispatch(
+        session.id,
+        session.revision,
+        `사용자가 지금 참조한 Candidate preview ${String(missingIds.length)}개만 상세화해 주세요. previewRoundId=${previewRound.id}, batch=SELECTED. Candidate ID와 preview의 의미 필드는 그대로 복사하고 requestedPreviews만 submit_candidate_enrichments로 제출하세요.\n\nCore tool identifiers: schemaVersion=1, projectId=${projectId}, discoverySessionId=${session.id}, correlationId=${session.correlationId}, expectedSessionRevision=${session.revision}, idempotencyKey=${entityId('idem')}.`,
+        createDiscoveryEphemeralContext(current, 'ENRICH_SELECTED', missingIds),
+        'ENRICH_SELECTED',
+      )
+      setAgentRun({
+        status: 'RUNNING',
+        startedAt,
+        detail: `고른 방향 ${String(missingIds.length)}개의 핵심 개념과 MVP 범위만 채우고 있어요.`,
+        retry: null,
+      })
+      const terminal: {
+        outcome: 'DONE' | 'TOOL_VALIDATION_FAILED' | 'STREAM_FAILED' | null
+        observedAt: number
+      } = { outcome: null, observedAt: 0 }
+      void receipt.completion.then((outcome) => {
+        terminal.outcome = outcome
+        terminal.observedAt = Date.now()
+      })
+      const deadline = startedAt + TARGET_DISCOVERY_TIMEOUT_MS
+      while (Date.now() < deadline && agentRunSequence.current === runSequence) {
+        await delay(900)
+        current = await coreClient.restoreProjectSession(correlationId(), projectId)
+        setSnapshot(current)
+        if ((current.discoveryContext?.rounds.length ?? 0) > 0) {
+          setAgentRun(idleAgentRun)
+          return current
+        }
+        const currentStoredIds = new Set(
+          current.discoveryContext?.candidateEnrichments.map(
+            (enrichment) => enrichment.candidate.id,
+          ) ?? [],
+        )
+        if ([...requestedIds].every((candidateId) => currentStoredIds.has(candidateId))) {
+          setAgentRun(idleAgentRun)
+          return current
+        }
+        if (
+          terminal.outcome !== null &&
+          Date.now() >= terminal.observedAt + TARGET_DISCOVERY_COMPLETION_GRACE_MS
+        ) {
+          throw new CrewAppClientError(
+            'OPERATION',
+            'SELECTED_ENRICHMENT_NOT_STORED',
+            terminal.outcome === 'TOOL_VALIDATION_FAILED'
+              ? '고른 방향의 상세 형식이 Core에서 거절됐습니다. 저장된 미리보기는 유지됩니다.'
+              : 'Agent 응답이 끝났지만 고른 방향의 상세가 Core에 저장되지 않았습니다.',
+          )
+        }
+      }
+      throw new CrewAppClientError(
+        'OPERATION',
+        'SELECTED_ENRICHMENT_TIMED_OUT',
+        '고른 방향의 상세 저장을 확인하지 못했습니다. 미리보기는 유지되며 다시 시도할 수 있어요.',
+      )
+    },
+    [coreClient, discoveryClient],
+  )
+
   const generatePreviewCandidates = useCallback(
     async (projectId: string): Promise<void> => {
       await performAgentRequest({
@@ -822,17 +925,31 @@ export function VibeHelperApp({
   }
 
   const recordDiscoveryFeedback = async (action: DiscoveryFeedbackAction): Promise<void> => {
-    const session = snapshot?.discoverySession
-    const round = snapshot?.discoveryContext?.rounds.at(-1)
-    if (snapshot === null || session === null || session === undefined || round === undefined) {
-      setActionError('현재 Candidate Round를 복원한 뒤 다시 시도해 주세요.')
+    if (snapshot === null) {
+      setActionError('현재 Discovery 상태를 복원한 뒤 다시 시도해 주세요.')
       return
     }
     setOperationBusy(true)
     setActionError(null)
-    const baselineRound = snapshot.discoveryContext?.rounds.length ?? 0
-    const baselineSpec = snapshot.discoveryContext?.learningSpec?.revision ?? 0
     try {
+      let prepared = snapshot
+      if (prepared.discoveryContext?.rounds.at(-1) === undefined) {
+        prepared = await enrichSelectedPreviews(
+          prepared.project.id,
+          action.targets.map((target) => target.candidateId),
+        )
+      }
+      const session = prepared.discoverySession
+      const roundId =
+        prepared.discoveryContext?.rounds.at(-1)?.id ??
+        prepared.discoveryContext?.previewRound?.finalRoundId
+      if (session === null || session === undefined || roundId === undefined) {
+        throw new CrewAppClientError(
+          'CONTRACT',
+          'DISCOVERY_FEEDBACK_CONTEXT_MISSING',
+          '현재 Candidate 상태를 Core에서 복원하지 못했습니다.',
+        )
+      }
       await coreClient.recordDiscoveryFeedback({
         schemaVersion: 1,
         kind: 'UI_RECORD_DISCOVERY_FEEDBACK',
@@ -844,7 +961,7 @@ export function VibeHelperApp({
           schemaVersion: 1,
           id: entityId('feedback'),
           discoverySessionId: session.id,
-          roundId: round.id,
+          roundId,
           correlationId: session.correlationId,
           intent: action.intent,
           targets: [...action.targets],
@@ -854,22 +971,28 @@ export function VibeHelperApp({
           redactionStatus: 'NOT_REQUIRED',
         },
       })
-      const next = await coreClient.restoreProjectSession(correlationId(), snapshot.project.id)
+      const next = await coreClient.restoreProjectSession(correlationId(), prepared.project.id)
       setSnapshot(next)
       if (action.intent === 'SELECT') {
-        window.location.hash = href('spec', snapshot.project.id).slice(1)
+        window.location.hash = href('spec', prepared.project.id).slice(1)
         await performAgentRequest({
-          projectId: snapshot.project.id,
+          projectId: prepared.project.id,
           message:
             '사용자가 UI에서 후보를 선택했습니다. 제공된 최신 Core context를 사용하고 설명보다 먼저 submit_learning_spec을 호출해 낮은 부담의 권장 Learning Spec 초안을 저장해 주세요.',
-          expectation: { kind: 'SPEC', baseline: baselineSpec },
+          expectation: {
+            kind: 'SPEC',
+            baseline: next.discoveryContext?.learningSpec?.revision ?? 0,
+          },
         })
       } else {
         await performAgentRequest({
-          projectId: snapshot.project.id,
+          projectId: prepared.project.id,
           message:
             '제공된 최신 Core context의 user-authored Discovery Feedback을 모두 반영해 다음 Candidate Round를 제출해 주세요.',
-          expectation: { kind: 'ROUND', baseline: baselineRound },
+          expectation: {
+            kind: 'ROUND',
+            baseline: next.discoveryContext?.rounds.length ?? 0,
+          },
         })
       }
     } catch (error) {

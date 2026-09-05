@@ -127,7 +127,7 @@ Concept Ledger + Project History
 - `FR-DIS-016`: Candidate refinement 자유 입력은 목록보다 먼저 보여야 하며 선택된 후보의 제목과 개수를 입력 옆에서 확인할 수 있어야 한다.
 - `FR-DIS-017`: preview identity가 저장된 뒤 enrichment Agent는 새 후보를 발명하거나 제목·핵심 방향을 바꾸지 않고 지정된 preview만 완성해야 한다. 모든 preview가 완성될 때 기존 ProjectCandidate revision과 Candidate Round를 한 transaction에서 materialize해야 한다.
 - `FR-DIS-018`: preview와 enrichment는 독립적인 idempotency 경계를 가져야 한다. 실패 시 저장된 preview와 성공한 enrichment를 보존하고 누락된 batch만 재시도하며, 사용자는 같은 Session revision에서 기존 atomic Candidate Round 생성으로 전환할 수 있어야 한다. 늦게 도착한 staged 결과는 이미 생성된 Round를 덮어쓰지 않아야 한다.
-- `FR-DIS-019`: preview는 상세 보강 중에도 checkbox 관심 목록에 담을 수 있지만, SELECT·refinement와 Spec 생성은 참조하는 Candidate가 complete revision으로 materialize된 뒤에만 허용해야 한다.
+- `FR-DIS-019`: preview는 상세 보강 중에도 checkbox 관심 목록에 담고 SELECT·refinement에 사용할 수 있어야 한다. complete Round가 없으면 참조한 preview identity만 just-in-time 보강·materialize하고 나머지 background 완료를 기다리지 않아야 한다.
 - `FR-DIS-020`: background enrichment가 complete Round를 materialize해 preview 표현을 완성 Candidate 표현으로 교체해도 동일 Candidate ID의 checkbox와 펼친 상세 상태를 유지해야 한다.
 
 완료 관찰:
@@ -254,6 +254,7 @@ Concept Ledger + Project History
 - `FR-UI-008`: Core 식별자와 transport 지시는 visible user message에 합치지 않고 ephemeral slot context로 전달해야 한다. Helper 화면은 전체 redaction된 응답을 보여주고 durable Evidence/Event에는 별도의 bounded summary만 저장해야 한다.
 - `FR-UI-009`: `[OPTIONS: ...]`, Markdown fence와 diff source marker를 평문으로 노출하지 않고 host renderer가 suggestion, Markdown과 diff UI로 해석해야 한다.
 - `FR-UI-010`: 실행 중 Agent turn은 해당 Builder 또는 Helper session composer에서 중지할 수 있어야 하며 transport stop payload를 raw JSON으로 노출하지 않아야 한다.
+- `FR-UI-011`: Builder와 Helper transcript는 viewport에 맞춘 pane 내부에서 독립적으로 스크롤되고, 긴 대화가 전체 페이지 높이를 계속 늘리지 않아야 한다.
 
 ## 6. 비기능 요구사항
 
@@ -269,7 +270,7 @@ Concept Ledger + Project History
 - `NFR-PERF-008`: 사용자와 직접 상호작용하는 Discovery 첫 durable Candidate preview, 단일 refinement와 Spec 초안은 target 환경에서 각각 30초 이내를 목표로 하고, 첫 유용 반응은 3~5초를 지향한다. T15 release gate는 최종 설치본의 대표 end-to-end 실행 한 번에서 10개 preview 저장, refinement와 Spec 구간이 모두 30초 이내이고 background enrichment가 complete Round로 수렴하며 사용자가 결과를 승인하는 것으로 판정한다. 장기 P95 표본은 T21에서 수집한다. provider/model/config별 latency를 같은 unseen 입력으로 비교하며 30초가 지나면 작업은 백그라운드에서 이어지되 사용자가 저장된 결과를 보거나 다른 화면으로 이동하는 것을 막지 않아야 한다.
 - `NFR-PERF-009`: Agent tool input의 구조적 형식 오류는 transport 경계에서 안전하게 정규화하거나 즉시 표시하고, 같은 의미 내용을 모델이 다시 생성하게 만들지 않아야 한다. tool validation 재시도율의 초기 목표는 1% 미만이다.
 
-T01 macOS probe의 두 실행은 20~37ms에 dispatch가 반환되고 약 12초 안에 결과 validation을 마쳤다. T15 model screen에서는 `auto` 첫 Candidate 41.6초, `claude-haiku-4.5` 22.1초였고 Luna는 contract를 지키지 못했다. Haiku 고정, ephemeral Core context, phase별 최소 prompt/tool과 Core-derived MERGE를 적용한 v1.1.5 target 5회에서 first Candidate·MERGE·first Spec의 nearest-rank P95는 각각 26.564초·21.044초·22.900초였고 15개 phase가 모두 durable 저장에 성공했다. v1.1.6 Spec 수정 재검증에서는 Haiku 정상 수정이 19.256~24.903초였지만 raw 2회 중 1회가 no-tool로 끝나 bounded 1회 UI 복구를 추가했다. SPEC만 Terra는 첫 Spec 43.257초, Auto는 첫 Spec 39.240초·수정 36.027초로 30초 gate를 넘겨 Haiku를 유지한다. 사용자 승인에 따른 대표 MERGE 13.226초, 첫 Spec 18.860초와 Spec 수정 23.097초는 통과했지만 기존 first Candidate는 50.132초였다. single Round 대안은 latency와 durable reliability를 함께 충족하지 못해 staged 경로를 적용했다. v1.1.8 target preview는 21.635초, v1.1.9 최종 preview는 23.241초로 30초 gate를 통과했고 둘 다 identity 10개와 Session revision 1→2를 보존한 complete Round로 수렴했다. v1.1.9의 enrichment 완료는 148.371초로 v1.1.8의 217.934초보다 약 31.9% 짧아졌지만 SELECT·refinement가 그동안 잠기는 것은 MVP의 알려진 제한이다. 3~5초 first-useful과 background 장기 분포는 T21에 남긴다. timeout 뒤 늦은 결과는 현재 Session revision과 staged identity가 일치하지 않으면 버린다.
+T01 macOS probe의 두 실행은 20~37ms에 dispatch가 반환되고 약 12초 안에 결과 validation을 마쳤다. T15 model screen에서는 `auto` 첫 Candidate 41.6초, `claude-haiku-4.5` 22.1초였고 Luna는 contract를 지키지 못했다. Haiku 고정, ephemeral Core context, phase별 최소 prompt/tool과 Core-derived MERGE를 적용한 v1.1.5 target 5회에서 first Candidate·MERGE·first Spec의 nearest-rank P95는 각각 26.564초·21.044초·22.900초였고 15개 phase가 모두 durable 저장에 성공했다. v1.1.6 Spec 수정 재검증에서는 Haiku 정상 수정이 19.256~24.903초였지만 raw 2회 중 1회가 no-tool로 끝나 bounded 1회 UI 복구를 추가했다. SPEC만 Terra는 첫 Spec 43.257초, Auto는 첫 Spec 39.240초·수정 36.027초로 30초 gate를 넘겨 Haiku를 유지한다. 사용자 승인에 따른 대표 MERGE 13.226초, 첫 Spec 18.860초와 Spec 수정 23.097초는 통과했지만 기존 first Candidate는 50.132초였다. single Round 대안은 latency와 durable reliability를 함께 충족하지 못해 staged 경로를 적용했다. v1.1.8 target preview는 21.635초, v1.1.9 최종 preview는 23.241초로 30초 gate를 통과했고 둘 다 identity 10개와 Session revision 1→2를 보존한 complete Round로 수렴했다. v1.1.9의 enrichment 완료는 148.371초로 v1.1.8의 217.934초보다 약 31.9% 짧았다. v1.2.0부터 SELECT·refinement는 참조한 preview만 우선 보강하므로 이 background 완료를 기다리지 않는다. 3~5초 first-useful과 background 장기 분포는 T21에 남긴다. timeout 뒤 늦은 결과는 현재 Session revision과 staged identity가 일치하지 않으면 버린다.
 
 ### 6.2 보안·개인정보
 

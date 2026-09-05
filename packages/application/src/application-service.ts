@@ -742,22 +742,31 @@ export class ApplicationService {
               'Candidate enrichment must reference the staged Preview Round.',
             )
           }
-          const requestedPreviews = previewRound.previews.filter((preview) =>
-            request.batch === 'FIRST' ? preview.position <= 5 : preview.position > 5,
-          )
           const enrichmentsByCandidate = new Map(
             request.enrichments.map((enrichment) => [enrichment.candidate.id, enrichment]),
           )
+          const requestedPreviews = previewRound.previews.filter((preview) => {
+            if (request.batch === 'FIRST') return preview.position <= 5
+            if (request.batch === 'SECOND') return preview.position > 5
+            return enrichmentsByCandidate.has(preview.candidateId)
+          })
+          const expectedSize = request.batch === 'SELECTED' ? request.enrichments.length : 5
           if (
-            enrichmentsByCandidate.size !== 5 ||
+            enrichmentsByCandidate.size !== expectedSize ||
+            requestedPreviews.length !== expectedSize ||
             requestedPreviews.some((preview) => !enrichmentsByCandidate.has(preview.candidateId))
           ) {
             throw this.#validationError(
               request.correlationId,
               'CANDIDATE_ENRICHMENT_BATCH_INVALID',
-              'Candidate enrichment must contain exactly the five identities assigned to its batch.',
+              request.batch === 'SELECTED'
+                ? 'Selected Candidate enrichment must contain only unique identities from the staged Preview Round.'
+                : 'Candidate enrichment must contain exactly the five identities assigned to its batch.',
             )
           }
+          const existingCandidateIds = new Set(
+            scoped.candidateEnrichments.map((enrichment) => enrichment.candidate.id),
+          )
           for (const preview of requestedPreviews) {
             const enrichment = enrichmentsByCandidate.get(preview.candidateId)
             if (enrichment === undefined) continue
@@ -794,7 +803,9 @@ export class ApplicationService {
                 'Candidate enrichment cannot change its preview identity or core meaning.',
               )
             }
-            repository.appendCandidateEnrichment(enrichment)
+            if (!existingCandidateIds.has(candidate.id)) {
+              repository.appendCandidateEnrichment(enrichment)
+            }
           }
 
           const updated = this.#readDiscoveryBySession(
@@ -1183,7 +1194,72 @@ export class ApplicationService {
               'Discovery Feedback can be recorded only for the active Discovery session.',
             )
           }
-          const latestRound = scoped.rounds.at(-1)
+          let latestRound = scoped.rounds.at(-1)
+          let feedbackCandidates = scoped.candidates
+          if (latestRound === undefined) {
+            const previewRound = scoped.previewRound
+            const targetIds = new Set(request.feedback.targets.map((target) => target.candidateId))
+            const enrichmentsByCandidate = new Map(
+              scoped.candidateEnrichments.map((enrichment) => [
+                enrichment.candidate.id,
+                enrichment,
+              ]),
+            )
+            const orderedEnrichments =
+              previewRound === null
+                ? []
+                : previewRound.previews.flatMap((preview) => {
+                    if (!targetIds.has(preview.candidateId)) return []
+                    const enrichment = enrichmentsByCandidate.get(preview.candidateId)
+                    return enrichment === undefined ? [] : [enrichment]
+                  })
+            const canMaterializeReferencedPreviews =
+              previewRound !== null &&
+              request.feedback.roundId === previewRound.finalRoundId &&
+              request.feedback.targets.length > 0 &&
+              targetIds.size === request.feedback.targets.length &&
+              request.feedback.targets.every((target) => target.revision === 1) &&
+              orderedEnrichments.length === targetIds.size
+            if (canMaterializeReferencedPreviews && previewRound !== null) {
+              for (const enrichment of orderedEnrichments) {
+                repository.appendCandidate(enrichment.candidate)
+              }
+              latestRound = {
+                schemaVersion: 1,
+                id: previewRound.finalRoundId,
+                discoverySessionId: scoped.session.id,
+                correlationId: request.correlationId,
+                roundIndex: 1,
+                inputSnapshot: scoped.session.input,
+                appliedFeedbackIds: [],
+                candidates: orderedEnrichments.map((enrichment) => ({
+                  candidateId: enrichment.candidate.id,
+                  revision: enrichment.candidate.revision,
+                })),
+                generationRationale: previewRound.generationRationale,
+                diversityCheck: {
+                  dimensionsReviewed: [
+                    'PROBLEM_DOMAIN',
+                    'TARGET_USER',
+                    'CORE_INTERACTION',
+                    'DATA_SHAPE',
+                    'USER_APPEAL',
+                  ],
+                  modeCollapseDetected: false,
+                  rationale:
+                    'Only the preview identities referenced by the user were enriched before continuing.',
+                },
+                createdAt: request.feedback.createdAt,
+                source: { kind: 'AGENT', role: 'DISCOVERY' },
+                redactionStatus: 'NOT_REQUIRED',
+              }
+              repository.appendCandidateRound(latestRound)
+              feedbackCandidates = [
+                ...scoped.candidates,
+                ...orderedEnrichments.map((enrichment) => enrichment.candidate),
+              ]
+            }
+          }
           if (latestRound === undefined || latestRound.id !== request.feedback.roundId) {
             throw this.#validationError(
               request.correlationId,
@@ -1204,7 +1280,7 @@ export class ApplicationService {
             )
           }
           const latestRevisionByCandidate = new Map<string, number>()
-          for (const candidate of scoped.candidates) {
+          for (const candidate of feedbackCandidates) {
             latestRevisionByCandidate.set(
               candidate.id,
               Math.max(latestRevisionByCandidate.get(candidate.id) ?? 0, candidate.revision),

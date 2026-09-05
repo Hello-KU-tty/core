@@ -174,15 +174,25 @@ export const discoverySubmitCandidatePreviewsCommandSchema = z
     message: 'Candidate Preview Round correlation ID must match its command',
   })
 
-export const discoverySubmitCandidateEnrichmentsCommandSchema = z.strictObject({
-  ...discoveryQueryMetadata,
-  kind: z.literal('DISCOVERY_SUBMIT_CANDIDATE_ENRICHMENTS'),
-  idempotencyKey: idempotencyKeySchema,
-  expectedSessionRevision: expectedRevisionSchema,
-  previewRoundId: candidatePreviewRoundSchema.shape.id,
-  batch: candidateEnrichmentBatchSchema,
-  enrichments: z.array(candidateEnrichmentSchema).length(5),
-})
+export const discoverySubmitCandidateEnrichmentsCommandSchema = z
+  .strictObject({
+    ...discoveryQueryMetadata,
+    kind: z.literal('DISCOVERY_SUBMIT_CANDIDATE_ENRICHMENTS'),
+    idempotencyKey: idempotencyKeySchema,
+    expectedSessionRevision: expectedRevisionSchema,
+    previewRoundId: candidatePreviewRoundSchema.shape.id,
+    batch: candidateEnrichmentBatchSchema,
+    enrichments: z.array(candidateEnrichmentSchema).min(1).max(10),
+  })
+  .superRefine((command, context) => {
+    if (command.batch !== 'SELECTED' && command.enrichments.length !== 5) {
+      context.addIssue({
+        code: 'custom',
+        path: ['enrichments'],
+        message: `${command.batch} enrichment must contain exactly five candidates`,
+      })
+    }
+  })
 
 export const discoverySubmitLearningSpecCommandSchema = z
   .strictObject({

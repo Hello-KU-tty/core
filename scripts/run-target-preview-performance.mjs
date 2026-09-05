@@ -25,6 +25,7 @@ const timeoutMs = Number(process.env.VIBE_HELPER_TARGET_PERF_TIMEOUT_MS ?? 180_0
 if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 30_000 || timeoutMs > 420_000) {
   throw new TypeError('VIBE_HELPER_TARGET_PERF_TIMEOUT_MS must be 30000..420000')
 }
+const selectedOnly = process.env.VIBE_HELPER_TARGET_SELECTED_ONLY === '1'
 
 const cookieName = `mc_token_${gatewayUrl.port || '80'}`
 
@@ -197,6 +198,86 @@ if (
 }
 
 const previewCandidateIds = previewRound.previews.map((preview) => preview.candidateId)
+if (selectedOnly) {
+  const selectedPreview = previewRound.previews[2]
+  if (selectedPreview === undefined) throw new Error('Selected preview fixture is missing')
+  const selectedEnrichmentStartedAt = Date.now()
+  const selectedReceipt = await discoveryClient.dispatch(
+    snapshot.discoverySession.id,
+    snapshot.discoverySession.revision,
+    `사용자가 지금 참조한 Candidate preview 1개만 상세화해 주세요. previewRoundId=${previewRound.id}, batch=SELECTED. Candidate ID와 preview의 의미 필드는 그대로 복사하고 requestedPreviews만 submit_candidate_enrichments로 제출하세요.\n\n${toolIdentifiers(snapshot)}`,
+    createDiscoveryEphemeralContext(snapshot, 'ENRICH_SELECTED', [selectedPreview.candidateId]),
+    'ENRICH_SELECTED',
+  )
+  snapshot = await waitForDurableOrCompleted(
+    projectId,
+    (current) =>
+      current.discoveryContext?.candidateEnrichments.some(
+        (enrichment) => enrichment.candidate.id === selectedPreview.candidateId,
+      ) ?? false,
+    [selectedReceipt.completion],
+  )
+  const selectedEnrichmentDurableAt = Date.now()
+  const activeSession = snapshot.discoverySession
+  if (activeSession === null || activeSession === undefined) {
+    throw new Error('Discovery Session disappeared before selection')
+  }
+  await coreClient.recordDiscoveryFeedback({
+    schemaVersion: 1,
+    kind: 'UI_RECORD_DISCOVERY_FEEDBACK',
+    correlationId: activeSession.correlationId,
+    actor: { kind: 'UI' },
+    idempotencyKey: id('idem'),
+    expectedSessionRevision: activeSession.revision,
+    feedback: {
+      schemaVersion: 1,
+      id: id('feedback'),
+      discoverySessionId: activeSession.id,
+      roundId: previewRound.finalRoundId,
+      correlationId: activeSession.correlationId,
+      intent: 'SELECT',
+      targets: [{ candidateId: selectedPreview.candidateId, revision: 1 }],
+      createdAt: new Date().toISOString(),
+      source: { kind: 'USER' },
+      redactionStatus: 'NOT_REQUIRED',
+    },
+  })
+  snapshot = await restore(projectId)
+  const partialRound = snapshot.discoveryContext?.rounds.at(-1)
+  if (
+    snapshot.discoverySession?.status !== 'SELECTED' ||
+    snapshot.project.status !== 'SPEC_REVIEW' ||
+    snapshot.selectedCandidate?.id !== selectedPreview.candidateId ||
+    partialRound?.candidates.length !== 1 ||
+    partialRound.candidates[0]?.candidateId !== selectedPreview.candidateId
+  ) {
+    throw new Error('Selected preview did not become the only Candidate in a partial Round')
+  }
+  const selectedCompletion = await observedCompletion(selectedReceipt.completion)
+  process.stdout.write(
+    `${JSON.stringify({
+      phase: 'TARGET_JIT_SELECTED_ENRICHMENT_COMPLETE',
+      promptVersion: '1.2.0',
+      model: 'claude-haiku-4.5',
+      previewCount: previewRound.previews.length,
+      selectedCandidateCount: partialRound.candidates.length,
+      candidateEnrichmentCount: snapshot.discoveryContext?.candidateEnrichments.length ?? 0,
+      previewDurableMilliseconds: previewDurableAt - previewStartedAt,
+      selectedEnrichmentMilliseconds: selectedEnrichmentDurableAt - selectedEnrichmentStartedAt,
+      selectionCoreMilliseconds: Date.now() - selectedEnrichmentDurableAt,
+      selectedWithoutRemainingBackground: true,
+      sessionRevision: snapshot.discoverySession.revision,
+      projectStatus: snapshot.project.status,
+      contextInjection: [previewReceipt.contextInjection, selectedReceipt.contextInjection],
+      completionObservedAtDurableState: [
+        await observedCompletion(previewReceipt.completion),
+        selectedCompletion,
+      ],
+      containsPersonalData: false,
+    })}\n`,
+  )
+  process.exit(0)
+}
 const enrichmentStartedAt = Date.now()
 const firstReceipt = await dispatch(
   snapshot,
@@ -247,7 +328,7 @@ const [previewCompletion, firstCompletion, secondCompletion] = await Promise.all
 
 const result = {
   phase: 'TARGET_PREVIEW_ENRICHMENT_COMPLETE',
-  promptVersion: '1.1.9',
+  promptVersion: '1.2.0',
   model: 'claude-haiku-4.5',
   previewCount: previewRound.previews.length,
   completeCandidateCount: finalRound.candidates.length,

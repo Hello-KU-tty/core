@@ -1872,8 +1872,10 @@ h4 {
 
 .agent-pane {
   display: flex;
+  height: clamp(560px, calc(100svh - 190px), 760px);
+  max-height: 760px;
   min-width: 0;
-  min-height: 680px;
+  min-height: 0;
   overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: 16px;
@@ -1923,7 +1925,7 @@ h4 {
 .native-chat-frame {
   display: flex;
   min-width: 0;
-  min-height: 360px;
+  min-height: 0;
   overflow: hidden;
   flex: 1;
   flex-direction: column;
@@ -1935,10 +1937,10 @@ h4 {
 }
 
 .native-message-list {
-  min-height: 280px;
+  min-height: 0;
   padding: 4px;
   overflow: auto;
-  flex: 1;
+  flex: 1 1 0;
   overscroll-behavior: contain;
 }
 
@@ -2593,7 +2595,9 @@ h4 {
   }
 
   .agent-pane {
-    min-height: 560px;
+    height: min(680px, calc(100svh - 170px));
+    max-height: 680px;
+    min-height: 520px;
   }
 
   .quick-actions {

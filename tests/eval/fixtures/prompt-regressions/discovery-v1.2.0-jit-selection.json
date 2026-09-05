@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "promptVersion": "1.2.0",
+  "requestedBatch": "SELECTED",
+  "requestedPreviewPositions": [3, 8],
+  "materializedCandidatePositions": [3, 8],
+  "waitsForRemainingBackground": false,
+  "provenance": {
+    "candidateMeaning": "AGENT",
+    "selectionFeedback": "USER"
+  },
+  "automatedVerification": {
+    "selectedBatchAcceptsOneOrMoreReferencedPreviews": true,
+    "fixedPreviewMeaningRemainsImmutable": true,
+    "partialRoundContainsOnlyReferencedCandidates": true,
+    "lateBackgroundBatchIsRejectedAfterFeedback": true,
+    "previewSelectionAndRefinementStayInteractive": true
+  },
+  "targetMeasurement": {
+    "status": "PASSED",
+    "model": "claude-haiku-4.5",
+    "previewDurableMilliseconds": 20037,
+    "selectedEnrichmentMilliseconds": 10525,
+    "selectionCoreMilliseconds": 273,
+    "selectedCandidateCount": 1,
+    "candidateEnrichmentCount": 1,
+    "projectStatus": "SPEC_REVIEW"
+  },
+  "containsPersonalData": false
+}

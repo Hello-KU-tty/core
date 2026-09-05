@@ -56,7 +56,7 @@ const runtimeFiles = [
   ],
   ['agents/vibe-helper-builder.json', 'agents/vibe-helper-builder.json'],
   ['agents/vibe-helper-helper.json', 'agents/vibe-helper-helper.json'],
-  ['apps/crew-app/dist/index.mjs', 'ui/dist/index-0.2.1.mjs'],
+  ['apps/crew-app/dist/index.mjs', 'ui/dist/index-0.2.2.mjs'],
   ['apps/crew-backend/dist/main.bundle.js', 'apps/crew-backend/dist/main.js'],
   [
     'apps/crew-backend/dist/builder-tool-guard.bundle.js',
@@ -90,7 +90,7 @@ if (typeof drizzleVersion !== 'string' || !/^\d+\.\d+\.\d+$/.test(drizzleVersion
 
 const runtimeManifest = {
   name: 'vibe-helper-runtime',
-  version: '0.2.1',
+  version: '0.2.2',
   private: true,
   type: 'module',
   engines: { node: '>=24 <27' },

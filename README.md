@@ -40,9 +40,9 @@ MVP host는 Kiro/Crew이고 Agent 중심 Crew App을 primary surface로 삼는�
 | T15 | 완료 | Korean-first Discovery/Spec UI, 10개 durable preview와 순차 background enrichment, selection narrowing, Spec revision·Builder 진입, target Crew 설치·복구 검증 |
 | 다음 | T16 | Agent 중심 Build·Helper 동시 UI와 Decision UI |
 
-T15의 최종 설치본은 `claude-haiku-4.5`와 Discovery prompt v1.1.9를 사용한다. unseen WebRTC 입력에서 preview 10개를 23.241초에 저장했고, 기존 MERGE 13.226초·첫 Spec 18.860초·Spec 수정 23.097초와 함께 대표 interaction 30초 gate를 통과했다. 두 enrichment batch는 identity와 부분 저장을 보존하며 complete Round로 수렴했고, preview에서 선택하거나 펼친 검토 상태도 전환 뒤 유지된다. 최종 `pnpm check`는 unit 2개, integration 189개, eval 17개, smoke 6개와 Chromium E2E 11개를 통과했다.
+T15의 최종 설치본은 `claude-haiku-4.5`와 Discovery prompt v1.2.0을 사용한다. unseen WebRTC 입력에서 preview 10개를 23.241초에 저장했고, preview만으로 판단이 끝나면 참조 후보만 just-in-time 보강해 SELECT·refinement를 진행한다. 두 background enrichment batch는 identity와 부분 저장을 보존하며 기다리는 사용자가 있을 때 complete Round로 수렴한다. 최종 `pnpm check`는 unit 2개, package/app integration 201개, eval 18개, smoke 6개와 Chromium E2E 12개를 통과했다.
 
-알려진 제한으로 첫 유용 반응은 아직 3~5초 stretch goal에 도달하지 않았고, 최종 측정에서 complete Round까지 148.371초가 걸려 그동안 SELECT와 refinement가 잠긴다. 장기 P95와 background 수렴 분포는 T21에서 검증한다. 실행 중 Agent stream/progress의 화면 이탈 후 재연결은 MVP 보장 범위가 아니지만, 저장 완료된 Project·Session·Task·Decision·Context는 Core에서 복원한다.
+알려진 제한으로 첫 유용 반응은 아직 3~5초 stretch goal에 도달하지 않았다. 전체 background 상세 수렴은 최종 측정에서 148.371초였지만 사용자 진행 조건은 아니며, 장기 P95와 background 분포는 T21에서 검증한다. 실행 중 Agent stream/progress의 화면 이탈 후 재연결은 MVP 보장 범위가 아니지만, 저장 완료된 Project·Session·Task·Decision·Context는 Core에서 복원한다.
 
 평가 실행법과 자동/사람 review 경계는 `tests/eval/README.md`, Agent 회귀 결과는 `tests/eval/results/`, AC 추적표는 `tests/eval/TRACEABILITY.md`에 있다. T01의 상세 계획과 결과는 `docs/spikes/KIRO_CREW_CAPABILITY_SPIKE.md`, `docs/spikes/KIRO_CREW_CAPABILITY_RESULTS.md`에 있다.
 

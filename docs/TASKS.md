@@ -597,6 +597,8 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - T15의 대표 gate는 앞서 통과한 MERGE 13.226초·첫 Spec 18.860초·Spec 수정 23.097초와 최종 preview 23.241초를 합쳐 모두 30초 이내로 닫는다. preview 이후 checkbox/basket은 바로 사용할 수 있지만 SELECT·refinement는 complete Round까지 최대 관측 148.371초 기다리는 제한이 있으며, 이는 background 수렴 분포와 3~5초 first-useful stretch goal과 함께 T21에서 계속 측정한다.
 - 최종 `pnpm check`가 format/lint 149 files, typecheck, Drizzle check, unit 2개, package/app integration 189개, eval 17개, build, smoke 6개와 Chromium E2E 11개를 통과했다.
 - 2026-09-05 사용자 최종 검토에서 background enrichment 완료 시 펼쳐 둔 preview 상세가 닫히는 UI 회귀를 확인했다. 펼침 상태를 `DiscoveryWorkspace`의 Candidate ID·revision key로 옮겨 preview→complete 표현 전환 뒤에도 유지했다. 390x844 E2E와 전체 `pnpm check`가 통과했고, versioned UI 0.1.3을 Kiro에 data-preserving update한 뒤 설치 UI hash, SQLite 무결성과 실제 Core read를 확인해 T15를 최종 종료했다.
+- 2026-09-05 사용자 재검토에서 background enrichment가 SELECT·refinement까지 막는 것은 제품 의도와 다름을 확인해 T15를 다시 열었다. preview만으로 판단이 끝난 사용자는 참조 후보의 just-in-time enrichment만 거쳐 즉시 진행할 수 있어야 하며, 나머지 상세 보강은 필수 조건이 아니다.
+- prompt v1.2.0과 UI protocol v6은 `SELECTED` enrichment로 참조 preview만 보강하고 같은 transaction 경계에서 partial Candidate Round와 user Feedback을 적용한다. Application·MCP·prompt eval과 Chromium E2E는 background 중 선택·refinement, late batch 거절과 1개 후보 Round를 검증했다. 설치본 실제 Haiku 실행은 preview 10개 20.037초, 선택 후보 1개 10.525초, Core 선택 273ms였고 나머지 9개 없이 `SPEC_REVIEW`로 진행했다. app 0.2.2 data-preserving update 전후 기존 59 project·60 Discovery Session·26 Learning Spec·5 Task·2 Completion Report와 SQLite 무결성이 유지됐으며 synthetic 실행 뒤 project/session만 각각 1개 늘었다.
 - First Candidate 대안 spike 종료 시점에는 모든 실험 package를 `/private/tmp`에 보존하고 target을 Haiku v1.1.6·Agent 4개로 복원했다. 이후 승인된 preview 구현은 이 stable 기준 위에서만 진행했다.
 - 대안 spike 시점의 `pnpm check`는 format/lint 147 files, typecheck, Drizzle check, unit 2개, package/app integration 185개, eval 16개, build, smoke 6개와 Chromium E2E 10개를 통과했다.
 
@@ -653,6 +655,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - 실제 target Helper가 700자 이상 답변의 마지막 `설명 끝`까지 표시했고, Builder transcript에서 raw option/diff marker가 사라진 대신 native diff control을 확인했다. 두 실제 Decision을 선택·적용했으며 generated WebRTC project의 TypeScript typecheck와 Vitest 4 files·19 tests가 통과했다. `execute_bash`는 generated workspace와 exact allowlist 안에서만 허용되고 pipe 명령은 실제로 거절됐다.
 - 장기 Agent turn을 같은 composer에서 중지하는 Builder/Helper control을 추가했다. stop 요청은 exact Vibe Helper slot에만 허용되며 transcript의 transport JSON은 `Agent 실행이 중지되었습니다.`로 정규화된다. Core Completion Report는 target Task revision 3을 `COMPLETED`로 전이했고 task별 report는 정확히 1개, SQLite `quick_check=ok`다.
 - Node.js 24.19.0·pnpm 11.12.0 최종 `pnpm check`에서 format/lint 153 files, typecheck, Drizzle check, unit 2개, package/app integration 200개, eval 17개, build, smoke 6개와 Chromium E2E 11개가 모두 통과했다. app 0.2.1을 data-preserving update한 뒤 desktop과 390×844 Builder/Helper tab, 실제 Helper stop을 Chrome에서 검토했으며 설치 package 28개 hash가 source와 전부 일치했다. 기존 58 project·59 Discovery Session·25 Learning Spec과 SQLite 무결성이 유지됐다.
+- 2026-09-05 Builder/Helper pane을 viewport 기반 bounded flex layout으로 바꾸고 transcript만 내부 스크롤되게 했다. 긴 native transcript의 `scrollHeight > clientHeight`, pane 760px 이하와 composer 고정을 Chromium E2E로 검증했으며 app 0.2.2 설치 UI/backend hash가 source와 일치했다.
 
 > 2026-09-05 승인된 capability gate: Crew는 browser App API의
 > `POST /api/chat/slots/{slot}/project`로만 기존 slot의 project directory를 바꾸며,

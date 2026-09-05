@@ -286,7 +286,7 @@ export const discoverySubmitCandidatePreviewsToolInputSchema = z.strictObject({
   generationRationale: nonEmptyTextSchema,
 })
 
-export const candidateEnrichmentBatchSchema = z.enum(['FIRST', 'SECOND'])
+export const candidateEnrichmentBatchSchema = z.enum(['FIRST', 'SECOND', 'SELECTED'])
 
 export const candidateEnrichmentDraftSchema = z.strictObject({
   candidateId: candidateIdSchema,
@@ -304,7 +304,7 @@ export const candidateEnrichmentSchema = z.strictObject({
   redactionStatus: redactionStatusSchema,
 })
 
-export const discoverySubmitCandidateEnrichmentsToolInputSchema = z.strictObject({
+export const discoverySubmitCandidateEnrichmentsToolInputBaseSchema = z.strictObject({
   __tool_use_purpose: nonEmptyTextSchema.optional(),
   schemaVersion: schemaVersionSchema,
   projectId: projectIdSchema,
@@ -314,8 +314,19 @@ export const discoverySubmitCandidateEnrichmentsToolInputSchema = z.strictObject
   expectedSessionRevision: expectedRevisionSchema,
   previewRoundId: candidatePreviewRoundIdSchema,
   batch: candidateEnrichmentBatchSchema,
-  candidates: z.array(candidateEnrichmentDraftSchema).length(5),
+  candidates: z.array(candidateEnrichmentDraftSchema).min(1).max(10),
 })
+
+export const discoverySubmitCandidateEnrichmentsToolInputSchema =
+  discoverySubmitCandidateEnrichmentsToolInputBaseSchema.superRefine((input, context) => {
+    if (input.batch !== 'SELECTED' && input.candidates.length !== 5) {
+      context.addIssue({
+        code: 'custom',
+        path: ['candidates'],
+        message: `${input.batch} enrichment must contain exactly five candidates`,
+      })
+    }
+  })
 
 export const candidateRoundSchema = z
   .strictObject({
