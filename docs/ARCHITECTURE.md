@@ -2,9 +2,9 @@
 
 ## 1. 상태
 
-- 상태: 사용자 승인 완료, T17 Evidence Trace·개인화 provenance 및 target 검증 완료
+- 상태: 사용자 승인 완료, T18 Campus Drop Golden Path 구현 및 검증 완료
 - 기준 입력: [PROJECT_BRIEF.md](../PROJECT_BRIEF.md), [SPEC.md](SPEC.md)
-- T03 versioned contract와 Agent/UI runtime validation, T04 pure reducer와 Evidence policy v1.0.0, T05 SQLite schema/repository/migration, T06 application use case와 역할 고정 MCP server, T07 criterion 기반 evaluation contract와 harness, T08 Candidate loop, T09 Discovery Agent prompt v1.1.0과 Learning Spec revision flow, T10 native workspace lifecycle, T11 Builder prompt v1.1.0과 Decision gate, T12 Helper prompt v1.0.0과 bounded context/refresh, T13 Evidence Analyst prompt v1.0.1과 durable Analysis Job, T14 Crew Node backend와 Project History/session restore UI, T15 Discovery/Spec UI와 target Crew Agent 연결, T16 Agent Mode package와 target 설치, T17 Evidence Trace와 다음 대화 개인화까지 구현됐다.
+- T03 versioned contract와 Agent/UI runtime validation, T04 pure reducer와 Evidence policy v1.0.0, T05 SQLite schema/repository/migration, T06 application use case와 역할 고정 MCP server, T07 criterion 기반 evaluation contract와 harness, T08 Candidate loop, T09 Discovery와 Learning Spec, T10 native workspace lifecycle, T11 Builder와 Decision gate, T12 bounded Helper context, T13 Evidence Analyst와 durable Analysis Job, T14 Crew backend와 session restore, T15 Discovery/Spec UI, T16 conversation-first Agent Mode, T17 Evidence Trace와 다음 대화 개인화, T18 hidden Analyst worker·local result runtime·optional Final Upgrade까지 구현됐다.
 - Kiro/Crew 세부 연결은 capability spike 결과에 따라 이 문서를 갱신한다.
 
 ## 2. 선택한 기술 스택과 선택 이유
@@ -194,6 +194,7 @@ Domain은 Kiro SDK, React와 SQLite library에 의존하지 않는다.
 - Analyst dispatch와 retry
 - Evidence proposal apply
 - Personalization retrieval
+- evidence-aware Final Upgrade planning
 
 Application transaction은 SQLite repository interface를 통해 상태를 변경한다.
 
@@ -203,7 +204,7 @@ T12는 Helper가 활성 Task가 없는 완료 Project에서도 마지막 current
 
 stale/missing Context refresh는 audit-only 신호가 아니라 versioned `ContextRefreshRequest`로 저장한다. Helper는 요청만 만들고 Builder-owned Context를 변경하지 않는다. Builder의 다음 더 새로운 Context update가 pending request를 같은 transaction에서 `FULFILLED`로 닫고, Builder Task context는 pending request를 노출한다.
 
-T13은 raw Crew transcript가 아니라 검증된 Application 상태 전이에서 `TASK_STARTED`, `LIVE_CONTEXT_UPDATED`, `DECISION_REQUESTED/RESOLVED`, `USER_MESSAGE`, `HELPER_RESPONSE`, `CONCEPT_REPORTED`, `VALIDATION_RESULT`, `TASK_COMPLETED` Event를 만든다. BUILD_TASK는 Task 시작→완료, DECISION은 Request→사용자 Resolution, HELPER_CONVERSATION은 첫 사용자 발화→명시적 종료·관련 Decision 해결·Task 완료로 닫는다. 닫힌 Episode와 initial `AnalysisJob`은 같은 transaction에 저장하므로 Event마다 Analyst를 호출하지 않는다. FINAL_UPGRADE type과 assembler 경계는 유지하되 실제 개인화 적용 source는 T18 flow에서 연결한다.
+T13은 raw Crew transcript가 아니라 검증된 Application 상태 전이에서 `TASK_STARTED`, `LIVE_CONTEXT_UPDATED`, `DECISION_REQUESTED/RESOLVED`, `USER_MESSAGE`, `HELPER_RESPONSE`, `CONCEPT_REPORTED`, `VALIDATION_RESULT`, `TASK_COMPLETED` Event를 만든다. BUILD_TASK는 Task 시작→완료, DECISION은 Request→사용자 Resolution, HELPER_CONVERSATION은 첫 사용자 발화→명시적 종료·관련 Decision 해결·Task 완료로 닫는다. 닫힌 Episode와 initial `AnalysisJob`은 같은 transaction에 저장하므로 Event마다 Analyst를 호출하지 않는다. T18은 completed source Task의 성공한 Analysis Job, 같은 Task에 대한 Evidence-aware Helper personalization과 사용자가 직접 쓴 개선 목표를 모두 검증한 뒤에만 sequence 2 Task를 만든다. 이 Task의 lifecycle Event는 `FINAL_UPGRADE` Episode로 조립하며 Agent 답변이나 quick action만으로는 만들지 않는다.
 
 ### 4.5 storage-sqlite
 
@@ -254,11 +255,13 @@ T11의 Builder `request_user_decision`과 `apply_decision_result` 외부 schema�
 
 Discovery prompt 원문은 `docs/agent-prompts/discovery.md` 하나이며 현재 버전은 1.2.0이다. Node build adapter는 version marker와 section을 검증해 PREVIEW·ENRICHMENT·ROUND·MERGE·SPEC·SPEC recovery의 bounded inline prompt와 최소 tool allowlist를 만든다. ROUND는 staged 경로의 fallback 또는 이후 refinement에 쓰며 간결한 Candidate 4개를 우선 생성하고 뚜렷한 추가 가치가 있을 때만 5~6개로 늘린다. 각 카드의 대표 사용자·개념·MVP·scope 수와 자유 서술 길이를 제한하고 상세 evaluation과 risks는 관심·비교가 필요할 때까지 미룬다. `MORE`만 이전 후보를 carry하며 target이 있는 refinement는 결과와 explicit pin만 current Round에 남긴다. MERGE는 의미 Candidate 하나만 생성하고 stable lineage metadata는 Core에 맡긴다. 정상 SPEC은 주입된 snapshot과 submit tool 하나만 사용해 current selected Candidate 기반 draft를 저장하며, context 주입이 불가능한 경우에만 recovery Agent가 context를 읽는다. 모든 phase는 Candidate/Round/Spec ID, revision, timestamp와 source 같은 Core-owned metadata, 명시적 SELECT, Spec confirmation 또는 Session 재개를 만들지 않는다.
 
-Builder prompt 원문은 `docs/agent-prompts/builder.md` 하나이며 T11 버전은 1.1.0이다. Builder adapter는 7개 Core MCP tool과 생성 workspace에 한정한 read/write/shell만 구성하고 web, subagent, global MCP를 허용하지 않는다. Prompt는 되돌리기 쉬운 내부 세부사항을 자율 처리하고, 사용자 가시 제품 동작·데이터·보안·비용·주요 아키텍처나 학습 Concept에 영향을 주는 선택만 semantic Decision으로 요청한다. Crew slot은 첫 message 전에 Core가 발급한 canonical workspace에 연결하고, Kiro CLI 2 Agent Engine v2의 `denyByDefault` shell 설정과 pre-tool path guard를 함께 사용한다. Kiro CLI 2.20.2 live 회귀에서 blocking Decision request, Helper handoff, user recommendation resolution, Builder application/resume, workspace escape probe 차단, 초기 test 실패와 수정 뒤 통과, final Context와 Completion Report 복원을 확인했다. 이 경계가 이후 runtime escape probe를 막지 못하면 안전하지 않은 fallback으로 실행하지 않고 별도 결정을 받는다. 사용자에게 보이는 message/tool/file/test/error stream은 transient runtime data로 다루며, durable Core에는 redaction된 checkpoint와 source reference만 저장한다.
+Builder prompt 원문은 `docs/agent-prompts/builder.md` 하나이며 현재 버전은 1.3.0이다. Builder adapter는 7개 Core MCP tool과 생성 workspace에 한정한 read/write/shell만 구성하고 web, subagent, global MCP를 허용하지 않는다. Prompt는 되돌리기 쉬운 내부 세부사항을 자율 처리하고, 사용자 가시 제품 동작·데이터·보안·비용·주요 아키텍처나 학습 Concept에 영향을 주는 선택만 semantic Decision으로 요청한다. T18부터 완료 가능한 web result는 compiled relative JavaScript entry, health path와 사용자 open path가 있는 strict manifest를 남기고 loopback `HOST`·동적 `PORT`에서 실제 실행을 확인한다. `finalUpgrade` Task에서는 Evidence가 숙달을 증명한다고 추정하지 않고 사용자 목표만 기존 결과에 반영한다. Crew slot은 첫 message 전에 Core가 발급한 canonical workspace에 연결하고, Kiro CLI 2 Agent Engine v2의 `denyByDefault` shell 설정과 pre-tool path guard를 함께 사용한다. 사용자에게 보이는 message/tool/file/test/error stream은 transient runtime data로 다루며, durable Core에는 redaction된 checkpoint와 source reference만 저장한다.
 
 Helper prompt 원문은 `docs/agent-prompts/helper.md` 하나이며 T12 버전은 1.0.0이다. Helper adapter는 role-bound `get_helper_context`와 `request_builder_context_refresh`만 허용하고 native file, shell, web과 state mutation tool을 갖지 않는다. Application이 current/focused Decision, 최대 5개 관련 Ledger·Episode, 최대 3개의 workspace-contained 8 KiB code excerpt를 조립하고 source를 다시 redaction한다. diff와 대화 원문은 가용성만 표시한다. Kiro CLI 2.20.2 Agent Engine v2 live 회귀에서 `DEMONSTRATED` 상태의 Helper가 현재 Decision과 code excerpt를 읽어 선택지를 비교하고 복합 DB/Excel 비유를 claim 단위로 답했으며, context tool 1회, refresh 0회, Builder state 불변과 secret 미노출을 확인했다.
 
 Evidence Analyst prompt 원문은 `docs/agent-prompts/evidence-analyst.md` 하나이며 T13 버전은 1.0.1이다. hidden Agent definition은 tool allowlist가 비어 있고 bounded Episode Context만 받아 stable ID·timestamp·provenance를 제외한 strict semantic JSON을 반환한다. adapter가 Core-owned metadata를 채우고 Application의 deterministic Evidence policy가 Proposal별 채택·거절, misconception issue와 Ledger를 계산한다. 빈 Proposal 결과도 성공으로 완료하며 Builder 보고는 사용자 이해가 아닌 Core `CONCEPT_OBSERVATION`으로만 `OBSERVED`를 만든다. Kiro CLI 2.20.2 Agent Engine v2 live 회귀에서 tool 호출 0회, mixed-strength Proposal 2개, 직접 유도 반복 거절 1개, 독립 적용 채택 1개, runtime validation `DEMONSTRATED`, Job `SUCCEEDED`와 Episode `ANALYZED`를 확인했다.
+
+T18의 product Analyst worker는 UI runtime에서 단 하나만 동작하며 2초 간격으로 expired lease를 회수한 뒤 pending Job 하나를 claim한다. browser는 고정 `/api/analysis`와 read-only `/api/analyst-context`만 호출하고, hidden slot은 `projectId`·`analysisJobId`·attempt로 격리한다. strict JSON 결과는 30초 soft timeout 안에 adapter가 제출하며 첫 실패는 한 번 자동 재시도하고, revision·attempt가 다른 late result는 Core가 거절한다. backend가 browser를 역호출하거나 Analyst에게 일반 mutation tool을 주지 않는다.
 
 Crew 0.3.0의 App event bridge는 실제 stream을 App DOM event로 전달하지 않고, generic App API client는 `/api/chat` SSE를 JSON으로 파싱한다. 따라서 event는 MVP primary 경로에서 제외한다. raw fetch는 same-origin `POST /api/chat` 하나와 고정 payload로 제한하고, slot 생성·history/result 조회는 permission-checked App API를 사용한다. 이 세부사항은 UI나 Core가 아니라 이 adapter에만 존재한다. 참고: <https://kiro.dev/docs/crew/apps/sdk/>
 
@@ -295,6 +298,8 @@ T15 UI는 Korean-first Learning Goal 필수·Personal Need 선택 입력과 순�
 T16 Agent Mode는 conversation-first Agent Session이다. desktop에서 실제 Builder Crew chat을 주 surface로, 실제 read-only Helper chat을 보조 surface로 동시에 표시하고 좁은 화면에서는 같은 두 session을 접근 가능한 tab으로 전환한다. app adapter가 current slot의 structured message를 polling하고 모든 문자열을 redaction한 뒤 host `ChatMessageList`에 전달해 Markdown, ToolCall, diff와 follow-up option을 native renderer로 표시한다. persistent composer는 같은 slot dispatch에 연결하며 app이 assistant text를 `말/도구/파일` event log나 plain paragraph로 다시 만들지 않는다. 각 Agent pane은 viewport 기반 높이를 가지며 transcript만 내부 스크롤되고 header, Decision/completion intervention과 composer는 고정 sibling으로 남는다. 진행 중에는 같은 composer에서 bounded stop API를 호출할 수 있고 raw stop event는 자연어 transcript 상태로 정규화한다. 이 host export는 공개 SDK 문서에 없는 installed capability이므로 한 `NativeChatSession` component에 격리하고 capability 실패는 raw transcript fallback 없이 명시적으로 표시한다. Builder SSE normalization은 Core completion polling과 redaction된 진단에만 사용하고 primary rendering을 소유하지 않는다.
 
 T17은 storage 내부 `EvidenceTrace`를 UI에 직접 노출하지 않고 Project-scoped read model로 조립한다. 이 read model은 현재 Concept State와 reducer version, State를 지지한 accepted Evidence, 연결된 Episode·source Project, 반영하지 않은 Proposal의 Core reason, analysis no-evidence/failure와 open misconception을 redacted bounded data로 제공한다. current Project에서 생성된 Evidence뿐 아니라 그 Project의 Agent context에 실제 제공된 과거 Concept도 조회할 수 있지만 임의 Concept ID 열람은 거절한다. 접이식 UI는 열 때마다 최신 read model을 조회하고 Helper exchange를 기록한 직후에도 무효화·갱신하므로 오래된 빈 결과를 provenance처럼 유지하지 않는다.
+
+T18 완료 UI는 결과 실행을 먼저 제공하고, 선택적으로 `Helper와 개선 방향 찾기`를 시작한다. Final Upgrade는 Helper turn에서 생성된 같은 source Task의 `EVIDENCE_AWARE` Personalization Trace와 사용자가 직접 입력한 목표가 있어야 활성화된다. Core가 sequence·선행 Task·성공한 분석을 다시 검증해 새 Builder Task를 만들며, Task가 바뀌면 UI의 이전 `DONE` runtime 상태를 초기화해 새 versioned Builder slot을 자동 시작한다. 건너뛰기는 정상 완료이고 이 흐름 하나에서 Concept State를 `TRANSFERRED`로 올리지 않는다.
 
 Personalization retrieval은 local single-user Ledger의 최신 head와 immutable accepted Evidence를 사용한다. Helper는 질문·Live Context·Decision의 명시적 Concept/alias match를 우선해 최대 5개를 받고, Discovery는 새 Project가 이전 Project의 bounded Ledger를 볼 수 있게 하되 흥미·실용성을 대체하는 deterministic curriculum score를 만들지 않는다. Core는 Agent-bound context마다 `EVIDENCE_AWARE` 또는 명시적 no-evidence reason이 있는 basis를 만들며, source Evidence·Episode·Project와 Ledger revision을 immutable Personalization Trace로 저장한다. Discovery의 일반 restore는 조회 전용이며 실제 Agent dispatch 직전 `UI_PREPARE_DISCOVERY_AGENT_CONTEXT`만 trace를 생성한다. Helper의 turn correlation은 각 요청과 personalization provenance를 식별하고, 여러 turn을 묶는 HELPER_CONVERSATION Episode의 Event는 최초 correlation을 유지한다. 이 Trace는 `Agent에게 제공됨`을 증명할 뿐 실제 semantic 사용을 단정하지 않으며, 결과 영향은 A/B Agent fixture와 target regression으로 검증한다. Helper/Discovery에는 기존 권한 외의 tool을 추가하지 않고 raw 대화·전체 Ledger·confidence percentage를 전달하지 않는다.
 
@@ -352,6 +357,7 @@ BuilderTask 1 ── 0..1 CompletionReport
 - Resolution은 사용자 선택이고 Application은 Builder 구현 결과다. 둘을 별도 record로 보존하며 모든 Request가 적용되기 전에는 Task를 완료하지 않는다.
 - Decision Application과 active Decision ID를 제거한 `DIRECTION_CHANGED` Context는 atomic write다.
 - Live Context version은 project/task 안에서 단조 증가한다.
+- optional Final Upgrade Task는 완료된 source Task의 다음 sequence이고, source Task·Evidence-aware Personalization Trace·user-authored goal을 immutable provenance로 보존한다.
 
 ### 5.3 Evidence
 
@@ -443,6 +449,8 @@ blocking Decision request는 Task/Context optimistic revision을 모두 검증�
 - open Helper with context
 - read Builder stream and task progress
 - read Evidence Trace
+- recover/claim/submit/retry Evidence analysis job
+- prepare an explicit user-selected Final Upgrade Task
 - launch/open generated result
 
 UI는 reducer와 SQL을 직접 호출하지 않는다.
@@ -464,7 +472,9 @@ Raw event를 저장하지 않고 normalized Activity Event로 변환한다. 원�
 - project root는 Core가 발급한 `projects/<projectId>` 상대 scope와 host의 canonical generated-workspace root를 사용한다.
 - Builder tool은 root 밖 path를 거절한다.
 - related diff와 snippet은 Task reference로 저장한다.
-- 실행 command는 생성 project가 실제로 정의한 script만 사용한다.
+- 실행 가능한 web result는 strict `.vibe-helper/result.json`의 compiled relative `.js`/`.mjs`/`.cjs` entry만 사용한다. shell command, package script와 TypeScript source는 entry가 될 수 없다.
+- backend supervisor는 manifest와 entry의 realpath containment·symlink를 확인하고 `HOST=127.0.0.1`, 동적 `PORT`, production mode와 Node binary directory만 있는 최소 환경으로 child를 실행한다.
+- `healthPath`의 HTTP 2xx를 확인한 뒤 `openPath` URL을 반환한다. 같은 project의 건강한 process는 재사용하고 backend 종료 시 child를 정리한다.
 - 첫 Live Context는 `TASK_STARTED`, 완료 직전 마지막 Context는 `TASK_COMPLETED`여야 한다. 같은 Context ID에서 version과 timestamp가 단조 증가하며 stale update는 상태 변경 없이 거절한다.
 
 ## 7. 인증과 권한
@@ -525,6 +535,7 @@ Crew App의 `permissions.api`는 T01에서 host SDK의 client-side path guard로
 - 첫 retryable Analyst 실패는 Episode를 `PENDING_ANALYSIS`로 유지하고 durable AnalysisJob을 다음 `PENDING` attempt로 돌린다. 두 번째 실패는 Job `FAILED`와 Episode `ANALYSIS_FAILED`로 보존하며 UI의 명시적 수동 재시도만 다시 연다.
 - timeout 뒤 도착한 Analyst 결과는 current attempt/revision과 일치하지 않으면 폐기한다.
 - Builder 결과와 Project History는 Analyst 실패 때문에 폐기하지 않는다.
+- generated result의 manifest·entry·health 실패는 redaction된 `GENERATED_PROJECT` 오류로 반환하고 성공처럼 열지 않는다.
 - SQLite migration 전에 backup 또는 recoverable copy 경계를 둔다.
 - generated project 오류는 Builder stream과 Completion Report에 남긴다.
 
@@ -575,6 +586,7 @@ Crew App의 `permissions.api`는 T01에서 host SDK의 client-side path guard로
 - T07 자동 scorer: strict contract, 구조적 Candidate mode collapse, Spec scope 경계, Context freshness/completeness, production Evidence policy outcome, synthetic redaction leak
 - T07 사람 review: 의미적 Discovery 다양성, Concept Necessity, scope 적절성, Decision 필요성, false mastery/false misconception claim 의미
 - Campus Drop 회귀 입력과 서로 다른 unseen Learning Goal, Personal Need 유무를 함께 유지
+- Campus Drop은 SQLite metadata와 filesystem blob 경계, token digest·expiry·consume-once Decision, 실제 loopback HTTP upload/download와 Final Upgrade의 허용 Evidence 상한을 검증
 - 사람이 검토하지 않은 의미 criterion은 `NEEDS_REVIEW`이며 자동 통과로 바꾸지 않음
 - T07 calibration baseline은 harness의 good/bad 구별을 고정하며 제품 성능 baseline으로 해석하지 않음
 - T08 실제 Kiro 출력 회귀: canonical Discovery prompt version, strict Candidate contract, 구조 signature와 기록된 의미 다양성·Concept Necessity review
@@ -589,7 +601,9 @@ Crew App의 `permissions.api`는 T01에서 host SDK의 client-side path guard로
 - Builder stream→Decision→Helper→resolve
 - stale context refresh
 - Evidence Trace
-- result launch
+- hidden Analyst claim→strict result→Core 적용
+- strict result manifest→health→user open URL launch
+- Helper personalization→user goal→Final Upgrade Task
 - 오류, empty, permission 상태
 - keyboard와 핵심 접근성
 - Code Mode same-state smoke
@@ -637,7 +651,7 @@ Crew App의 `permissions.api`는 T01에서 host SDK의 client-side path guard로
 - local SQLite data directory
 - repository의 project-local `.kiro/agents/` Builder/Helper config
 
-T15 package는 app manifest, inline ROUND·MERGE·SPEC Discovery Agent, `ui/dist/index.mjs` UI bundle, role-bound backend bundle, SQL migration과 exact `better-sqlite3`·`drizzle-orm` runtime dependency만 포함한다. Crew host는 manifest의 `ui.entry`를 설치 root가 아니라 고정 `ui/` root에 상대적으로 해석하므로 entry는 `dist/index.mjs`다. source repository, 개인 문서, test와 workspace package link를 설치본에 복사하지 않는다. 제출 archive와 Builder/Helper workspace Agent packaging의 최종 형태는 T28에서 확정한다. 별도 Kiro panel package는 없다.
+T18 package는 app manifest, phase별 Discovery Agent, Builder·Helper, hidden no-tool Evidence Analyst, versioned `ui/dist/index-0.4.1.mjs` bundle, role-bound backend bundle, SQL migration과 exact `better-sqlite3`·`drizzle-orm` runtime dependency만 포함한다. Crew host는 manifest의 `ui.entry`를 설치 root가 아니라 고정 `ui/` root에 상대적으로 해석하므로 entry는 `dist/index-0.4.1.mjs`다. source repository, 개인 문서, test와 workspace package link를 설치본에 복사하지 않는다. 제출 archive와 Builder/Helper workspace Agent packaging의 최종 형태는 T28에서 확정한다. 별도 Kiro panel package는 없다.
 
 ### 11.3 rollback 원칙
 

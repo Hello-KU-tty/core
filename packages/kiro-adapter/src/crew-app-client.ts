@@ -1,4 +1,9 @@
 import { redactSensitiveText } from '@vibe-helper/application/redaction'
+import type {
+  AgentApplicationResponse,
+  AnalysisApplicationResponse,
+  ApplicationResult,
+} from '@vibe-helper/application'
 import {
   builderSlotKey,
   helperSlotKey,
@@ -50,6 +55,7 @@ import {
   uiPrepareDiscoveryAgentContextQuerySchema,
   uiPrepareBuilderSessionQuerySchema,
   uiPrepareBuilderTaskCommandSchema,
+  uiPrepareFinalUpgradeTaskCommandSchema,
   uiRecordDiscoveryFeedbackCommandSchema,
   uiRecordHelperExchangeCommandSchema,
   uiReadAnalysisJobsQuerySchema,
@@ -62,6 +68,8 @@ import {
 } from '@vibe-helper/contracts'
 
 export const CREW_CORE_APPLICATION_PATH = '/apps/vibe-helper/api/application'
+export const CREW_CORE_ANALYSIS_PATH = '/apps/vibe-helper/api/analysis'
+export const CREW_CORE_ANALYST_CONTEXT_PATH = '/apps/vibe-helper/api/analyst-context'
 export const CREW_CHAT_STREAM_PATH = '/api/chat'
 export const DISCOVERY_PREVIEW_AGENT_NAME = 'vibe-helper-discovery-preview'
 export const DISCOVERY_ENRICHMENT_AGENT_NAME = 'vibe-helper-discovery-enrichment'
@@ -376,6 +384,13 @@ export class CrewCoreClient {
     return preparedBuilderTaskDescriptorSchema.parse(parseApplicationSuccess(response).data)
   }
 
+  async prepareFinalUpgradeTask(
+    request: Extract<UiRequest, { kind: 'UI_PREPARE_FINAL_UPGRADE_TASK' }>,
+  ): Promise<PreparedBuilderTaskDescriptor> {
+    const response = await this.#postCore(uiPrepareFinalUpgradeTaskCommandSchema.parse(request))
+    return preparedBuilderTaskDescriptorSchema.parse(parseApplicationSuccess(response).data)
+  }
+
   async prepareBuilderSession(
     request: Extract<UiRequest, { kind: 'UI_PREPARE_BUILDER_SESSION' }>,
   ): Promise<BuilderSessionBindingDescriptor> {
@@ -465,6 +480,52 @@ export class CrewCoreClient {
         { cause: error },
       )
     }
+  }
+}
+
+export class CrewAnalysisApplicationClient {
+  readonly #api: CrewAppApi
+
+  constructor(api: CrewAppApi) {
+    this.#api = api
+  }
+
+  async executeAnalysis(input: unknown): Promise<ApplicationResult<AnalysisApplicationResponse>> {
+    return (await this.#post(
+      CREW_CORE_ANALYSIS_PATH,
+      input,
+    )) as ApplicationResult<AnalysisApplicationResponse>
+  }
+
+  async executeAgent(
+    role: 'EVIDENCE_ANALYST',
+    input: unknown,
+  ): Promise<ApplicationResult<AgentApplicationResponse>> {
+    if (role !== 'EVIDENCE_ANALYST') {
+      throw new CrewAppClientError(
+        'PERMISSION',
+        'ANALYSIS_ROLE_DENIED',
+        'The background analysis transport only accepts Evidence Analyst requests.',
+      )
+    }
+    return (await this.#post(
+      CREW_CORE_ANALYST_CONTEXT_PATH,
+      input,
+    )) as ApplicationResult<AgentApplicationResponse>
+  }
+
+  async #post(path: string, input: unknown): Promise<unknown> {
+    if (typeof input !== 'object' || input === null || Array.isArray(input)) {
+      throw new CrewAppClientError(
+        'CONTRACT',
+        'INVALID_ANALYSIS_REQUEST',
+        'Invalid analysis request.',
+      )
+    }
+    return this.#api.post(path, {
+      ...(input as Readonly<Record<string, unknown>>),
+      clientProtocolVersion: CREW_UI_PROTOCOL_VERSION,
+    })
   }
 }
 

@@ -34,6 +34,7 @@ describe('artifact and local-data hygiene', () => {
       'packages/storage-sqlite/dist',
       'packages/kiro-adapter/dist',
       'tests/eval/dist',
+      'tests/campus-drop-generated/dist',
     ]
     const files = (
       await Promise.all(
@@ -100,7 +101,7 @@ describe('artifact and local-data hygiene', () => {
       type: 'node',
       healthCheck: '/health',
     })
-    expect(manifest.ui.entry).toBe('dist/index-0.3.2.mjs')
+    expect(manifest.ui.entry).toBe('dist/index-0.4.1.mjs')
     expect(manifest.permissions).toEqual({
       api: ['/apps/vibe-helper/api', '/api/chat', '/api/chat/slots', '/api/chat/slots/*'],
       storage: false,
@@ -121,7 +122,7 @@ describe('artifact and local-data hygiene', () => {
       'builder-core': { url: 'http://127.0.0.1:9100/mcp/builder' },
       'helper-core': { url: 'http://127.0.0.1:9100/mcp/helper' },
     })
-    expect(discoveryAgents).toHaveLength(8)
+    expect(discoveryAgents).toHaveLength(9)
     const previewAgent = discoveryAgents.find((agent) => agent.name.endsWith('-preview'))
     const enrichmentAgent = discoveryAgents.find((agent) => agent.name.endsWith('-enrichment'))
     const roundAgent = discoveryAgents.find((agent) => agent.name.endsWith('-round'))
@@ -130,6 +131,9 @@ describe('artifact and local-data hygiene', () => {
     const specRecoveryAgent = discoveryAgents.find((agent) => agent.name.endsWith('-spec-recovery'))
     const builderAgent = discoveryAgents.find((agent) => agent.name === 'vibe-helper-builder')
     const helperAgent = discoveryAgents.find((agent) => agent.name === 'vibe-helper-helper')
+    const analystAgent = discoveryAgents.find(
+      (agent) => agent.name === 'vibe-helper-evidence-analyst',
+    )
     expect(previewAgent).toMatchObject({
       name: 'vibe-helper-discovery-preview',
       tools: ['@vibe-helper:discovery-preview-core'],
@@ -192,6 +196,11 @@ describe('artifact and local-data hygiene', () => {
       allowedTools: ['@vibe-helper:helper-core'],
       includeMcpJson: false,
     })
+    expect(analystAgent).toMatchObject({
+      tools: [],
+      allowedTools: [],
+      includeMcpJson: false,
+    })
     expect(roundAgent?.prompt.length).toBeLessThan(prompt.length)
     expect(specAgent?.prompt.length).toBeLessThan(prompt.length)
     expect(bundle).not.toContain('vibe-helper.test')
@@ -220,6 +229,7 @@ describe('artifact and local-data hygiene', () => {
     expect(files).toContain('agents/vibe-helper-discovery-spec-recovery.json')
     expect(files).toContain('agents/vibe-helper-builder.json')
     expect(files).toContain('agents/vibe-helper-helper.json')
+    expect(files).toContain('agents/vibe-helper-evidence-analyst.json')
     expect(files).toContain('app.json')
     expect(files).toContain(path.join('ui', appManifest.ui.entry))
     expect(files).toContain('apps/crew-backend/dist/main.js')

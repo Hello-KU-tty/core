@@ -597,7 +597,13 @@ function CompletionView({
         </button>
         {descriptor === null ? null : (
           <p className="result-ready" role="status">
-            실행 준비 완료 · {descriptor.workspacePath}
+            {descriptor.status === 'RUNNING' ? (
+              <a href={descriptor.url} target="_blank" rel="noreferrer">
+                실행 중인 결과 다시 열기
+              </a>
+            ) : (
+              `실행 준비 완료 · ${descriptor.workspacePath}`
+            )}
           </p>
         )}
         {error === null ? null : <p className="pane-error">{error}</p>}
@@ -622,6 +628,64 @@ function CompletionView({
           </ul>
         </section>
       </div>
+    </section>
+  )
+}
+
+function FinalUpgradePanel({
+  personalizationReady,
+  goal,
+  busy,
+  error,
+  onGoal,
+  onAskHelper,
+  onPrepare,
+}: {
+  readonly personalizationReady: boolean
+  readonly goal: string
+  readonly busy: boolean
+  readonly error: string | null
+  readonly onGoal: (value: string) => void
+  readonly onAskHelper: () => void
+  readonly onPrepare: () => void
+}) {
+  return (
+    <section className="final-upgrade-panel" aria-labelledby="final-upgrade-title">
+      <p className="eyebrow">Optional Final Upgrade</p>
+      <h3 id="final-upgrade-title">Evidence를 다음 개선에 연결하기</h3>
+      <p>
+        Helper가 검증된 Evidence와 현재 결과를 함께 보고 다음 개선 후보를 설명합니다. 건너뛰어도
+        완료 상태는 그대로 유지됩니다.
+      </p>
+      <button type="button" disabled={busy} onClick={onAskHelper}>
+        Helper와 개선 방향 찾기
+      </button>
+      {personalizationReady ? (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            onPrepare()
+          }}
+        >
+          <label>
+            <span>내가 선택한 개선 목표</span>
+            <textarea
+              value={goal}
+              onChange={(event) => onGoal(event.target.value)}
+              placeholder="예: 만료된 링크와 이미 사용한 링크를 서로 다른 안내로 보여줘"
+              rows={3}
+            />
+          </label>
+          <button
+            className="primary-button"
+            type="submit"
+            disabled={busy || goal.trim().length === 0}
+          >
+            {busy ? '개선 Task 준비 중…' : '이 목표로 개선 시작'}
+          </button>
+        </form>
+      ) : null}
+      {error === null ? null : <p className="pane-error">{error}</p>}
     </section>
   )
 }
@@ -652,12 +716,17 @@ export function BuildWorkspace({
   const [launchBusy, setLaunchBusy] = useState(false)
   const [launchError, setLaunchError] = useState<string | null>(null)
   const [resultDescriptor, setResultDescriptor] = useState<GeneratedResultDescriptor | null>(null)
+  const [upgradePersonalizationId, setUpgradePersonalizationId] = useState<string | null>(null)
+  const [upgradeGoal, setUpgradeGoal] = useState('')
+  const [upgradeBusy, setUpgradeBusy] = useState(false)
+  const [upgradeError, setUpgradeError] = useState<string | null>(null)
   const [evidenceTrace, setEvidenceTrace] = useState<ProjectEvidenceTrace | null>(null)
   const [evidenceBusy, setEvidenceBusy] = useState(false)
   const [evidenceError, setEvidenceError] = useState<string | null>(null)
   const autoStartedTasks = useRef(new Set<string>())
 
   const task = snapshot.currentTask
+  const runtimeTaskId = useRef(task?.id)
   const focusedDecision =
     snapshot.decisions.find((item) => item.resolution === null)?.request ?? null
   const allDecisionItems = useMemo(() => {
@@ -740,11 +809,20 @@ export function BuildWorkspace({
   )
 
   useEffect(() => {
+    if (runtimeTaskId.current === task?.id) return
+
+    runtimeTaskId.current = task?.id
+    setRuntimeStatus('IDLE')
+    setRuntimeError(null)
+    setConversationId(undefined)
+  }, [task?.id])
+
+  useEffect(() => {
     if (
       sessions === null ||
       task === null ||
       task.status !== 'PENDING' ||
-      sessions.builderMessages.length > 0 ||
+      (task.sequence === 1 && sessions.builderMessages.length > 0) ||
       runtimeStatus !== 'IDLE' ||
       autoStartedTasks.current.has(task.id)
     ) {
@@ -789,7 +867,7 @@ export function BuildWorkspace({
     setHelperError(null)
     try {
       const helperCorrelationId = entityId('corr')
-      await coreClient.openHelper({
+      const helperContext = await coreClient.openHelper({
         schemaVersion: 1,
         kind: 'UI_OPEN_HELPER',
         correlationId: helperCorrelationId,
@@ -828,6 +906,17 @@ export function BuildWorkspace({
         closeConversation: false,
       })
       setConversationId(recorded.conversationId)
+      if (task.status === 'COMPLETED') {
+        if (helperContext.personalization.mode === 'EVIDENCE_AWARE') {
+          setUpgradePersonalizationId(helperContext.personalization.id)
+          setUpgradeError(null)
+        } else {
+          setUpgradePersonalizationId(null)
+          setUpgradeError(
+            '아직 연결할 accepted Evidence가 없습니다. 분석이 끝난 뒤 다시 확인해 주세요.',
+          )
+        }
+      }
       if (decisionId !== undefined) {
         setHelperUsedDecisionIds((current) => new Set([...current, decisionId]))
       }
@@ -903,20 +992,48 @@ export function BuildWorkspace({
     setLaunchBusy(true)
     setLaunchError(null)
     try {
-      setResultDescriptor(
-        await coreClient.launchResult({
-          schemaVersion: 1,
-          kind: 'UI_LAUNCH_RESULT',
-          correlationId: entityId('corr'),
-          actor: { kind: 'UI' },
-          idempotencyKey: entityId('idem'),
-          projectId: snapshot.project.id,
-        }),
-      )
+      const descriptor = await coreClient.launchResult({
+        schemaVersion: 1,
+        kind: 'UI_LAUNCH_RESULT',
+        correlationId: entityId('corr'),
+        actor: { kind: 'UI' },
+        idempotencyKey: entityId('idem'),
+        projectId: snapshot.project.id,
+      })
+      setResultDescriptor(descriptor)
+      if (descriptor.status === 'RUNNING') {
+        window.open(descriptor.url, '_blank', 'noopener,noreferrer')
+      }
     } catch (error) {
       setLaunchError(actionError(error))
     } finally {
       setLaunchBusy(false)
+    }
+  }
+
+  const prepareFinalUpgrade = async (): Promise<void> => {
+    if (task === null || task.status !== 'COMPLETED' || upgradePersonalizationId === null) return
+    setUpgradeBusy(true)
+    setUpgradeError(null)
+    try {
+      await coreClient.prepareFinalUpgradeTask({
+        schemaVersion: 1,
+        kind: 'UI_PREPARE_FINAL_UPGRADE_TASK',
+        correlationId: entityId('corr'),
+        actor: { kind: 'UI' },
+        idempotencyKey: entityId('idem'),
+        projectId: snapshot.project.id,
+        sourceTaskId: task.id,
+        expectedSourceTaskRevision: task.revision,
+        personalizationTraceId: upgradePersonalizationId,
+        userGoal: upgradeGoal,
+      })
+      setResultDescriptor(null)
+      await restore()
+    } catch (error) {
+      setUpgradeError(actionError(error))
+    } finally {
+      setUpgradeBusy(false)
     }
   }
 
@@ -1034,13 +1151,32 @@ export function BuildWorkspace({
               </section>
             )}
             {snapshot.completionReport === null ? null : (
-              <CompletionView
-                snapshot={snapshot}
-                descriptor={resultDescriptor}
-                busy={launchBusy}
-                error={launchError}
-                onLaunch={() => void launchResult()}
-              />
+              <>
+                <CompletionView
+                  snapshot={snapshot}
+                  descriptor={resultDescriptor}
+                  busy={launchBusy}
+                  error={launchError}
+                  onLaunch={() => void launchResult()}
+                />
+                {task?.finalUpgrade === undefined ? (
+                  <FinalUpgradePanel
+                    personalizationReady={upgradePersonalizationId !== null}
+                    goal={upgradeGoal}
+                    busy={upgradeBusy || helperBusy}
+                    error={upgradeError}
+                    onGoal={setUpgradeGoal}
+                    onAskHelper={() => {
+                      setMobilePane('HELPER')
+                      void askHelper(
+                        '검증된 Evidence와 지금 완성된 결과를 연결해서, 내가 직접 선택할 만한 작고 유용한 다음 개선 2가지를 tradeoff와 함께 제안해줘.',
+                        'QUICK_ACTION',
+                      )
+                    }}
+                    onPrepare={() => void prepareFinalUpgrade()}
+                  />
+                ) : null}
+              </>
             )}
           </div>
         </AgentPane>

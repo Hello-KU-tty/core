@@ -1,13 +1,13 @@
 {
   "name": "vibe-helper",
-  "version": "0.3.2",
+  "version": "0.4.1",
   "displayName": "Vibe Helper",
   "description": "Learn unfamiliar development concepts by building a project you personally need.",
   "author": "hurdoo",
   "tags": ["learning", "developer-tools", "projects"],
   "defaultEnabled": false,
   "ui": {
-    "entry": "dist/index-0.3.2.mjs",
+    "entry": "dist/index-0.4.1.mjs",
     "pages": [{ "route": "/apps/vibe-helper", "label": "Vibe Helper", "icon": "Sprout" }]
   },
   "permissions": {
@@ -24,7 +24,8 @@
     "agents/vibe-helper-discovery-spec.json",
     "agents/vibe-helper-discovery-spec-recovery.json",
     "agents/vibe-helper-builder.json",
-    "agents/vibe-helper-helper.json"
+    "agents/vibe-helper-helper.json",
+    "agents/vibe-helper-evidence-analyst.json"
   ],
   "mcpServers": {
     "discovery-preview-core": {

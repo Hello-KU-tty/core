@@ -30,6 +30,10 @@
       "types": "./dist/evidence-analyst-prompt-node.d.ts",
       "import": "./dist/evidence-analyst-prompt-node.js"
     },
+    "./evidence-analyst": {
+      "types": "./dist/evidence-analyst-agent.d.ts",
+      "import": "./dist/evidence-analyst-agent.js"
+    },
     "./crew-app": {
       "types": "./dist/crew-app-client.d.ts",
       "import": "./dist/crew-app-client.js"

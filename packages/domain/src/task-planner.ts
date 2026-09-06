@@ -2,6 +2,7 @@ import {
   type BuilderTask,
   builderTaskSchema,
   type LearningSpecRevision,
+  type PersonalizationTrace,
   type Project,
 } from '@vibe-helper/contracts'
 
@@ -16,6 +17,16 @@ export interface PlanBuilderTaskInput {
   readonly spec: LearningSpecRevision
   readonly taskId: string
   readonly sequence: number
+  readonly now: string
+}
+
+export interface PlanFinalUpgradeTaskInput {
+  readonly project: Project
+  readonly spec: LearningSpecRevision
+  readonly sourceTask: BuilderTask
+  readonly personalization: PersonalizationTrace
+  readonly userGoal: string
+  readonly taskId: string
   readonly now: string
 }
 
@@ -99,6 +110,7 @@ export function planBuilderTask(input: PlanBuilderTaskInput): DomainResult<Build
     'Use TypeScript for the generated project runtime.',
     ...pack(agentSupport, 'Agent-supported implementation scope: ', MAX_LONG_TEXT),
     ...pack(input.spec.deploymentConstraints, 'Deployment constraints: ', MAX_LONG_TEXT),
+    'Write .vibe-helper/result.json for the compiled loopback web entry and health path.',
   ]
   const acceptanceCriteria = [
     ...input.spec.mvpFeatures.map((feature, index) => ({
@@ -151,6 +163,90 @@ export function planBuilderTask(input: PlanBuilderTaskInput): DomainResult<Build
   return applied(parsed.data, {
     operation: OPERATION,
     reasonCode: 'BUILDER_TASK_PLANNED',
+    entityIds: [...entityIds, parsed.data.id],
+    after: parsed.data.status,
+  })
+}
+
+export function planFinalUpgradeTask(input: PlanFinalUpgradeTaskInput): DomainResult<BuilderTask> {
+  const entityIds = [input.project.id, input.spec.id, input.sourceTask.id, input.personalization.id]
+  if (
+    input.project.status !== 'BUILDING' ||
+    input.spec.status !== 'CONFIRMED' ||
+    input.spec.projectId !== input.project.id ||
+    input.sourceTask.projectId !== input.project.id ||
+    input.sourceTask.status !== 'COMPLETED' ||
+    input.sourceTask.sequence !== 1 ||
+    input.sourceTask.finalUpgrade !== undefined ||
+    input.personalization.projectId !== input.project.id ||
+    input.personalization.mode !== 'EVIDENCE_AWARE' ||
+    input.personalization.target.kind !== 'HELPER_TURN' ||
+    input.personalization.target.taskId !== input.sourceTask.id
+  ) {
+    return rejected({
+      operation: OPERATION,
+      reasonCode: 'FINAL_UPGRADE_EVIDENCE_REQUIRED',
+      entityIds,
+    })
+  }
+  const userGoal = input.userGoal.trim()
+  const expectedConcepts = uniqueNormalized(input.sourceTask.expectedConcepts).slice(0, 20)
+  const parsed = builderTaskSchema.safeParse({
+    schemaVersion: 1,
+    id: input.taskId,
+    projectId: input.project.id,
+    learningSpecId: input.spec.id,
+    learningSpecRevision: input.spec.revision,
+    correlationId: input.project.correlationId,
+    revision: 1,
+    title: `${input.project.title} improvement`,
+    productGoal: userGoal,
+    requirements: [
+      `Implement the user-selected improvement: ${userGoal}`,
+      'Preserve the working MVP unless the user explicitly changes its behavior.',
+      'Use TypeScript for the generated project runtime.',
+      'Update .vibe-helper/result.json when the compiled loopback web entry changes.',
+    ],
+    acceptanceCriteria: [
+      {
+        key: 'user_selected_improvement',
+        description: `Implement and verify the selected improvement: ${userGoal}`,
+      },
+      {
+        key: 'local_result',
+        description: 'The updated TypeScript project runs through the local result manifest.',
+      },
+      {
+        key: 'tests_pass',
+        description: 'The updated generated project tests pass without hiding failures.',
+      },
+    ],
+    expectedConcepts,
+    excludedWork: input.sourceTask.excludedWork,
+    prerequisiteTaskIds: [input.sourceTask.id],
+    expectedDecisionCategories: input.sourceTask.expectedDecisionCategories,
+    finalUpgrade: {
+      sourceTaskId: input.sourceTask.id,
+      personalizationTraceId: input.personalization.id,
+      userGoal,
+    },
+    sequence: 2,
+    status: 'PENDING',
+    createdAt: input.now,
+    updatedAt: input.now,
+    source: { kind: 'CORE' },
+    redactionStatus: 'VERIFIED_REDACTED',
+  })
+  if (!parsed.success) {
+    return rejected({
+      operation: OPERATION,
+      reasonCode: 'FINAL_UPGRADE_PLAN_INVALID',
+      entityIds,
+    })
+  }
+  return applied(parsed.data, {
+    operation: OPERATION,
+    reasonCode: 'FINAL_UPGRADE_TASK_PLANNED',
     entityIds: [...entityIds, parsed.data.id],
     after: parsed.data.status,
   })

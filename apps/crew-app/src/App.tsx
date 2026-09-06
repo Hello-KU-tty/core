@@ -7,6 +7,7 @@ import type {
 } from '@vibe-helper/contracts'
 import {
   CrewAppClientError,
+  CrewAnalysisApplicationClient,
   CrewAgentModeClient,
   type DiscoveryAgentPhase,
   CrewCoreClient,
@@ -18,6 +19,7 @@ import {
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import appStyles from './app.css?inline'
+import { AnalysisWorker } from './AnalysisWorker.js'
 import { BuildWorkspace } from './BuildWorkspace.js'
 import {
   AgentRunBanner,
@@ -1424,16 +1426,20 @@ export function App() {
       sessions: new CrewSessionClient(api),
       discovery: new CrewDiscoveryClient(api),
       agentMode: new CrewAgentModeClient(api),
+      analysis: new CrewAnalysisApplicationClient(api),
     }),
     [api],
   )
   return (
-    <VibeHelperApp
-      coreClient={clients.core}
-      sessionClient={clients.sessions}
-      discoveryClient={clients.discovery}
-      agentClient={clients.agentMode}
-    />
+    <>
+      <AnalysisWorker application={clients.analysis} agentClient={clients.agentMode} />
+      <VibeHelperApp
+        coreClient={clients.core}
+        sessionClient={clients.sessions}
+        discoveryClient={clients.discovery}
+        agentClient={clients.agentMode}
+      />
+    </>
   )
 }
 

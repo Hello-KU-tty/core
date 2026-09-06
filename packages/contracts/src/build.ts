@@ -18,6 +18,7 @@ import {
   liveContextIdSchema,
   nonEmptyTextSchema,
   projectIdSchema,
+  personalizationTraceIdSchema,
   redactionStatusSchema,
   schemaVersionSchema,
   shortTextSchema,
@@ -61,6 +62,13 @@ export const builderTaskSchema = z.strictObject({
   excludedWork: z.array(shortTextSchema).max(30),
   prerequisiteTaskIds: z.array(taskIdSchema).max(20),
   expectedDecisionCategories: z.array(decisionCategorySchema).max(10),
+  finalUpgrade: z
+    .strictObject({
+      sourceTaskId: taskIdSchema,
+      personalizationTraceId: personalizationTraceIdSchema,
+      userGoal: nonEmptyTextSchema,
+    })
+    .optional(),
   sequence: z.int().positive(),
   status: builderTaskStatusSchema,
   createdAt: utcTimestampSchema,

@@ -52,6 +52,9 @@ describe('Builder Agent adapter', () => {
     expect(definition.prompt).toContain('apply_decision_result')
     expect(definition.prompt).toContain('최신 명시적 메시지는 현재 작업 지시')
     expect(definition.prompt).toContain('Spec과 다르다는 사실만으로 거절하지')
+    expect(definition.prompt).toContain('.vibe-helper/result.json')
+    expect(definition.prompt).toContain('HOST=127.0.0.1')
+    expect(definition.prompt).toContain('finalUpgrade')
     expect(BUILDER_CORE_TOOL_NAMES).toHaveLength(7)
   })
 
@@ -64,7 +67,7 @@ describe('Builder Agent adapter', () => {
       expect.objectContaining<Partial<BuilderAgentAdapterError>>({ code: 'INVALID_PROMPT' }),
     )
     expect(() =>
-      createBuilderAgentDefinition('# Builder\n\n> Prompt version: `1.2.0`', {
+      createBuilderAgentDefinition('# Builder\n\n> Prompt version: `1.3.0`', {
         guardCommand: ' ',
       }),
     ).toThrowError(

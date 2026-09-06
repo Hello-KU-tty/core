@@ -147,6 +147,8 @@ importers:
         specifier: 0.31.10
         version: 0.31.10
 
+  tests/campus-drop-generated: {}
+
   tests/eval:
     dependencies:
       '@vibe-helper/contracts':

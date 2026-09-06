@@ -1,12 +1,13 @@
 import { redactSensitiveText } from '@vibe-helper/application/redaction'
 
-import { builderSlotKey, helperSlotKey } from './agent-slots.js'
+import { builderSlotKey, evidenceAnalystSlotKey, helperSlotKey } from './agent-slots.js'
 import { type BuilderStreamEvent, normalizeBuilderStreamLine } from './builder-stream.js'
 
 const CHAT_PATH = '/api/chat'
 const SLOT_PATH = '/api/chat/slots'
 const BUILDER_AGENT = 'vibe-helper-builder'
 const HELPER_AGENT = 'vibe-helper-helper'
+const EVIDENCE_ANALYST_AGENT = 'vibe-helper-evidence-analyst'
 const MAX_ASSISTANT_CHARACTERS = 12_000
 
 interface AgentModeApi {
@@ -51,6 +52,13 @@ export interface HelperDispatchInput {
   readonly onText?: (text: string) => void
 }
 
+export interface EvidenceAnalystDispatchInput {
+  readonly projectId: string
+  readonly analysisJobId: string
+  readonly attempt: number
+  readonly context: string
+}
+
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -72,7 +80,12 @@ function assistantTextPart(payload: string): AssistantTextPart | null {
   if (typeof event.content === 'string') {
     try {
       const nested: unknown = JSON.parse(event.content)
-      if (isRecord(nested)) event = nested
+      if (
+        isRecord(nested) &&
+        ('type' in nested || 'event' in nested || 'kind' in nested || 'cls' in nested)
+      ) {
+        event = nested
+      }
     } catch {
       // A normal assistant message is not a nested transport envelope.
     }
@@ -314,6 +327,34 @@ export class CrewAgentModeClient {
       const text = redactSensitiveText(assistantText(payload))
       if (text.length > 0) input.onText?.(text)
     })
+      .then((text) => {
+        const assistantText = redactSensitiveText(text).trim()
+        return {
+          assistantText,
+          assistantSummary: summarizeAssistantText(assistantText),
+          status: 'DONE' as const,
+        }
+      })
+      .catch(() => ({
+        assistantText: '',
+        assistantSummary: '',
+        status: 'STREAM_FAILED' as const,
+      }))
+    return { slotKey: key, completion }
+  }
+
+  async dispatchEvidenceAnalyst(
+    input: EvidenceAnalystDispatchInput,
+  ): Promise<AgentModeDispatchReceipt> {
+    const key = evidenceAnalystSlotKey(input.projectId, input.analysisJobId, input.attempt)
+    await this.#ensureSlot(key, EVIDENCE_ANALYST_AGENT)
+    await this.#injectContext(key, input.context)
+    const response = await this.#dispatch(
+      key,
+      EVIDENCE_ANALYST_AGENT,
+      'Analyze the injected Episode context and return exactly one strict JSON result.',
+    )
+    const completion = consumeSse(response, () => undefined)
       .then((text) => {
         const assistantText = redactSensitiveText(text).trim()
         return {

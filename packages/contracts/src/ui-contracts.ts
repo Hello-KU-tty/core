@@ -17,6 +17,7 @@ import {
   learningSpecIdSchema,
   nonEmptyTextSchema,
   projectIdSchema,
+  personalizationTraceIdSchema,
   relativePosixPathSchema,
   schemaVersionSchema,
   shortTextSchema,
@@ -66,6 +67,17 @@ export const uiPrepareBuilderTaskCommandSchema = z.strictObject({
   projectId: projectIdSchema,
   learningSpecId: learningSpecIdSchema,
   expectedSpecRevision: entityRevisionSchema,
+})
+
+export const uiPrepareFinalUpgradeTaskCommandSchema = z.strictObject({
+  ...uiRequestMetadata,
+  kind: z.literal('UI_PREPARE_FINAL_UPGRADE_TASK'),
+  idempotencyKey: idempotencyKeySchema,
+  projectId: projectIdSchema,
+  sourceTaskId: taskIdSchema,
+  expectedSourceTaskRevision: entityRevisionSchema,
+  personalizationTraceId: personalizationTraceIdSchema,
+  userGoal: nonEmptyTextSchema,
 })
 
 export const uiUpdateLearningSpecCommandSchema = z.strictObject({
@@ -183,13 +195,29 @@ export const uiLaunchResultCommandSchema = z.strictObject({
   projectId: projectIdSchema,
 })
 
-export const generatedResultDescriptorSchema = z.strictObject({
+const generatedResultDescriptorBase = {
   schemaVersion: schemaVersionSchema,
   correlationId: correlationIdSchema,
   projectId: projectIdSchema,
   workspacePath: relativePosixPathSchema,
-  status: z.literal('READY'),
-})
+} as const
+
+export const generatedResultDescriptorSchema = z.discriminatedUnion('status', [
+  z.strictObject({
+    ...generatedResultDescriptorBase,
+    status: z.literal('READY'),
+  }),
+  z.strictObject({
+    ...generatedResultDescriptorBase,
+    status: z.literal('RUNNING'),
+    url: z.url().refine((value) => {
+      const match = value.match(/^http:\/\/127\.0\.0\.1:([1-9]\d{0,4})(?:\/[^?#]*)?$/)
+      if (match?.[1] === undefined) return false
+      return Number(match[1]) <= 65_535
+    }, 'Generated result URL must use loopback HTTP'),
+    reused: z.boolean(),
+  }),
+])
 
 export const builderSessionBindingDescriptorSchema = z.strictObject({
   schemaVersion: schemaVersionSchema,
@@ -228,6 +256,7 @@ export const uiRequestSchema = z.discriminatedUnion('kind', [
   uiUpdateLearningSpecCommandSchema,
   uiConfirmLearningSpecCommandSchema,
   uiPrepareBuilderTaskCommandSchema,
+  uiPrepareFinalUpgradeTaskCommandSchema,
   uiReturnToDiscoveryCommandSchema,
   uiResolveDecisionCommandSchema,
   uiListProjectsQuerySchema,

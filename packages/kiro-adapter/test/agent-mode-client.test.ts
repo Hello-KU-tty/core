@@ -6,7 +6,7 @@ const projectId = 'project_00000000-0000-4000-8000-000000000001'
 const taskId = 'task_00000000-0000-4000-8000-000000000009'
 const workspaceDirectory =
   '/private/tmp/vibe-helper/generated-workspaces/projects/project_00000000-0000-4000-8000-000000000001'
-const builderSlot = `vibe-helper-builder-v7-${projectId}`
+const builderSlot = `vibe-helper-builder-v8-${projectId}`
 const helperSlot = `vibe-helper-helper-v3-${projectId}`
 
 function sseResponse(payloads: readonly string[]) {
@@ -287,6 +287,68 @@ describe('Crew Agent Mode client', () => {
     expect(completion.assistantSummary).toHaveLength(240)
     expect(completion.assistantSummary).not.toContain('[OPTIONS:')
     expect(completion.assistantText.startsWith(completion.assistantSummary)).toBe(true)
+  })
+
+  it('dispatches Evidence Analyst through an isolated hidden no-tool slot', async () => {
+    const analysisJobId = 'analysis_job_00000000-0000-4000-8000-000000000010'
+    const analystSlot = `vibe-helper-evidence-analyst-v1-${projectId}-${analysisJobId}-a1`
+    const post = vi.fn(async (path: string) =>
+      path === '/api/chat/slots' ? { key: analystSlot } : { ok: true },
+    )
+    const streamingFetch = vi.fn(async () =>
+      sseResponse([
+        JSON.stringify({
+          type: 'message',
+          content: JSON.stringify({
+            schemaVersion: 1,
+            episodeId: 'episode_00000000-0000-4000-8000-000000000011',
+            episodeRevision: 1,
+            correlationId: 'corr_00000000-0000-4000-8000-000000000012',
+            proposals: [],
+            noEvidenceReason: 'No independently expressed Evidence.',
+          }),
+        }),
+        '[DONE]',
+      ]),
+    )
+    const client = new CrewAgentModeClient(
+      { get: vi.fn(async () => []), post },
+      { fetch: streamingFetch },
+    )
+
+    const receipt = await client.dispatchEvidenceAnalyst({
+      projectId,
+      analysisJobId,
+      attempt: 1,
+      context: '{"kind":"EPISODE_CONTEXT"}',
+    })
+    const completion = await receipt.completion
+
+    expect(receipt.slotKey).toBe(analystSlot)
+    expect(post).toHaveBeenNthCalledWith(1, '/api/chat/slots', {
+      name: analystSlot,
+      agent: 'vibe-helper-evidence-analyst',
+      memory_mode: 'temporary',
+    })
+    expect(post).toHaveBeenNthCalledWith(2, `/api/chat/slots/${analystSlot}/context`, {
+      content: '{"kind":"EPISODE_CONTEXT"}',
+      source: 'vibe-helper-core',
+      ephemeral: true,
+      maxAge: 300,
+    })
+    expect(streamingFetch).toHaveBeenCalledWith(
+      '/api/chat',
+      expect.objectContaining({
+        body: JSON.stringify({
+          message:
+            'Analyze the injected Episode context and return exactly one strict JSON result.',
+          slot: analystSlot,
+          agent: 'vibe-helper-evidence-analyst',
+        }),
+      }),
+    )
+    expect(completion).toMatchObject({ status: 'DONE' })
+    expect(JSON.parse(completion.assistantText)).toMatchObject({ proposals: [] })
   })
 
   it('fails closed when private Core context cannot be injected', async () => {

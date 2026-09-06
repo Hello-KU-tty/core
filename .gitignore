@@ -30,6 +30,7 @@ test-results/
 *.sqlite-*
 *.db-wal
 *.db-shm
+.vibe-helper/runtime-data/
 
 # Private source material
 chatgpt-share-*.txt

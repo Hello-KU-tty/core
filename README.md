@@ -2,7 +2,7 @@
 
 Vibe Helper는 코딩 초보자가 자기에게 실용적인 TypeScript 서비스를 고르고, Kiro Builder와 함께 실제로 만들며, 필요한 순간 Helper와 대화해 개념을 익히도록 돕는 build-first 개발 환경이다. 제품은 개발을 교육용 단계로 끊지 않고 실제 Decision, 작업 맥락과 사용자 행동에서 나온 Evidence를 다음 설명과 project 추천에 연결한다.
 
-현재 repository는 T00~T15의 승인·구현·검증 결과를 포함한다. Discovery→Learning Spec→Builder/Decision→Helper→Event/Episode→Evidence/Concept State Core 흐름과 durable SQLite 복구, 역할별 Kiro adapter, Crew App shell 및 실제 Discovery/Spec 사용자 흐름이 연결돼 있다. 다음 작업은 T16 Agent 중심 Build·Helper 동시 UI와 Decision UI이며, `spikes/kiro-crew/`의 코드는 외부 기능 경계를 확인하기 위한 폐기 가능한 실험물이다.
+현재 repository는 T00~T18의 승인·구현 결과를 포함한다. Discovery→Learning Spec→Builder/Decision→Helper→Episode 단위 Evidence 분석→다음 개인화→사용자 선택 Final Upgrade→실행 가능한 local 결과까지 하나의 durable 수직 흐름으로 연결돼 있다. 다음 작업은 T19 Code 중심 thin prototype이며, `spikes/kiro-crew/`의 코드는 외부 기능 경계를 확인하기 위한 폐기 가능한 실험물이다.
 
 ## 문서 읽는 순서
 
@@ -38,9 +38,12 @@ MVP host는 Kiro/Crew이고 Agent 중심 Crew App을 primary surface로 삼는�
 | T08~T13 | 완료 | Candidate revision loop, Learning Spec, 실제 Builder/Decision, read-only Helper, Event/Episode와 no-tool Evidence Analyst |
 | T14 | 완료 | Crew Node backend, same-origin HMAC 경계, Project History와 durable session 복원, Builder/Helper slot binding |
 | T15 | 완료 | Korean-first Discovery/Spec UI, 10개 durable preview와 순차 background enrichment, selection narrowing, Spec revision·Builder 진입, target Crew 설치·복구 검증 |
-| 다음 | T16 | Agent 중심 Build·Helper 동시 UI와 Decision UI |
+| T16 | 완료 | conversation-first Builder/Helper UI, 실제 Decision handoff, native transcript와 완료 결과 |
+| T17 | 완료 | Project Evidence Trace, bounded cross-project retrieval, immutable personalization provenance |
+| T18 | 완료 | hidden Evidence Analyst worker, strict loopback 결과 실행기, optional Final Upgrade, Campus Drop 실행 fixture |
+| 다음 | T19 | Code 중심 thin prototype |
 
-T15의 최종 설치본은 `claude-haiku-4.5`와 Discovery prompt v1.2.0을 사용한다. unseen WebRTC 입력에서 preview 10개를 23.241초에 저장했고, preview만으로 판단이 끝나면 참조 후보만 just-in-time 보강해 SELECT·refinement를 진행한다. 두 background enrichment batch는 identity와 부분 저장을 보존하며 기다리는 사용자가 있을 때 complete Round로 수렴한다. 최종 `pnpm check`는 unit 2개, package/app integration 201개, eval 18개, smoke 6개와 Chromium E2E 12개를 통과했다.
+T18의 Campus Drop fixture는 TypeScript runtime boundary, SQLite metadata와 blob file 분리, SHA-256 token digest, expiry와 1회 consume를 실제 build/test/HTTP 실행으로 검증한다. 제품 결과 실행기는 workspace 안의 strict `.vibe-helper/result.json`과 compiled JavaScript만 읽고, symlink containment를 확인한 뒤 최소 환경의 Node child를 `127.0.0.1` 동적 port에서 감독한다.
 
 알려진 제한으로 첫 유용 반응은 아직 3~5초 stretch goal에 도달하지 않았다. 전체 background 상세 수렴은 최종 측정에서 148.371초였지만 사용자 진행 조건은 아니며, 장기 P95와 background 분포는 T21에서 검증한다. 실행 중 Agent stream/progress의 화면 이탈 후 재연결은 MVP 보장 범위가 아니지만, 저장 완료된 Project·Session·Task·Decision·Context는 Core에서 복원한다.
 
@@ -70,6 +73,7 @@ pnpm test:eval:live-spec      # selected Candidate에서 draft Spec을 저장하
 pnpm test:eval:live-builder   # Decision gate를 포함한 bounded Builder live probe
 pnpm test:eval:live-helper    # current context 기반 read-only Helper live probe
 pnpm test:eval:live-analyst   # closed Episode→no-tool Analyst→Core Evidence live probe
+pnpm test:campus-drop        # Golden Path fixture build, unit와 실제 HTTP 회귀
 pnpm build
 pnpm test:smoke
 pnpm test:e2e
@@ -87,6 +91,7 @@ packages/application      use case와 transaction boundary
 packages/storage-sqlite   SQLite repository와 migration
 packages/kiro-adapter     Crew slot·polling·SSE transport 격리
 tests/eval                평가 calibration과 실제 Agent prompt 회귀 경계
+tests/campus-drop-generated 실행 가능한 Campus Drop Golden Path fixture
 ```
 
-T02 package는 후속 작업의 위치와 dependency 방향을 고정했고 T03~T07은 versioned contract, deterministic reducer, durable SQLite repository, Agent/UI 공통 use case, 역할 고정 MCP catalog와 평가 기반을 구현했다. T08~T13은 네 Agent의 prompt·adapter와 Candidate/Spec/Build/Decision/Helper/Evidence 수직 Core 흐름을 연결했다. T14~T15는 그 상태를 실제 Crew App backend와 Discovery/Spec UI에서 복원·조작하고 target Kiro 설치본까지 검증했다.
+T02 package는 후속 작업의 위치와 dependency 방향을 고정했고 T03~T07은 versioned contract, deterministic reducer, durable SQLite repository, Agent/UI 공통 use case, 역할 고정 MCP catalog와 평가 기반을 구현했다. T08~T13은 네 Agent의 prompt·adapter와 Candidate/Spec/Build/Decision/Helper/Evidence 수직 Core 흐름을 연결했다. T14~T18은 그 상태를 실제 Crew App에서 복원·조작하고, Evidence 기반 다음 행동과 실행 가능한 local 결과까지 확장했다.

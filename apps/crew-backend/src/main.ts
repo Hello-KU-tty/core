@@ -16,6 +16,7 @@ import {
   DISCOVERY_SPEC_RECOVERY_MCP_PATH,
   HELPER_MCP_PATH,
 } from './server.js'
+import { ResultRuntimeSupervisor } from './result-runtime.js'
 
 function required(name: string): string {
   const value = process.env[name]
@@ -72,6 +73,7 @@ export async function runCrewBackend(): Promise<void> {
   const storage = await openSqliteStorage({ dataDirectory: directories.data })
   const workspacePolicy = await WorkspacePathPolicy.create(directories.workspaces)
   const application = new ApplicationService({ storage, workspacePolicy })
+  const resultLauncher = await ResultRuntimeSupervisor.create(directories.workspaces)
   const mcpHandlers = {
     [DISCOVERY_PREVIEW_MCP_PATH]: createRoleBoundMcpHttpHandler({
       role: 'DISCOVERY',
@@ -126,6 +128,7 @@ export async function runCrewBackend(): Promise<void> {
     application,
     proxySecret: required('KIROCREW_PROXY_SECRET'),
     mcpHandlers,
+    resultLauncher,
   })
 
   const close = (): void => {

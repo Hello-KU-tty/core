@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "promptVersion": "1.3.0",
+  "scenario": "Campus Drop result and optional Final Upgrade",
+  "initialTask": {
+    "requiredResultManifest": ".vibe-helper/result.json",
+    "runtime": "WEB",
+    "bindHost": "127.0.0.1",
+    "dynamicPortEnvironment": "PORT"
+  },
+  "finalUpgrade": {
+    "automatic": false,
+    "requiresUserGoal": true,
+    "requiresEvidenceAwareTrace": true,
+    "mayClaimMastery": false,
+    "preserveExistingMvp": true
+  },
+  "evidenceBounds": {
+    "builderCodeAndTestsMaximum": "OBSERVED",
+    "sameFlowMaximum": "DEMONSTRATED",
+    "sameFlowMayReachTransferred": false
+  },
+  "containsPersonalData": false
+}

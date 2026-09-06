@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "name": "Campus Drop TypeScript Golden Path",
+  "discoveryInput": {
+    "learningGoal": "TypeScript로 만료되는 파일 공유 흐름을 만들며 데이터 모델과 접근 제어를 배우고 싶다",
+    "personalNeed": "공용 PC와 개인 기기 사이에서 USB 없이 작은 파일을 옮기고 싶다",
+    "currentLevel": "BEGINNER"
+  },
+  "learningScope": {
+    "learnerFocus": [
+      "TypeScript runtime boundary",
+      "SQLite metadata and filesystem blob separation",
+      "access token and expiry state transition"
+    ],
+    "agentSupport": ["HTTP and upload parsing", "local filesystem permissions"],
+    "excluded": ["login", "permanent storage", "large or multipart upload", "object storage", "hosted deployment"]
+  },
+  "decision": {
+    "question": "첫 다운로드 뒤 링크를 즉시 소비할까, 만료 전까지 재사용할까?",
+    "acceptedOption": "CONSUME_AFTER_FIRST_DOWNLOAD"
+  },
+  "helperUserMessage": "토큰 원문 대신 해시를 저장하면 DB가 노출돼도 바로 다운로드 링크로 재사용하기 어렵고, 첫 성공 뒤 consumed 상태로 바꾸면 두 번째 요청을 막을 수 있다고 이해했는데 맞아?",
+  "finalUpgradeUserGoal": "만료된 링크와 이미 사용한 링크를 서로 다른 안내로 보여줘.",
+  "allowedEvidence": {
+    "builderOutputMaximum": "OBSERVED",
+    "userExplanationMaximum": "EXPLAINED",
+    "independentDecisionOrApplicationMaximum": "DEMONSTRATED",
+    "sameSessionTransferredAllowed": false
+  },
+  "containsPersonalData": false
+}

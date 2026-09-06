@@ -731,7 +731,11 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - Discovery에서 흥미·실용성이 Ledger보다 우선한다.
 - 동일 사용자라도 근거가 없을 때 state를 추측하거나 자신감 퍼센트를 만들어내지 않는다.
 
-### [>] T18. Campus Drop TypeScript Golden Path
+### [x] T18. Campus Drop TypeScript Golden Path
+
+**승인 기록**
+
+- 2026-09-06 사용자가 T17 변경을 별도 커밋한 뒤 T18 계획 전체를 승인했다. 제품 경로에는 hidden no-tool Evidence Analyst worker, loopback-only 실제 결과 실행, 사용자가 선택하는 optional `FINAL_UPGRADE`를 연결한다.
 
 **범위**
 
@@ -755,7 +759,14 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - 결과물을 실제로 실행하거나 열 수 있고 Builder 완료 보고와 test 결과가 일치한다.
 - fixture 전용 hard-coded 후보, 답변 또는 Evidence가 없다.
 
-### [ ] T19. Code 중심 thin prototype
+**검증 기록**
+
+- Campus Drop fixture가 Discovery 후보·세 범위의 Learning Spec·1회 consume 대 재사용 Decision·Helper 대화·사용자 설명·Builder 완료·Evidence-aware Helper·사용자가 쓴 개선 목표·sequence 2 Final Upgrade를 한 browser session에서 통과했다. 최종 Evidence는 Builder 코드·test에 `OBSERVED`, 사용자 자기 설명에 최대 `EXPLAINED`를 허용하고 같은 흐름에서 `TRANSFERRED`를 금지한다. 제품 reducer와 prompt에는 Campus Drop 전용 분기가 없다.
+- `tests/campus-drop-generated`는 strict TypeScript로 SQLite metadata와 blob file을 분리하고 SHA-256 token digest, TTL, atomic consume-once를 구현한다. build 뒤 실제 loopback HTTP process를 띄워 upload, 1회 download, 재사용 `410`, 잘못된 base64를 검증했다. 제품 결과 실행기는 strict manifest, compiled relative JavaScript, containment·symlink 검사, 최소 환경, 동적 loopback port, health/open path 분리, process reuse·종료를 integration test에서 실제 child process로 검증했다.
+- Node.js 24.19.0·pnpm 11.12.0에서 format/lint/typecheck/Drizzle check, unit 2개, integration 212개, eval 22개, Campus Drop 3개, build, smoke 6개와 Chromium E2E 12개가 통과했다.
+- target Kiro Crew 설치본을 data-preserving update endpoint로 app 0.4.1에 갱신했다. 설치 UI·backend·Builder·hidden no-tool Evidence Analyst hash가 source package와 일치하고 backend `/health`가 `ok`이며 실제 History UI가 기존 Project를 복원했다. 첫 target worker 검증에서 실제 Agent가 설명 뒤 single fenced JSON을 반환해 whole-message parser가 legacy 대기 Job 6개를 최대 재시도 뒤 거절하는 회귀를 발견했다. parser를 정확히 하나의 fenced JSON block만 허용하고 복수 block은 거절하도록 고친 versioned 0.4.1 UI에서 같은 no-evidence 형태의 실제 Job 2개가 13.8초·17.8초에 `SUCCEEDED`가 됐다. SQLite `quick_check=ok`이고 Project 61, Discovery Session 62, Learning Spec 27, Task 6, accepted Evidence 13, Concept Ledger 13, Completion Report 2가 유지됐으며, 실패·성공 Job revision도 provenance 때문에 삭제하지 않았다. 새 Campus Drop Agent run은 추가 durable fixture data를 만들지 않고 deterministic full E2E와 실제 result runtime integration으로 대체했다.
+
+### [>] T19. Code 중심 thin prototype
 
 **범위**
 

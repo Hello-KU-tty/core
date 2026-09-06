@@ -1,5 +1,6 @@
-export const BUILDER_SESSION_REVISION = 7 as const
+export const BUILDER_SESSION_REVISION = 8 as const
 export const HELPER_SESSION_REVISION = 3 as const
+export const EVIDENCE_ANALYST_SESSION_REVISION = 1 as const
 
 function revisionedBuilderSlotKey(projectId: string, revision: number): string {
   return `vibe-helper-builder-v${String(revision)}-${projectId}`
@@ -33,4 +34,12 @@ export function priorHelperSlotKeys(projectId: string): readonly string[] {
       revisionedHelperSlotKey(projectId, index + 2),
     ),
   ]
+}
+
+export function evidenceAnalystSlotKey(
+  projectId: string,
+  analysisJobId: string,
+  attempt: number,
+): string {
+  return `vibe-helper-evidence-analyst-v${String(EVIDENCE_ANALYST_SESSION_REVISION)}-${projectId}-${analysisJobId}-a${String(attempt)}`
 }

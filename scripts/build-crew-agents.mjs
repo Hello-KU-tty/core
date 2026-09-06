@@ -6,6 +6,7 @@ const workspaceRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 const sourcePath = join(workspaceRoot, 'docs', 'agent-prompts', 'discovery.md')
 const builderSourcePath = join(workspaceRoot, 'docs', 'agent-prompts', 'builder.md')
 const helperSourcePath = join(workspaceRoot, 'docs', 'agent-prompts', 'helper.md')
+const analystSourcePath = join(workspaceRoot, 'docs', 'agent-prompts', 'evidence-analyst.md')
 const agentsDirectory = join(workspaceRoot, 'agents')
 const expectedVersion = '1.3.0'
 const discoveryModel = process.env.VIBE_HELPER_DISCOVERY_MODEL ?? 'claude-haiku-4.5'
@@ -18,6 +19,7 @@ for (const model of [discoveryModel, specModel]) {
 const prompt = await readFile(sourcePath, 'utf8')
 const builderPrompt = await readFile(builderSourcePath, 'utf8')
 const helperPrompt = await readFile(helperSourcePath, 'utf8')
+const analystPrompt = await readFile(analystSourcePath, 'utf8')
 const version = prompt.match(/^> Prompt version: `([^`]+)`$/m)?.[1]
 
 if (version !== expectedVersion) {
@@ -25,11 +27,14 @@ if (version !== expectedVersion) {
     `Discovery prompt version mismatch: expected ${expectedVersion}, received ${version ?? 'none'}`,
   )
 }
-if (builderPrompt.match(/^> Prompt version: `([^`]+)`$/m)?.[1] !== '1.2.0') {
-  throw new TypeError('Builder prompt version mismatch: expected 1.2.0')
+if (builderPrompt.match(/^> Prompt version: `([^`]+)`$/m)?.[1] !== '1.3.0') {
+  throw new TypeError('Builder prompt version mismatch: expected 1.3.0')
 }
 if (helperPrompt.match(/^> Prompt version: `([^`]+)`$/m)?.[1] !== '1.2.0') {
   throw new TypeError('Helper prompt version mismatch: expected 1.2.0')
+}
+if (analystPrompt.match(/^> Prompt version: `([^`]+)`$/m)?.[1] !== '1.0.1') {
+  throw new TypeError('Evidence Analyst prompt version mismatch: expected 1.0.1')
 }
 
 function sectionStart(heading) {
@@ -162,6 +167,16 @@ const agents = [
     mcpServers: {},
     tools: ['@vibe-helper:helper-core'],
     allowedTools: ['@vibe-helper:helper-core'],
+    managedToolPolicy: common.managedToolPolicy,
+  },
+  {
+    name: 'vibe-helper-evidence-analyst',
+    description: 'Analyzes one bounded closed Episode without tools or user-visible chat.',
+    prompt: analystPrompt,
+    includeMcpJson: false,
+    mcpServers: {},
+    tools: [],
+    allowedTools: [],
     managedToolPolicy: common.managedToolPolicy,
   },
 ]

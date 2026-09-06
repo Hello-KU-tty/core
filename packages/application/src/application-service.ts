@@ -16,6 +16,7 @@ import {
   type AuditRecord,
   auditRecordSchema,
   type BuilderTaskContext,
+  type BuilderTask,
   builderTaskContextSchema,
   type BuilderSessionBindingDescriptor,
   builderSessionBindingDescriptorSchema,
@@ -88,6 +89,7 @@ import {
   reduceConceptState,
   resolveDecision,
   planBuilderTask,
+  planFinalUpgradeTask,
   transitionBuilderTask,
   supersedeLearningSpec,
   transitionAnalysisJob,
@@ -376,6 +378,8 @@ export class ApplicationService {
         return this.#confirmLearningSpec(request)
       case 'UI_PREPARE_BUILDER_TASK':
         return this.#prepareBuilderTask(request)
+      case 'UI_PREPARE_FINAL_UPGRADE_TASK':
+        return this.#prepareFinalUpgradeTask(request)
       case 'UI_RETURN_TO_DISCOVERY':
         return this.#returnToDiscovery(request)
       case 'UI_RESOLVE_DECISION':
@@ -1764,6 +1768,111 @@ export class ApplicationService {
     )
   }
 
+  async #prepareFinalUpgradeTask(
+    request: Extract<UiRequest, { kind: 'UI_PREPARE_FINAL_UPGRADE_TASK' }>,
+  ): Promise<PreparedBuilderTaskDescriptor> {
+    const preparedAt = this.#timestamp()
+    const taskId = this.#generateId('task')
+    const source = this.#storage.transaction((repository) =>
+      repository.readBuilderTaskAggregate(request.projectId, request.sourceTaskId),
+    )
+    if (source === null) throw this.#notFound(request.correlationId, 'BUILDER_TASK_NOT_FOUND')
+    await this.#workspacePolicy.resolveProjectWorkspace(source.project, request.correlationId)
+
+    return this.#storage.transaction((repository) =>
+      this.#idempotent(
+        repository,
+        request,
+        'ui.prepare_final_upgrade_task',
+        preparedBuilderTaskDescriptorSchema,
+        () => {
+          const aggregate = repository.readBuilderTaskAggregate(
+            request.projectId,
+            request.sourceTaskId,
+          )
+          if (aggregate === null) {
+            throw this.#notFound(request.correlationId, 'BUILDER_TASK_NOT_FOUND')
+          }
+          this.#assertRevision(
+            request.expectedSourceTaskRevision,
+            aggregate.task.revision,
+            request.correlationId,
+            'BUILDER_TASK_STALE',
+          )
+          const latestTask = repository.readLatestTaskForProject(request.projectId)
+          if (
+            latestTask?.id !== aggregate.task.id ||
+            aggregate.task.status !== 'COMPLETED' ||
+            aggregate.completionReport === null
+          ) {
+            throw this.#validationError(
+              request.correlationId,
+              'FINAL_UPGRADE_SOURCE_NOT_CURRENT',
+              'Final Upgrade requires the latest completed Builder Task.',
+            )
+          }
+          const personalization = repository.readPersonalizationTrace(
+            request.personalizationTraceId,
+          )
+          if (personalization === null) {
+            throw this.#notFound(request.correlationId, 'PERSONALIZATION_TRACE_NOT_FOUND')
+          }
+          const hasSucceededAnalysis = repository
+            .readAnalysisJobsForProject(request.projectId, 'SUCCEEDED', 100)
+            .some((job) => {
+              const episode = repository.readEpisodeAggregate(request.projectId, job.episodeId)
+              return episode?.episode.taskId === aggregate.task.id
+            })
+          if (!hasSucceededAnalysis) {
+            throw this.#validationError(
+              request.correlationId,
+              'FINAL_UPGRADE_ANALYSIS_REQUIRED',
+              'Wait for Evidence analysis before preparing a Final Upgrade.',
+            )
+          }
+          if (aggregate.project.generatedWorkspacePath === undefined) {
+            throw this.#validationError(
+              request.correlationId,
+              'BUILDER_WORKSPACE_NOT_ASSIGNED',
+              'Final Upgrade requires the existing generated workspace.',
+            )
+          }
+          const planned = planFinalUpgradeTask({
+            project: aggregate.project,
+            spec: aggregate.learningSpec,
+            sourceTask: aggregate.task,
+            personalization,
+            userGoal: redactSensitiveText(request.userGoal),
+            taskId,
+            now: preparedAt,
+          })
+          if (planned.outcome === 'REJECTED') {
+            throw this.#domainError(request.correlationId, planned.reasonCode)
+          }
+          repository.appendTask(planned.value)
+          this.#appendAudit(repository, {
+            correlationId: request.correlationId,
+            actor: { kind: 'USER' },
+            action: 'CREATED',
+            resource: { type: 'BUILDER_TASK', id: planned.value.id, revision: 1 },
+            summary: 'Prepared an optional evidence-aware Final Upgrade Task.',
+            changedFields: ['finalUpgrade', 'prerequisiteTaskIds', 'sequence', 'status'],
+            occurredAt: preparedAt,
+          })
+          const response = preparedBuilderTaskDescriptorSchema.parse({
+            schemaVersion: 1,
+            correlationId: request.correlationId,
+            projectId: request.projectId,
+            workspacePath: aggregate.project.generatedWorkspacePath,
+            task: planned.value,
+            status: 'READY',
+          })
+          return { response, resourceId: planned.value.id, resourceRevision: 1 }
+        },
+      ),
+    )
+  }
+
   #returnToDiscovery(
     request: Extract<UiRequest, { kind: 'UI_RETURN_TO_DISCOVERY' }>,
   ): CommandReceipt {
@@ -1919,7 +2028,7 @@ export class ApplicationService {
           sourceReferences: [],
         })
         this.#openEpisode(repository, {
-          type: 'BUILD_TASK',
+          type: this.#taskEpisodeType(proposed),
           event,
           taskId: proposed.id,
           conceptNames: proposed.expectedConcepts,
@@ -1996,12 +2105,15 @@ export class ApplicationService {
             },
             sourceReferences: request.context.relatedFiles,
           })
-          const buildEpisode = repository.readOpenEpisode(request.context.projectId, 'BUILD_TASK', {
-            taskId: request.context.taskId,
-          })
+          const taskEpisodeType = this.#taskEpisodeType(current.task)
+          const buildEpisode = repository.readOpenEpisode(
+            request.context.projectId,
+            taskEpisodeType,
+            { taskId: request.context.taskId },
+          )
           if (buildEpisode === null) {
             this.#openEpisode(repository, {
-              type: 'BUILD_TASK',
+              type: taskEpisodeType,
               event,
               taskId: request.context.taskId,
               conceptNames: request.context.activeConceptNames,
@@ -2189,12 +2301,13 @@ export class ApplicationService {
             },
             sourceReferences: contextResult.value.relatedFiles,
           })
-          const buildEpisode = repository.readOpenEpisode(decision.projectId, 'BUILD_TASK', {
+          const taskEpisodeType = this.#taskEpisodeType(current.task)
+          const buildEpisode = repository.readOpenEpisode(decision.projectId, taskEpisodeType, {
             taskId: decision.taskId,
           })
           if (buildEpisode === null) {
             this.#openEpisode(repository, {
-              type: 'BUILD_TASK',
+              type: taskEpisodeType,
               event: contextEvent,
               taskId: decision.taskId,
               conceptNames: contextResult.value.activeConceptNames,
@@ -2587,12 +2700,13 @@ export class ApplicationService {
             },
             sourceReferences: application.sourceReferences,
           })
-          const buildEpisode = repository.readOpenEpisode(application.projectId, 'BUILD_TASK', {
+          const taskEpisodeType = this.#taskEpisodeType(current.task)
+          const buildEpisode = repository.readOpenEpisode(application.projectId, taskEpisodeType, {
             taskId: application.taskId,
           })
           if (buildEpisode === null) {
             this.#openEpisode(repository, {
-              type: 'BUILD_TASK',
+              type: taskEpisodeType,
               event,
               taskId: application.taskId,
               conceptNames: contextResult.value.activeConceptNames,
@@ -2731,7 +2845,8 @@ export class ApplicationService {
         }
         repository.appendCompletionReport(request.report)
         repository.appendTask(proposed)
-        let buildEpisode = repository.readOpenEpisode(proposed.projectId, 'BUILD_TASK', {
+        const taskEpisodeType = this.#taskEpisodeType(proposed)
+        let buildEpisode = repository.readOpenEpisode(proposed.projectId, taskEpisodeType, {
           taskId: proposed.id,
         })
         const conceptNames = request.report.conceptUsage.map((usage) => usage.conceptName)
@@ -2751,7 +2866,7 @@ export class ApplicationService {
           buildEpisode =
             buildEpisode === null
               ? this.#openEpisode(repository, {
-                  type: 'BUILD_TASK',
+                  type: taskEpisodeType,
                   event: conceptEvent,
                   taskId: proposed.id,
                   conceptNames,
@@ -2784,7 +2899,7 @@ export class ApplicationService {
           buildEpisode =
             buildEpisode === null
               ? this.#openEpisode(repository, {
-                  type: 'BUILD_TASK',
+                  type: taskEpisodeType,
                   event: validationEvent,
                   taskId: proposed.id,
                 })
@@ -2812,7 +2927,7 @@ export class ApplicationService {
         buildEpisode =
           buildEpisode === null
             ? this.#openEpisode(repository, {
-                type: 'BUILD_TASK',
+                type: taskEpisodeType,
                 event: completionEvent,
                 taskId: proposed.id,
                 conceptNames,
@@ -4472,6 +4587,10 @@ export class ApplicationService {
         occurredAt: context.updatedAt,
       })
     }
+  }
+
+  #taskEpisodeType(task: BuilderTask): Episode['type'] {
+    return task.finalUpgrade === undefined ? 'BUILD_TASK' : 'FINAL_UPGRADE'
   }
 
   #appendActivityEvent(

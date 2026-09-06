@@ -1,9 +1,8 @@
 const applicationPrefix = '/apps/vibe-helper/api'
-const applicationTarget = '/api/application'
 const chatSlotsPath = ['/api', 'chat', 'slots'].join('/')
 const testProxySecret = 'test-proxy-secret-with-at-least-thirty-two-bytes'
 
-async function signature(body: string): Promise<string> {
+async function signature(body: string, target: string): Promise<string> {
   const timestamp = Math.floor(Date.now() / 1_000).toString()
   const bytes = new TextEncoder().encode(body)
   const bodyHash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)))
@@ -16,7 +15,7 @@ async function signature(body: string): Promise<string> {
     false,
     ['sign'],
   )
-  const payload = new TextEncoder().encode(`${timestamp}:POST:${applicationTarget}:${bodyHash}`)
+  const payload = new TextEncoder().encode(`${timestamp}:POST:${target}:${bodyHash}`)
   const digest = await crypto.subtle.sign('HMAC', key, payload)
   const mac = Array.from(new Uint8Array(digest))
     .map((value) => value.toString(16).padStart(2, '0'))
@@ -96,7 +95,10 @@ const api = {
     }
     const body = JSON.stringify(input)
     const headers: Record<string, string> = { 'content-type': 'application/json' }
-    if (path.startsWith(applicationPrefix)) headers['x-kirocrew-proxy'] = await signature(body)
+    if (path.startsWith(applicationPrefix)) {
+      const backendTarget = `/api${path.slice(applicationPrefix.length)}`
+      headers['x-kirocrew-proxy'] = await signature(body, backendTarget)
+    }
     return readJson(await fetch(path, { method: 'POST', headers, body }))
   },
 }

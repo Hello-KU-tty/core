@@ -6,6 +6,7 @@ import {
   confirmLearningSpec,
   openDecision,
   planBuilderTask,
+  planFinalUpgradeTask,
   reduceCandidateRevision,
   requiredEvidenceConceptNames,
   resolveDecision,
@@ -26,6 +27,7 @@ import {
   discoveryFeedbackFixture,
   draftLearningSpecFixture,
   episodeFixture,
+  helperPersonalizationFixture,
   ids,
   liveContextFixture,
   projectFixture,
@@ -280,6 +282,77 @@ describe('Task and Decision reducers', () => {
         now: timestamp,
       }).trace.reasonCode,
     ).toBe('BUILDER_TASK_CONFIRMED_SPEC_REQUIRED')
+  })
+
+  it('plans an optional sequence-two Task only from evidence-aware Helper personalization', () => {
+    const sourceTask = { ...completedTask, sequence: 1 }
+    const evidenceAware = {
+      ...helperPersonalizationFixture,
+      mode: 'EVIDENCE_AWARE' as const,
+      basis: [
+        {
+          conceptId: ids.concept,
+          conceptName: 'runtime validation',
+          ledgerRevision: 1,
+          state: 'DEMONSTRATED' as const,
+          evidenceIds: [ids.evidence],
+          episodeIds: [ids.episode],
+          sourceProjectIds: [ids.project],
+          sourceProjectTitles: ['Webhook Lens'],
+          openIssueIds: [],
+          purpose: 'HELPER_EXPLANATION_START' as const,
+        },
+      ],
+      fallbackReason: undefined,
+    }
+    const planned = planFinalUpgradeTask({
+      project: projectFixture,
+      spec: confirmedLearningSpecFixture,
+      sourceTask,
+      personalization: evidenceAware,
+      userGoal: 'Show expired and consumed links as different states.',
+      taskId: 'task_00000000-0000-4000-8000-000000000099',
+      now: timestamp,
+    })
+
+    expect(planned.outcome).toBe('APPLIED')
+    if (planned.outcome !== 'APPLIED') return
+    expect(planned.value).toMatchObject({
+      sequence: 2,
+      prerequisiteTaskIds: [ids.task],
+      finalUpgrade: {
+        sourceTaskId: ids.task,
+        personalizationTraceId: ids.personalization,
+        userGoal: 'Show expired and consumed links as different states.',
+      },
+    })
+    expect(planned.value.acceptanceCriteria.map((criterion) => criterion.key)).toEqual([
+      'user_selected_improvement',
+      'local_result',
+      'tests_pass',
+    ])
+    expect(
+      planFinalUpgradeTask({
+        project: projectFixture,
+        spec: confirmedLearningSpecFixture,
+        sourceTask,
+        personalization: helperPersonalizationFixture,
+        userGoal: 'Guess a next feature.',
+        taskId: 'task_00000000-0000-4000-8000-000000000100',
+        now: timestamp,
+      }).trace.reasonCode,
+    ).toBe('FINAL_UPGRADE_EVIDENCE_REQUIRED')
+    expect(
+      planFinalUpgradeTask({
+        project: projectFixture,
+        spec: confirmedLearningSpecFixture,
+        sourceTask: { ...sourceTask, sequence: 2 },
+        personalization: evidenceAware,
+        userGoal: 'Chain another upgrade automatically.',
+        taskId: 'task_00000000-0000-4000-8000-000000000101',
+        now: timestamp,
+      }).trace.reasonCode,
+    ).toBe('FINAL_UPGRADE_EVIDENCE_REQUIRED')
   })
 
   it('requires a started first Context and rejects stale or post-completion updates', () => {

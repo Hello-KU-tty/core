@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomUUID } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 
 import { type APIRequestContext, expect, type Page, type Route, test } from '@playwright/test'
 import {
@@ -11,8 +12,41 @@ import {
 } from '../../packages/contracts/dist/index.js'
 
 const applicationPath = '/api/application'
+const analystContextPath = '/api/analyst-context'
 const testAgentPath = '/api/test/agent'
 const proxySecret = 'test-proxy-secret-with-at-least-thirty-two-bytes'
+const campusDropFixture = JSON.parse(
+  readFileSync(new URL('./campus-drop-session.fixture.json', import.meta.url), 'utf8'),
+) as {
+  readonly discoveryInput: {
+    readonly learningGoal: string
+    readonly personalNeed: string
+  }
+  readonly decision: {
+    readonly question: string
+    readonly acceptedOption: string
+  }
+  readonly learningScope: {
+    readonly learnerFocus: readonly string[]
+    readonly agentSupport: readonly string[]
+    readonly excluded: readonly string[]
+  }
+  readonly helperUserMessage: string
+  readonly finalUpgradeUserGoal: string
+  readonly allowedEvidence: {
+    readonly builderOutputMaximum: string
+    readonly userExplanationMaximum: string
+    readonly independentDecisionOrApplicationMaximum: string
+    readonly sameSessionTransferredAllowed: boolean
+  }
+  readonly containsPersonalData: boolean
+}
+
+function isCampusDrop(snapshot: ProjectSessionSnapshot): boolean {
+  return (
+    snapshot.discoverySession?.input.learningGoal === campusDropFixture.discoveryInput.learningGoal
+  )
+}
 
 function id(prefix: string): string {
   return `${prefix}_${randomUUID()}`
@@ -39,7 +73,7 @@ async function executeBackend(
 }
 
 async function executeUi(request: APIRequestContext, input: Readonly<Record<string, unknown>>) {
-  return executeBackend(request, applicationPath, { ...input, clientProtocolVersion: 8 })
+  return executeBackend(request, applicationPath, { ...input, clientProtocolVersion: 9 })
 }
 
 async function executeDiscoveryAgent(
@@ -71,7 +105,34 @@ const evaluationCriteria = [
   'DISTINCTIVENESS',
 ] as const
 
-function candidateContent(title: string, summary: string) {
+function candidateContent(title: string, summary: string, campusDrop = false) {
+  if (campusDrop) {
+    return {
+      title,
+      summary,
+      targetUsers: ['공용 PC와 개인 기기 사이에서 작은 파일을 옮기는 사용자'],
+      coreInteraction: '작은 파일과 만료 시간을 고르고 일회용 다운로드 링크를 만든다.',
+      usageMoment: '로그인이나 USB 없이 개인 기기로 작은 파일 하나를 가져올 때',
+      appeal: '링크의 생성·만료·소비 상태가 실제 다운로드 결과로 바로 보인다.',
+      personalNeedRelationship: '공용 PC에서 개인 기기로 작은 파일을 안전하게 옮길 수 있다.',
+      technologyNecessity:
+        'TypeScript runtime validation과 명시적 상태 분기로 만료·소비 경계를 검증해야 한다.',
+      coreConcepts: ['TypeScript runtime boundary', 'access token expiry state'],
+      mvpFeatures: ['작은 파일 업로드', '만료 링크 생성', '일회 다운로드'],
+      suggestedScope: {
+        learnerFocus: ['runtime boundary와 token 상태 전이'],
+        agentSupport: ['HTTP parsing과 local filesystem 권한'],
+        excluded: ['로그인', '영구·대용량·hosted storage'],
+      },
+      risks: ['token과 blob 보관 경계를 섞으면 링크 원문이나 파일이 과도하게 노출될 수 있다.'],
+      generationTags: ['DIRECT'] as const,
+      evaluation: evaluationCriteria.map((criterion) => ({
+        criterion,
+        assessment: 'POSITIVE' as const,
+        rationale: `${criterion} 기준에서 작은 local TypeScript MVP로 검증 가능하다.`,
+      })),
+    }
+  }
   return {
     title,
     summary,
@@ -127,6 +188,127 @@ async function readEvidenceTrace(request: APIRequestContext, projectId: string) 
   return projectEvidenceTraceSchema.parse(payload.data)
 }
 
+async function fulfillAnalystTurn(
+  route: Route,
+  request: APIRequestContext,
+  projectId: string,
+): Promise<void> {
+  const response = await executeUi(request, {
+    schemaVersion: 1,
+    kind: 'UI_READ_ANALYSIS_JOBS',
+    correlationId: id('corr'),
+    actor: { kind: 'UI' },
+    projectId,
+    status: 'RUNNING',
+    limit: 100,
+  })
+  const payload = await response.json()
+  const jobs = payload.success === true && Array.isArray(payload.data) ? payload.data : []
+  const job = jobs.at(-1)
+  if (
+    typeof job !== 'object' ||
+    job === null ||
+    typeof job.episodeId !== 'string' ||
+    typeof job.episodeRevision !== 'number' ||
+    typeof job.correlationId !== 'string'
+  ) {
+    throw new TypeError('Running Evidence Analyst job is missing')
+  }
+  const contextResponse = await executeBackend(request, analystContextPath, {
+    schemaVersion: 1,
+    kind: 'ANALYST_GET_EPISODE_CONTEXT',
+    correlationId: job.correlationId,
+    actor: { kind: 'AGENT', role: 'EVIDENCE_ANALYST' },
+    projectId,
+    episodeId: job.episodeId,
+    expectedEpisodeRevision: job.episodeRevision,
+    clientProtocolVersion: 9,
+  })
+  const contextPayload = (await contextResponse.json()) as {
+    readonly success?: boolean
+    readonly data?: {
+      readonly episode?: {
+        readonly type?: string
+        readonly conceptCandidates?: readonly { readonly originalExpression?: string }[]
+      }
+      readonly events?: readonly {
+        readonly payload?: {
+          readonly type?: string
+          readonly redactedExcerpt?: string
+        }
+        readonly sourceReferences?: readonly Readonly<Record<string, unknown>>[]
+      }[]
+      readonly decisionContext?: {
+        readonly request?: {
+          readonly relatedConceptNames?: readonly string[]
+        }
+        readonly resolution?: {
+          readonly decisionId?: string
+          readonly customProposal?: string
+        } | null
+      } | null
+    }
+  }
+  expect(contextPayload.success).toBe(true)
+  const userMessageEvent = contextPayload.data?.events?.find(
+    (event) => event.payload?.type === 'USER_MESSAGE',
+  )
+  const userMessageSource = userMessageEvent?.sourceReferences?.find(
+    (source) => source.kind === 'USER_MESSAGE',
+  )
+  const evidenceExcerpt = userMessageEvent?.payload?.redactedExcerpt
+  const conceptName = contextPayload.data?.episode?.conceptCandidates?.find((candidate) =>
+    candidate.originalExpression?.toLowerCase().includes('token'),
+  )?.originalExpression
+  const hasUserExplanation =
+    contextPayload.data?.episode?.type === 'HELPER_CONVERSATION' &&
+    userMessageSource !== undefined &&
+    typeof evidenceExcerpt === 'string'
+  const semanticResult = {
+    schemaVersion: 1,
+    episodeId: job.episodeId,
+    episodeRevision: job.episodeRevision,
+    correlationId: job.correlationId,
+    proposals: hasUserExplanation
+      ? [
+          {
+            concept: {
+              originalExpression: conceptName ?? 'access token and expiry state transition',
+              proposedCanonicalName: conceptName ?? 'access token and expiry state transition',
+            },
+            signal: 'REPHRASE',
+            strength: 'STRONG',
+            promptDependence: 'LIGHT_HINT',
+            userEvidenceSources: userMessageSource === undefined ? [] : [userMessageSource],
+            contextSources: [],
+            redactedEvidenceExcerpt: evidenceExcerpt ?? 'The user explained the token boundary.',
+            rationale:
+              'The user connected token digest storage and the consumed transition in their own follow-up question.',
+            maximumSupportedState: 'EXPLAINED',
+            misconception: { action: 'NONE' },
+          },
+        ]
+      : [],
+    ...(hasUserExplanation
+      ? {}
+      : {
+          noEvidenceReason:
+            'This Episode contains no independent user explanation or justified decision.',
+        }),
+  }
+  await route.fulfill({
+    status: 200,
+    contentType: 'text/event-stream',
+    body: [
+      `data: ${JSON.stringify({
+        type: 'message',
+        content: JSON.stringify(semanticResult),
+      })}`,
+      'data: [DONE]',
+    ].join('\n\n'),
+  })
+}
+
 async function submitCandidateRound(
   request: APIRequestContext,
   snapshot: ProjectSessionSnapshot,
@@ -138,19 +320,35 @@ async function submitCandidateRound(
   const pendingFeedback = context.feedback.filter(
     (feedback) => !currentRound?.appliedFeedbackIds.includes(feedback.id),
   )
+  const campusDrop = isCampusDrop(snapshot)
   const now = new Date().toISOString()
   let candidates: ProjectCandidateRevision[]
   let references: CandidateRevisionReference[]
   if (currentRound === undefined) {
-    candidates = [
-      [
-        'Safe Config Lab',
-        '잘못된 설정을 직접 넣어 보며 runtime validation의 역할을 확인하는 로컬 실험실',
-      ],
-      ['API Shape Detective', '여러 API 응답 모양을 비교하고 안전하게 좁히는 탐정형 playground'],
-      ['Webhook Replay Desk', '서로 다른 webhook payload를 재생하고 분기 결과를 비교하는 도구'],
-      ['Form State Theater', '복잡한 폼 상태를 명시적 variant로 바꾸며 흐름을 확인하는 도구'],
-    ].map(([title, summary]) =>
+    candidates = (
+      campusDrop
+        ? [
+            ['Campus Drop', '작은 파일을 만료·일회용 링크로 개인 기기에 옮기는 local 도구'],
+            ['QR Note Relay', '짧은 텍스트를 만료 QR로 다른 기기에 넘기는 도구'],
+            ['Clipboard Capsule', '한 번만 열리는 작은 clipboard payload를 만드는 도구'],
+            ['Local Token Lab', 'token 생성·만료·소비 상태를 직접 비교하는 실험실'],
+          ]
+        : [
+            [
+              'Safe Config Lab',
+              '잘못된 설정을 직접 넣어 보며 runtime validation의 역할을 확인하는 로컬 실험실',
+            ],
+            [
+              'API Shape Detective',
+              '여러 API 응답 모양을 비교하고 안전하게 좁히는 탐정형 playground',
+            ],
+            [
+              'Webhook Replay Desk',
+              '서로 다른 webhook payload를 재생하고 분기 결과를 비교하는 도구',
+            ],
+            ['Form State Theater', '복잡한 폼 상태를 명시적 variant로 바꾸며 흐름을 확인하는 도구'],
+          ]
+    ).map(([title, summary]) =>
       projectCandidateRevisionSchema.parse({
         schemaVersion: 1,
         id: id('candidate'),
@@ -158,7 +356,11 @@ async function submitCandidateRound(
         correlationId: session.correlationId,
         revision: 1,
         parentRevisions: [],
-        ...candidateContent(title ?? 'Untitled Candidate', summary ?? 'Candidate summary'),
+        ...candidateContent(
+          title ?? 'Untitled Candidate',
+          summary ?? 'Candidate summary',
+          campusDrop,
+        ),
         createdAt: now,
         source: { kind: 'AGENT', role: 'DISCOVERY' },
         redactionStatus: 'NOT_REQUIRED',
@@ -172,12 +374,30 @@ async function submitCandidateRound(
     const feedback = pendingFeedback.at(-1)
     expect(feedback).toBeDefined()
     if (feedback?.intent === 'MORE') {
-      candidates = [
-        ['CLI Output Triage', '여러 command 결과를 성공과 실패 variant로 분류하는 로컬 도구'],
-        ['Import Contract Gate', '가져온 JSON 파일의 shape를 검사하고 안전한 부분만 여는 도구'],
-        ['Plugin Message Router', 'plugin message 종류별 처리 흐름을 시각적으로 추적하는 도구'],
-        ['Database Row Guard', 'nullable query 결과를 명시적 상태로 바꾸고 안전하게 표시하는 도구'],
-      ].map(([title, summary]) =>
+      candidates = (
+        campusDrop
+          ? [
+              ['Expiry State Board', '같은 token의 유효·만료·소비 상태를 비교하는 local board'],
+              ['Tiny Blob Locker', '작은 blob과 metadata 보관 경계를 비교하는 도구'],
+              ['One-time Inbox', '한 번 수신하면 닫히는 local message inbox'],
+              ['Transfer Audit Map', '파일 이동 event와 상태 전이를 따라가는 local map'],
+            ]
+          : [
+              ['CLI Output Triage', '여러 command 결과를 성공과 실패 variant로 분류하는 로컬 도구'],
+              [
+                'Import Contract Gate',
+                '가져온 JSON 파일의 shape를 검사하고 안전한 부분만 여는 도구',
+              ],
+              [
+                'Plugin Message Router',
+                'plugin message 종류별 처리 흐름을 시각적으로 추적하는 도구',
+              ],
+              [
+                'Database Row Guard',
+                'nullable query 결과를 명시적 상태로 바꾸고 안전하게 표시하는 도구',
+              ],
+            ]
+      ).map(([title, summary]) =>
         projectCandidateRevisionSchema.parse({
           schemaVersion: 1,
           id: id('candidate'),
@@ -185,7 +405,11 @@ async function submitCandidateRound(
           correlationId: session.correlationId,
           revision: 1,
           parentRevisions: [],
-          ...candidateContent(title ?? 'Untitled Candidate', summary ?? 'Candidate summary'),
+          ...candidateContent(
+            title ?? 'Untitled Candidate',
+            summary ?? 'Candidate summary',
+            campusDrop,
+          ),
           createdAt: now,
           source: { kind: 'AGENT', role: 'DISCOVERY' },
           redactionStatus: 'NOT_REQUIRED',
@@ -276,12 +500,28 @@ const initialPreviewDirections = [
   ['Schema Error Coach', '검증 오류를 초보자용 설명으로 바꾸는 로컬 코치'],
 ] as const
 
+const campusDropPreviewDirections = [
+  ['Campus Drop', '작은 파일을 만료·일회용 링크로 개인 기기에 옮기는 local 도구'],
+  ['QR Note Relay', '짧은 텍스트를 만료 QR로 다른 기기에 넘기는 도구'],
+  ['Clipboard Capsule', '한 번만 열리는 작은 clipboard payload를 만드는 도구'],
+  ['Local Token Lab', 'token 생성·만료·소비 상태를 직접 비교하는 실험실'],
+  ['Expiry State Board', '같은 token의 유효·만료·소비 상태를 비교하는 local board'],
+  ['Tiny Blob Locker', '작은 blob과 metadata 보관 경계를 비교하는 도구'],
+  ['One-time Inbox', '한 번 수신하면 닫히는 local message inbox'],
+  ['Transfer Audit Map', '파일 이동 event와 상태 전이를 따라가는 local map'],
+  ['Pocket File Ferry', '같은 Wi-Fi 안에서 작은 파일을 잠깐 건네는 local 도구'],
+  ['Link Lifecycle Coach', '공유 link lifecycle을 단계별로 설명하는 local coach'],
+] as const
+
 async function submitCandidatePreviews(
   request: APIRequestContext,
   snapshot: ProjectSessionSnapshot,
 ): Promise<void> {
   const session = snapshot.discoverySession
   if (session === null) throw new TypeError('Discovery session is missing')
+  const previewDirections = isCampusDrop(snapshot)
+    ? campusDropPreviewDirections
+    : initialPreviewDirections
   const response = await executeDiscoveryAgent(request, {
     schemaVersion: 1,
     kind: 'DISCOVERY_SUBMIT_CANDIDATE_PREVIEWS',
@@ -296,14 +536,20 @@ async function submitCandidatePreviews(
       discoverySessionId: session.id,
       correlationId: session.correlationId,
       inputSnapshot: session.input,
-      previews: initialPreviewDirections.map(([title, summary], index) => ({
+      previews: previewDirections.map(([title, summary], index) => ({
         candidateId: id('candidate'),
         position: index + 1,
         title,
         summary,
-        coreInteraction: `샘플 ${String(index + 1)}을 입력하고 타입이 좁혀지는 결과를 비교한다.`,
-        appeal: `보이지 않던 경계 ${String(index + 1)}을 직접 깨뜨리고 고칠 수 있다.`,
-        technologyNecessity: '실행 시점 입력을 TypeScript의 안전한 상태로 바꿔야 한다.',
+        coreInteraction: isCampusDrop(snapshot)
+          ? `작은 payload ${String(index + 1)}의 생성·만료·소비 흐름을 비교한다.`
+          : `샘플 ${String(index + 1)}을 입력하고 타입이 좁혀지는 결과를 비교한다.`,
+        appeal: isCampusDrop(snapshot)
+          ? `일시적인 전달 상태 ${String(index + 1)}을 실제 결과로 확인할 수 있다.`
+          : `보이지 않던 경계 ${String(index + 1)}을 직접 깨뜨리고 고칠 수 있다.`,
+        technologyNecessity: isCampusDrop(snapshot)
+          ? '실행 시점 token과 만료 상태를 TypeScript의 명시적 분기로 바꿔야 한다.'
+          : '실행 시점 입력을 TypeScript의 안전한 상태로 바꿔야 한다.',
         generationTags: ['DIRECT'],
       })),
       generationRationale: '서로 다른 입력과 상호작용을 가진 10개 방향을 먼저 비교했다.',
@@ -343,7 +589,7 @@ async function submitCandidateEnrichment(
     previewRoundId: previewRound.id,
     batch,
     enrichments: previews.map((preview) => {
-      const details = candidateContent(preview.title, preview.summary)
+      const details = candidateContent(preview.title, preview.summary, isCampusDrop(snapshot))
       return {
         schemaVersion: 1,
         previewRoundId: previewRound.id,
@@ -382,6 +628,7 @@ async function submitLearningSpec(
   const selected = snapshot.selectedCandidate
   if (session === null || selected === null) throw new TypeError('Selected Discovery is missing')
   const current = snapshot.learningSpec
+  const campusDrop = isCampusDrop(snapshot)
   const now = new Date().toISOString()
   const response = await executeDiscoveryAgent(request, {
     schemaVersion: 1,
@@ -401,42 +648,96 @@ async function submitLearningSpec(
       selectedCandidate: { candidateId: selected.id, revision: selected.revision },
       productPurpose:
         current === null
-          ? '잘못된 외부 설정을 실행 전에 발견하는 로컬 validation 도구를 만든다.'
-          : '로그인 없이 한 화면에서 외부 설정을 안전하게 검증하는 로컬 도구를 만든다.',
-      targetUsers: current?.targetUsers ?? ['작은 TypeScript 도구를 만드는 초보 개발자'],
+          ? campusDrop
+            ? '작은 파일을 만료되는 일회용 링크로 개인 기기에 옮기는 local 도구를 만든다.'
+            : '잘못된 외부 설정을 실행 전에 발견하는 로컬 validation 도구를 만든다.'
+          : campusDrop
+            ? '로그인 없이 작은 파일을 만료·일회용 링크로 옮기는 local 도구를 만든다.'
+            : '로그인 없이 한 화면에서 외부 설정을 안전하게 검증하는 로컬 도구를 만든다.',
+      targetUsers:
+        current?.targetUsers ??
+        (campusDrop
+          ? ['공용 PC와 개인 기기 사이에서 작은 파일을 옮기는 사용자']
+          : ['작은 TypeScript 도구를 만드는 초보 개발자']),
       primaryUsageMoment:
-        current?.primaryUsageMoment ?? '새 설정 파일이나 API payload를 연결하기 전',
+        current?.primaryUsageMoment ??
+        (campusDrop
+          ? '로그인이나 USB 없이 개인 기기로 작은 파일 하나를 가져올 때'
+          : '새 설정 파일이나 API payload를 연결하기 전'),
       successMoment:
         current?.successMoment ??
-        '잘못된 입력이 안전한 오류로 바뀌고 올바른 입력만 다음 단계로 전달된다.',
-      mvpFeatures: current?.mvpFeatures ?? ['샘플 입력 편집', 'schema 검증', '성공·실패 분기 비교'],
-      scope: current?.scope ?? [
-        {
-          category: 'LEARNER_FOCUS',
-          title: '실행 시점 검증 판단',
-          rationale: '이번 학습 목표와 제품의 핵심 동작이 직접 만난다.',
-          conceptNames: ['runtime validation', 'discriminated union'],
-        },
-        {
-          category: 'AGENT_SUPPORT',
-          title: '로컬 앱 shell',
-          rationale: '제품에는 필요하지만 이번 목표 밖의 반복 구현이다.',
-          conceptNames: [],
-        },
-        {
-          category: 'EXCLUDED',
-          title: '계정과 cloud sync',
-          rationale: '핵심 검증 경험 없이 운영 범위만 키운다.',
-          conceptNames: [],
-        },
-      ],
-      expectedDecisions: current?.expectedDecisions ?? [
-        {
-          category: 'PRODUCT_BEHAVIOR',
-          description: '검증 실패를 한 번에 보여줄지 단계별로 보여줄지 정한다.',
-          whyUserInputMatters: '사용자가 배우고 싶은 비교 방식과 직접 연결된다.',
-        },
-      ],
+        (campusDrop
+          ? '첫 다운로드는 성공하고 같은 링크의 두 번째 다운로드는 소비된 상태로 거절된다.'
+          : '잘못된 입력이 안전한 오류로 바뀌고 올바른 입력만 다음 단계로 전달된다.'),
+      mvpFeatures:
+        current?.mvpFeatures ??
+        (campusDrop
+          ? ['작은 파일 업로드', '만료 링크 생성', '일회 다운로드']
+          : ['샘플 입력 편집', 'schema 검증', '성공·실패 분기 비교']),
+      scope:
+        current?.scope ??
+        (campusDrop
+          ? [
+              {
+                category: 'LEARNER_FOCUS',
+                title: 'TypeScript runtime과 상태 경계',
+                rationale: '파일 전달의 안전한 상태 전이가 학습 목표와 직접 만난다.',
+                conceptNames: [
+                  'TypeScript runtime boundary',
+                  'SQLite metadata and filesystem blob separation',
+                  'access token and expiry state transition',
+                ],
+              },
+              {
+                category: 'AGENT_SUPPORT',
+                title: 'HTTP와 local file 처리',
+                rationale: '제품에는 필요하지만 이번 판단의 중심이 아닌 구현 지원이다.',
+                conceptNames: [],
+              },
+              {
+                category: 'EXCLUDED',
+                title: '운영 인프라와 대용량 전송',
+                rationale: 'local Golden Path 없이 운영 범위만 키운다.',
+                conceptNames: [],
+              },
+            ]
+          : [
+              {
+                category: 'LEARNER_FOCUS',
+                title: '실행 시점 검증 판단',
+                rationale: '이번 학습 목표와 제품의 핵심 동작이 직접 만난다.',
+                conceptNames: ['runtime validation', 'discriminated union'],
+              },
+              {
+                category: 'AGENT_SUPPORT',
+                title: '로컬 앱 shell',
+                rationale: '제품에는 필요하지만 이번 목표 밖의 반복 구현이다.',
+                conceptNames: [],
+              },
+              {
+                category: 'EXCLUDED',
+                title: '계정과 cloud sync',
+                rationale: '핵심 검증 경험 없이 운영 범위만 키운다.',
+                conceptNames: [],
+              },
+            ]),
+      expectedDecisions:
+        current?.expectedDecisions ??
+        (campusDrop
+          ? [
+              {
+                category: 'PRODUCT_BEHAVIOR',
+                description: campusDropFixture.decision.question,
+                whyUserInputMatters: '링크의 실제 재사용 가능성과 상태 모델을 결정한다.',
+              },
+            ]
+          : [
+              {
+                category: 'PRODUCT_BEHAVIOR',
+                description: '검증 실패를 한 번에 보여줄지 단계별로 보여줄지 정한다.',
+                whyUserInputMatters: '사용자가 배우고 싶은 비교 방식과 직접 연결된다.',
+              },
+            ]),
       runtimeConstraint: 'TYPESCRIPT',
       deploymentConstraints: current?.deploymentConstraints ?? ['첫 MVP는 로컬에서 실행한다.'],
       status: 'DRAFT',
@@ -512,6 +813,7 @@ async function fulfillInitialBuilderTurn(
   const snapshot = await restoreProject(request, projectId)
   const task = snapshot.currentTask
   if (task === null) throw new TypeError('Builder Task is missing')
+  const campusDrop = isCampusDrop(snapshot)
   await executeBuilderAgent(request, {
     schemaVersion: 1,
     kind: 'BUILDER_START_TASK',
@@ -538,13 +840,23 @@ async function fulfillInitialBuilderTurn(
       contextVersion: 1,
       expectedPreviousVersion: 0,
       checkpoint: 'TASK_STARTED',
-      stage: 'Implementing the local validation flow',
-      currentGoal: 'Render a safe success and failure result from unknown input.',
-      recentChanges: ['Created the parser boundary and result shell.'],
+      stage: campusDrop
+        ? 'Implementing the local one-time transfer flow'
+        : 'Implementing the local validation flow',
+      currentGoal: campusDrop
+        ? 'Store a small blob separately and enforce token expiry and consume-once state.'
+        : 'Render a safe success and failure result from unknown input.',
+      recentChanges: campusDrop
+        ? ['Created the metadata and blob storage boundary.']
+        : ['Created the parser boundary and result shell.'],
       activeDecisionIds: [],
       activeConceptNames: task.expectedConcepts,
       relatedFiles: [],
-      nextActions: ['Choose how validation failures should be presented.'],
+      nextActions: [
+        campusDrop
+          ? 'Choose whether a successful download consumes the link.'
+          : 'Choose how validation failures should be presented.',
+      ],
       updatedAt: now,
       source: { kind: 'AGENT', role: 'BUILDER' },
       redactionStatus: 'VERIFIED_REDACTED',
@@ -562,38 +874,74 @@ async function fulfillInitialBuilderTurn(
     expectedContextVersion: 1,
     decision: {
       category: 'PRODUCT_BEHAVIOR',
-      question: '검증 오류를 한 번에 보여줄까요, 첫 오류부터 단계별로 보여줄까요?',
-      reasonRequiredNow: '오류 결과 화면과 parser 반환 형식이 이 선택에 따라 달라집니다.',
-      options: [
-        {
-          key: 'all',
-          label: '오류를 한 번에 표시',
-          description: '발견한 모든 validation 오류를 같은 결과 카드에 보여줍니다.',
-          impacts: ['사용자가 입력 전체를 한 번에 고칠 수 있습니다.'],
-          tradeoffs: ['처음 보는 사용자에게 정보가 많을 수 있습니다.'],
-        },
-        {
-          key: 'first',
-          label: '첫 오류부터 단계별 표시',
-          description: '가장 먼저 발견한 오류 하나만 안내합니다.',
-          impacts: ['한 번에 집중할 내용이 줄어듭니다.'],
-          tradeoffs: ['여러 번 수정해야 전체 오류를 확인할 수 있습니다.'],
-        },
-      ],
-      recommendedOptionKey: 'all',
-      recommendationRationale: '작은 설정 파일은 모든 오류를 함께 고치는 흐름이 더 빠릅니다.',
-      relatedConceptNames: ['runtime validation'],
+      question: campusDrop
+        ? campusDropFixture.decision.question
+        : '검증 오류를 한 번에 보여줄까요, 첫 오류부터 단계별로 보여줄까요?',
+      reasonRequiredNow: campusDrop
+        ? 'download handler와 token 상태 전이가 이 선택에 따라 달라집니다.'
+        : '오류 결과 화면과 parser 반환 형식이 이 선택에 따라 달라집니다.',
+      options: campusDrop
+        ? [
+            {
+              key: 'consume',
+              label: '첫 다운로드 뒤 소비',
+              description: '첫 성공 직후 token을 소비해 같은 링크의 재사용을 막습니다.',
+              impacts: ['공용 PC에 남은 링크가 다시 사용될 가능성을 줄입니다.'],
+              tradeoffs: ['다운로드가 끝난 뒤 같은 링크로 다시 받을 수 없습니다.'],
+            },
+            {
+              key: 'reuse',
+              label: '만료 전까지 재사용',
+              description: '만료 전에는 같은 token으로 여러 번 다운로드할 수 있습니다.',
+              impacts: ['여러 개인 기기에서 같은 파일을 받기 쉽습니다.'],
+              tradeoffs: ['노출된 링크의 재사용 가능 시간이 길어집니다.'],
+            },
+          ]
+        : [
+            {
+              key: 'all',
+              label: '오류를 한 번에 표시',
+              description: '발견한 모든 validation 오류를 같은 결과 카드에 보여줍니다.',
+              impacts: ['사용자가 입력 전체를 한 번에 고칠 수 있습니다.'],
+              tradeoffs: ['처음 보는 사용자에게 정보가 많을 수 있습니다.'],
+            },
+            {
+              key: 'first',
+              label: '첫 오류부터 단계별 표시',
+              description: '가장 먼저 발견한 오류 하나만 안내합니다.',
+              impacts: ['한 번에 집중할 내용이 줄어듭니다.'],
+              tradeoffs: ['여러 번 수정해야 전체 오류를 확인할 수 있습니다.'],
+            },
+          ],
+      recommendedOptionKey: campusDrop ? 'consume' : 'all',
+      recommendationRationale: campusDrop
+        ? '공용 PC에서 개인 파일을 옮기는 목적에는 링크 재사용을 막는 쪽이 더 안전합니다.'
+        : '작은 설정 파일은 모든 오류를 함께 고치는 흐름이 더 빠릅니다.',
+      relatedConceptNames: campusDrop
+        ? ['access token and expiry state transition']
+        : ['runtime validation'],
       sourceReferences: [],
       independentWorkCanContinue: false,
     },
     context: {
-      stage: 'Waiting for validation error presentation',
-      currentGoal: 'Choose the result shape before finishing the parser UI.',
-      recentChanges: ['Created the parser boundary and result shell.'],
+      stage: campusDrop
+        ? 'Waiting for the download consumption policy'
+        : 'Waiting for validation error presentation',
+      currentGoal: campusDrop
+        ? 'Choose the token transition before finishing the download handler.'
+        : 'Choose the result shape before finishing the parser UI.',
+      recentChanges: campusDrop
+        ? ['Created the metadata and blob storage boundary.']
+        : ['Created the parser boundary and result shell.'],
       activeConceptNames: task.expectedConcepts,
       relatedFiles: [],
-      nextActions: ['Apply the selected presentation.', 'Run the acceptance tests.'],
-      blockingReason: 'The result component depends on the user choice.',
+      nextActions: [
+        campusDrop ? 'Apply the selected consume policy.' : 'Apply the selected presentation.',
+        'Run the acceptance tests.',
+      ],
+      blockingReason: campusDrop
+        ? 'The token update and second download response depend on the user choice.'
+        : 'The result component depends on the user choice.',
     },
   })
   await route.fulfill({
@@ -610,7 +958,10 @@ async function fulfillInitialBuilderTurn(
         }),
       })}`,
       'data: {"type":"tool_call","command":"get_builder_task"}',
-      'data: {"type":"file_change","summary":"Updated src/parser.ts"}',
+      `data: ${JSON.stringify({
+        type: 'file_change',
+        summary: campusDrop ? 'Updated src/core.ts' : 'Updated src/parser.ts',
+      })}`,
       'data: {"type":"status","command":"pnpm test"}',
       'data: {"type":"error","summary":"token=synthetic-e2e-secret was rejected and fixed"}',
       'data: {"type":"message","content":"Decision input is required before continuing."}',
@@ -633,6 +984,7 @@ async function fulfillResumedBuilderTurn(
   if (task === null || context === null || decision === undefined || decision.resolution === null) {
     throw new TypeError('Resolved Builder context is missing')
   }
+  const campusDrop = isCampusDrop(resolved)
   await executeBuilderAgent(request, {
     schemaVersion: 1,
     kind: 'BUILDER_APPLY_DECISION',
@@ -644,13 +996,20 @@ async function fulfillResumedBuilderTurn(
     decisionId: decision.request.id,
     expectedTaskRevision: task.revision,
     expectedContextVersion: context.contextVersion,
-    appliedResult:
-      '\\ubaa8\\ub4e0 validation \\uc624\\ub958\\ub97c \\ud55c \\uacb0\\uacfc \\uce74\\ub4dc\\uc5d0 \\ud45c\\uc2dc\\ud558\\ub3c4\\ub85d \\uc801\\uc6a9\\ud588\\uc2b5\\ub2c8\\ub2e4.',
+    appliedResult: campusDrop
+      ? '첫 다운로드가 성공한 뒤 token을 consumed 상태로 전이해 두 번째 요청을 거절하도록 적용했습니다.'
+      : '\\ubaa8\\ub4e0 validation \\uc624\\ub958\\ub97c \\ud55c \\uacb0\\uacfc \\uce74\\ub4dc\\uc5d0 \\ud45c\\uc2dc\\ud558\\ub3c4\\ub85d \\uc801\\uc6a9\\ud588\\uc2b5\\ub2c8\\ub2e4.',
     sourceReferences: [],
     context: {
-      stage: 'Applied the validation error presentation',
-      currentGoal: 'Validate the completed local result.',
-      recentChanges: ['Rendered all validation errors in one result card.'],
+      stage: campusDrop
+        ? 'Applied the consume-after-first-download policy'
+        : 'Applied the validation error presentation',
+      currentGoal: campusDrop
+        ? 'Validate the one-time local transfer result.'
+        : 'Validate the completed local result.',
+      recentChanges: campusDrop
+        ? ['Stored only the token digest and made the consume transition atomic.']
+        : ['Rendered all validation errors in one result card.'],
       activeConceptNames: task.expectedConcepts,
       relatedFiles: [],
       nextActions: ['Run the acceptance tests.'],
@@ -673,8 +1032,12 @@ async function fulfillResumedBuilderTurn(
       expectedPreviousVersion: applied.liveContext.contextVersion,
       checkpoint: 'TASK_COMPLETED',
       stage: 'Completed and validated',
-      currentGoal: 'Open the generated local result.',
-      recentChanges: ['Implemented the selected error view.', 'Passed all acceptance checks.'],
+      currentGoal: campusDrop
+        ? 'Open the generated Campus Drop result.'
+        : 'Open the generated local result.',
+      recentChanges: campusDrop
+        ? ['Implemented the selected one-time download policy.', 'Passed all acceptance checks.']
+        : ['Implemented the selected error view.', 'Passed all acceptance checks.'],
       activeDecisionIds: [],
       nextActions: ['Open the generated result.'],
       updatedAt: completedAt,
@@ -693,20 +1056,30 @@ async function fulfillResumedBuilderTurn(
       taskId: task.id,
       correlationId: task.correlationId,
       expectedTaskRevision: applied.currentTask.revision,
-      implementedFeatures: ['Unknown input validation and result comparison flow'],
+      implementedFeatures: campusDrop
+        ? ['Small-file upload, expiring token, and one-time download flow']
+        : ['Unknown input validation and result comparison flow'],
       acceptanceResults: applied.currentTask.acceptanceCriteria.map((criterion) => ({
         criterionKey: criterion.key,
         status: 'PASSED',
         evidence: [],
       })),
       validationResults: [
-        { name: 'Build Agent E2E', status: 'PASSED', summary: 'The local flow completed.' },
+        {
+          name: campusDrop ? 'Campus Drop Build E2E' : 'Build Agent E2E',
+          status: 'PASSED',
+          summary: campusDrop
+            ? 'Build, tests, and consume-once flow completed.'
+            : 'The local flow completed.',
+        },
       ],
       conceptUsage: task.expectedConcepts.map((conceptName) => ({
         conceptName,
         scope: 'LEARNER_FOCUS',
         importance: 'CORE',
-        usageReason: 'The parser narrows unknown input into safe success and failure states.',
+        usageReason: campusDrop
+          ? 'The runtime separates metadata, blob bytes, expiry, and consumed token states.'
+          : 'The parser narrows unknown input into safe success and failure states.',
         codeReferences: [],
       })),
       appliedDecisionIds: [decision.request.id],
@@ -725,9 +1098,140 @@ async function fulfillResumedBuilderTurn(
     contentType: 'text/event-stream',
     body: [
       'data: {"type":"tool_call","command":"get_decision_result"}',
-      'data: {"type":"file_change","summary":"Updated src/result.ts"}',
+      `data: ${JSON.stringify({
+        type: 'file_change',
+        summary: campusDrop ? 'Updated src/core.ts and src/server.ts' : 'Updated src/result.ts',
+      })}`,
       'data: {"type":"status","command":"pnpm test"}',
       'data: {"type":"message","content":"Implementation and validation completed."}',
+      'data: [DONE]',
+    ].join('\n\n'),
+  })
+}
+
+async function fulfillFinalUpgradeBuilderTurn(
+  route: Route,
+  request: APIRequestContext,
+  projectId: string,
+): Promise<void> {
+  const restored = await restoreProject(request, projectId)
+  const task = restored.currentTask
+  if (task === null || task.status !== 'PENDING' || task.finalUpgrade === undefined) {
+    throw new TypeError('Final Upgrade Builder Task is missing')
+  }
+  await executeBuilderAgent(request, {
+    schemaVersion: 1,
+    kind: 'BUILDER_START_TASK',
+    correlationId: task.correlationId,
+    actor: { kind: 'AGENT', role: 'BUILDER' },
+    idempotencyKey: id('idem'),
+    projectId,
+    taskId: task.id,
+    expectedTaskRevision: task.revision,
+  })
+  const startedAt = new Date().toISOString()
+  const contextId = id('context')
+  await executeBuilderAgent(request, {
+    schemaVersion: 1,
+    kind: 'BUILDER_UPDATE_LIVE_CONTEXT',
+    correlationId: task.correlationId,
+    actor: { kind: 'AGENT', role: 'BUILDER' },
+    idempotencyKey: id('idem'),
+    context: {
+      schemaVersion: 1,
+      id: contextId,
+      projectId,
+      taskId: task.id,
+      correlationId: task.correlationId,
+      contextVersion: 1,
+      expectedPreviousVersion: 0,
+      checkpoint: 'TASK_STARTED',
+      stage: 'Implementing the user-selected Final Upgrade',
+      currentGoal: task.finalUpgrade.userGoal,
+      recentChanges: [],
+      activeDecisionIds: [],
+      activeConceptNames: task.expectedConcepts,
+      relatedFiles: [],
+      nextActions: ['Implement the selected distinction.', 'Run regression tests.'],
+      updatedAt: startedAt,
+      source: { kind: 'AGENT', role: 'BUILDER' },
+      redactionStatus: 'VERIFIED_REDACTED',
+    },
+  })
+  const completedAt = new Date(Date.now() + 1).toISOString()
+  await executeBuilderAgent(request, {
+    schemaVersion: 1,
+    kind: 'BUILDER_UPDATE_LIVE_CONTEXT',
+    correlationId: task.correlationId,
+    actor: { kind: 'AGENT', role: 'BUILDER' },
+    idempotencyKey: id('idem'),
+    context: {
+      schemaVersion: 1,
+      id: contextId,
+      projectId,
+      taskId: task.id,
+      correlationId: task.correlationId,
+      contextVersion: 2,
+      expectedPreviousVersion: 1,
+      checkpoint: 'TASK_COMPLETED',
+      stage: 'Final Upgrade completed',
+      currentGoal: task.finalUpgrade.userGoal,
+      recentChanges: ['Distinguished the two requested result states.'],
+      activeDecisionIds: [],
+      activeConceptNames: task.expectedConcepts,
+      relatedFiles: [],
+      nextActions: ['Open the updated result.'],
+      updatedAt: completedAt,
+      source: { kind: 'AGENT', role: 'BUILDER' },
+      redactionStatus: 'VERIFIED_REDACTED',
+    },
+  })
+  await executeBuilderAgent(request, {
+    schemaVersion: 1,
+    kind: 'BUILDER_COMPLETE_TASK',
+    correlationId: task.correlationId,
+    actor: { kind: 'AGENT', role: 'BUILDER' },
+    idempotencyKey: id('idem'),
+    report: {
+      schemaVersion: 1,
+      id: id('completion_report'),
+      projectId,
+      taskId: task.id,
+      correlationId: task.correlationId,
+      expectedTaskRevision: 2,
+      implementedFeatures: [task.finalUpgrade.userGoal],
+      acceptanceResults: task.acceptanceCriteria.map((criterion) => ({
+        criterionKey: criterion.key,
+        status: 'PASSED',
+        evidence: [],
+      })),
+      validationResults: [
+        { name: 'Final Upgrade E2E', status: 'PASSED', summary: 'Updated flow passed.' },
+      ],
+      conceptUsage: task.expectedConcepts.map((conceptName) => ({
+        conceptName,
+        scope: 'LEARNER_FOCUS',
+        importance: 'CORE',
+        usageReason: 'The selected improvement makes the state transition visible.',
+        codeReferences: [],
+      })),
+      appliedDecisionIds: [],
+      codeReferences: [],
+      diffReferences: [],
+      specDeviations: [],
+      remainingIssues: [],
+      limitations: [],
+      completedAt,
+      source: { kind: 'AGENT', role: 'BUILDER' },
+      redactionStatus: 'VERIFIED_REDACTED',
+    },
+  })
+  await route.fulfill({
+    status: 200,
+    contentType: 'text/event-stream',
+    body: [
+      'data: {"type":"status","command":"pnpm test"}',
+      'data: {"type":"message","content":"The user-selected Final Upgrade is implemented and tested."}',
       'data: [DONE]',
     ].join('\n\n'),
   })
@@ -775,20 +1279,37 @@ function projectIdFromUrl(url: string): string {
   return match[1]
 }
 
-async function startFromKeyboard(page: Page): Promise<void> {
-  await page.getByLabel(/무엇을 배우고 싶나요/).fill('TypeScript runtime validation')
-  await page
-    .getByLabel(/요즘 직접 해결하고 싶은 일이 있나요/)
-    .fill('작은 도구의 설정 오류를 실행 전에 찾고 싶어요.')
+async function startFromKeyboard(
+  page: Page,
+  input: { readonly learningGoal: string; readonly personalNeed: string } = {
+    learningGoal: 'TypeScript runtime validation',
+    personalNeed: '작은 도구의 설정 오류를 실행 전에 찾고 싶어요.',
+  },
+): Promise<void> {
+  await page.getByLabel(/무엇을 배우고 싶나요/).fill(input.learningGoal)
+  await page.getByLabel(/요즘 직접 해결하고 싶은 일이 있나요/).fill(input.personalNeed)
   const startButton = page.getByRole('button', { name: '프로젝트 후보 만나기' })
   await startButton.focus()
   await page.keyboard.press('Enter')
 }
 
-test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion through durable Core state', async ({
+test('runs the Campus Drop Golden Path through Discovery, Decision, Evidence, Final Upgrade, and completion', async ({
   page,
   request,
 }) => {
+  expect(campusDropFixture).toMatchObject({
+    decision: { acceptedOption: 'CONSUME_AFTER_FIRST_DOWNLOAD' },
+    allowedEvidence: {
+      builderOutputMaximum: 'OBSERVED',
+      userExplanationMaximum: 'EXPLAINED',
+      independentDecisionOrApplicationMaximum: 'DEMONSTRATED',
+      sameSessionTransferredAllowed: false,
+    },
+    containsPersonalData: false,
+  })
+  expect(campusDropFixture.learningScope.excluded).toEqual(
+    expect.arrayContaining(['login', 'permanent storage', 'hosted deployment']),
+  )
   const pageErrors: Error[] = []
   let agentDispatches = 0
   let builderDispatches = 0
@@ -804,6 +1325,10 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
     const agent = String(dispatch.agent)
     const dispatchedProjectId = projectIdFromRoute(route)
     const slotKey = String(dispatch.slot)
+    if (agent === 'vibe-helper-evidence-analyst') {
+      await fulfillAnalystTurn(route, request, dispatchedProjectId)
+      return
+    }
     if (agent === 'vibe-helper-builder') {
       builderDispatches += 1
       if (builderDispatches === 1) {
@@ -815,20 +1340,20 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
           slotKey,
           'assistant',
           [
-            'parser 흐름을 만들고 실제 Decision이 필요한 지점까지 진행했습니다.',
+            'Campus Drop의 metadata/blob 경계를 만들고 실제 Decision이 필요한 지점까지 진행했습니다.',
             ...Array.from(
               { length: 24 },
-              (_, index) => `진행 로그 ${String(index + 1)}: parser 경계를 검증했습니다.`,
+              (_, index) => `진행 로그 ${String(index + 1)}: token 상태 경계를 검증했습니다.`,
             ),
             '```diff',
-            '--- a/src/parser.ts',
-            '+++ b/src/parser.ts',
-            '+export const parseInput = (value: unknown) => value',
+            '--- a/src/core.ts',
+            '+++ b/src/core.ts',
+            '+export type DownloadState = "READY" | "EXPIRED" | "CONSUMED"',
             '```',
-            '[OPTIONS: 오류를 한 번에 표시 | 첫 오류부터 단계별 표시]',
+            '[OPTIONS: 첫 다운로드 뒤 소비 | 만료 전까지 재사용]',
           ].join('\n'),
         )
-      } else {
+      } else if (builderDispatches === 2) {
         await builderResumeGate
         await fulfillResumedBuilderTurn(route, request, dispatchedProjectId)
         await appendTestCrewMessage(page, slotKey, 'user', String(dispatch.message))
@@ -836,14 +1361,23 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
           page,
           slotKey,
           'assistant',
-          '선택한 결과 표시 방식을 반영했고 모든 검증을 통과했습니다.',
+          '선택한 consume-once 정책을 반영했고 모든 검증을 통과했습니다.',
+        )
+      } else {
+        await fulfillFinalUpgradeBuilderTurn(route, request, dispatchedProjectId)
+        await appendTestCrewMessage(page, slotKey, 'user', String(dispatch.message))
+        await appendTestCrewMessage(
+          page,
+          slotKey,
+          'assistant',
+          '사용자가 선택한 Final Upgrade를 구현하고 검증했습니다.',
         )
       }
       return
     }
     if (agent === 'vibe-helper-helper') {
       helperDispatches += 1
-      const longHelperAnswer = `한 번에 표시하면 모든 오류를 함께 고칠 수 있지만 처음에는 정보가 더 많습니다. ${'각 오류는 같은 입력에서 독립적으로 발견되며 사용자는 수정 우선순위를 직접 정할 수 있습니다. '.repeat(8)}이 문장이 240자 뒤에도 온전히 보이면 전체 답변 렌더링이 정상입니다.`
+      const longHelperAnswer = `첫 다운로드 뒤 소비하면 공용 PC에 남은 링크가 다시 쓰일 위험을 줄일 수 있고, 만료 전 재사용하면 여러 기기에서 받기 쉽습니다. ${'두 선택은 편의성과 링크 재사용 위험 사이의 tradeoff이며, 사용 목적에 맞춰 결정할 수 있습니다. '.repeat(8)}이 문장이 240자 뒤에도 온전히 보이면 전체 답변 렌더링이 정상입니다.`
       await route.fulfill({
         status: 200,
         contentType: 'text/event-stream',
@@ -863,10 +1397,10 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
   await page.goto('/#/discovery')
   await expect(page.getByRole('heading', { name: /배우고 싶은 것을/ })).toBeVisible()
   await expect(page.getByRole('button', { name: '프로젝트 후보 만나기' })).toBeDisabled()
-  await startFromKeyboard(page)
+  await startFromKeyboard(page, campusDropFixture.discoveryInput)
 
   const firstCandidate = page.getByRole('listitem').filter({
-    has: page.getByRole('heading', { name: 'Safe Config Lab', exact: true }),
+    has: page.getByRole('heading', { name: 'Campus Drop', exact: true }),
   })
   await expect(firstCandidate).toBeVisible()
   await expect(page.getByText('10개 후보')).toBeVisible()
@@ -934,7 +1468,7 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
   expect(mobileMetrics.shellColor).toBe('rgb(32, 33, 38)')
   expect(mobileMetrics.shellBackground).toBe('rgb(246, 246, 248)')
   const interestCheckbox = firstCandidate.getByRole('checkbox', {
-    name: 'Safe Config Lab 관심 목록에 담기',
+    name: 'Campus Drop 관심 목록에 담기',
   })
   await interestCheckbox.click()
   await expect(interestCheckbox).toBeChecked()
@@ -961,7 +1495,7 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
   await page.keyboard.press('Space')
   await expect(interestCheckbox).toBeChecked()
   const secondInterestCheckbox = page.getByRole('checkbox', {
-    name: 'API Shape Detective 관심 목록에 담기',
+    name: 'QR Note Relay 관심 목록에 담기',
   })
   await secondInterestCheckbox.check()
   await expect(page.getByText('2개 담음')).toBeVisible()
@@ -971,13 +1505,11 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
   await page.getByRole('button', { name: '선택한 주제로 합치기' }).focus()
   await page.keyboard.press('Enter')
   const revisedCandidate = page.getByRole('listitem').filter({
-    has: page.getByRole('heading', { name: 'Safe Config Lab · 작은 MVP', exact: true }),
+    has: page.getByRole('heading', { name: 'Campus Drop · 작은 MVP', exact: true }),
   })
   await expect(revisedCandidate).toBeVisible()
   await expect(page.locator('.candidate-list > .candidate-card')).toHaveCount(1)
-  await expect(page.getByRole('heading', { name: 'API Shape Detective', exact: true })).toHaveCount(
-    0,
-  )
+  await expect(page.getByRole('heading', { name: 'QR Note Relay', exact: true })).toHaveCount(0)
   await revisedCandidate.getByRole('button', { name: '이 방향 선택' }).focus()
   await page.keyboard.press('Enter')
 
@@ -992,14 +1524,14 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
   await page.getByRole('button', { name: 'Agent에게 다시 정리해달라고 하기' }).click()
   await expect(page.getByText('권장 Learning Spec · revision 2')).toBeVisible()
   await expect(
-    page.getByText('로그인 없이 한 화면에서 외부 설정을 안전하게 검증하는 로컬 도구를 만든다.'),
+    page.getByText('로그인 없이 작은 파일을 만료·일회용 링크로 옮기는 local 도구를 만든다.'),
   ).toBeVisible()
 
   await page.getByRole('button', { name: /다른 주제로 돌아가기/ }).click()
   await expect(page).toHaveURL(/#\/discovery\?project=/)
   await expect(page.getByText('이전 후보를 그대로 보고 있어요.')).toBeVisible()
   await expect(
-    page.getByRole('heading', { name: 'Safe Config Lab · 작은 MVP', exact: true }),
+    page.getByRole('heading', { name: 'Campus Drop · 작은 MVP', exact: true }),
   ).toBeVisible()
   await expect(page.getByRole('button', { name: '새 후보 받기' })).toBeVisible()
   expect(agentDispatches).toBe(7)
@@ -1012,7 +1544,7 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL(/#\/build\?project=/)
   await expect(
-    page.getByRole('heading', { name: 'TypeScript runtime validation', exact: true }),
+    page.getByRole('heading', { name: campusDropFixture.discoveryInput.learningGoal, exact: true }),
   ).toBeVisible()
   await expect(page.locator('.builder-pane')).toBeVisible()
   await expect
@@ -1024,7 +1556,9 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
   const preparedProjectId = projectIdFromUrl(page.url())
   await page.goto('/#/history')
   const preparedProject = page
-    .getByRole('button', { name: /TypeScript runtime validation.*Open Build →/ })
+    .getByRole('button', {
+      name: new RegExp(`${campusDropFixture.discoveryInput.learningGoal}.*Open Build →`),
+    })
     .first()
   await expect(preparedProject).toContainText('Open Build →')
   await preparedProject.click()
@@ -1100,19 +1634,21 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
   await page.setViewportSize({ width: 1280, height: 720 })
 
   await expect(
-    page.getByText('parser 흐름을 만들고 실제 Decision이 필요한 지점까지 진행했습니다.'),
+    page.getByText(
+      'Campus Drop의 metadata/blob 경계를 만들고 실제 Decision이 필요한 지점까지 진행했습니다.',
+    ),
   ).toBeVisible()
   await expect(page.locator('body')).not.toContainText('synthetic-e2e-secret')
   await expect(page.locator('body')).not.toContainText('noisy-fragment')
   await expect(page.locator('body')).not.toContainText('used_tokens')
   const decisionHeading = page.getByRole('heading', {
-    name: '검증 오류를 한 번에 보여줄까요, 첫 오류부터 단계별로 보여줄까요?',
+    name: campusDropFixture.decision.question,
   })
   await expect(decisionHeading).toBeVisible()
   await expect(page.getByText('Builder recommendation')).toBeVisible()
-  await expect(page.getByText('오류를 한 번에 표시', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('첫 다운로드 뒤 소비', { exact: true }).first()).toBeVisible()
   const recommendationButton = page.getByRole('button', {
-    name: '오류를 한 번에 표시 · 추천',
+    name: '첫 다운로드 뒤 소비 · 추천',
   })
   const recommendationButtonMetrics = await recommendationButton.evaluate((button) => {
     const rect = button.getBoundingClientRect()
@@ -1149,7 +1685,9 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
 
   await page.getByRole('button', { name: 'Helper에게 비교 요청' }).click()
   await expect(
-    page.getByText('한 번에 표시하면 모든 오류를 함께 고칠 수 있지만 처음에는 정보가 더 많습니다.'),
+    page.getByText(
+      '첫 다운로드 뒤 소비하면 공용 PC에 남은 링크가 다시 쓰일 위험을 줄일 수 있고, 만료 전 재사용하면 여러 기기에서 받기 쉽습니다.',
+    ),
   ).toBeVisible()
   await expect(
     page.getByText('이 문장이 240자 뒤에도 온전히 보이면 전체 답변 렌더링이 정상입니다.'),
@@ -1166,33 +1704,44 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
     evidenceBeforeHelper.personalization.length + 1,
   )
 
-  await page
-    .getByLabel('Builder message')
-    .fill(
-      '첫 오류부터 단계별로 보여주는 방향으로 진행해줘. 초보자가 수정 순서를 따라가기 쉬웠으면 해.',
-    )
-  await page.getByRole('button', { name: 'Builder에게 보내기' }).click()
+  await page.getByLabel('Helper message').fill(campusDropFixture.helperUserMessage)
+  await page.getByRole('button', { name: 'Helper에게 보내기' }).click()
+  await expect
+    .poll(async () => {
+      const restored = await restoreProject(request, projectId)
+      return restored.helperConversations[0]?.redactedUserExcerpts ?? []
+    })
+    .toContain(campusDropFixture.helperUserMessage)
+  expect(helperDispatches).toBe(2)
+  const evidenceAfterExplanation = await readEvidenceTrace(request, projectId)
+  await recommendationButton.click()
   await expect(page.getByText('APPLY PENDING', { exact: true })).toBeVisible()
   releaseBuilderResume?.()
   await expect(
-    page.getByRole('heading', { name: 'TypeScript runtime validation 완성' }),
+    page.getByRole('heading', {
+      name: `${campusDropFixture.discoveryInput.learningGoal} 완성`,
+    }),
   ).toBeVisible()
   await expect(
-    page.getByText('모든 validation 오류를 한 결과 카드에 표시하도록 적용했습니다.'),
+    page.getByText(
+      '첫 다운로드가 성공한 뒤 token을 consumed 상태로 전이해 두 번째 요청을 거절하도록 적용했습니다.',
+    ),
   ).toBeVisible()
   await expect(page.locator('body')).not.toContainText('\\ubaa8')
   await expect(page.getByRole('log', { name: 'Builder transcript' })).toContainText(
-    '선택한 결과 표시 방식을 반영했고 모든 검증을 통과했습니다.',
+    '선택한 consume-once 정책을 반영했고 모든 검증을 통과했습니다.',
   )
   await expect(page.getByLabel('Builder message')).toBeVisible()
-  await expect(page.getByText('Unknown input validation and result comparison flow')).toBeVisible()
-  await expect(page.getByText('Build Agent E2E')).toBeVisible()
+  await expect(
+    page.getByText('Small-file upload, expiring token, and one-time download flow'),
+  ).toBeVisible()
+  await expect(page.getByText('Campus Drop Build E2E')).toBeVisible()
   await evidenceSummary.focus()
   await page.keyboard.press('Enter')
   await expect(page.getByText('코드·작업에서 개념 사용이 관찰됨').first()).toBeVisible()
   await expect(page.getByText('프로젝트에서 관찰됨').first()).toBeVisible()
   await expect(page.getByText('Agent에 제공된 근거')).toBeVisible()
-  const latestPersonalization = evidenceAfterHelper.personalization[0]
+  const latestPersonalization = evidenceAfterExplanation.personalization[0]
   if (latestPersonalization === undefined) throw new Error('missing personalization trace')
   const latestPersonalizationLabel =
     latestPersonalization.mode === 'NO_RELEVANT_EVIDENCE'
@@ -1200,7 +1749,7 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
       : latestPersonalization.basis
           .map((basis) => `${basis.conceptName} · ${basis.sourceProjectTitles.join(', ')}`)
           .join(' / ')
-  const matchingPersonalizationLabels = evidenceAfterHelper.personalization.filter((item) => {
+  const matchingPersonalizationLabels = evidenceAfterExplanation.personalization.filter((item) => {
     const label =
       item.mode === 'NO_RELEVANT_EVIDENCE'
         ? '관련 Evidence 없이 일반 경로를 사용함'
@@ -1213,9 +1762,37 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
     matchingPersonalizationLabels,
   )
   await expect(page.locator('.evidence-trace-panel')).not.toContainText('%')
+  await expect
+    .poll(async () => {
+      const trace = await readEvidenceTrace(request, projectId)
+      return trace.analysis.filter((job) => job.status === 'SUCCEEDED').length
+    })
+    .toBeGreaterThan(0)
+  await expect
+    .poll(async () => {
+      const trace = await readEvidenceTrace(request, projectId)
+      return trace.concepts.some(
+        (concept) =>
+          concept.conceptName === 'access token and expiry state transition' &&
+          concept.state === 'EXPLAINED' &&
+          concept.evidence.some((evidence) => evidence.kind === 'USER_UNDERSTANDING'),
+      )
+    })
+    .toBe(true)
+  await page.getByRole('button', { name: 'Helper와 개선 방향 찾기' }).click()
+  await expect(page.getByLabel('내가 선택한 개선 목표')).toBeVisible()
+  await page.getByLabel('내가 선택한 개선 목표').fill(campusDropFixture.finalUpgradeUserGoal)
+  await page.getByRole('button', { name: '이 목표로 개선 시작' }).click()
+  await expect(page.getByRole('log', { name: 'Builder transcript' })).toContainText(
+    '사용자가 선택한 Final Upgrade를 구현하고 검증했습니다.',
+  )
+  await expect(page.getByText('Final Upgrade E2E')).toBeVisible()
   await page.getByRole('button', { name: '생성 결과 열기' }).click()
   await expect(page.getByText(/실행 준비 완료 · projects\/project_/)).toBeVisible()
-  expect(builderDispatches).toBe(2)
+  const finalEvidence = await readEvidenceTrace(request, projectId)
+  expect(finalEvidence.concepts.every((concept) => concept.state !== 'TRANSFERRED')).toBe(true)
+  expect(builderDispatches).toBe(3)
+  expect(helperDispatches).toBe(3)
   expect(pageErrors).toEqual([])
 })
 

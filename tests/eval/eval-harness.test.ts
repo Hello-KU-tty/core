@@ -848,6 +848,92 @@ describe('T11 Builder prompt regression', () => {
       ]),
     )
   })
+
+  it('keeps runnable web output and the optional Final Upgrade inside conservative Evidence bounds', async () => {
+    const prompt = await readFile(path.join(workspaceRoot, 'docs/agent-prompts/builder.md'), 'utf8')
+    const fixture = (await loadInput(
+      'tests/eval/fixtures/prompt-regressions/t18-builder-result-final-upgrade.json',
+    )) as {
+      readonly promptVersion: string
+      readonly initialTask: {
+        readonly requiredResultManifest: string
+        readonly bindHost: string
+        readonly dynamicPortEnvironment: string
+      }
+      readonly finalUpgrade: {
+        readonly automatic: boolean
+        readonly requiresUserGoal: boolean
+        readonly requiresEvidenceAwareTrace: boolean
+        readonly mayClaimMastery: boolean
+      }
+      readonly evidenceBounds: {
+        readonly builderCodeAndTestsMaximum: string
+        readonly sameFlowMaximum: string
+        readonly sameFlowMayReachTransferred: boolean
+      }
+      readonly containsPersonalData: boolean
+    }
+    const campusDrop = (await loadInput('tests/e2e/campus-drop-session.fixture.json')) as {
+      readonly learningScope: {
+        readonly learnerFocus: readonly string[]
+        readonly agentSupport: readonly string[]
+        readonly excluded: readonly string[]
+      }
+      readonly decision: { readonly acceptedOption: string }
+      readonly finalUpgradeUserGoal: string
+      readonly allowedEvidence: {
+        readonly builderOutputMaximum: string
+        readonly userExplanationMaximum: string
+        readonly independentDecisionOrApplicationMaximum: string
+        readonly sameSessionTransferredAllowed: boolean
+      }
+      readonly containsPersonalData: boolean
+    }
+
+    expect(prompt).toContain('Prompt version: `1.3.0`')
+    expect(prompt).toContain('.vibe-helper/result.json')
+    expect(prompt).toContain('HOST=127.0.0.1')
+    expect(prompt).toContain('동적 `PORT`')
+    expect(prompt).toContain('finalUpgrade')
+    expect(fixture).toMatchObject({
+      promptVersion: '1.3.0',
+      initialTask: {
+        requiredResultManifest: '.vibe-helper/result.json',
+        bindHost: '127.0.0.1',
+        dynamicPortEnvironment: 'PORT',
+      },
+      finalUpgrade: {
+        automatic: false,
+        requiresUserGoal: true,
+        requiresEvidenceAwareTrace: true,
+        mayClaimMastery: false,
+      },
+      evidenceBounds: {
+        builderCodeAndTestsMaximum: 'OBSERVED',
+        sameFlowMaximum: 'DEMONSTRATED',
+        sameFlowMayReachTransferred: false,
+      },
+      containsPersonalData: false,
+    })
+    expect(campusDrop.learningScope.learnerFocus).toEqual([
+      'TypeScript runtime boundary',
+      'SQLite metadata and filesystem blob separation',
+      'access token and expiry state transition',
+    ])
+    expect(campusDrop.learningScope.agentSupport).toContain('HTTP and upload parsing')
+    expect(campusDrop.learningScope.excluded).toEqual(
+      expect.arrayContaining(['login', 'object storage', 'hosted deployment']),
+    )
+    expect(campusDrop.decision.acceptedOption).toBe('CONSUME_AFTER_FIRST_DOWNLOAD')
+    expect(campusDrop.finalUpgradeUserGoal).toContain('만료된 링크')
+    expect(campusDrop.allowedEvidence).toEqual({
+      builderOutputMaximum: 'OBSERVED',
+      userExplanationMaximum: 'EXPLAINED',
+      independentDecisionOrApplicationMaximum: 'DEMONSTRATED',
+      sameSessionTransferredAllowed: false,
+    })
+    expect(campusDrop.containsPersonalData).toBe(false)
+  })
 })
 
 describe('T12 Helper prompt regression', () => {

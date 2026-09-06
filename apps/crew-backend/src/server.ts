@@ -2,9 +2,15 @@ import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 
 import { type ApplicationService, MAX_APPLICATION_PAYLOAD_BYTES } from '@vibe-helper/application'
-import { CREW_UI_PROTOCOL_VERSION } from '@vibe-helper/contracts'
+import {
+  CREW_UI_PROTOCOL_VERSION,
+  type GeneratedResultDescriptor,
+  generatedResultDescriptorSchema,
+} from '@vibe-helper/contracts'
 
 const APPLICATION_PATH = '/api/application'
+export const ANALYSIS_PATH = '/api/analysis'
+export const ANALYST_CONTEXT_PATH = '/api/analyst-context'
 const TEST_AGENT_PATH = '/api/test/agent'
 export const DISCOVERY_ROUND_MCP_PATH = '/mcp/discovery-round'
 export const DISCOVERY_PREVIEW_MCP_PATH = '/mcp/discovery-preview'
@@ -18,10 +24,14 @@ const HEALTH_PATH = '/health'
 const MAX_CLOCK_SKEW_SECONDS = 60
 
 export interface CrewBackendOptions {
-  readonly application: Pick<ApplicationService, 'executeUi'>
+  readonly application: Pick<ApplicationService, 'executeUi' | 'executeAnalysis' | 'executeAgent'>
   readonly proxySecret: string
   readonly now?: () => number
   readonly testAgentExecutor?: (input: unknown) => Promise<unknown>
+  readonly resultLauncher?: {
+    readonly launch: (descriptor: GeneratedResultDescriptor) => Promise<GeneratedResultDescriptor>
+    readonly close: () => Promise<void>
+  }
   readonly mcpHandlers?: Readonly<
     Record<
       string,
@@ -147,7 +157,11 @@ async function handleMcpRequest(
   response.end(responseBody)
 }
 
-function isApplicationResult(value: unknown): boolean {
+type ApplicationEnvelope =
+  | { readonly success: true; readonly data: unknown }
+  | { readonly success: false; readonly error: unknown }
+
+function isApplicationResult(value: unknown): value is ApplicationEnvelope {
   if (typeof value !== 'object' || value === null || !('success' in value)) return false
   const record = value as Record<string, unknown>
   return (
@@ -173,8 +187,15 @@ async function handleRequest(
   }
   const testAgentExecutor = options.testAgentExecutor
   const isApplicationRequest = target === APPLICATION_PATH
+  const isAnalysisRequest = target === ANALYSIS_PATH
+  const isAnalystContextRequest = target === ANALYST_CONTEXT_PATH
   const isTestAgentRequest = target === TEST_AGENT_PATH && testAgentExecutor !== undefined
-  if (!isApplicationRequest && !isTestAgentRequest) {
+  if (
+    !isApplicationRequest &&
+    !isAnalysisRequest &&
+    !isAnalystContextRequest &&
+    !isTestAgentRequest
+  ) {
     json(response, 404, { error: 'not found' })
     return
   }
@@ -231,7 +252,7 @@ async function handleRequest(
     return
   }
 
-  if (isApplicationRequest) {
+  if (isApplicationRequest || isAnalysisRequest || isAnalystContextRequest) {
     if (
       typeof input !== 'object' ||
       input === null ||
@@ -247,14 +268,67 @@ async function handleRequest(
     const { clientProtocolVersion: _clientProtocolVersion, ...applicationInput } = input
     input = applicationInput
   }
+  if (
+    isAnalystContextRequest &&
+    (typeof input !== 'object' ||
+      input === null ||
+      !('kind' in input) ||
+      input.kind !== 'ANALYST_GET_EPISODE_CONTEXT')
+  ) {
+    json(response, 403, { error: 'analyst context route is read-only' })
+    return
+  }
 
-  const result =
+  let result =
     isTestAgentRequest && testAgentExecutor !== undefined
       ? await testAgentExecutor(input)
-      : await options.application.executeUi(input)
+      : isAnalysisRequest
+        ? await options.application.executeAnalysis(input)
+        : isAnalystContextRequest
+          ? await options.application.executeAgent('EVIDENCE_ANALYST', input)
+          : await options.application.executeUi(input)
   if (!isApplicationResult(result)) {
     json(response, 500, { error: 'invalid Core response' })
     return
+  }
+  if (
+    isApplicationRequest &&
+    options.resultLauncher !== undefined &&
+    result.success === true &&
+    typeof input === 'object' &&
+    input !== null &&
+    'kind' in input &&
+    input.kind === 'UI_LAUNCH_RESULT'
+  ) {
+    try {
+      result = {
+        success: true,
+        data: await options.resultLauncher.launch(
+          generatedResultDescriptorSchema.parse(result.data),
+        ),
+      }
+    } catch (error) {
+      result = {
+        success: false,
+        error: {
+          schemaVersion: 1,
+          kind: 'OPERATION_ERROR',
+          category: 'GENERATED_PROJECT',
+          code:
+            error instanceof Error && 'code' in error && typeof error.code === 'string'
+              ? error.code
+              : 'RESULT_LAUNCH_FAILED',
+          disposition: 'USER_ACTION_REQUIRED',
+          message: error instanceof Error ? error.message : 'Generated result could not start.',
+          correlationId:
+            typeof input === 'object' && input !== null && 'correlationId' in input
+              ? input.correlationId
+              : 'corr_00000000-0000-4000-8000-000000000000',
+          issues: [],
+          redactionStatus: 'VERIFIED_REDACTED',
+        },
+      }
+    }
   }
   json(response, 200, result)
 }
@@ -269,11 +343,12 @@ export function createCrewBackendServer(options: CrewBackendOptions): Server {
       else response.end()
     })
   })
-  if (options.mcpHandlers !== undefined) {
+  if (options.mcpHandlers !== undefined || options.resultLauncher !== undefined) {
     server.once('close', () => {
       for (const handler of Object.values(options.mcpHandlers ?? {})) {
         void handler.close()
       }
+      void options.resultLauncher?.close()
     })
   }
   return server

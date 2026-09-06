@@ -85,13 +85,24 @@ export function parseEvidenceAnalystResult(value: unknown): AnalystSemanticResul
   let candidate = value
   if (typeof value === 'string') {
     const trimmed = value.trim()
-    const unfenced = trimmed.startsWith('```')
-      ? trimmed.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
-      : trimmed
     try {
-      candidate = JSON.parse(unfenced)
+      candidate = JSON.parse(trimmed)
     } catch {
-      throw new EvidenceAnalystAdapterError('INVALID_RESULT', 'Analyst result is not valid JSON.')
+      const fencedBlocks = [...trimmed.matchAll(/```(?:json)?\s*\n([\s\S]*?)\n```/gi)]
+      if (fencedBlocks.length !== 1) {
+        throw new EvidenceAnalystAdapterError(
+          'INVALID_RESULT',
+          'Analyst result must contain exactly one JSON value or fenced JSON block.',
+        )
+      }
+      try {
+        candidate = JSON.parse(fencedBlocks[0]?.[1]?.trim() ?? '')
+      } catch {
+        throw new EvidenceAnalystAdapterError(
+          'INVALID_RESULT',
+          'Analyst result fenced block is not valid JSON.',
+        )
+      }
     }
   }
   const parsed = analystSemanticResultSchema.safeParse(candidate)
@@ -189,6 +200,25 @@ export class EvidenceAnalystJobAdapter {
       throw new EvidenceAnalystAdapterError(
         'APPLICATION_ERROR',
         'Core returned an unexpected expired Analysis Job response.',
+      )
+    }
+    return analysisJobSchema.array().parse(result)
+  }
+
+  async listPending(correlationId: string, limit = 100): Promise<readonly AnalysisJob[]> {
+    const result = unwrap(
+      await this.#application.executeAnalysis({
+        schemaVersion: 1,
+        kind: 'ANALYSIS_LIST_PENDING',
+        correlationId,
+        actor: { kind: 'KIRO_ADAPTER' },
+        limit,
+      }),
+    )
+    if (!Array.isArray(result)) {
+      throw new EvidenceAnalystAdapterError(
+        'APPLICATION_ERROR',
+        'Core returned an unexpected pending Analysis Job response.',
       )
     }
     return analysisJobSchema.array().parse(result)

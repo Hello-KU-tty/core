@@ -130,6 +130,7 @@ describe('Crew browser-safe clients', () => {
     const previousBuilderV4 = `vibe-helper-builder-v4-${projectId}`
     const previousBuilderV5 = `vibe-helper-builder-v5-${projectId}`
     const previousBuilderV6 = `vibe-helper-builder-v6-${projectId}`
+    const previousBuilderV7 = `vibe-helper-builder-v7-${projectId}`
     const api: CrewAppApi = {
       get: vi.fn(async (path: string) => {
         if (path === '/api/chat/slots') {
@@ -140,6 +141,7 @@ describe('Crew browser-safe clients', () => {
             { key: previousBuilderV4 },
             { key: previousBuilderV5 },
             { key: previousBuilderV6 },
+            { key: previousBuilderV7 },
             { key: currentBuilder },
           ]
         }
@@ -161,6 +163,9 @@ describe('Crew browser-safe clients', () => {
         if (path.includes(previousBuilderV6)) {
           return { messages: [{ role: 'assistant', content: 'Previous session v6' }] }
         }
+        if (path.includes(previousBuilderV7)) {
+          return { messages: [{ role: 'assistant', content: 'Previous session v7' }] }
+        }
         return { messages: [{ role: 'assistant', content: 'Legacy session' }] }
       }),
       post: vi.fn(),
@@ -176,9 +181,10 @@ describe('Crew browser-safe clients', () => {
       'Previous session v4',
       'Previous session v5',
       'Previous session v6',
+      'Previous session v7',
       'Current session',
     ])
-    expect(new Set(restored.builderMessages.map((message) => message.key)).size).toBe(7)
+    expect(new Set(restored.builderMessages.map((message) => message.key)).size).toBe(8)
   })
 
   it('keeps missing slots empty and reports disconnected Crew history', async () => {

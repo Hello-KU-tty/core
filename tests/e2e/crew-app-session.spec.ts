@@ -9,7 +9,7 @@ const projectId = 'project_10000000-0000-4000-8000-000000000001'
 const correlationId = 'corr_10000000-0000-4000-8000-000000000001'
 
 async function executeUi(request: APIRequestContext, input: Readonly<Record<string, unknown>>) {
-  const body = JSON.stringify({ ...input, clientProtocolVersion: 8 })
+  const body = JSON.stringify({ ...input, clientProtocolVersion: 9 })
   const timestamp = Math.floor(Date.now() / 1_000).toString()
   const hash = createHash('sha256').update(body).digest('hex')
   const signature = createHmac('sha256', proxySecret)
@@ -80,7 +80,7 @@ test('restores Project History, route state, and Crew conversations across reloa
         'vibe-helper.test.slots',
         JSON.stringify([
           {
-            key: `vibe-helper-builder-v7-${project}`,
+            key: `vibe-helper-builder-v8-${project}`,
             messages: [
               { role: 'user', content: 'token=synthetic-browser-secret' },
               { role: 'assistant', content: 'I will keep the parser strict.' },

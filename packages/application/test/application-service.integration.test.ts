@@ -21,6 +21,7 @@ import {
   projectCandidateRevisionSchema,
   projectSchema,
   preparedBuilderTaskDescriptorSchema,
+  personalizationTraceSchema,
 } from '@vibe-helper/contracts'
 import { describe, expect, it } from 'vitest'
 
@@ -32,6 +33,7 @@ import {
   candidateFixture,
   candidateRoundFixture,
   confirmedLearningSpecFixture,
+  completionReportFixture,
   canonicalConceptFixture,
   decisionRequestFixture,
   decisionResolutionFixture,
@@ -41,6 +43,7 @@ import {
   draftLearningSpecFixture,
   episodeFixture,
   evidenceProposalBatchFixture,
+  helperPersonalizationFixture,
   ids,
   learningSpecDraftContentFixture,
   liveContextFixture,
@@ -2003,6 +2006,129 @@ describe('T10 Builder Task and Live Context application flow', () => {
         status: 'READY',
       },
     })
+  })
+})
+
+describe('T18 evidence-aware Final Upgrade application flow', () => {
+  it('requires completed analysis and opens sequence two as a FINAL_UPGRADE Episode', async () => {
+    const finalTaskId = 'task_00000000-0000-4000-8000-000000000401'
+    let generatedSequence = 401
+    const { service, storage, workspaceRoot } = await createHarness({
+      generateId: (prefix) => {
+        if (prefix === 'task') return finalTaskId
+        generatedSequence += 1
+        return `${prefix}_00000000-0000-4000-8000-${String(generatedSequence).padStart(12, '0')}`
+      },
+    })
+    seedBuilderGraph(storage)
+    await mkdir(join(workspaceRoot, ...projectFixture.generatedWorkspacePath.split('/')), {
+      recursive: true,
+    })
+    const completedTask = builderTaskSchema.parse({
+      ...builderTaskFixture,
+      revision: 2,
+      status: 'COMPLETED',
+    })
+    const analyzedEpisode = episodeSchema.parse({
+      ...episodeFixture,
+      decisionId: undefined,
+      conversationId: undefined,
+      type: 'BUILD_TASK',
+      status: 'ANALYZED',
+      closeReason: 'Initial Builder Task completed and analysis succeeded.',
+    })
+    const succeededAnalysis = analysisJobSchema.parse({
+      ...analysisJobFixture,
+      revision: 3,
+      status: 'SUCCEEDED',
+      runtimeHandle: undefined,
+      deadlineAt: undefined,
+      completedAt: timestamp,
+      resultSummary: {
+        proposalCount: 0,
+        acceptedCount: 0,
+        rejectedCount: 0,
+        noEvidenceReason: 'Builder observation was recorded separately.',
+      },
+    })
+    const evidenceAwareTrace = personalizationTraceSchema.parse({
+      ...helperPersonalizationFixture,
+      mode: 'EVIDENCE_AWARE',
+      basis: [
+        {
+          conceptId: ids.concept,
+          conceptName: 'runtime validation',
+          ledgerRevision: 1,
+          state: 'DEMONSTRATED',
+          evidenceIds: [ids.evidence],
+          episodeIds: [ids.episode],
+          sourceProjectIds: [ids.project],
+          sourceProjectTitles: ['Webhook Lens'],
+          openIssueIds: [],
+          purpose: 'HELPER_EXPLANATION_START',
+        },
+      ],
+      fallbackReason: undefined,
+    })
+    storage.transaction((repository) => {
+      repository.appendTask(completedTask)
+      repository.appendCompletionReport(completionReportFixture)
+      repository.appendActivityEvent(activityEventSchema.parse(activityEventFixture))
+      repository.appendEpisode(analyzedEpisode)
+      repository.appendAnalysisJob(analysisJobSchema.parse(analysisJobPendingFixture))
+      repository.appendAnalysisJob(analysisJobSchema.parse(analysisJobFixture))
+      repository.appendAnalysisJob(succeededAnalysis)
+      repository.appendPersonalizationTrace(evidenceAwareTrace)
+    })
+
+    const prepared = await service.executeUi({
+      schemaVersion: 1,
+      kind: 'UI_PREPARE_FINAL_UPGRADE_TASK',
+      correlationId: 'corr_00000000-0000-4000-8000-000000000402',
+      actor: { kind: 'UI' },
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000403',
+      projectId: ids.project,
+      sourceTaskId: ids.task,
+      expectedSourceTaskRevision: 2,
+      personalizationTraceId: ids.personalization,
+      userGoal: 'Show expired and consumed links as different states.',
+    })
+    expect(prepared).toMatchObject({
+      success: true,
+      data: {
+        task: {
+          id: finalTaskId,
+          sequence: 2,
+          prerequisiteTaskIds: [ids.task],
+          finalUpgrade: {
+            sourceTaskId: ids.task,
+            personalizationTraceId: ids.personalization,
+            userGoal: 'Show expired and consumed links as different states.',
+          },
+        },
+      },
+    })
+
+    await expect(
+      service.executeAgent('BUILDER', {
+        schemaVersion: 1,
+        kind: 'BUILDER_START_TASK',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'BUILDER' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000404',
+        projectId: ids.project,
+        taskId: finalTaskId,
+        expectedTaskRevision: 1,
+      }),
+    ).resolves.toMatchObject({ success: true, data: { resourceRevision: 2 } })
+    expect(
+      storage.repository.readOpenEpisode(ids.project, 'FINAL_UPGRADE', {
+        taskId: finalTaskId,
+      }),
+    ).toMatchObject({ type: 'FINAL_UPGRADE', taskId: finalTaskId, status: 'OPEN' })
+    expect(
+      storage.repository.readOpenEpisode(ids.project, 'BUILD_TASK', { taskId: finalTaskId }),
+    ).toBe(null)
   })
 })
 

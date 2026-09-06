@@ -1,0 +1,14 @@
+{
+  "name": "@vibe-helper/campus-drop-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b --pretty false",
+    "test": "pnpm build && node --test dist/*.test.js",
+    "start": "node dist/server.js"
+  },
+  "engines": {
+    "node": "24.19.x"
+  }
+}

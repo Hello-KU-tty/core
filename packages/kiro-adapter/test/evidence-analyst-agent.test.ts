@@ -65,6 +65,16 @@ describe('Evidence Analyst adapter', () => {
     expect(
       parseEvidenceAnalystResult(`\`\`\`json\n${JSON.stringify(emptySemanticResult)}\n\`\`\``),
     ).toEqual(emptySemanticResult)
+    expect(
+      parseEvidenceAnalystResult(
+        `No user-authored evidence was present.\n\n\`\`\`json\n${JSON.stringify(emptySemanticResult)}\n\`\`\``,
+      ),
+    ).toEqual(emptySemanticResult)
+    expect(() =>
+      parseEvidenceAnalystResult(
+        `\`\`\`json\n${JSON.stringify(emptySemanticResult)}\n\`\`\`\n\`\`\`json\n${JSON.stringify(emptySemanticResult)}\n\`\`\``,
+      ),
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_RESULT' }))
   })
 
   it('claims a durable job, reads bounded context and submits Core-owned metadata', async () => {
@@ -196,5 +206,27 @@ describe('Evidence Analyst adapter', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('lists only strict pending jobs for the product background worker', async () => {
+    const executeAnalysis = vi.fn(async () => ({
+      success: true as const,
+      data: [analysisJobPendingFixture],
+    }))
+    const adapter = new EvidenceAnalystJobAdapter({
+      executeAgent: vi.fn(),
+      executeAnalysis,
+    })
+
+    await expect(adapter.listPending(ids.correlation, 10)).resolves.toEqual([
+      analysisJobPendingFixture,
+    ])
+    expect(executeAnalysis).toHaveBeenCalledWith({
+      schemaVersion: 1,
+      kind: 'ANALYSIS_LIST_PENDING',
+      correlationId: ids.correlation,
+      actor: { kind: 'KIRO_ADAPTER' },
+      limit: 10,
+    })
   })
 })
