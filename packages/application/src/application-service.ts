@@ -60,11 +60,16 @@ import {
   type Project,
   type ProjectHistory,
   projectHistorySchema,
+  type ProjectEvidenceTrace,
+  projectEvidenceTraceSchema,
   type ProjectCandidateRevision,
   type ProjectSessionSnapshot,
   projectSessionSnapshotSchema,
   type PreparedBuilderTaskDescriptor,
   preparedBuilderTaskDescriptorSchema,
+  type PersonalizationBasis,
+  type PersonalizationTrace,
+  personalizationTraceSchema,
   liveProjectContextSchema,
   type UiRequest,
   uiRequestSchema,
@@ -127,8 +132,7 @@ export type UiApplicationResponse =
   | readonly AnalysisJob[]
   | HelperExchangeReceipt
   | HelperContext
-  | EvidenceTrace
-  | readonly EvidenceTrace[]
+  | ProjectEvidenceTrace
   | PreparedBuilderTaskDescriptor
   | BuilderSessionBindingDescriptor
   | GeneratedResultDescriptor
@@ -192,6 +196,15 @@ function latestByRevision<T extends { readonly revision: number }>(items: readon
 
 function unique<T>(items: readonly T[]): T[] {
   return [...new Set(items)]
+}
+
+function deterministicPersonalizationId(key: string): string {
+  const digest = sha256(key)
+  return `personalization_${digest.slice(0, 8)}-${digest.slice(8, 12)}-4${digest.slice(13, 16)}-8${digest.slice(17, 20)}-${digest.slice(20, 32)}`
+}
+
+function normalizedConceptName(value: string): string {
+  return value.trim().toLocaleLowerCase('en-US')
 }
 
 function candidateReferenceKey(reference: {
@@ -371,6 +384,8 @@ export class ApplicationService {
         return this.#listProjects(request)
       case 'UI_RESTORE_PROJECT_SESSION':
         return this.#restoreProjectSession(request)
+      case 'UI_PREPARE_DISCOVERY_AGENT_CONTEXT':
+        return this.#restoreProjectSession(request, true)
       case 'UI_OPEN_HELPER':
         return this.#openHelperFromUi(request)
       case 'UI_PREPARE_BUILDER_SESSION':
@@ -422,7 +437,11 @@ export class ApplicationService {
   }
 
   #restoreProjectSession(
-    request: Extract<UiRequest, { kind: 'UI_RESTORE_PROJECT_SESSION' }>,
+    request: Extract<
+      UiRequest,
+      { kind: 'UI_RESTORE_PROJECT_SESSION' | 'UI_PREPARE_DISCOVERY_AGENT_CONTEXT' }
+    >,
+    recordDiscoveryDelivery = false,
   ): ProjectSessionSnapshot {
     return this.#storage.transaction((repository) => {
       const recovery = repository.recoverProject(request.projectId)
@@ -445,8 +464,15 @@ export class ApplicationService {
         recovery.discoverySession === null
           ? null
           : repository.readDiscoveryAggregate(request.projectId, recovery.discoverySession.id)
-      const discoveryContext =
+      const discoveryPersonalization =
         discoveryAggregate === null
+          ? null
+          : this.#discoveryPersonalization(repository, discoveryAggregate, recordDiscoveryDelivery)
+      const discoveryBasisIds = new Set(
+        discoveryPersonalization?.basis.map((basis) => basis.conceptId) ?? [],
+      )
+      const discoveryContext =
+        discoveryAggregate === null || discoveryPersonalization === null
           ? null
           : discoveryContextSchema.parse({
               schemaVersion: 1,
@@ -459,7 +485,11 @@ export class ApplicationService {
               learningSpec: currentLearningSpec(discoveryAggregate),
               previewRound: discoveryAggregate.previewRound,
               candidateEnrichments: discoveryAggregate.candidateEnrichments,
-              relevantLedgerEntries: discoveryAggregate.relevantLedgerEntries,
+              relevantLedgerEntries: repository
+                .readRecentEvidenceTraces(100)
+                .flatMap((trace) => (trace.ledger === null ? [] : [trace.ledger]))
+                .filter((entry) => discoveryBasisIds.has(entry.concept.id)),
+              personalization: discoveryPersonalization,
             })
       const scopedLearningSpec =
         discoveryAggregate === null
@@ -538,6 +568,159 @@ export class ApplicationService {
     }
   }
 
+  #personalizationBasis(
+    repository: PersistenceRepository,
+    trace: EvidenceTrace,
+    evidenceRecords: EvidenceTrace['acceptedEvidence'],
+    purpose: PersonalizationBasis['purpose'],
+  ): PersonalizationBasis | null {
+    if (trace.ledger === null) return null
+    const evidence = [...evidenceRecords]
+      .sort((left, right) => right.acceptedAt.localeCompare(left.acceptedAt))
+      .slice(0, 5)
+    if (evidence.length === 0) return null
+    const sourceProjects = unique(
+      evidence.flatMap((record) => {
+        const recovery = repository.recoverProject(record.projectId)
+        return recovery === null ? [] : [{ id: recovery.project.id, title: recovery.project.title }]
+      }),
+    ).filter(
+      (project, index, projects) =>
+        projects.findIndex((candidate) => candidate.id === project.id) === index,
+    )
+    if (sourceProjects.length === 0) return null
+    const proposal = evidence
+      .flatMap((record) =>
+        'evidenceProposalId' in record
+          ? trace.proposals.filter((candidate) => candidate.id === record.evidenceProposalId)
+          : [],
+      )
+      .at(0)
+    return {
+      conceptId: trace.concept.id,
+      conceptName: trace.concept.canonicalName,
+      ledgerRevision: trace.ledger.revision,
+      state: trace.ledger.state.state,
+      evidenceIds: evidence.map((record) => record.id),
+      episodeIds: unique(evidence.map((record) => record.episodeId)),
+      sourceProjectIds: sourceProjects.map((project) => project.id),
+      sourceProjectTitles: sourceProjects.map((project) => project.title),
+      openIssueIds: trace.ledger.openIssues.slice(0, 10).map((issue) => issue.id),
+      purpose,
+      ...(proposal === undefined
+        ? {}
+        : {
+            redactedEvidenceExcerpt: redactSensitiveText(proposal.redactedEvidenceExcerpt).slice(
+              0,
+              240,
+            ),
+          }),
+    }
+  }
+
+  #discoveryPersonalization(
+    repository: PersistenceRepository,
+    aggregate: DiscoveryAggregate,
+    recordDelivery = true,
+  ): PersonalizationTrace {
+    const personalizationId = deterministicPersonalizationId(
+      `discovery:${aggregate.session.id}:${aggregate.session.correlationId}`,
+    )
+    const existing = repository.readPersonalizationTrace(personalizationId)
+    if (existing !== null) return existing
+    const traces = repository.readRecentEvidenceTraces(100)
+    const basis = traces
+      .flatMap((trace) => {
+        const priorEvidence = trace.acceptedEvidence.filter(
+          (evidence) => evidence.projectId !== aggregate.project.id,
+        )
+        const item = this.#personalizationBasis(
+          repository,
+          trace,
+          priorEvidence,
+          'DISCOVERY_TIE_BREAK',
+        )
+        return item === null ? [] : [item]
+      })
+      .slice(0, 5)
+    const personalization = personalizationTraceSchema.parse({
+      schemaVersion: 1,
+      id: personalizationId,
+      projectId: aggregate.project.id,
+      correlationId: aggregate.session.correlationId,
+      target: { kind: 'DISCOVERY_SESSION', discoverySessionId: aggregate.session.id },
+      mode: basis.length === 0 ? 'NO_RELEVANT_EVIDENCE' : 'EVIDENCE_AWARE',
+      basis,
+      ...(basis.length > 0
+        ? {}
+        : { fallbackReason: traces.length === 0 ? 'NO_LEDGER' : 'NO_PRIOR_PROJECT_EVIDENCE' }),
+      createdAt: this.#timestamp(),
+      source: { kind: 'CORE' },
+      redactionStatus: 'VERIFIED_REDACTED',
+    })
+    if (recordDelivery) repository.appendPersonalizationTrace(personalization)
+    return personalization
+  }
+
+  #helperPersonalization(
+    repository: PersistenceRepository,
+    input: {
+      readonly projectId: string
+      readonly taskId: string
+      readonly decisionId?: string
+      readonly correlationId: string
+      readonly question: string
+      readonly relatedConceptNames: readonly string[]
+    },
+  ): PersonalizationTrace {
+    const personalizationId = deterministicPersonalizationId(
+      `helper:${input.projectId}:${input.taskId}:${input.correlationId}`,
+    )
+    const existing = repository.readPersonalizationTrace(personalizationId)
+    if (existing !== null) return existing
+    const traces = repository.readRecentEvidenceTraces(100)
+    const explicitNames = new Set(input.relatedConceptNames.map(normalizedConceptName))
+    const question = normalizedConceptName(input.question)
+    const relevantTraces = traces.filter((trace) => {
+      const names = [trace.concept.canonicalName, ...(trace.ledger?.acceptedAliases ?? [])].map(
+        normalizedConceptName,
+      )
+      return names.some((name) => explicitNames.has(name) || question.includes(name))
+    })
+    const basis = relevantTraces
+      .flatMap((trace) => {
+        const purpose = trace.acceptedEvidence.some(
+          (evidence) => evidence.projectId !== input.projectId,
+        )
+          ? ('HELPER_PAST_EXPERIENCE_CONNECTION' as const)
+          : ('HELPER_EXPLANATION_START' as const)
+        const item = this.#personalizationBasis(repository, trace, trace.acceptedEvidence, purpose)
+        return item === null ? [] : [item]
+      })
+      .slice(0, 5)
+    const personalization = personalizationTraceSchema.parse({
+      schemaVersion: 1,
+      id: personalizationId,
+      projectId: input.projectId,
+      correlationId: input.correlationId,
+      target: {
+        kind: 'HELPER_TURN',
+        taskId: input.taskId,
+        ...(input.decisionId === undefined ? {} : { decisionId: input.decisionId }),
+      },
+      mode: basis.length === 0 ? 'NO_RELEVANT_EVIDENCE' : 'EVIDENCE_AWARE',
+      basis,
+      ...(basis.length > 0
+        ? {}
+        : { fallbackReason: traces.length === 0 ? 'NO_LEDGER' : 'NO_RELEVANT_CONCEPT' }),
+      createdAt: this.#timestamp(),
+      source: { kind: 'CORE' },
+      redactionStatus: 'VERIFIED_REDACTED',
+    })
+    repository.appendPersonalizationTrace(personalization)
+    return personalization
+  }
+
   #startDiscovery(request: Extract<UiRequest, { kind: 'UI_START_DISCOVERY' }>): CommandReceipt {
     const createdAt = this.#timestamp()
     const sessionId = this.#generateId('discovery_session')
@@ -596,10 +779,23 @@ export class ApplicationService {
   #getDiscoveryContext(
     request: Extract<AgentRequest, { kind: 'DISCOVERY_GET_CONTEXT' }>,
   ): DiscoveryContext {
-    const aggregate = this.#storage.transaction((repository) =>
-      repository.readDiscoveryAggregate(request.projectId, request.discoverySessionId),
-    )
-    if (aggregate === null) throw this.#notFound(request.correlationId, 'DISCOVERY_NOT_FOUND')
+    const scoped = this.#storage.transaction((repository) => {
+      const aggregate = repository.readDiscoveryAggregate(
+        request.projectId,
+        request.discoverySessionId,
+      )
+      if (aggregate === null) return null
+      return {
+        aggregate,
+        personalization: this.#discoveryPersonalization(repository, aggregate),
+        ledgerEntries: repository
+          .readRecentEvidenceTraces(100)
+          .flatMap((trace) => (trace.ledger === null ? [] : [trace.ledger])),
+      }
+    })
+    if (scoped === null) throw this.#notFound(request.correlationId, 'DISCOVERY_NOT_FOUND')
+    const { aggregate, personalization } = scoped
+    const basisIds = new Set(personalization.basis.map((basis) => basis.conceptId))
     return discoveryContextSchema.parse({
       schemaVersion: 1,
       correlationId: request.correlationId,
@@ -611,7 +807,8 @@ export class ApplicationService {
       learningSpec: currentLearningSpec(aggregate),
       previewRound: aggregate.previewRound,
       candidateEnrichments: aggregate.candidateEnrichments,
-      relevantLedgerEntries: aggregate.relevantLedgerEntries,
+      relevantLedgerEntries: scoped.ledgerEntries.filter((entry) => basisIds.has(entry.concept.id)),
+      personalization,
     })
   }
 
@@ -2675,7 +2872,7 @@ export class ApplicationService {
       request.correlationId,
     )
     const traces = this.#storage.transaction((repository) =>
-      repository.readEvidenceTracesForProject(request.projectId),
+      repository.readRecentEvidenceTraces(100),
     )
     const currentVersion = aggregate.liveContext?.contextVersion ?? null
     if (
@@ -2714,17 +2911,20 @@ export class ApplicationService {
           : []
       }),
     ]).map((name) => name.toLocaleLowerCase('en-US'))
-    const relevantLedgerEntries = relevanceNames
-      .flatMap((name) => {
-        const trace = traces.find(
-          (candidate) =>
-            candidate.concept.canonicalName.toLocaleLowerCase('en-US') === name ||
-            (candidate.ledger?.acceptedAliases ?? []).some(
-              (alias) => alias.toLocaleLowerCase('en-US') === name,
-            ),
-        )
-        return trace?.ledger === null || trace?.ledger === undefined ? [] : [trace.ledger]
-      })
+    const personalization = this.#storage.transaction((repository) =>
+      this.#helperPersonalization(repository, {
+        projectId: request.projectId,
+        taskId: aggregate.task.id,
+        ...(request.decisionId === undefined ? {} : { decisionId: request.decisionId }),
+        correlationId: request.correlationId,
+        question: request.question,
+        relatedConceptNames: relevanceNames,
+      }),
+    )
+    const personalizationConceptIds = new Set(personalization.basis.map((basis) => basis.conceptId))
+    const relevantLedgerEntries = traces
+      .flatMap((trace) => (trace.ledger === null ? [] : [trace.ledger]))
+      .filter((entry) => personalizationConceptIds.has(entry.concept.id))
       .filter(
         (entry, index, entries) =>
           entries.findIndex((candidate) => candidate.id === entry.id) === index,
@@ -2837,6 +3037,7 @@ export class ApplicationService {
       activeDecisions: activeDecisions.slice(0, 10),
       focusedDecision,
       relevantLedgerEntries,
+      personalization,
       recentEpisodes,
       contextReferences,
       referenceDetails,
@@ -3002,6 +3203,7 @@ export class ApplicationService {
           const existing = repository.readOpenEpisode(request.projectId, 'HELPER_CONVERSATION', {
             conversationId,
           })
+          const episodeCorrelationId = existing?.correlationId ?? request.correlationId
           let episode = existing
           if (request.origin === 'FREE_TEXT') {
             const userMessageId = this.#generateId('message')
@@ -3010,7 +3212,7 @@ export class ApplicationService {
               taskId: task.id,
               ...(request.decisionId === undefined ? {} : { decisionId: request.decisionId }),
               conversationId,
-              correlationId: request.correlationId,
+              correlationId: episodeCorrelationId,
               actor: { kind: 'USER' },
               occurredAt: recordedAt,
               payload: {
@@ -3039,7 +3241,7 @@ export class ApplicationService {
             taskId: task.id,
             ...(request.decisionId === undefined ? {} : { decisionId: request.decisionId }),
             conversationId,
-            correlationId: request.correlationId,
+            correlationId: episodeCorrelationId,
             actor: { kind: 'AGENT', role: 'HELPER' },
             occurredAt: recordedAt,
             payload: {
@@ -3692,17 +3894,163 @@ export class ApplicationService {
 
   #readEvidenceTrace(
     request: Extract<UiRequest, { kind: 'UI_READ_EVIDENCE_TRACE' }>,
-  ): EvidenceTrace | readonly EvidenceTrace[] {
+  ): ProjectEvidenceTrace {
     return this.#storage.transaction((repository) => {
-      if (repository.recoverProject(request.projectId) === null) {
+      const recovery = repository.recoverProject(request.projectId)
+      if (recovery === null) {
         throw this.#notFound(request.correlationId, 'PROJECT_NOT_FOUND')
       }
-      if (request.conceptId === undefined) {
-        return repository.readEvidenceTracesForProject(request.projectId)
+      const personalization = repository
+        .readPersonalizationTracesForProject(request.projectId, 100)
+        .filter((trace) => {
+          if (trace.target.kind !== 'DISCOVERY_SESSION') return true
+          const aggregate = repository.readDiscoveryAggregate(
+            trace.projectId,
+            trace.target.discoverySessionId,
+          )
+          return aggregate?.session.correlationId === trace.correlationId
+        })
+      const personalizationEvidenceIds = new Set(
+        personalization.flatMap((trace) => trace.basis.flatMap((basis) => basis.evidenceIds)),
+      )
+      const personalizationIssueIds = new Set(
+        personalization.flatMap((trace) => trace.basis.flatMap((basis) => basis.openIssueIds)),
+      )
+      const directTraces = repository.readEvidenceTracesForProject(request.projectId)
+      const allowedConceptIds = new Set([
+        ...directTraces.map((trace) => trace.concept.id),
+        ...personalization.flatMap((trace) => trace.basis.map((basis) => basis.conceptId)),
+      ])
+      if (request.conceptId !== undefined && !allowedConceptIds.has(request.conceptId)) {
+        throw this.#notFound(request.correlationId, 'EVIDENCE_TRACE_NOT_FOUND')
       }
-      const trace = repository.readEvidenceTrace(request.conceptId)
-      if (trace === null) throw this.#notFound(request.correlationId, 'EVIDENCE_TRACE_NOT_FOUND')
-      return trace
+      const conceptIds =
+        request.conceptId === undefined ? [...allowedConceptIds] : [request.conceptId]
+      const concepts = conceptIds.flatMap((conceptId) => {
+        const trace = repository.readEvidenceTrace(conceptId)
+        if (trace === null) return []
+        const evidence = trace.acceptedEvidence.flatMap((record) => {
+          if (
+            record.projectId !== request.projectId &&
+            !personalizationEvidenceIds.has(record.id)
+          ) {
+            return []
+          }
+          const episode = repository.readEpisodeAggregate(record.projectId, record.episodeId)
+          const sourceProject = repository.recoverProject(record.projectId)
+          if (episode === null || sourceProject === null) return []
+          const proposal =
+            'evidenceProposalId' in record
+              ? trace.proposals.find((candidate) => candidate.id === record.evidenceProposalId)
+              : undefined
+          return [
+            {
+              evidenceId: record.id,
+              kind: record.kind,
+              projectId: record.projectId,
+              projectTitle: sourceProject.project.title,
+              ...(record.taskId === undefined ? {} : { taskId: record.taskId }),
+              episodeId: record.episodeId,
+              episodeType: episode.episode.type,
+              episodeStatus: episode.episode.status,
+              ...(episode.episode.endedAt === undefined
+                ? {}
+                : { episodeEndedAt: episode.episode.endedAt }),
+              acceptedAt: record.acceptedAt,
+              ...('supportsState' in record ? { supportsState: record.supportsState } : {}),
+              ...('signal' in record ? { signal: record.signal } : {}),
+              ...('strength' in record ? { strength: record.strength } : {}),
+              ...('promptDependence' in record
+                ? { promptDependence: record.promptDependence }
+                : {}),
+              ...(proposal === undefined
+                ? {}
+                : {
+                    redactedEvidenceExcerpt: proposal.redactedEvidenceExcerpt,
+                    rationale: proposal.rationale,
+                  }),
+            },
+          ]
+        })
+        const rejectedEvidence = trace.decisions.flatMap((decision) => {
+          if (decision.outcome !== 'REJECTED') return []
+          const proposal = trace.proposals.find(
+            (candidate) => candidate.id === decision.evidenceProposalId,
+          )
+          if (proposal === undefined || proposal.projectId !== request.projectId) return []
+          const episode = repository.readEpisodeAggregate(proposal.projectId, proposal.episodeId)
+          const sourceProject = repository.recoverProject(proposal.projectId)
+          if (episode === null || sourceProject === null) return []
+          return [
+            {
+              proposalId: proposal.id,
+              evidenceDecisionId: decision.id,
+              projectId: proposal.projectId,
+              projectTitle: sourceProject.project.title,
+              episodeId: proposal.episodeId,
+              episodeType: episode.episode.type,
+              proposedConceptName: proposal.concept.proposedCanonicalName,
+              signal: proposal.signal,
+              strength: proposal.strength,
+              promptDependence: proposal.promptDependence,
+              redactedEvidenceExcerpt: proposal.redactedEvidenceExcerpt,
+              reasonCode: decision.reasonCode,
+              explanation: decision.explanation,
+              decidedAt: decision.decidedAt,
+            },
+          ]
+        })
+        const visibleEvidenceIds = new Set(evidence.map((item) => item.evidenceId))
+        return [
+          {
+            conceptId: trace.concept.id,
+            conceptName: trace.concept.canonicalName,
+            description: trace.concept.description,
+            state: trace.ledger?.state.state ?? null,
+            stateRevision: trace.ledger?.state.revision ?? null,
+            reducerVersion: trace.ledger?.state.reducerVersion ?? null,
+            updatedAt: trace.ledger?.updatedAt ?? null,
+            stateEvidenceIds:
+              trace.ledger?.state.acceptedEvidenceIds.filter((id) => visibleEvidenceIds.has(id)) ??
+              [],
+            evidence,
+            rejectedEvidence,
+            openIssues: trace.misconceptionIssues.filter(
+              (issue) =>
+                issue.status === 'OPEN' &&
+                (issue.projectId === request.projectId || personalizationIssueIds.has(issue.id)),
+            ),
+          },
+        ]
+      })
+      const analysis = repository.readAnalysisJobsForProject(request.projectId, undefined, 100)
+      const noEvidenceReason = analysis.find(
+        (job) => job.status === 'SUCCEEDED' && job.resultSummary?.noEvidenceReason !== undefined,
+      )?.resultSummary?.noEvidenceReason
+      return projectEvidenceTraceSchema.parse({
+        schemaVersion: 1,
+        correlationId: request.correlationId,
+        projectId: request.projectId,
+        concepts,
+        analysis: analysis.map((job) => ({
+          analysisJobId: job.id,
+          episodeId: job.episodeId,
+          status: job.status,
+          revision: job.revision,
+          ...(job.resultSummary === undefined ? {} : { resultSummary: job.resultSummary }),
+          ...(job.lastFailure === undefined ? {} : { lastFailure: job.lastFailure }),
+          updatedAt: job.updatedAt,
+        })),
+        personalization,
+        ...(concepts.length > 0
+          ? {}
+          : {
+              emptyReason:
+                noEvidenceReason ??
+                '아직 검증된 사용자 Evidence가 없습니다. 작업과 대화가 분석되면 여기에 표시됩니다.',
+            }),
+        redactionStatus: 'VERIFIED_REDACTED',
+      })
     })
   }
 

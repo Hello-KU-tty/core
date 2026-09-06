@@ -691,7 +691,23 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - 사용자는 실제 Decision에서 판단 책임을 유지하고 Builder 추천과 Helper 설명을 함께 볼 수 있다.
 - 완료 화면은 학습 점수보다 실행 가능한 결과물을 먼저 보여준다.
 
-### [>] T17. Evidence Trace와 다음 대화 개인화
+### [x] T17. Evidence Trace와 다음 대화 개인화
+
+**승인 기록**
+
+- 2026-09-06 사용자가 UI-safe Evidence Trace, Core-owned immutable personalization provenance, bounded cross-project Ledger retrieval, Helper/Discovery prompt revision, 비점수형 UI, A/B fixture와 실제 Kiro data-preserving 검증 계획을 승인했다.
+- Personalization Trace는 Agent가 Evidence를 실제로 사용했다고 단정하지 않고 해당 turn에 Core가 제공한 근거를 기록한다. 실제 결과 차이는 evidence 있음/없음 A/B 평가로 별도 검증한다.
+- 2026-09-06 사용자가 추상적·주관적인 개인화 경계를 여러 상황에서 추가 검증하도록 요청했다. 실제 Kiro 다중 turn과 결정론적 경계 fixture를 함께 확장한다.
+
+**검증 기록**
+
+- UI-safe Project Evidence Trace, additive SQLite `personalization_traces`, 최대 5개 accepted Evidence retrieval, 명시적 no-evidence fallback, Helper v1.2.0과 Discovery v1.3.0, 비점수형 접이식 UI를 구현했다. 일반 session restore는 trace를 만들지 않고 실제 Discovery dispatch 직전 prepare command만 immutable trace를 남긴다.
+- 결정론적 A/B fixture는 같은 질문에서 `NO_RELEVANT_EVIDENCE`가 과거 경험을 추측하지 않고 `EVIDENCE_AWARE`가 source Project·Episode·Evidence를 연결하는 차이를 고정했다. 실제 Kiro Helper 두 turn도 각각 34초·0.40 credits와 35초·0.53 credits에 같은 경계를 지켰고 `OBSERVED`를 숙달로 과장하지 않았다.
+- 실제 첫 검토에서 같은 Helper conversation의 두 번째 요청 correlation이 Episode scope와 충돌하는 결함과 이미 열린 Evidence 패널의 빈 결과 cache를 발견했다. Episode는 최초 correlation을 유지하고 요청·personalization trace는 turn correlation을 유지하도록 분리했으며, Helper 기록 뒤와 패널 재개방 때 read model을 갱신한다. 4-event 연속 대화 integration regression을 추가했다.
+- 추가 실제 Kiro stress turn 5개에서 무관한 경험 비추측, 단일 근거, 서로 다른 출처의 복수 근거, 약한 비유 경계와 `TRANSFERRED` 과장 거절을 확인했다. 모두 기대한 Core mode/basis와 일치했고 한 Helper Episode가 revision 10·event 10으로 이어졌으며 Project Evidence UI와 SQLite `quick_check=ok`를 확인했다. target 데이터에 없는 `DEMONSTRATED`+open issue와 최대 5개 경계는 fixture·prompt/contract 회귀로 보강했다. 최신 native turn이 다음 turn 전까지 두 번 보이는 Kiro native-session 렌더링 현상은 Core 기록 중복이 아닌 별도 표시 이슈로 남겼다.
+- 추가 회귀 후 Node.js 24.19.0·pnpm 11.12.0에서 format, lint, typecheck, migration, unit 2, package/app integration 203, prompt eval 21, build와 smoke 6을 통과했다. sandbox 안 Chromium은 macOS Mach port 권한 때문에 test 시작 전에 종료됐고 같은 E2E를 허용된 브라우저 환경에서 재실행해 12/12 통과했다.
+- target Kiro Crew 설치본을 app 0.3.2로 data-preserving update했다. source/설치 UI·backend·Discovery·Helper hash가 일치하고 `/health`가 `ok`, SQLite `quick_check=ok`이며 update 전후 Project 61, Discovery Session 62, Learning Spec 27, Task 6, accepted Evidence 13, Concept Ledger 13, Completion Report 2가 보존됐다. 초기 pre-fix restore probe가 만든 correlation 불일치 Discovery Trace 1개는 immutable 기록이라 삭제하지 않고 UI query에서 제외했으며 이후 restore로 수가 증가하지 않음을 확인했다.
+- Node.js 24.19.0과 pnpm 11.12.0에서 format, lint, typecheck, migration check, unit, package/app integration, prompt eval, build, smoke와 Chromium E2E를 검증했다. standalone `pnpm test:eval:live-helper`는 Kiro CLI 2.21.1의 ACP `new_session` 종료로 Agent 호출 전에 두 번 실패했으며 mock 성공으로 대체하지 않았다. 실제 제품 경로 A/B는 target Crew에서 별도로 성공했다.
 
 **범위**
 
@@ -715,7 +731,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - Discovery에서 흥미·실용성이 Ledger보다 우선한다.
 - 동일 사용자라도 근거가 없을 때 state를 추측하거나 자신감 퍼센트를 만들어내지 않는다.
 
-### [ ] T18. Campus Drop TypeScript Golden Path
+### [>] T18. Campus Drop TypeScript Golden Path
 
 **범위**
 

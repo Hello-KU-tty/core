@@ -14,6 +14,7 @@ import {
   episodeSchema,
   learningSpecRevisionSchema,
   liveProjectContextSchema,
+  personalizationTraceSchema,
   projectCandidateRevisionSchema,
   taskCompletionReportSchema,
   type EvaluationCaseResult,
@@ -194,6 +195,86 @@ describe('T08 Discovery Agent regression', () => {
         expect.objectContaining({ criterionKey: 'concept_necessity', status: 'PASSED' }),
       ]),
     )
+  })
+})
+
+describe('T17 personalization A/B fixture', () => {
+  it('uses accepted provenance when present and keeps the no-evidence fallback neutral', async () => {
+    const fixture = (await loadInput(
+      'tests/eval/fixtures/prompt-regressions/t17-personalization-ab.json',
+    )) as {
+      helper: {
+        evidenceAware: { trace: unknown; answer: string }
+        noEvidence: { trace: unknown; answer: string }
+      }
+      discovery: {
+        primarySignals: string[]
+        tieBreakSignal: string
+        evidenceAwareOrder: string[]
+        noEvidenceOrder: string[]
+      }
+      stressCases: {
+        unrelatedEvidence: Record<string, unknown>
+        singleObserved: Record<string, unknown>
+        multipleSources: Record<string, unknown>
+        weakAnalogy: Record<string, unknown>
+        stateInflation: Record<string, unknown>
+        openIssue: Record<string, unknown>
+        bounds: Record<string, unknown>
+      }
+    }
+    const evidenceAware = personalizationTraceSchema.parse(fixture.helper.evidenceAware.trace)
+    const noEvidence = personalizationTraceSchema.parse(fixture.helper.noEvidence.trace)
+
+    expect(evidenceAware.mode).toBe('EVIDENCE_AWARE')
+    expect(evidenceAware.basis).toHaveLength(1)
+    expect(fixture.helper.evidenceAware.answer).toContain(
+      evidenceAware.basis[0]?.sourceProjectTitles[0],
+    )
+    expect(noEvidence).toMatchObject({
+      mode: 'NO_RELEVANT_EVIDENCE',
+      basis: [],
+      fallbackReason: 'NO_RELEVANT_CONCEPT',
+    })
+    expect(fixture.helper.noEvidence.answer).not.toContain('Webhook Lens')
+    expect(fixture.helper.noEvidence.answer).not.toMatch(/\d+%/u)
+    expect(fixture.discovery.primarySignals).toEqual(['interest', 'personal utility'])
+    expect(fixture.discovery.tieBreakSignal).toBe('accepted prior-project evidence')
+    expect(fixture.discovery.evidenceAwareOrder).not.toEqual(fixture.discovery.noEvidenceOrder)
+    expect(fixture.stressCases).toMatchObject({
+      unrelatedEvidence: {
+        expectedMode: 'NO_RELEVANT_EVIDENCE',
+        expectedBasisCount: 0,
+        inventPriorExperience: false,
+      },
+      singleObserved: {
+        expectedMode: 'EVIDENCE_AWARE',
+        expectedBasisCount: 1,
+        actualStates: ['OBSERVED'],
+        claimTransferred: false,
+      },
+      multipleSources: {
+        expectedBasisCount: 2,
+        requiredDistinctSourceProjects: 2,
+        keepSourcesSeparate: true,
+      },
+      weakAnalogy: {
+        forceDirectMapping: false,
+        requireCommonalityAndDifference: true,
+      },
+      stateInflation: {
+        actualState: 'OBSERVED',
+        requestedState: 'TRANSFERRED',
+        allowRequestedStateClaim: false,
+      },
+      openIssue: {
+        actualState: 'DEMONSTRATED',
+        openIssueCount: 1,
+        ignoreOpenIssue: false,
+        allowMasteryClaim: false,
+      },
+      bounds: { maximumBasisCount: 5 },
+    })
   })
 })
 
@@ -413,7 +494,7 @@ describe('T15 Discovery Agent Spec persistence recovery', () => {
       readonly containsPersonalData: boolean
     }
 
-    expect(prompt).toContain('Prompt version: `1.2.0`')
+    expect(prompt).toContain('Prompt version: `1.3.0`')
     expect(prompt).toContain('확인 질문이나 설명으로 끝내지 마라')
     expect(performance).toMatchObject({
       promptVersion: '1.1.6',
@@ -516,7 +597,7 @@ describe('T15 Discovery Agent v1.1.9 historical compact preview enrichment', () 
       readonly containsPersonalData: boolean
     }
 
-    expect(prompt).toContain('Prompt version: `1.2.0`')
+    expect(prompt).toContain('Prompt version: `1.3.0`')
     expect(prompt).toContain('lightweight preview를 정확히 10개')
     expect(prompt).toContain('summary·coreInteraction·technologyNecessity는 각각 45자')
     expect(prompt).toContain('가장 잘 맞는 하나만 사용')
@@ -563,7 +644,7 @@ describe('T15 Discovery Agent v1.2.0 just-in-time selected enrichment', () => {
       readonly containsPersonalData: boolean
     }
 
-    expect(prompt).toContain('Prompt version: `1.2.0`')
+    expect(prompt).toContain('Prompt version: `1.3.0`')
     expect(prompt).toContain('`SELECTED`')
     expect(prompt).toContain('`requestedPreviews`에 있는 수만큼만 완성')
     expect(fixture).toMatchObject({

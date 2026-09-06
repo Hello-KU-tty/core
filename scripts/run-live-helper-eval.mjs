@@ -475,6 +475,8 @@ if (
   preflight.data.freshness.status !== 'CURRENT' ||
   preflight.data.focusedDecision?.id !== ids.decision ||
   preflight.data.relevantLedgerEntries[0]?.state.state !== 'DEMONSTRATED' ||
+  preflight.data.personalization.mode !== 'EVIDENCE_AWARE' ||
+  preflight.data.personalization.basis[0]?.conceptName !== 'runtime validation' ||
   preflight.data.recentEpisodes[0]?.episodeId !== ids.episode ||
   preflight.data.sourceExcerpts[0]?.reference.path !== 'src/events.ts' ||
   JSON.stringify(preflight).includes(secretSentinel)

@@ -25,6 +25,7 @@ import {
 } from './discovery.js'
 import { conceptLedgerEntrySchema, evidenceProposalBatchSchema } from './evidence.js'
 import { learningSpecRevisionSchema } from './learning-spec.js'
+import { personalizationTraceSchema } from './personalization.js'
 import {
   analysisJobIdSchema,
   correlationIdSchema,
@@ -382,6 +383,7 @@ export const discoveryContextSchema = z.strictObject({
   previewRound: candidatePreviewRoundSchema.nullable().default(null),
   candidateEnrichments: z.array(candidateEnrichmentSchema).max(10).default([]),
   relevantLedgerEntries: z.array(conceptLedgerEntrySchema).max(20),
+  personalization: personalizationTraceSchema,
 })
 
 export const builderTaskContextSchema = z.strictObject({
@@ -430,6 +432,7 @@ export const helperContextSchema = z.strictObject({
   activeDecisions: z.array(decisionRequestSchema).max(10),
   focusedDecision: decisionRequestSchema.nullable(),
   relevantLedgerEntries: z.array(conceptLedgerEntrySchema).max(5),
+  personalization: personalizationTraceSchema,
   recentEpisodes: z.array(helperEpisodeSummarySchema).max(5),
   contextReferences: z.array(contextualSourceReferenceSchema).max(30),
   referenceDetails: z.array(helperReferenceDetailSchema).max(30),

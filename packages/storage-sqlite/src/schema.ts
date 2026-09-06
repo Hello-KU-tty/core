@@ -1096,6 +1096,35 @@ export const baselineResults = sqliteTable(
   ],
 )
 
+export const personalizationTraces = sqliteTable(
+  'personalization_traces',
+  {
+    id: text('id').primaryKey(),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'restrict' }),
+    correlationId: text('correlation_id').notNull(),
+    targetKind: text('target_kind').notNull(),
+    discoverySessionId: text('discovery_session_id').references(() => discoverySessions.id, {
+      onDelete: 'restrict',
+    }),
+    taskId: text('task_id').references(() => tasks.id, { onDelete: 'restrict' }),
+    mode: text('mode').notNull(),
+    createdAt: text('created_at').notNull(),
+    ...payloadColumns(),
+  },
+  (table) => [
+    check(
+      'personalization_traces_target_shape',
+      sql`(${table.targetKind} = 'DISCOVERY_SESSION' AND ${table.discoverySessionId} IS NOT NULL AND ${table.taskId} IS NULL) OR (${table.targetKind} = 'HELPER_TURN' AND ${table.discoverySessionId} IS NULL AND ${table.taskId} IS NOT NULL)`,
+    ),
+    check('personalization_traces_payload_json_valid', sql`json_valid(${table.payloadJson})`),
+    index('personalization_traces_project_created_idx').on(table.projectId, table.createdAt),
+    index('personalization_traces_discovery_session_idx').on(table.discoverySessionId),
+    index('personalization_traces_correlation_idx').on(table.correlationId),
+  ],
+)
+
 export const idempotencyReceipts = sqliteTable(
   'idempotency_receipts',
   {

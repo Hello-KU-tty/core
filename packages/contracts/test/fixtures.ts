@@ -27,6 +27,7 @@ export const ids = {
   evidenceDecision: 'evidence_decision_00000000-0000-4000-8000-000000000024',
   evidence: 'evidence_00000000-0000-4000-8000-000000000025',
   conceptLedger: 'concept_ledger_00000000-0000-4000-8000-000000000026',
+  personalization: 'personalization_00000000-0000-4000-8000-000000000035',
   audit: 'audit_00000000-0000-4000-8000-000000000027',
   fixture: 'fixture_00000000-0000-4000-8000-000000000028',
   evaluationRun: 'evaluation_run_00000000-0000-4000-8000-000000000029',
@@ -37,6 +38,25 @@ export const ids = {
 } as const
 
 export const timestamp = '2026-08-25T03:00:00.000Z'
+
+export const discoveryPersonalizationFixture = {
+  schemaVersion: 1,
+  id: ids.personalization,
+  projectId: ids.project,
+  correlationId: ids.correlation,
+  target: { kind: 'DISCOVERY_SESSION', discoverySessionId: ids.discoverySession },
+  mode: 'NO_RELEVANT_EVIDENCE',
+  basis: [],
+  fallbackReason: 'NO_LEDGER',
+  createdAt: timestamp,
+  source: { kind: 'CORE' },
+  redactionStatus: 'VERIFIED_REDACTED',
+} as const
+
+export const helperPersonalizationFixture = {
+  ...discoveryPersonalizationFixture,
+  target: { kind: 'HELPER_TURN', taskId: ids.task },
+} as const
 
 export const projectFixture = {
   schemaVersion: 1,

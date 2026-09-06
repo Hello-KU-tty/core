@@ -2,6 +2,7 @@ import type {
   DecisionRequest,
   DecisionSessionItem,
   GeneratedResultDescriptor,
+  ProjectEvidenceTrace,
   ProjectSessionSnapshot,
 } from '@vibe-helper/contracts'
 import {
@@ -56,6 +57,153 @@ function StatusPill({ value }: { readonly value: string }) {
     <span className={`status-pill status-${value.toLowerCase()}`}>
       {value.replaceAll('_', ' ')}
     </span>
+  )
+}
+
+const conceptStateLabels = {
+  OBSERVED: '프로젝트에서 관찰됨',
+  EXPLAINED: '사용자가 설명함',
+  DEMONSTRATED: '구현에서 보여줌',
+  TRANSFERRED: '다른 맥락에 적용함',
+} as const
+
+function EvidenceTracePanel({
+  trace,
+  busy,
+  error,
+  onOpen,
+  onRetry,
+}: {
+  readonly trace: ProjectEvidenceTrace | null
+  readonly busy: boolean
+  readonly error: string | null
+  readonly onOpen: () => void
+  readonly onRetry: (job: ProjectEvidenceTrace['analysis'][number]) => void
+}) {
+  return (
+    <details
+      className="evidence-trace-panel"
+      onToggle={(event) => {
+        if (event.currentTarget.open) onOpen()
+      }}
+    >
+      <summary>
+        <span>
+          <strong>학습 Evidence 확인</strong>
+          <small>상태 점수가 아니라, Core가 채택한 근거와 제외한 이유를 봅니다.</small>
+        </span>
+        <span aria-hidden="true">＋</span>
+      </summary>
+      <div className="evidence-trace-body" aria-live="polite">
+        {busy ? <p>검증된 Evidence를 불러오는 중입니다…</p> : null}
+        {error === null ? null : (
+          <p className="pane-error" role="alert">
+            {error}
+          </p>
+        )}
+        {trace?.concepts.length === 0 ? (
+          <div className="evidence-empty-state">
+            <strong>아직 표시할 Evidence가 없습니다.</strong>
+            <p>{trace.emptyReason}</p>
+          </div>
+        ) : null}
+        {trace?.concepts.map((concept) => (
+          <article className="concept-evidence-card" key={concept.conceptId}>
+            <header>
+              <div>
+                <h3>{concept.conceptName}</h3>
+                <p>{concept.description}</p>
+              </div>
+              {concept.state === null ? null : (
+                <span className="evidence-state">{conceptStateLabels[concept.state]}</span>
+              )}
+            </header>
+            {concept.evidence.length === 0 ? (
+              <p className="evidence-muted">이 프로젝트에 공개할 수 있는 채택 근거가 없습니다.</p>
+            ) : (
+              <ol className="evidence-timeline">
+                {concept.evidence.map((evidence) => (
+                  <li key={evidence.evidenceId}>
+                    <strong>{evidence.projectTitle}</strong>
+                    <span>
+                      {evidence.kind === 'CONCEPT_OBSERVATION'
+                        ? '코드·작업에서 개념 사용이 관찰됨'
+                        : evidence.redactedEvidenceExcerpt}
+                    </span>
+                    <small>
+                      {evidence.episodeType.replaceAll('_', ' ')} ·{' '}
+                      {evidence.supportsState === undefined
+                        ? '오해 가능성 신호'
+                        : conceptStateLabels[evidence.supportsState]}
+                    </small>
+                    {evidence.rationale === undefined ? null : <small>{evidence.rationale}</small>}
+                  </li>
+                ))}
+              </ol>
+            )}
+            {concept.rejectedEvidence.length === 0 ? null : (
+              <details className="evidence-subsection">
+                <summary>채택되지 않은 제안 {concept.rejectedEvidence.length}개</summary>
+                <ul>
+                  {concept.rejectedEvidence.map((item) => (
+                    <li key={item.evidenceDecisionId}>
+                      <span>{item.redactedEvidenceExcerpt}</span>
+                      <small>{item.explanation}</small>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+            {concept.openIssues.length === 0 ? null : (
+              <div className="evidence-open-issues">
+                <strong>아직 열린 오해 가능성</strong>
+                <ul>
+                  {concept.openIssues.map((issue) => (
+                    <li key={issue.id}>{issue.summary}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </article>
+        ))}
+        {trace?.personalization.length === 0 ? null : (
+          <section
+            className="personalization-provenance"
+            aria-label="Agent personalization provenance"
+          >
+            <h3>Agent에 제공된 근거</h3>
+            <p>이 기록은 근거 제공 여부를 뜻하며, 답변에 실제 사용됐다는 보증은 아닙니다.</p>
+            <ul>
+              {trace?.personalization.slice(0, 10).map((item) => (
+                <li key={item.id}>
+                  {item.mode === 'NO_RELEVANT_EVIDENCE'
+                    ? '관련 Evidence 없이 일반 경로를 사용함'
+                    : item.basis
+                        .map(
+                          (basis) =>
+                            `${basis.conceptName} · ${basis.sourceProjectTitles.join(', ')}`,
+                        )
+                        .join(' / ')}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        {trace?.analysis.map((job) =>
+          job.status === 'FAILED' ? (
+            <div className="analysis-retry" key={job.analysisJobId} role="status">
+              <span>
+                Evidence 분석이 완료되지 않았습니다. 저장된 Episode에서 안전하게 다시 시도할 수
+                있습니다.
+              </span>
+              <button type="button" disabled={busy} onClick={() => onRetry(job)}>
+                분석 다시 시도
+              </button>
+            </div>
+          ) : null,
+        )}
+      </div>
+    </details>
   )
 }
 
@@ -504,6 +652,9 @@ export function BuildWorkspace({
   const [launchBusy, setLaunchBusy] = useState(false)
   const [launchError, setLaunchError] = useState<string | null>(null)
   const [resultDescriptor, setResultDescriptor] = useState<GeneratedResultDescriptor | null>(null)
+  const [evidenceTrace, setEvidenceTrace] = useState<ProjectEvidenceTrace | null>(null)
+  const [evidenceBusy, setEvidenceBusy] = useState(false)
+  const [evidenceError, setEvidenceError] = useState<string | null>(null)
   const autoStartedTasks = useRef(new Set<string>())
 
   const task = snapshot.currentTask
@@ -607,6 +758,27 @@ export function BuildWorkspace({
     )
   }, [dispatchBuilder, runtimeStatus, sessions, snapshot, task])
 
+  const loadEvidenceTrace = useCallback(async (): Promise<void> => {
+    if (evidenceBusy) return
+    setEvidenceBusy(true)
+    setEvidenceError(null)
+    try {
+      setEvidenceTrace(
+        await coreClient.readEvidenceTrace({
+          schemaVersion: 1,
+          kind: 'UI_READ_EVIDENCE_TRACE',
+          correlationId: entityId('corr'),
+          actor: { kind: 'UI' },
+          projectId: snapshot.project.id,
+        }),
+      )
+    } catch (error) {
+      setEvidenceError(actionError(error))
+    } finally {
+      setEvidenceBusy(false)
+    }
+  }, [coreClient, evidenceBusy, snapshot.project.id])
+
   const askHelper = async (
     question: string,
     origin: HelperOrigin,
@@ -660,6 +832,8 @@ export function BuildWorkspace({
         setHelperUsedDecisionIds((current) => new Set([...current, decisionId]))
       }
       await restore()
+      setEvidenceTrace(null)
+      await loadEvidenceTrace()
     } catch (error) {
       setHelperError(actionError(error))
     } finally {
@@ -743,6 +917,29 @@ export function BuildWorkspace({
       setLaunchError(actionError(error))
     } finally {
       setLaunchBusy(false)
+    }
+  }
+
+  const retryAnalysis = async (job: ProjectEvidenceTrace['analysis'][number]): Promise<void> => {
+    setEvidenceBusy(true)
+    setEvidenceError(null)
+    try {
+      await coreClient.retryAnalysis({
+        schemaVersion: 1,
+        kind: 'UI_RETRY_ANALYSIS',
+        correlationId: entityId('corr'),
+        actor: { kind: 'UI' },
+        idempotencyKey: entityId('idem'),
+        projectId: snapshot.project.id,
+        analysisJobId: job.analysisJobId,
+        expectedJobRevision: job.revision,
+      })
+      setEvidenceTrace(null)
+      await loadEvidenceTrace()
+    } catch (error) {
+      setEvidenceError(actionError(error))
+    } finally {
+      setEvidenceBusy(false)
     }
   }
 
@@ -871,6 +1068,15 @@ export function BuildWorkspace({
           />
         </AgentPane>
       </div>
+      <EvidenceTracePanel
+        trace={evidenceTrace}
+        busy={evidenceBusy}
+        error={evidenceError}
+        onOpen={() => {
+          if (!evidenceBusy) void loadEvidenceTrace()
+        }}
+        onRetry={(job) => void retryAnalysis(job)}
+      />
     </section>
   )
 }

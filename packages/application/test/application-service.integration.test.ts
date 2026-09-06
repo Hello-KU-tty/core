@@ -861,6 +861,17 @@ describe('ApplicationService boundary', () => {
       data: {
         focusedDecision: { id: ids.decision },
         relevantLedgerEntries: [{ state: { state: 'DEMONSTRATED' } }],
+        personalization: {
+          mode: 'EVIDENCE_AWARE',
+          basis: [
+            {
+              conceptName: 'runtime validation',
+              state: 'DEMONSTRATED',
+              purpose: 'HELPER_EXPLANATION_START',
+              sourceProjectIds: [ids.project],
+            },
+          ],
+        },
         recentEpisodes: [
           {
             episodeId: ids.episode,
@@ -894,6 +905,117 @@ describe('ApplicationService boundary', () => {
     })
     expect(JSON.stringify(helper)).not.toContain('do-not-expose')
     expect(JSON.stringify(helper)).not.toContain('do-not-expose-json')
+
+    await expect(
+      service.executeUi({
+        schemaVersion: 1,
+        kind: 'UI_READ_EVIDENCE_TRACE',
+        correlationId: 'corr_00000000-0000-4000-8000-000000000240',
+        actor: { kind: 'UI' },
+        projectId: ids.project,
+      }),
+    ).resolves.toMatchObject({
+      success: true,
+      data: {
+        projectId: ids.project,
+        concepts: [
+          {
+            conceptName: 'runtime validation',
+            state: 'DEMONSTRATED',
+            evidence: [
+              {
+                projectId: ids.project,
+                redactedEvidenceExcerpt:
+                  'Rejecting unknown fields should catch typos at the boundary.',
+              },
+            ],
+          },
+        ],
+        personalization: [expect.objectContaining({ mode: 'EVIDENCE_AWARE' })],
+      },
+    })
+
+    const nextProjectId = 'project_00000000-0000-4000-8000-000000000241'
+    const nextCorrelationId = 'corr_00000000-0000-4000-8000-000000000242'
+    await expect(
+      service.executeUi({
+        schemaVersion: 1,
+        kind: 'UI_START_DISCOVERY',
+        correlationId: nextCorrelationId,
+        actor: { kind: 'UI' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000243',
+        projectId: nextProjectId,
+        input: {
+          learningGoal: 'Use runtime validation in another local tool',
+          interestAreas: ['developer tools'],
+          currentLevel: 'BEGINNER',
+        },
+      }),
+    ).resolves.toMatchObject({ success: true })
+    const nextSession = storage.repository.recoverProject(nextProjectId)?.discoverySession
+    expect(nextSession).not.toBeNull()
+    await expect(
+      service.executeUi({
+        schemaVersion: 1,
+        kind: 'UI_RESTORE_PROJECT_SESSION',
+        correlationId: 'corr_00000000-0000-4000-8000-000000000244',
+        actor: { kind: 'UI' },
+        projectId: nextProjectId,
+        helperConversationLimit: 20,
+      }),
+    ).resolves.toMatchObject({
+      success: true,
+      data: { discoveryContext: { personalization: { mode: 'EVIDENCE_AWARE' } } },
+    })
+    expect(storage.repository.readPersonalizationTracesForProject(nextProjectId, 10)).toEqual([])
+    await expect(
+      service.executeUi({
+        schemaVersion: 1,
+        kind: 'UI_PREPARE_DISCOVERY_AGENT_CONTEXT',
+        correlationId: 'corr_00000000-0000-4000-8000-000000000245',
+        actor: { kind: 'UI' },
+        projectId: nextProjectId,
+        helperConversationLimit: 20,
+      }),
+    ).resolves.toMatchObject({
+      success: true,
+      data: {
+        discoveryContext: {
+          personalization: {
+            mode: 'EVIDENCE_AWARE',
+            correlationId: nextCorrelationId,
+          },
+        },
+      },
+    })
+    expect(storage.repository.readPersonalizationTracesForProject(nextProjectId, 10)).toHaveLength(
+      1,
+    )
+    await expect(
+      service.executeAgent('DISCOVERY', {
+        schemaVersion: 1,
+        kind: 'DISCOVERY_GET_CONTEXT',
+        correlationId: nextCorrelationId,
+        actor: { kind: 'AGENT', role: 'DISCOVERY' },
+        projectId: nextProjectId,
+        discoverySessionId: nextSession?.id,
+      }),
+    ).resolves.toMatchObject({
+      success: true,
+      data: {
+        relevantLedgerEntries: [{ state: { state: 'DEMONSTRATED' } }],
+        personalization: {
+          mode: 'EVIDENCE_AWARE',
+          basis: [
+            {
+              conceptName: 'runtime validation',
+              purpose: 'DISCOVERY_TIE_BREAK',
+              sourceProjectIds: [ids.project],
+            },
+          ],
+        },
+      },
+    })
 
     storage.transaction((repository) => {
       repository.appendTask(
@@ -2449,6 +2571,60 @@ describe('T11 Decision gate and Builder resume application flow', () => {
       result: emptyResult,
     })
     expect(late).toMatchObject({ success: false, error: { code: 'ANALYSIS_JOB_STALE' } })
+  })
+
+  it('keeps one Helper conversation Episode across request correlation boundaries', async () => {
+    const { service, storage } = await createHarness()
+    seedBuilderGraph(storage)
+
+    const first = await service.executeUi({
+      schemaVersion: 1,
+      kind: 'UI_RECORD_HELPER_EXCHANGE',
+      correlationId: ids.correlation,
+      actor: { kind: 'UI' },
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000305',
+      projectId: ids.project,
+      taskId: ids.task,
+      conversationId: ids.conversation,
+      userMessage: 'How does the first state transition work?',
+      helperResponseSummary: 'The first transition moves the task into progress.',
+      origin: 'FREE_TEXT',
+      closeConversation: false,
+    })
+    expect(first).toMatchObject({ success: true, data: { episodeRevision: 2, status: 'OPEN' } })
+
+    const secondCorrelationId = 'corr_00000000-0000-4000-8000-000000000032'
+    const second = await service.executeUi({
+      schemaVersion: 1,
+      kind: 'UI_RECORD_HELPER_EXCHANGE',
+      correlationId: secondCorrelationId,
+      actor: { kind: 'UI' },
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000306',
+      projectId: ids.project,
+      taskId: ids.task,
+      conversationId: ids.conversation,
+      userMessage: 'How does the next state transition differ?',
+      helperResponseSummary: 'The next transition preserves the completed validation result.',
+      origin: 'FREE_TEXT',
+      closeConversation: false,
+    })
+    if (!second.success) throw new Error(JSON.stringify(second.error))
+    expect(second).toMatchObject({
+      success: true,
+      data: { correlationId: secondCorrelationId, episodeRevision: 4, status: 'OPEN' },
+    })
+    if (!('episodeId' in second.data)) throw new Error('missing episode')
+
+    const aggregate = storage.repository.readEpisodeAggregate(ids.project, second.data.episodeId)
+    expect(aggregate).toMatchObject({
+      episode: { correlationId: ids.correlation, revision: 4 },
+      events: [
+        { correlationId: ids.correlation, payload: { type: 'USER_MESSAGE' } },
+        { correlationId: ids.correlation, payload: { type: 'HELPER_RESPONSE' } },
+        { correlationId: ids.correlation, payload: { type: 'USER_MESSAGE' } },
+        { correlationId: ids.correlation, payload: { type: 'HELPER_RESPONSE' } },
+      ],
+    })
   })
 
   it('keeps a Helper quick action out of user-authored evidence', async () => {

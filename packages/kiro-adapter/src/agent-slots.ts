@@ -1,5 +1,5 @@
 export const BUILDER_SESSION_REVISION = 7 as const
-export const HELPER_SESSION_REVISION = 2 as const
+export const HELPER_SESSION_REVISION = 3 as const
 
 function revisionedBuilderSlotKey(projectId: string, revision: number): string {
   return `vibe-helper-builder-v${String(revision)}-${projectId}`

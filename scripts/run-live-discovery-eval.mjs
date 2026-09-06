@@ -116,6 +116,19 @@ const providedContext = JSON.stringify({
   selectedCandidate: null,
   learningSpec: null,
   relevantLedgerEntries: [],
+  personalization: {
+    schemaVersion: 1,
+    id: 'personalization_00000000-0000-4000-8000-000000000840',
+    projectId: ids.project,
+    correlationId: ids.correlation,
+    target: { kind: 'DISCOVERY_SESSION', discoverySessionId: ids.session },
+    mode: 'NO_RELEVANT_EVIDENCE',
+    basis: [],
+    fallbackReason: 'NO_LEDGER',
+    createdAt: new Date().toISOString(),
+    source: { kind: 'CORE' },
+    redactionStatus: 'VERIFIED_REDACTED',
+  },
 })
 const turn = [
   'Run one synthetic, redacted Discovery evaluation.',

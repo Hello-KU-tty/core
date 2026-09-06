@@ -5,6 +5,7 @@ import {
   type CandidateRevisionReference,
   type ProjectCandidateRevision,
   type ProjectSessionSnapshot,
+  projectEvidenceTraceSchema,
   projectCandidateRevisionSchema,
   projectSessionSnapshotSchema,
 } from '../../packages/contracts/dist/index.js'
@@ -38,7 +39,7 @@ async function executeBackend(
 }
 
 async function executeUi(request: APIRequestContext, input: Readonly<Record<string, unknown>>) {
-  return executeBackend(request, applicationPath, { ...input, clientProtocolVersion: 7 })
+  return executeBackend(request, applicationPath, { ...input, clientProtocolVersion: 8 })
 }
 
 async function executeDiscoveryAgent(
@@ -110,6 +111,20 @@ async function restoreProject(request: APIRequestContext, projectId: string) {
   const payload = await response.json()
   expect(payload).toMatchObject({ success: true })
   return projectSessionSnapshotSchema.parse(payload.data)
+}
+
+async function readEvidenceTrace(request: APIRequestContext, projectId: string) {
+  const response = await executeUi(request, {
+    schemaVersion: 1,
+    kind: 'UI_READ_EVIDENCE_TRACE',
+    correlationId: id('corr'),
+    actor: { kind: 'UI' },
+    projectId,
+  })
+  expect(response.ok()).toBe(true)
+  const payload = await response.json()
+  expect(payload).toMatchObject({ success: true })
+  return projectEvidenceTraceSchema.parse(payload.data)
 }
 
 async function submitCandidateRound(
@@ -1122,6 +1137,16 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
     decisionComposerOrder.composerTop,
   )
 
+  const evidenceSummary = page.locator('.evidence-trace-panel > summary')
+  await evidenceSummary.focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByText('Agent에 제공된 근거')).toBeVisible()
+  const projectId = projectIdFromUrl(page.url())
+  const evidenceBeforeHelper = await readEvidenceTrace(request, projectId)
+  expect(evidenceBeforeHelper.personalization.length).toBeGreaterThan(0)
+  await evidenceSummary.focus()
+  await page.keyboard.press('Enter')
+
   await page.getByRole('button', { name: 'Helper에게 비교 요청' }).click()
   await expect(
     page.getByText('한 번에 표시하면 모든 오류를 함께 고칠 수 있지만 처음에는 정보가 더 많습니다.'),
@@ -1131,11 +1156,15 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
   ).toBeVisible()
   await expect
     .poll(async () => {
-      const restored = await restoreProject(request, projectIdFromUrl(page.url()))
+      const restored = await restoreProject(request, projectId)
       return restored.helperConversations[0]?.redactedUserExcerpts ?? null
     })
     .toEqual([])
   expect(helperDispatches).toBe(1)
+  const evidenceAfterHelper = await readEvidenceTrace(request, projectId)
+  expect(evidenceAfterHelper.personalization).toHaveLength(
+    evidenceBeforeHelper.personalization.length + 1,
+  )
 
   await page
     .getByLabel('Builder message')
@@ -1158,6 +1187,32 @@ test('runs Discovery, Spec, Builder stream, Helper, Decision, and completion thr
   await expect(page.getByLabel('Builder message')).toBeVisible()
   await expect(page.getByText('Unknown input validation and result comparison flow')).toBeVisible()
   await expect(page.getByText('Build Agent E2E')).toBeVisible()
+  await evidenceSummary.focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByText('코드·작업에서 개념 사용이 관찰됨').first()).toBeVisible()
+  await expect(page.getByText('프로젝트에서 관찰됨').first()).toBeVisible()
+  await expect(page.getByText('Agent에 제공된 근거')).toBeVisible()
+  const latestPersonalization = evidenceAfterHelper.personalization[0]
+  if (latestPersonalization === undefined) throw new Error('missing personalization trace')
+  const latestPersonalizationLabel =
+    latestPersonalization.mode === 'NO_RELEVANT_EVIDENCE'
+      ? '관련 Evidence 없이 일반 경로를 사용함'
+      : latestPersonalization.basis
+          .map((basis) => `${basis.conceptName} · ${basis.sourceProjectTitles.join(', ')}`)
+          .join(' / ')
+  const matchingPersonalizationLabels = evidenceAfterHelper.personalization.filter((item) => {
+    const label =
+      item.mode === 'NO_RELEVANT_EVIDENCE'
+        ? '관련 Evidence 없이 일반 경로를 사용함'
+        : item.basis
+            .map((basis) => `${basis.conceptName} · ${basis.sourceProjectTitles.join(', ')}`)
+            .join(' / ')
+    return label === latestPersonalizationLabel
+  }).length
+  await expect(page.getByText(latestPersonalizationLabel, { exact: true })).toHaveCount(
+    matchingPersonalizationLabels,
+  )
+  await expect(page.locator('.evidence-trace-panel')).not.toContainText('%')
   await page.getByRole('button', { name: '생성 결과 열기' }).click()
   await expect(page.getByText(/실행 준비 완료 · projects\/project_/)).toBeVisible()
   expect(builderDispatches).toBe(2)

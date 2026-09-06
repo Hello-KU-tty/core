@@ -460,7 +460,12 @@ export function VibeHelperApp({
           detail: '사용자 입력과 Core에 저장된 최신 상태를 연결하고 있습니다.',
           retry: null,
         })
-        const discoverySession = restored.discoverySession
+        const prepared = await coreClient.prepareDiscoveryAgentContext(
+          correlationId(),
+          request.projectId,
+        )
+        setSnapshot(prepared)
+        const discoverySession = prepared.discoverySession
         if (discoverySession === null) {
           throw new CrewAppClientError(
             'CONTRACT',
@@ -468,12 +473,12 @@ export function VibeHelperApp({
             'Core did not return an active Discovery Session.',
           )
         }
-        const agentPhase = request.phase ?? discoveryAgentPhase(restored, request.expectation)
+        const agentPhase = request.phase ?? discoveryAgentPhase(prepared, request.expectation)
         const dispatchReceipt = await discoveryClient.dispatch(
           discoverySession.id,
           discoverySession.revision,
           `${request.message}\n\nCore tool identifiers: schemaVersion=1, projectId=${request.projectId}, discoverySessionId=${discoverySession.id}, correlationId=${discoverySession.correlationId}, expectedSessionRevision=${discoverySession.revision}, idempotencyKey=${entityId('idem')}.`,
-          createDiscoveryEphemeralContext(restored, agentPhase),
+          createDiscoveryEphemeralContext(prepared, agentPhase),
           agentPhase,
         )
         if (agentRunSequence.current !== runSequence) return
@@ -491,7 +496,11 @@ export function VibeHelperApp({
               )
               if (expectationMet(current, request.expectation)) return
               if (attempt === 0 && agentPhase === 'SPEC' && completion === 'DONE') {
-                const currentSession = current.discoverySession
+                const preparedRecovery = await coreClient.prepareDiscoveryAgentContext(
+                  correlationId(),
+                  request.projectId,
+                )
+                const currentSession = preparedRecovery.discoverySession
                 if (currentSession !== null) {
                   setAgentRun({
                     status: 'RUNNING',
@@ -504,7 +513,7 @@ export function VibeHelperApp({
                     currentSession.id,
                     currentSession.revision,
                     `${request.message}\n\n이전 응답은 Core 저장 없이 끝났습니다. 확인 질문이나 설명을 하지 말고 submit_learning_spec으로 다음 revision을 제출하세요. Core tool identifiers: schemaVersion=1, projectId=${request.projectId}, discoverySessionId=${currentSession.id}, correlationId=${currentSession.correlationId}, expectedSessionRevision=${currentSession.revision}, idempotencyKey=${entityId('idem')}.`,
-                    createDiscoveryEphemeralContext(current, 'SPEC'),
+                    createDiscoveryEphemeralContext(preparedRecovery, 'SPEC'),
                     'SPEC',
                   )
                   completion = await recoveryReceipt.completion
@@ -673,10 +682,20 @@ export function VibeHelperApp({
             detail: `상세 batch ${String(phaseIndex + 1)}/${String(phases.length)}를 순서대로 저장하고 있어요.`,
             retry: null,
           })
+          const prepared = await coreClient.prepareDiscoveryAgentContext(correlationId(), projectId)
+          const preparedSession = prepared.discoverySession
+          if (preparedSession === null) {
+            throw new CrewAppClientError(
+              'CONTRACT',
+              'DISCOVERY_SESSION_MISSING',
+              'Core did not return an active Discovery Session.',
+            )
+          }
+          currentSnapshot = prepared
           const receipt = await discoveryClient.dispatch(
-            session.id,
-            session.revision,
-            `Candidate preview의 ${batch} batch를 상세화해 주세요. previewRoundId=${previewRound.id}, batch=${batch}. Candidate ID와 preview의 의미 필드는 그대로 복사하고 지정된 5개만 submit_candidate_enrichments로 제출하세요.\n\nCore tool identifiers: schemaVersion=1, projectId=${projectId}, discoverySessionId=${session.id}, correlationId=${session.correlationId}, expectedSessionRevision=${session.revision}, idempotencyKey=${entityId('idem')}.`,
+            preparedSession.id,
+            preparedSession.revision,
+            `Candidate preview의 ${batch} batch를 상세화해 주세요. previewRoundId=${previewRound.id}, batch=${batch}. Candidate ID와 preview의 의미 필드는 그대로 복사하고 지정된 5개만 submit_candidate_enrichments로 제출하세요.\n\nCore tool identifiers: schemaVersion=1, projectId=${projectId}, discoverySessionId=${preparedSession.id}, correlationId=${preparedSession.correlationId}, expectedSessionRevision=${preparedSession.revision}, idempotencyKey=${entityId('idem')}.`,
             createDiscoveryEphemeralContext(currentSnapshot, phase),
             phase,
           )
@@ -816,11 +835,21 @@ export function VibeHelperApp({
         detail: `고른 ${String(missingIds.length)}개 방향만 먼저 준비하고 있습니다. 나머지 background 상세는 기다리지 않아요.`,
         retry: null,
       })
+      const prepared = await coreClient.prepareDiscoveryAgentContext(correlationId(), projectId)
+      const preparedSession = prepared.discoverySession
+      if (preparedSession === null) {
+        throw new CrewAppClientError(
+          'CONTRACT',
+          'DISCOVERY_SESSION_MISSING',
+          'Core did not return an active Discovery Session.',
+        )
+      }
+      current = prepared
       const receipt = await discoveryClient.dispatch(
-        session.id,
-        session.revision,
-        `사용자가 지금 참조한 Candidate preview ${String(missingIds.length)}개만 상세화해 주세요. previewRoundId=${previewRound.id}, batch=SELECTED. Candidate ID와 preview의 의미 필드는 그대로 복사하고 requestedPreviews만 submit_candidate_enrichments로 제출하세요.\n\nCore tool identifiers: schemaVersion=1, projectId=${projectId}, discoverySessionId=${session.id}, correlationId=${session.correlationId}, expectedSessionRevision=${session.revision}, idempotencyKey=${entityId('idem')}.`,
-        createDiscoveryEphemeralContext(current, 'ENRICH_SELECTED', missingIds),
+        preparedSession.id,
+        preparedSession.revision,
+        `사용자가 지금 참조한 Candidate preview ${String(missingIds.length)}개만 상세화해 주세요. previewRoundId=${previewRound.id}, batch=SELECTED. Candidate ID와 preview의 의미 필드는 그대로 복사하고 requestedPreviews만 submit_candidate_enrichments로 제출하세요.\n\nCore tool identifiers: schemaVersion=1, projectId=${projectId}, discoverySessionId=${preparedSession.id}, correlationId=${preparedSession.correlationId}, expectedSessionRevision=${preparedSession.revision}, idempotencyKey=${entityId('idem')}.`,
+        createDiscoveryEphemeralContext(prepared, 'ENRICH_SELECTED', missingIds),
         'ENRICH_SELECTED',
       )
       setAgentRun({

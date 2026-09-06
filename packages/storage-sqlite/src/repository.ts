@@ -39,6 +39,8 @@ import {
   learningSpecRevisionSchema,
   liveProjectContextSchema,
   misconceptionIssueSchema,
+  personalizationTraceIdSchema,
+  personalizationTraceSchema,
   projectCandidateRevisionSchema,
   projectSchema,
   stableEntityIdSchema,
@@ -69,6 +71,7 @@ import {
   type LearningSpecRevision,
   type LiveProjectContext,
   type MisconceptionIssue,
+  type PersonalizationTrace,
   type Project,
   type ProjectCandidateRevision,
   type TaskCompletionReport,
@@ -1364,6 +1367,37 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
     )
   }
 
+  appendPersonalizationTrace(input: PersonalizationTrace): PersistenceWriteResult {
+    const prepared = prepareRecord(personalizationTraceSchema, input)
+    const record = prepared.record
+    return this.#write(record.id, () =>
+      this.#appendImmutable(
+        record.id,
+        prepared,
+        'SELECT payload_json, payload_hash FROM personalization_traces WHERE id = ?',
+        [record.id],
+        () => {
+          this.#sqlite
+            .prepare(
+              'INSERT INTO personalization_traces (id, project_id, correlation_id, target_kind, discovery_session_id, task_id, mode, created_at, payload_json, payload_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            )
+            .run(
+              record.id,
+              record.projectId,
+              record.correlationId,
+              record.target.kind,
+              record.target.kind === 'DISCOVERY_SESSION' ? record.target.discoverySessionId : null,
+              record.target.kind === 'HELPER_TURN' ? record.target.taskId : null,
+              record.mode,
+              record.createdAt,
+              prepared.payloadJson,
+              prepared.payloadHash,
+            )
+        },
+      ),
+    )
+  }
+
   appendAuditRecord(input: AuditRecord): PersistenceWriteResult {
     const prepared = prepareRecord(auditRecordSchema, input)
     const record = prepared.record
@@ -2339,6 +2373,69 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
         return trace === null ? [] : [trace]
       })
     })
+  }
+
+  readRecentEvidenceTraces(limit: number): readonly EvidenceTrace[] {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Evidence Trace limit is invalid')
+    }
+    return this.#read(() =>
+      this.#allLedgerHeads()
+        .slice(0, limit)
+        .flatMap((ledger) => {
+          const trace = this.readEvidenceTrace(ledger.concept.id)
+          return trace === null ? [] : [trace]
+        }),
+    )
+  }
+
+  readPersonalizationTrace(personalizationTraceId: string): PersonalizationTrace | null {
+    if (!personalizationTraceIdSchema.safeParse(personalizationTraceId).success) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Personalization Trace ID is invalid')
+    }
+    return this.#read(() =>
+      this.#headRecord(
+        'SELECT payload_json, payload_hash FROM personalization_traces WHERE id = ?',
+        [personalizationTraceId],
+        personalizationTraceSchema,
+      ),
+    )
+  }
+
+  readPersonalizationTraceForDiscoverySession(
+    discoverySessionId: string,
+  ): PersonalizationTrace | null {
+    if (!discoverySessionSchema.shape.id.safeParse(discoverySessionId).success) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Discovery session identity is invalid')
+    }
+    return this.#read(() =>
+      this.#headRecord(
+        `SELECT payload_json, payload_hash FROM personalization_traces
+         WHERE discovery_session_id = ? ORDER BY created_at DESC LIMIT 1`,
+        [discoverySessionId],
+        personalizationTraceSchema,
+      ),
+    )
+  }
+
+  readPersonalizationTracesForProject(
+    projectId: string,
+    limit: number,
+  ): readonly PersonalizationTrace[] {
+    if (!projectSchema.shape.id.safeParse(projectId).success) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Project ID is invalid')
+    }
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Personalization Trace limit is invalid')
+    }
+    return this.#read(() =>
+      this.#recordList(
+        `SELECT payload_json, payload_hash FROM personalization_traces
+         WHERE project_id = ? ORDER BY created_at DESC LIMIT ?`,
+        [projectId, limit],
+        personalizationTraceSchema,
+      ),
+    )
   }
 
   #projectHead(projectId: string): Project | null {

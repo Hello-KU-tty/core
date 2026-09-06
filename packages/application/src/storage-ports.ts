@@ -24,6 +24,7 @@ import type {
   LearningSpecRevision,
   LiveProjectContext,
   MisconceptionIssue,
+  PersonalizationTrace,
   Project,
   ProjectCandidateRevision,
   TaskCompletionReport,
@@ -158,6 +159,7 @@ export interface PersistenceRepository {
   appendAcceptedEvidence(record: AcceptedEvidence): PersistenceWriteResult
   appendMisconceptionIssue(record: MisconceptionIssue): PersistenceWriteResult
   appendConceptLedger(record: ConceptLedgerEntry): PersistenceWriteResult
+  appendPersonalizationTrace(record: PersonalizationTrace): PersistenceWriteResult
   appendAuditRecord(record: AuditRecord): PersistenceWriteResult
   appendEvaluationRun(record: EvaluationRun): PersistenceWriteResult
   appendBaselineResult(record: BaselineResult): PersistenceWriteResult
@@ -205,6 +207,15 @@ export interface PersistenceRepository {
   readBaselineResult(baselineResultId: string): BaselineResult | null
   readEvidenceTrace(conceptId: string): EvidenceTrace | null
   readEvidenceTracesForProject(projectId: string): readonly EvidenceTrace[]
+  readRecentEvidenceTraces(limit: number): readonly EvidenceTrace[]
+  readPersonalizationTrace(personalizationTraceId: string): PersonalizationTrace | null
+  readPersonalizationTraceForDiscoverySession(
+    discoverySessionId: string,
+  ): PersonalizationTrace | null
+  readPersonalizationTracesForProject(
+    projectId: string,
+    limit: number,
+  ): readonly PersonalizationTrace[]
 }
 
 export interface StorageUnitOfWork {

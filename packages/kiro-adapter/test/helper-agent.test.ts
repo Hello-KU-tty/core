@@ -15,6 +15,7 @@ import { loadHelperAgentDefinition } from '../src/helper-prompt-node.js'
 import {
   builderTaskFixture,
   confirmedLearningSpecFixture,
+  helperPersonalizationFixture,
   ids,
   projectFixture,
 } from '../../contracts/test/fixtures.js'
@@ -40,6 +41,12 @@ describe('Helper Agent adapter', () => {
     expect(definition.prompt).toContain('MISSING')
     expect(definition.prompt).toContain('Spec은 변경 가능한 초기 합의')
     expect(definition.prompt).toContain('사용자의 질문·결정·학습 권한을 제한')
+    expect(definition.prompt).toContain('personalization')
+    expect(definition.prompt).toContain('NO_RELEVANT_EVIDENCE')
+    expect(definition.prompt).toContain('최대 5개 개념')
+    expect(definition.prompt).toContain('OBSERVED`를 사용자 이해로 과장하지 마라')
+    expect(definition.prompt).toContain('openIssueIds')
+    expect(definition.prompt).toContain('과거 경험이 현재 코드와 같다고 단정하지 마라')
     expect(HELPER_TOOL_NAMES).toEqual(['get_helper_context', 'request_builder_context_refresh'])
   })
 
@@ -66,6 +73,7 @@ describe('Helper Agent adapter', () => {
               activeDecisions: [],
               focusedDecision: null,
               relevantLedgerEntries: [],
+              personalization: helperPersonalizationFixture,
               recentEpisodes: [],
               contextReferences: [],
               referenceDetails: [],

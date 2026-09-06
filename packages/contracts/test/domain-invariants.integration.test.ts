@@ -11,6 +11,7 @@ import {
   evidenceProposalSchema,
   learningSpecRevisionSchema,
   liveProjectContextSchema,
+  personalizationTraceSchema,
   projectCandidateRevisionSchema,
   projectSchema,
   relativePosixPathSchema,
@@ -25,6 +26,7 @@ import {
   discoveryInputFixture,
   episodeFixture,
   evidenceProposalFixture,
+  helperPersonalizationFixture,
   ids,
   liveContextFixture,
   projectFixture,
@@ -180,6 +182,43 @@ describe('Build, Event, and Evidence provenance invariants', () => {
       }).success,
     ).toBe(false)
     expect(conceptStateSchema.safeParse('MISCONCEPTION').success).toBe(false)
+  })
+
+  it('keeps personalization provenance explicit about evidence and fallback modes', () => {
+    expect(personalizationTraceSchema.safeParse(helperPersonalizationFixture).success).toBe(true)
+    expect(
+      personalizationTraceSchema.safeParse({
+        ...helperPersonalizationFixture,
+        mode: 'EVIDENCE_AWARE',
+      }).success,
+    ).toBe(false)
+    expect(
+      personalizationTraceSchema.safeParse({
+        ...helperPersonalizationFixture,
+        basis: [],
+        fallbackReason: undefined,
+      }).success,
+    ).toBe(false)
+    const basis = {
+      conceptId: ids.concept,
+      conceptName: 'runtime validation',
+      ledgerRevision: 1,
+      state: 'OBSERVED',
+      evidenceIds: [ids.evidence],
+      episodeIds: [ids.episode],
+      sourceProjectIds: [ids.project],
+      sourceProjectTitles: ['Webhook Lens'],
+      openIssueIds: [],
+      purpose: 'HELPER_EXPLANATION_START',
+    } as const
+    expect(
+      personalizationTraceSchema.safeParse({
+        ...helperPersonalizationFixture,
+        mode: 'EVIDENCE_AWARE',
+        basis: Array.from({ length: 6 }, () => basis),
+        fallbackReason: undefined,
+      }).success,
+    ).toBe(false)
   })
 
   it('keeps contradiction Evidence separate from user-understanding State support', () => {

@@ -131,6 +131,13 @@ export const uiRestoreProjectSessionQuerySchema = z.strictObject({
   helperConversationLimit: z.int().min(1).max(20),
 })
 
+export const uiPrepareDiscoveryAgentContextQuerySchema = z.strictObject({
+  ...uiRequestMetadata,
+  kind: z.literal('UI_PREPARE_DISCOVERY_AGENT_CONTEXT'),
+  projectId: projectIdSchema,
+  helperConversationLimit: z.int().min(1).max(20),
+})
+
 export const uiRecordHelperExchangeCommandSchema = z.strictObject({
   ...uiRequestMetadata,
   kind: z.literal('UI_RECORD_HELPER_EXCHANGE'),
@@ -225,6 +232,7 @@ export const uiRequestSchema = z.discriminatedUnion('kind', [
   uiResolveDecisionCommandSchema,
   uiListProjectsQuerySchema,
   uiRestoreProjectSessionQuerySchema,
+  uiPrepareDiscoveryAgentContextQuerySchema,
   uiOpenHelperQuerySchema,
   uiPrepareBuilderSessionQuerySchema,
   uiRecordHelperExchangeCommandSchema,

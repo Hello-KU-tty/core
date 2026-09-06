@@ -566,6 +566,19 @@ describe('Crew browser-safe clients', () => {
           ],
           learningSpec: null,
           relevantLedgerEntries: [],
+          personalization: {
+            schemaVersion: 1,
+            id: 'personalization_00000000-0000-4000-8000-000000000020',
+            projectId,
+            correlationId,
+            target: { kind: 'DISCOVERY_SESSION', discoverySessionId: session.id },
+            mode: 'NO_RELEVANT_EVIDENCE',
+            basis: [],
+            fallbackReason: 'NO_LEDGER',
+            createdAt: '2026-09-06T00:00:00.000Z',
+            source: { kind: 'CORE' },
+            redactionStatus: 'VERIFIED_REDACTED',
+          },
         },
         selectedCandidate: null,
       } as never,
@@ -579,6 +592,7 @@ describe('Crew browser-safe clients', () => {
       expectedSessionRevision: 3,
       currentCandidates: [expect.objectContaining({ id: candidateId, title: 'Config Lab' })],
       pendingFeedback: [expect.objectContaining({ id: feedbackId, intent: 'EXPAND' })],
+      personalization: { mode: 'NO_RELEVANT_EVIDENCE', fallbackReason: 'NO_LEDGER' },
     })
     expect(context).not.toContain('historical detail must not be injected')
   })
@@ -631,6 +645,19 @@ describe('Crew browser-safe clients', () => {
           feedback: [],
           learningSpec: null,
           relevantLedgerEntries: [],
+          personalization: {
+            schemaVersion: 1,
+            id: 'personalization_00000000-0000-4000-8000-000000000021',
+            projectId,
+            correlationId,
+            target: { kind: 'DISCOVERY_SESSION', discoverySessionId: session.id },
+            mode: 'NO_RELEVANT_EVIDENCE',
+            basis: [],
+            fallbackReason: 'NO_LEDGER',
+            createdAt: '2026-09-06T00:00:00.000Z',
+            source: { kind: 'CORE' },
+            redactionStatus: 'VERIFIED_REDACTED',
+          },
           previewRound: {
             id: previewRoundId,
             finalRoundId,

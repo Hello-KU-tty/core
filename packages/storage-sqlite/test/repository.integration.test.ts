@@ -27,6 +27,7 @@ import {
   learningSpecRevisionSchema,
   liveProjectContextSchema,
   misconceptionIssueSchema,
+  personalizationTraceSchema,
   projectCandidateRevisionSchema,
   projectSchema,
 } from '@vibe-helper/contracts'
@@ -56,6 +57,7 @@ import {
   evidenceProposalFixture,
   evaluationRunFixture,
   ids,
+  helperPersonalizationFixture,
   liveContextFixture,
   projectFixture,
   timestamp,
@@ -123,6 +125,7 @@ const records = {
     ...conceptLedgerFixture,
     openIssues: [misconceptionIssueFixture],
   }),
+  personalization: personalizationTraceSchema.parse(helperPersonalizationFixture),
   audit: auditRecordSchema.parse(auditRecordFixture),
 }
 
@@ -148,6 +151,7 @@ const appendRecoveryGraph = (repository: ReturnType<typeof repositoryOf>): void 
   repository.appendAcceptedEvidence(records.evidence)
   repository.appendMisconceptionIssue(records.issue)
   repository.appendConceptLedger(records.ledger)
+  repository.appendPersonalizationTrace(records.personalization)
   repository.appendAuditRecord(records.audit)
 }
 
@@ -240,6 +244,12 @@ describe('SQLite persistence repository', () => {
       records.concept,
     )
     expect(reopened.repository.readEvidenceTracesForProject(ids.project)).toHaveLength(1)
+    expect(reopened.repository.readPersonalizationTrace(ids.personalization)).toEqual(
+      records.personalization,
+    )
+    expect(reopened.repository.readPersonalizationTracesForProject(ids.project, 10)).toEqual([
+      records.personalization,
+    ])
     reopened.close()
   })
 

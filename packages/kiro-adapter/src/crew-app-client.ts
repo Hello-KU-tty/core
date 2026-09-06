@@ -17,6 +17,8 @@ export {
 } from './agent-slots.js'
 export * from './builder-stream.js'
 import {
+  type AnalysisJob,
+  analysisJobSchema,
   type BuilderSessionBindingDescriptor,
   builderSessionBindingDescriptorSchema,
   type CommandReceipt,
@@ -35,19 +37,25 @@ import {
   type PreparedBuilderTaskDescriptor,
   type ProjectCandidateRevision,
   type ProjectHistory,
+  type ProjectEvidenceTrace,
   type ProjectSessionSnapshot,
   preparedBuilderTaskDescriptorSchema,
   projectHistorySchema,
+  projectEvidenceTraceSchema,
   projectSessionSnapshotSchema,
   type UiRequest,
   uiConfirmLearningSpecCommandSchema,
   uiLaunchResultCommandSchema,
   uiOpenHelperQuerySchema,
+  uiPrepareDiscoveryAgentContextQuerySchema,
   uiPrepareBuilderSessionQuerySchema,
   uiPrepareBuilderTaskCommandSchema,
   uiRecordDiscoveryFeedbackCommandSchema,
   uiRecordHelperExchangeCommandSchema,
+  uiReadAnalysisJobsQuerySchema,
+  uiReadEvidenceTraceQuerySchema,
   uiResolveDecisionCommandSchema,
+  uiRetryAnalysisCommandSchema,
   uiReturnToDiscoveryCommandSchema,
   uiStartDiscoveryCommandSchema,
   uiUpdateLearningSpecCommandSchema,
@@ -218,6 +226,7 @@ export function createDiscoveryEphemeralContext(
             deploymentConstraints: learningSpec.deploymentConstraints,
           },
     relevantLedgerEntries: context.relevantLedgerEntries,
+    personalization: context.personalization,
   })
 }
 
@@ -318,6 +327,24 @@ export class CrewCoreClient {
     return projectSessionSnapshotSchema.parse(parseApplicationSuccess(response).data)
   }
 
+  async prepareDiscoveryAgentContext(
+    correlationId: string,
+    projectId: string,
+    helperConversationLimit = 20,
+  ): Promise<ProjectSessionSnapshot> {
+    const response = await this.#postCore(
+      uiPrepareDiscoveryAgentContextQuerySchema.parse({
+        schemaVersion: 1,
+        kind: 'UI_PREPARE_DISCOVERY_AGENT_CONTEXT',
+        correlationId,
+        actor: { kind: 'UI' },
+        projectId,
+        helperConversationLimit,
+      }),
+    )
+    return projectSessionSnapshotSchema.parse(parseApplicationSuccess(response).data)
+  }
+
   async startDiscovery(
     request: Extract<UiRequest, { kind: 'UI_START_DISCOVERY' }>,
   ): Promise<CommandReceipt> {
@@ -374,6 +401,27 @@ export class CrewCoreClient {
   ): Promise<HelperExchangeReceipt> {
     const response = await this.#postCore(uiRecordHelperExchangeCommandSchema.parse(request))
     return helperExchangeReceiptSchema.parse(parseApplicationSuccess(response).data)
+  }
+
+  async readEvidenceTrace(
+    request: Extract<UiRequest, { kind: 'UI_READ_EVIDENCE_TRACE' }>,
+  ): Promise<ProjectEvidenceTrace> {
+    const response = await this.#postCore(uiReadEvidenceTraceQuerySchema.parse(request))
+    return projectEvidenceTraceSchema.parse(parseApplicationSuccess(response).data)
+  }
+
+  async readAnalysisJobs(
+    request: Extract<UiRequest, { kind: 'UI_READ_ANALYSIS_JOBS' }>,
+  ): Promise<readonly AnalysisJob[]> {
+    const response = await this.#postCore(uiReadAnalysisJobsQuerySchema.parse(request))
+    return analysisJobSchema.array().parse(parseApplicationSuccess(response).data)
+  }
+
+  async retryAnalysis(
+    request: Extract<UiRequest, { kind: 'UI_RETRY_ANALYSIS' }>,
+  ): Promise<AnalysisJob> {
+    const response = await this.#postCore(uiRetryAnalysisCommandSchema.parse(request))
+    return analysisJobSchema.parse(parseApplicationSuccess(response).data)
   }
 
   async launchResult(

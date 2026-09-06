@@ -17,6 +17,7 @@ import {
   candidateFixture,
   candidateRoundFixture,
   discoveryFeedbackFixture,
+  discoveryPersonalizationFixture,
   discoverySessionFixture,
   ids,
   learningSpecDraftContentFixture,
@@ -44,6 +45,8 @@ describe('Discovery Agent adapter', () => {
     expect(definition.prompt).toContain('lightweight preview를 정확히 10개')
     expect(definition.prompt).toContain('각 권장 범위 1~2개')
     expect(definition.prompt).toContain('JSON 문자열이 아니라 실제 배열')
+    expect(definition.prompt).toContain('tie-break')
+    expect(definition.prompt).toContain('NO_RELEVANT_EVIDENCE')
     expect(DISCOVERY_TOOL_NAMES).toEqual([
       'get_discovery_context',
       'submit_candidate_previews',
@@ -79,6 +82,7 @@ describe('Discovery Agent adapter', () => {
               feedback: [discoveryFeedbackFixture],
               learningSpec: null,
               relevantLedgerEntries: [],
+              personalization: discoveryPersonalizationFixture,
             },
           }
         }

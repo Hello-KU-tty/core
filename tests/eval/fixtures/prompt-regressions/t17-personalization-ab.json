@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "t17-personalization-ab",
+  "helper": {
+    "question": "이 입력 검사는 어떻게 이해하면 돼?",
+    "evidenceAware": {
+      "trace": {
+        "schemaVersion": 1,
+        "id": "personalization_17000000-0000-4000-8000-000000000001",
+        "projectId": "project_17000000-0000-4000-8000-000000000002",
+        "correlationId": "corr_17000000-0000-4000-8000-000000000003",
+        "target": {
+          "kind": "HELPER_TURN",
+          "taskId": "task_17000000-0000-4000-8000-000000000004"
+        },
+        "mode": "EVIDENCE_AWARE",
+        "basis": [
+          {
+            "conceptId": "concept_17000000-0000-4000-8000-000000000005",
+            "conceptName": "runtime validation",
+            "ledgerRevision": 2,
+            "state": "DEMONSTRATED",
+            "evidenceIds": ["evidence_17000000-0000-4000-8000-000000000006"],
+            "episodeIds": ["episode_17000000-0000-4000-8000-000000000007"],
+            "sourceProjectIds": ["project_17000000-0000-4000-8000-000000000008"],
+            "sourceProjectTitles": ["Webhook Lens"],
+            "openIssueIds": [],
+            "purpose": "HELPER_PAST_EXPERIENCE_CONNECTION",
+            "redactedEvidenceExcerpt": "알 수 없는 입력은 경계에서 먼저 거절해야 오류 위치가 분명해져요."
+          }
+        ],
+        "createdAt": "2026-09-06T00:00:00.000Z",
+        "source": { "kind": "CORE" },
+        "redactionStatus": "VERIFIED_REDACTED"
+      },
+      "answer": "지난 Webhook Lens에서 알 수 없는 입력을 경계에서 거절했던 runtime validation과 같은 원리예요. 이번에는 폼 입력이라는 점이 다르니 현재 schema가 거절할 값부터 확인하면 됩니다."
+    },
+    "noEvidence": {
+      "trace": {
+        "schemaVersion": 1,
+        "id": "personalization_17000000-0000-4000-8000-000000000009",
+        "projectId": "project_17000000-0000-4000-8000-000000000002",
+        "correlationId": "corr_17000000-0000-4000-8000-000000000010",
+        "target": {
+          "kind": "HELPER_TURN",
+          "taskId": "task_17000000-0000-4000-8000-000000000004"
+        },
+        "mode": "NO_RELEVANT_EVIDENCE",
+        "basis": [],
+        "fallbackReason": "NO_RELEVANT_CONCEPT",
+        "createdAt": "2026-09-06T00:00:00.000Z",
+        "source": { "kind": "CORE" },
+        "redactionStatus": "VERIFIED_REDACTED"
+      },
+      "answer": "입력 검사는 외부에서 들어온 값이 현재 schema의 조건을 만족하는지 실행 중에 확인하는 단계예요. 지금 코드의 입력 경계와 실패 메시지를 먼저 보면 됩니다."
+    }
+  },
+  "discovery": {
+    "primarySignals": ["interest", "personal utility"],
+    "tieBreakSignal": "accepted prior-project evidence",
+    "evidenceAwareOrder": ["로컬 설정 검사기", "API 응답 비교기"],
+    "noEvidenceOrder": ["API 응답 비교기", "로컬 설정 검사기"],
+    "claimBoundary": "The trace proves context provision; the paired output comparison is the causal check."
+  },
+  "stressCases": {
+    "unrelatedEvidence": {
+      "expectedMode": "NO_RELEVANT_EVIDENCE",
+      "expectedBasisCount": 0,
+      "inventPriorExperience": false
+    },
+    "singleObserved": {
+      "expectedMode": "EVIDENCE_AWARE",
+      "expectedBasisCount": 1,
+      "actualStates": ["OBSERVED"],
+      "claimTransferred": false
+    },
+    "multipleSources": {
+      "expectedMode": "EVIDENCE_AWARE",
+      "expectedBasisCount": 2,
+      "requiredDistinctSourceProjects": 2,
+      "keepSourcesSeparate": true
+    },
+    "weakAnalogy": {
+      "expectedMode": "EVIDENCE_AWARE",
+      "expectedBasisCount": 1,
+      "forceDirectMapping": false,
+      "requireCommonalityAndDifference": true
+    },
+    "stateInflation": {
+      "expectedMode": "EVIDENCE_AWARE",
+      "actualState": "OBSERVED",
+      "requestedState": "TRANSFERRED",
+      "allowRequestedStateClaim": false
+    },
+    "openIssue": {
+      "actualState": "DEMONSTRATED",
+      "openIssueCount": 1,
+      "ignoreOpenIssue": false,
+      "allowMasteryClaim": false
+    },
+    "bounds": {
+      "maximumBasisCount": 5
+    }
+  }
+}
