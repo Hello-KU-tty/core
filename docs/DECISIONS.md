@@ -492,3 +492,9 @@
 - **결정:** macOS capability 결과로 별도 local backend HTTP/SSE + CLI 2.21.1/v2 ACP를 구현했다. `LOCAL_PROTOCOL_VERSION=1`, SDK 0.1.0을 Crew protocol 9와 구분한다. role/run-bound MCP, private connection file, extension-host-only 인증, backend 소유 Analyst/결과 process를 사용하며 Windows gate는 미검증이다.
 - **완료 workspace:** 기존 `UI_PREPARE_BUILDER_SESSION`은 완료 Task에서 거절되어 History의 workspace 열기까지 막혔다. 승인된 인계 범위의 읽기 전용 복원을 위해 선택적 `purpose: WORKSPACE_VIEW`를 추가한다. 기본 `AGENT_SESSION` 동작과 완료 Task Agent 실행 거절은 유지한다. view는 canonical workspace 경로만 반환하며 Task/session/revision을 생성하거나 변경하지 않는다.
 - **검증 보고:** 실제 Builder 1.3.0은 guard-denied 명령을 통과로 보고했다. 실패 기록을 보존하고 canonical prompt 1.3.1에 허용 command·실제 결과·NOT_RUN/FAILED·미검증 시 미완료 지침을 추가한다. fixture 계약 평가와 실제 모델 검증을 분리한다. runtime의 TURN_ENDED, Core Agent-authored completion report, launcher health와 독립 build/test 성공을 같은 의미로 취급하지 않는다. 범용 shell/Agent endpoint와 자동 상태 덮어쓰기는 추가하지 않는다.
+
+## 2026-09-07: 프로젝트 GitHub push 경로
+
+- **상태:** 사용자 승인
+- **결정:** 이 프로젝트는 `@hurdooagent` 소유의 별도 repository로 복제하지 않는다. `@hurdoo` 측 현재 repository `Hello-KU-tty/core`에 `@hurdooagent`를 collaborator로 사용해 `origin/main`에 일반 push하는 2번 경로를 사용한다.
+- **운영 경계:** remote를 임의 변경하거나 force push하지 않는다. 이 경로의 기록은 앞으로의 push 대상을 명확히 하지만, repository 지침에 따라 각 push 직전의 사용자 승인은 계속 별도로 받는다. 권한 거부 시 반복 시도하지 않고 `@hurdooagent` collaborator 권한을 확인한다.
