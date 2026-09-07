@@ -1,0 +1,27 @@
+{
+  "mode": "MOCK",
+  "containsPersonalData": false,
+  "base": {
+    "protocolVersion": 1,
+    "backendInstanceId": "00000000-0000-4000-8000-000000000001",
+    "id": "run_00000000-0000-4000-8000-000000000002",
+    "projectId": "project_00000000-0000-4000-8000-000000000003",
+    "kind": "DISCOVERY",
+    "phase": "PREVIEW",
+    "status": "ACCEPTED",
+    "outcome": "PENDING",
+    "createdAt": "2026-09-07T00:00:00.000Z",
+    "updatedAt": "2026-09-07T00:00:00.000Z",
+    "errorCode": null,
+    "lastSequence": 1,
+    "retainedFromSequence": 1
+  },
+  "variants": {
+    "loading": { "status": "RUNNING" },
+    "partial_enrichment": { "status": "RUNNING", "phase": "ENRICH_FIRST" },
+    "no_durable_result": { "status": "FAILED", "outcome": "NONE", "errorCode": "AGENT_RESULT_NOT_STORED" },
+    "stale_revision": { "status": "FAILED", "outcome": "NONE", "errorCode": "STALE_DISCOVERY_REVISION" },
+    "cancelled": { "status": "CANCELLED", "outcome": "NONE", "errorCode": "CANCELLED" },
+    "durable_result": { "status": "SUCCEEDED", "outcome": "DURABLE_RESULT" }
+  }
+}

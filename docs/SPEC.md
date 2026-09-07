@@ -2,13 +2,13 @@
 
 ## 1. 상태
 
-- 상태: 사용자 승인 완료, 구현 전
+- 상태: T00~T18 구현 완료, T19 자체 IDE 패널 연동 구현·검증 사용자 승인(2026-09-07), 진행 중. frontend 대상은 Windows이며 push는 별도 승인 대기다.
 - 기준일: 2026-08-24
 - 입력 원본: [PROJECT_BRIEF.md](../PROJECT_BRIEF.md)
 - 상세 맥락: [PROJECT_SPEC.md](../PROJECT_SPEC.md), [CONVERSATION_RECORD.md](../CONVERSATION_RECORD.md)
 - 제품명: 미확정. 문서에서는 `Vibe Helper`를 작업명으로 사용한다.
 
-이 문서는 제품 요구사항의 구현 기준이다. 아직 애플리케이션 기능은 구현되지 않았다.
+이 문서는 제품 요구사항의 구현 기준이다. 완료된 기능과 예정된 구현의 검증 상태는 [TASKS.md](TASKS.md)에서 구분한다.
 
 ## 2. 목표와 해결할 문제
 
@@ -249,7 +249,7 @@ Concept Ledger + Project History
 
 - `FR-UI-001`: Agent 중심과 Code 중심을 초보·고급 단계로 표시하지 않아야 한다.
 - `FR-UI-002`: Agent 중심은 persistent composer를 가진 실제 Builder 채팅 session을 주 surface로, 별도의 read-only Helper 채팅 session을 보조 surface로 동시에 볼 수 있어야 한다. 좁은 화면에서는 같은 두 session을 tab으로 전환한다.
-- `FR-UI-003`: Code 중심 prototype은 Kiro editor에서 Builder/Helper panel과 같은 Core 상태에 접근해야 한다.
+- `FR-UI-003`: Code 중심 prototype은 Kiro editor 옆의 자체 확장/Webview 패널에서 Discovery·Spec·History 화면과 Builder/Helper 탭을 제공하고, Crew App과 같은 Core Project·Discovery Session·Spec·Task·Decision·Context에 연결해야 한다.
 - `FR-UI-004`: Mode 전환 또는 기존 Project 재진입 시 Core에 저장된 session, Task, Decision과 Context가 유지돼야 한다. 실행 중 Agent stream과 progress의 재연결은 MVP 보장 범위가 아니다.
 - `FR-UI-005`: 완료 결과는 Concept 점수보다 결과물 실행을 먼저 보여주되 Builder transcript를 교체하지 않고 session 안의 보조 결과 card로 주입돼야 한다.
 - `FR-UI-006`: 업데이트 전 UI protocol은 제거된 Agent를 호출하기 전에 차단해야 한다. exact Session/revision slot 복원은 중복 dispatch를 줄이는 방어 기능으로 유지하지만 MVP acceptance gate로 사용하지 않는다.
@@ -260,6 +260,9 @@ Concept Ledger + Project History
 - `FR-UI-011`: Builder와 Helper transcript는 viewport에 맞춘 pane 내부에서 독립적으로 스크롤되고, 긴 대화가 전체 페이지 높이를 계속 늘리지 않아야 한다.
 - `FR-UI-012`: Builder와 Helper의 persistent composer는 pane의 기본 조작으로 항상 보여야 한다. Decision option과 Helper quick action은 composer 바로 위의 compact 추천 답장으로 주입하고, 사용자는 같은 composer에 자연어로 직접 답하거나 다른 방향을 제안할 수 있어야 한다.
 - `FR-UI-013`: native transcript와 composer는 host의 light/dark theme에 따라 app surface·text token을 함께 사용해야 하며 한 mode의 고정 배경색 때문에 다른 mode의 글자가 사라지지 않아야 한다.
+- `FR-UI-014`: IDE 패널은 실제 Discovery preview·enrichment·refinement·선택과 Spec 생성·수정·확정을 거쳐 Core가 발급한 workspace와 Builder Task로 이어져야 한다. Agent 실행 요청의 접수·종료와 Core 결과 저장을 구분하고 성공 여부는 해당 Candidate·Spec·Task revision으로 확인해야 한다.
+- `FR-UI-015`: 프론트의 mock data와 DemoAdapter는 실제 연결과 같은 versioned 계약을 사용하는 명시적 개발 모드여야 한다. 실제 Agent·Core 실패를 mock 성공으로 바꾸거나 개발 fixture를 사용자 Evidence로 반영하지 않아야 한다.
+- `FR-UI-016`: History는 저장된 Project 목록·현재 상태·권장 진입 단계와 해당 Candidate·Spec·Task·Decision·Context·완료 보고를 제공해야 한다. IDE/backend 재시작 뒤 같은 상태로 재진입할 수 있어야 하고 목록·상세 조회만으로 새 Agent 작업을 시작하지 않아야 한다.
 
 ## 6. 비기능 요구사항
 
@@ -299,7 +302,7 @@ T01 macOS probe의 두 실행은 20~37ms에 dispatch가 반환되고 약 12초 �
 - `NFR-COMP-001`: MVP 생성·실행 project는 TypeScript Golden Path에 한정한다.
 - `NFR-COMP-002`: Core와 MCP contract는 Kiro UI package와 분리해야 한다.
 - `NFR-COMP-003`: MVP host는 Kiro/Crew이며 Claude Code·Codex adapter는 구현하지 않는다.
-- `NFR-COMP-004`: Code 중심 surface의 정확한 기능은 capability spike 결과를 넘지 않아야 한다.
+- `NFR-COMP-004`: Code 중심 패널의 Core 연결, Agent identity·model·MCP 권한, stream·중지와 process lifecycle은 T19 capability spike에서 설치된 Kiro 버전으로 검증해야 한다. T01의 내장 Agent 검증을 자체 패널 transport의 검증으로 간주하지 않아야 한다.
 
 ### 6.5 운영과 신뢰성
 
@@ -341,6 +344,7 @@ T01 macOS probe의 두 실행은 20~37ms에 dispatch가 반환되고 약 12초 �
 ### 8.1 Kiro/Crew
 
 - Crew App UI와 Agent runtime
+- Kiro IDE 자체 패널의 extension host와 제한된 Core/Agent 연결부(T19 구현 예정)
 - chat/tool/task event
 - sync/async Agent dispatch
 - MCP registration과 permission-scoped API
@@ -395,7 +399,7 @@ T01 macOS probe의 두 실행은 20~37ms에 dispatch가 반환되고 약 12초 �
 - `AC-MVP-009`: State 변경·보류의 Evidence Trace를 확인할 수 있다.
 - `AC-MVP-010`: 과거 Evidence가 다음 Helper 또는 Discovery 결과를 바꾼다.
 - `AC-MVP-011`: 생성 결과물을 실제로 실행하거나 열 수 있다.
-- `AC-MVP-012`: Code 중심 thin prototype이 같은 Core 상태를 읽는 것을 확인한다.
+- `AC-MVP-012`: 실제 Kiro IDE의 최소 연동 예제에서 새 Learning Goal→Candidate 수정·선택→Spec 생성·수정·확정→Builder 작업→Helper 질문·실제 Decision 적용→History 재진입이 같은 Core 식별자와 revision으로 이어진다. frontend 개발자가 push된 backend의 clean checkout, client와 지침으로 자신의 대상 OS에서 실행해 Discovery·Spec·Builder·History 화면을 모두 구현할 수 있다. Crew와 IDE 저장 상태 일치·중복 적용 거절·재시작 복원을 검증하며 frontend 최종 디자인 완료는 backend 인계 조건과 구분한다.
 - `AC-MVP-013`: secret redaction, path rejection, Agent 권한 거절 test가 통과한다.
 - `AC-MVP-014`: Golden Path와 unseen input의 전체 flow를 재현 가능한 방식으로 검증한다.
 
@@ -428,7 +432,7 @@ T01 macOS probe의 두 실행은 20~37ms에 dispatch가 반환되고 약 12초 �
 ## 12. 승인된 구현 가정
 
 - `ASM-001`: pnpm workspace가 여러 UI·Core·adapter package 경계를 관리하기 적합하다.
-- `ASM-002`: Agent 중심 Crew App을 주 vertical flow로 완성하고 Code 중심은 thin prototype으로 제한하는 것이 대회 완성도에 유리하다.
+- `ASM-002`: T18까지 완성한 Crew App vertical flow를 회귀 기준으로 유지하고, T19에서는 프론트 담당자의 자체 IDE 패널에 Discovery·Spec·Builder·Helper 연결을 제공한다. 전체 UI 재구현·polish보다 공통 계약과 실제 연결 인계를 우선한다(2026-09-07 사용자 승인).
 - `ASM-003`: 배포 없이도 결과물을 로컬에서 실행하면 첫 MVP의 build-first 가치를 검증할 수 있다.
 - `ASM-004`: Evidence threshold는 fixture와 사용자 pilot 전에는 확정하지 않는 것이 안전하다.
 - `ASM-005`: Campus Drop은 Discovery template가 아니라 integration fixture로 적합하다.
@@ -440,7 +444,7 @@ T01 macOS probe의 두 실행은 20~37ms에 dispatch가 반환되고 약 12초 �
 기본 방향은 승인됐다. 아래 세부사항만 정해진 task에서 검증·기록한다.
 
 1. T01: Kiro/Crew에서 Builder와 Helper session을 앱 안에서 어떻게 분리·표시하고 Core context로 연결할지
-2. T01: Code 중심 thin prototype이 실제 Kiro IDE에서 사용할 수 있는 최소 surface
+2. T19: 자체 IDE 패널의 Core/Agent transport, 권한·process lifecycle과 Discovery·Spec부터의 프론트 실제 연결 인계(T01 결과를 새 경계에서 재검증)
 3. T02: 실제 Node.js LTS version, runtime schema와 SQLite/migration library
 4. T07·T23: reducer fixture, reviewer 방식과 실제 pilot 규모
 5. T28: 대회 제출을 위한 공식 packaging·배포 경로

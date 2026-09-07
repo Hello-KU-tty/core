@@ -1,0 +1,17 @@
+{
+  "name": "@vibe-helper/runtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@vibe-helper/application": "workspace:*",
+    "@vibe-helper/contracts": "workspace:*",
+    "@vibe-helper/kiro-adapter": "workspace:*"
+  }
+}

@@ -126,6 +126,7 @@ export const uiOpenHelperQuerySchema = z.strictObject({
 export const uiPrepareBuilderSessionQuerySchema = z.strictObject({
   ...uiRequestMetadata,
   kind: z.literal('UI_PREPARE_BUILDER_SESSION'),
+  purpose: z.enum(['AGENT_SESSION', 'WORKSPACE_VIEW']).optional(),
   projectId: projectIdSchema,
   taskId: taskIdSchema,
 })
@@ -228,7 +229,11 @@ export const builderSessionBindingDescriptorSchema = z.strictObject({
     .string()
     .min(1)
     .max(4_096)
-    .refine((value) => value.startsWith('/') && !value.includes('\0'), 'Expected an absolute path'),
+    .refine(
+      (value) =>
+        (value.startsWith('/') || /^[A-Za-z]:[\\/]/.test(value)) && !/[\0\r\n]/.test(value),
+      'Expected an absolute local POSIX or Windows drive path',
+    ),
   status: z.literal('READY'),
 })
 

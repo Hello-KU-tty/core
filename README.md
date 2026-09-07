@@ -2,7 +2,7 @@
 
 Vibe Helper는 코딩 초보자가 자기에게 실용적인 TypeScript 서비스를 고르고, Kiro Builder와 함께 실제로 만들며, 필요한 순간 Helper와 대화해 개념을 익히도록 돕는 build-first 개발 환경이다. 제품은 개발을 교육용 단계로 끊지 않고 실제 Decision, 작업 맥락과 사용자 행동에서 나온 Evidence를 다음 설명과 project 추천에 연결한다.
 
-현재 repository는 T00~T18의 승인·구현 결과를 포함한다. Discovery→Learning Spec→Builder/Decision→Helper→Episode 단위 Evidence 분석→다음 개인화→사용자 선택 Final Upgrade→실행 가능한 local 결과까지 하나의 durable 수직 흐름으로 연결돼 있다. 다음 작업은 T19 Code 중심 thin prototype이며, `spikes/kiro-crew/`의 코드는 외부 기능 경계를 확인하기 위한 폐기 가능한 실험물이다.
+현재 repository는 T00~T18의 승인·구현 결과를 포함한다. Discovery→Learning Spec→Builder/Decision→Helper→Episode 단위 Evidence 분석→다음 개인화→사용자 선택 Final Upgrade→실행 가능한 local 결과까지 하나의 durable 수직 흐름으로 연결돼 있다. 다음 작업은 T19 자체 Kiro IDE 패널과 프론트 실제 연동이며, Discovery·Spec mock 교체부터 Builder·Helper 연결까지 범위가 승인됐다. `spikes/kiro-crew/`의 코드는 외부 기능 경계를 확인하기 위한 폐기 가능한 실험물이다.
 
 ## 문서 읽는 순서
 
@@ -14,6 +14,12 @@ Vibe Helper는 코딩 초보자가 자기에게 실용적인 TypeScript 서비�
 6. `docs/agent-prompts/`: Discovery, Builder, Helper와 Evidence Analyst의 prompt 계약
 
 `PROJECT_SPEC.md`와 `CONVERSATION_RECORD.md`는 합의의 상세 배경을 보존하는 참고 자료다.
+
+프론트 담당자는 [프론트 개발 안내](docs/FRONTEND_INTEGRATION.md)에서 PowerShell 설치·실행, SDK, program adapter와 네 화면 API를 확인할 수 있다. 독립 backend와 최소 Kiro 패널 예제는 구현됐지만 Windows native 실측 gate가 남아 있어 인계 완료 상태는 아니다.
+
+T19 완료 목표는 frontend 개발자가 backend를 Windows 컴퓨터에서 실행하고 실제 Kiro IDE의 Discovery·Spec·Builder·History를 구현할 수 있는 상태다. [상세 구현·검증 계획](docs/T19_IMPLEMENTATION_PLAN.md)은 push를 제외하고 승인됐다. push는 실행 전 별도로 승인받는다. [현재 capability 기록](docs/spikes/T19_LOCAL_RUNTIME_RESULTS.md)에서 macOS Core/CLI/IDE host 실측과 미검증 Windows 항목을 구분한다.
+
+독립 개발 경로는 `pnpm install --frozen-lockfile` → `pnpm build` → `pnpm core:init` → `pnpm core:doctor --live` → `pnpm core:start`다. live 진단은 본인 Kiro 모델 사용량을 소비한다. Crew secret이나 `/api/test/agent`는 사용하지 않는다. `pnpm client:pack`으로 외부 소비 SDK를 만들고 `pnpm panel:build` 후 Kiro에서 `examples/kiro-panel`을 F5로 실행한다. 지원 버전·Windows gate·인증 파일 취급은 위 개발 안내를 먼저 읽는다.
 
 ## MVP 수직 흐름
 
@@ -28,7 +34,7 @@ Learning Goal
   → 다음 Helper 설명과 Discovery 개인화
 ```
 
-MVP host는 Kiro/Crew이고 Agent 중심 Crew App을 primary surface로 삼는다. Code 중심 Kiro surface는 같은 Core 상태를 읽는 thin prototype으로 검증한다. Bedrock 별도 경로, Claude Code·Codex adapter, 기존 project import와 cloud sync는 MVP 범위 밖이다.
+MVP host는 Kiro/Crew이고 Agent 중심 Crew App을 primary surface로 삼는다. Code 중심은 자체 Kiro IDE 패널에서 Discovery·Spec·Builder·Helper를 같은 Core 상태와 실제 Agent에 연결하는 prototype으로 검증한다. Bedrock 별도 경로, Claude Code·Codex adapter, 기존 project import와 cloud sync는 MVP 범위 밖이다.
 
 ## 현재 상태
 
@@ -41,7 +47,7 @@ MVP host는 Kiro/Crew이고 Agent 중심 Crew App을 primary surface로 삼는�
 | T16 | 완료 | conversation-first Builder/Helper UI, 실제 Decision handoff, native transcript와 완료 결과 |
 | T17 | 완료 | Project Evidence Trace, bounded cross-project retrieval, immutable personalization provenance |
 | T18 | 완료 | hidden Evidence Analyst worker, strict loopback 결과 실행기, optional Final Upgrade, Campus Drop 실행 fixture |
-| 다음 | T19 | Code 중심 thin prototype |
+| 진행 중 | T19 | 독립 backend·SDK·최소 Kiro 패널 구현/로컬 검증, Windows native 인계 gate 대기 |
 
 T18의 Campus Drop fixture는 TypeScript runtime boundary, SQLite metadata와 blob file 분리, SHA-256 token digest, expiry와 1회 consume를 실제 build/test/HTTP 실행으로 검증한다. 제품 결과 실행기는 workspace 안의 strict `.vibe-helper/result.json`과 compiled JavaScript만 읽고, symlink containment를 확인한 뒤 최소 환경의 Node child를 `127.0.0.1` 동적 port에서 감독한다.
 

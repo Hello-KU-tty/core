@@ -20,7 +20,7 @@ import {
   decisionResultSchema,
 } from '@vibe-helper/contracts'
 
-export const BUILDER_PROMPT_VERSION = '1.3.0' as const
+export const BUILDER_PROMPT_VERSION = '1.3.1' as const
 export const BUILDER_PROMPT_SOURCE = 'docs/agent-prompts/builder.md' as const
 export const BUILDER_AGENT_NAME = 'vibe-helper-builder' as const
 export const BUILDER_MCP_SERVER_NAME = 'vibe-helper-builder-core' as const

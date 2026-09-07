@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.package.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/.tsbuildinfo",
+    "types": ["node"]
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../../packages/contracts" },
+    { "path": "../../packages/application" },
+    { "path": "../../packages/storage-sqlite" },
+    { "path": "../../packages/kiro-adapter" },
+    { "path": "../../packages/runtime" },
+    { "path": "../mcp-server" }
+  ]
+}

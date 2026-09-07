@@ -1,0 +1,3 @@
+{
+  "version": "0.2.0", "configurations": [{ "name": "Kiro Local Integration Panel", "type": "extensionHost", "request": "launch", "runtimeExecutable": "${execPath}", "args": ["--extensionDevelopmentPath=${workspaceFolder}"] }]
+}

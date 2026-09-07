@@ -6,6 +6,7 @@
 - 기준 입력: [PROJECT_BRIEF.md](../PROJECT_BRIEF.md), [SPEC.md](SPEC.md)
 - T03 versioned contract와 Agent/UI runtime validation, T04 pure reducer와 Evidence policy v1.0.0, T05 SQLite schema/repository/migration, T06 application use case와 역할 고정 MCP server, T07 criterion 기반 evaluation contract와 harness, T08 Candidate loop, T09 Discovery와 Learning Spec, T10 native workspace lifecycle, T11 Builder와 Decision gate, T12 bounded Helper context, T13 Evidence Analyst와 durable Analysis Job, T14 Crew backend와 session restore, T15 Discovery/Spec UI, T16 conversation-first Agent Mode, T17 Evidence Trace와 다음 대화 개인화, T18 hidden Analyst worker·local result runtime·optional Final Upgrade까지 구현됐다.
 - Kiro/Crew 세부 연결은 capability spike 결과에 따라 이 문서를 갱신한다.
+- 2026-09-07 T19 범위는 자체 IDE 패널의 Discovery·Spec·Builder·Helper·History 실제 연결과 frontend 로컬 실행 인계로 갱신됐다. [상세 구현 계획](T19_IMPLEMENTATION_PLAN.md)의 구현·검증은 승인됐고 진행 중이다. frontend 대상은 Windows native 실행이며 push는 별도 승인 대상이다. 아래 새 transport 설계의 실제 capability는 아직 검증 중이다.
 
 ## 2. 선택한 기술 스택과 선택 이유
 
@@ -15,8 +16,8 @@
 |---|---|---|
 | Domain과 application | TypeScript | 대회 MVP와 실제 생성 project의 단일 언어, 공통 계약 공유 |
 | Agent host | Kiro/Crew | 대회 제공 token과 Kiro-native 사용자 경험 활용 |
-| Agent integration | MCP + 제한된 Crew API | 구조화된 proposal, 최소 권한, Core stable ID 기반 context 공유 |
-| UI | React 기반 Crew App, Kiro 내장 Agent panel | Agent 중심과 Code 중심 두 취향 surface 검증 |
+| Agent integration | MCP + 제한된 Crew API, T19 IDE runtime adapter 예정 | 구조화된 proposal, 최소 권한, Core stable ID 기반 context 공유 |
+| UI | React 기반 Crew App, 자체 Kiro IDE 확장/Webview 패널 | Agent 중심과 Code 중심 두 취향 surface 검증, IDE 프론트는 별도 담당 |
 | Persistence | local SQLite | local-first, 단일 사용자 MVP, audit 가능한 관계 데이터 |
 | Generated project | TypeScript | 실행·테스트·배포 고려 범위 제한 |
 
@@ -33,7 +34,7 @@ T02에서 active LTS와 macOS/Windows 호환성을 검토해 세부 도구를 �
 | Browser test | Playwright 1.62.1 | Crew App 핵심 flow와 접근성 smoke |
 | Formatting/lint | Biome 2.5.10 | formatting과 정적 lint를 한 설정에서 수행 |
 | Schema validation | Zod 4.4.3 | Agent/UI 외부 입력과 MCP contract validation |
-| SQLite adapter | better-sqlite3 12.11.1 + Drizzle ORM 0.45.2 | local driver, typed query와 SQL migration |
+| SQLite adapter | better-sqlite3 13.0.3 + Drizzle ORM 0.45.2 | packaged N-API driver, typed query와 기존 SQL migration; T19 GC 충돌 대응 |
 | Migration tooling | Drizzle Kit 0.31.10 | versioned SQL migration 생성·검사 |
 
 존재하지 않는 package script와 command는 아직 문서화하지 않는다.
@@ -45,7 +46,7 @@ T02에서 active LTS와 macOS/Windows 호환성을 검토해 세부 도구를 �
 - Graph DB
 - Bedrock provider
 - 여러 deployment provider
-- 자체 ACP editor client
+- 범용 ACP editor client(자체 IDE 패널의 제한된 Kiro 연결부는 T19 spike 대상)
 - cloud database와 user account backend
 
 ## 3. 시스템 구성과 데이터 흐름
@@ -56,9 +57,9 @@ T02에서 active LTS와 macOS/Windows 호환성을 검토해 세부 도구를 �
 ┌──────────────────── User Surfaces ────────────────────┐
 │                                                       │
 │  Crew App Agent Mode        Kiro IDE Code Mode        │
-│  - Discovery                - Builder/Helper access   │
-│  - Builder stream           - Current context         │
-│  - Helper chat              - Shared decisions        │
+│  - Discovery/Spec           - Discovery/Spec panel    │
+│  - Builder stream           - Builder/Helper tabs     │
+│  - Helper chat              - Shared Core state      │
 │  - Decision/Evidence UI     - Native editor/diff      │
 │                                                       │
 └───────────────────────┬───────────────────────────────┘
@@ -158,7 +159,7 @@ tests/
 docs/agent-prompts/      # Agent prompt source of truth
 ```
 
-실제 package 경계는 T02에서 위 구조로 확정했다. Campus Drop fixture와 `.kiro/agents/` product config는 각각 T18과 T19에서 추가한다. 현재 원문 Prompt는 `docs/agent-prompts/`에 유지한다. 구현 package가 생겨도 이 문서를 임의 복사해 drift시키지 않고 source 또는 build input 관계를 명시한다.
+실제 package 경계는 T02에서 위 구조로 확정했다. Campus Drop fixture는 T18에서 추가했다. T19의 프론트 참조 구현은 [Hello-KU-tty/program](https://github.com/Hello-KU-tty/program)이며, 이 저장소는 공통 계약·Core·Agent 연결부와 개발 안내를 제공한다. IDE Agent config, adapter의 package 위치와 두 repository 간 배포 방식은 T19 첫 단계에서 결정한다. 현재 원문 Prompt는 `docs/agent-prompts/`에 유지하고, host별 config는 그 build input 관계를 명시해 prompt drift를 막는다.
 
 ### 4.2 contracts
 
@@ -285,11 +286,22 @@ Crew App:
 Kiro IDE Code mode:
 
 - native editor와 diff를 중심으로 사용
-- 내장 Agent panel에서 project-local Builder/Helper 선택
-- Agent별 Core MCP catalog로 current Task와 Decision 조회
+- 자체 확장/Webview에 Discovery·Spec·History 화면과 Builder/Helper 탭 배치
+- extension host의 연결부에서 UI command/query와 실제 Kiro Agent 실행을 분리
+- Agent별 Core MCP catalog로 Candidate·Spec 제출, Task·Context·Decision 처리와 Helper 조회
 - 같은 stable ID를 사용하고 Crew raw chat session 공유는 요구하지 않음
 
-MVP에는 별도 Open VSX extension/webview나 `apps/kiro-panel`을 만들지 않는다. 공식 Kiro 문서상 `.kiro/agents/`는 IDE와 CLI 양쪽에서 지원되고 Agent config의 MCP가 우선 적용된다. 실제 S4 CLI runtime이 동일 config와 Core revision handoff를 통과했다. macOS 시각 picker와 Windows host smoke는 제출 전 검증 항목이다.
+2026-09-07 사용자 승인으로 내장 Workspace Agent만 사용하는 T01 경계를 자체 패널 연결로 확장했다. `program`의 Webview와 `AgentAdapter` 교체 지점을 재사용하되 실제 `AcpTransport`와 Core 연결은 아직 구현되지 않았다. Kiro CLI ACP는 후보이며, 설치 버전에서 Agent identity·model·역할별 MCP·stream·중지·권한과 process lifecycle을 확인한 뒤 결정한다. 기존 Crew Agent config의 hook과 경로를 IDE에서 그대로 사용할 수 있다고 가정하지 않는다.
+
+T19 연결부는 `apps/local-backend`의 별도 Node process로 구현했다. UI command/query는 `ApplicationService.executeUi`, 제한된 Agent 실행은 `packages/runtime`이 담당한다. backend가 127.0.0.1 HTTP/SSE와 private connection file을 만들고 extension host의 `packages/frontend-client`만 인증한다. LOCAL_PROTOCOL_VERSION 1/SDK 0.1.0은 Crew protocol 9와 별개다. ACP는 CLI 2.21.1/v2의 지정 Agent/model을 확인하고 실행별 역할 MCP를 project/session/task/correlation과 활성 run에 묶는다. `executeAgent`와 E2E 전용 `/api/test/agent`는 모델 실행 API가 아니다. Webview에 secret, SQLite 또는 범용 Agent mutation을 노출하지 않는다. Windows native 실행은 별도 미검증 gate다.
+
+run/stream은 최대 100개/각 500 events·약 1MiB의 transient 상태이며 durable Project/Task와 다르다. UI 이탈은 backend 실행을 취소하지 않는다. cancel은 owned ACP process/역할 MCP를 폐기하고 저장된 Core 결과는 보존한다. backend 재시작 후 새 connection으로 History를 읽으며 raw transcript 공유를 전제하지 않는다. SDK는 외부 ESM/CJS artifact로 만들고 native storage를 포함하지 않는다. 최소 예제는 `examples/kiro-panel`이고 전체 frontend 디자인은 program에서 구현한다.
+
+History는 기존 `ProjectHistory`와 `ProjectSessionSnapshot`을 client로 제공해 Project 목록·권장 진입 단계·현재/완료 Task·Decision·Context·Spec을 복원한다. 목록·상세 조회는 Agent dispatch와 분리한다. frontend 인계는 별도 소비 프로젝트의 client 설치와 backend clean checkout, 실제 Kiro IDE의 네 화면 최소 연동 예제·재시작 복원을 증거로 삼고, frontend 제품 화면의 최종 디자인 완료와 구분한다.
+
+Discovery preview→background/JIT enrichment→feedback/refinement→명시적 SELECT→Spec 생성·수정·확정→Task/workspace 준비 순서는 기존 Application을 재사용한다. 현재 Crew `App.tsx`에 있는 phase 진행과 durable 결과 관찰 책임도 연결부의 명시적 소유자로 옮기거나 재사용해, 프론트 화면이 모델 호출·재시도 정책을 중복 구현하지 않게 한다. 새 Discovery는 생성 workspace가 없는 상태에서 시작하고, Spec 확정 뒤 Core가 발급한 workspace를 IDE project와 연결한다. 임의 기존 repository import로 확대하지 않는다.
+
+Crew의 AnalysisWorker는 유지한다. 독립 경로는 backend WorkflowRuntime이 2초 간격으로 기존 lease/attempt 기반 Analyst job을 처리한다. Helper exchange와 Builder checkpoint는 같은 Core Event/Episode로 이어지고 새 data root를 사용한다. ResultRuntimeSupervisor는 packages/runtime으로 옮겨 두 backend에서 재사용한다. 종료 시 active Agent와 결과 child를 정리한 뒤 SQLite를 닫는다. UI 전체 Evidence/Final Upgrade parity는 후속 목록이다. 개발 계약/실패 복구는 [FRONTEND_INTEGRATION.md](FRONTEND_INTEGRATION.md)에 정리한다.
 
 T14 Crew App은 browser bundle이 SQLite나 Node application implementation을 직접 import하지 않고, Crew가 관리하는 TypeScript Node backend의 same-origin reverse proxy를 통해 UI command/query를 호출한다. backend는 host가 제공한 absolute app-data 경계에서 SQLite와 generated workspace를 조합하고 Gateway proxy HMAC, 고정 route/method, payload 크기와 runtime schema를 검증한다. Project History와 session restore는 Core의 durable read model을 source of truth로 사용하며, Builder/Helper Crew slot은 project ID에서 결정적으로 파생한 교체 가능한 runtime binding이다. Crew history가 unavailable이어도 redacted Activity/Episode summary와 저장된 project state는 계속 표시하고 임의 대화나 mock state를 만들지 않는다.
 
@@ -649,9 +661,9 @@ Crew App의 `permissions.api`는 T01에서 host SDK의 client-side path guard로
 - `pnpm build`가 만드는 최소 `dist/crew-package` Crew App 설치물
 - local MCP/Core process
 - local SQLite data directory
-- repository의 project-local `.kiro/agents/` Builder/Helper config
+- T19의 host별 Discovery·Builder·Helper Agent config와 IDE 패널 연결부 개발 실행 안내
 
-T18 package는 app manifest, phase별 Discovery Agent, Builder·Helper, hidden no-tool Evidence Analyst, versioned `ui/dist/index-0.4.1.mjs` bundle, role-bound backend bundle, SQL migration과 exact `better-sqlite3`·`drizzle-orm` runtime dependency만 포함한다. Crew host는 manifest의 `ui.entry`를 설치 root가 아니라 고정 `ui/` root에 상대적으로 해석하므로 entry는 `dist/index-0.4.1.mjs`다. source repository, 개인 문서, test와 workspace package link를 설치본에 복사하지 않는다. 제출 archive와 Builder/Helper workspace Agent packaging의 최종 형태는 T28에서 확정한다. 별도 Kiro panel package는 없다.
+T18 package는 app manifest, phase별 Discovery Agent, Builder·Helper, hidden no-tool Evidence Analyst, versioned `ui/dist/index-0.4.1.mjs` bundle, role-bound backend bundle, SQL migration과 exact `better-sqlite3`·`drizzle-orm` runtime dependency만 포함한다. Crew host는 manifest의 `ui.entry`를 설치 root가 아니라 고정 `ui/` root에 상대적으로 해석하므로 entry는 `dist/index-0.4.1.mjs`다. source repository, 개인 문서, test와 workspace package link를 설치본에 복사하지 않는다. T19는 별도 담당 IDE 패널과 연결부의 개발 인계를 제공하며, 공개 extension 배포와 제출 archive의 최종 형태는 T28에서 확정한다.
 
 ### 11.3 rollback 원칙
 
@@ -672,8 +684,8 @@ T18 package는 app manifest, phase별 Discovery Agent, Builder·Helper, hidden n
 ### R2. Crew App과 Kiro editor session 공유
 
 - 위험: Agent Mode와 Code Mode의 대화·Task가 이어지지 않음
-- 대응: T01에서 raw session 공유 없이 Core stable ID·revision handoff를 검증함. 두 surface는 같은 MCP와 SQLite state를 읽음
-- 대안: Code Mode는 Kiro 내장 Workspace Agent panel까지만 제공하고 custom panel은 만들지 않음
+- 대응: T01에서 검증한 Core stable ID·revision handoff를 T19 자체 패널의 Discovery Session·Spec·Task 연결로 확장하고 실제 두 surface에서 검증
+- 대안: host transport가 불가하면 원인과 지원 version 제한을 기록하고 검증된 Crew runtime 재사용을 검토. 내장 Agent 선택기만으로 자체 패널 연동 완료를 대체하지 않음
 
 ### R3. TypeScript Gateway client 부재
 
@@ -696,7 +708,7 @@ T18 package는 app manifest, phase별 Discovery Agent, Builder·Helper, hidden n
 ### R6. 범위 과다
 
 - 위험: 두 UI·네 Agent·Core·평가가 모두 미완성
-- 대응: Crew App 단일 vertical flow 우선, Code Mode thin, deployment와 host adapter 보류
+- 대응: 완료된 Crew flow를 재사용하고 T19는 공통 연결부·Discovery/Spec mock 교체·Builder/Helper 실제 연동에 집중. 화면 polish와 공개 배포는 후속 작업
 - 대안: Analyst와 Helper를 같은 Kiro runtime에 두되 permission/prompt는 유지하고 packaging만 단순화
 
 ### R7. Kiro quota와 latency

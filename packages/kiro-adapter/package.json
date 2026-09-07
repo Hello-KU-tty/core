@@ -6,6 +6,10 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./acp-node": {
+      "types": "./dist/acp-client-node.d.ts",
+      "import": "./dist/acp-client-node.js"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"

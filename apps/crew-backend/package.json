@@ -9,6 +9,7 @@
     "dev:test": "tsc -b --pretty false && node ../../tests/e2e/support/start-crew-backend.mjs"
   },
   "dependencies": {
+    "@vibe-helper/runtime": "workspace:*",
     "@vibe-helper/application": "workspace:*",
     "@vibe-helper/contracts": "workspace:*",
     "@vibe-helper/mcp-server": "workspace:*",

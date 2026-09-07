@@ -766,32 +766,68 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - Node.js 24.19.0·pnpm 11.12.0에서 format/lint/typecheck/Drizzle check, unit 2개, integration 212개, eval 22개, Campus Drop 3개, build, smoke 6개와 Chromium E2E 12개가 통과했다.
 - target Kiro Crew 설치본을 data-preserving update endpoint로 app 0.4.1에 갱신했다. 설치 UI·backend·Builder·hidden no-tool Evidence Analyst hash가 source package와 일치하고 backend `/health`가 `ok`이며 실제 History UI가 기존 Project를 복원했다. 첫 target worker 검증에서 실제 Agent가 설명 뒤 single fenced JSON을 반환해 whole-message parser가 legacy 대기 Job 6개를 최대 재시도 뒤 거절하는 회귀를 발견했다. parser를 정확히 하나의 fenced JSON block만 허용하고 복수 block은 거절하도록 고친 versioned 0.4.1 UI에서 같은 no-evidence 형태의 실제 Job 2개가 13.8초·17.8초에 `SUCCEEDED`가 됐다. SQLite `quick_check=ok`이고 Project 61, Discovery Session 62, Learning Spec 27, Task 6, accepted Evidence 13, Concept Ledger 13, Completion Report 2가 유지됐으며, 실패·성공 Job revision도 provenance 때문에 삭제하지 않았다. 새 Campus Drop Agent run은 추가 durable fixture data를 만들지 않고 deterministic full E2E와 실제 result runtime integration으로 대체했다.
 
-### [>] T19. Code 중심 thin prototype
+### [~] T19. 자체 Kiro IDE 패널과 프론트 실제 연동
+
+**승인 기록**
+
+- 2026-09-07 사용자가 자체 IDE 패널을 개발하는 프론트 담당자와 협업하도록 기존 내장 Agent 선택기 중심 범위를 수정하는 데 동의했다. mock으로 개발 중인 Discovery·Spec의 실제 연결 준비도 포함한다.
+- 최초 범위 검토는 계획 갱신이었으며 아래 상세 승인 이후 실제 구현·실측에 착수했다.
+- 상세 인계 기준: [FRONTEND_INTEGRATION.md](FRONTEND_INTEGRATION.md). 기존 T01의 자체 extension/Webview 제외 결정은 2026-09-07 결정으로 대체한다.
+- 2026-09-07 사용자가 push된 backend를 frontend 개발자가 자신의 컴퓨터에서 실행해 실제 Kiro IDE의 Discovery·Spec·Builder·History 화면을 모두 구현할 수 있어야 한다고 완료 기준을 명확히 했다. [구체적인 구현 계획](T19_IMPLEMENTATION_PLAN.md)은 아래 기록처럼 push 제외 승인됐다.
+- 이후 사용자가 상세 계획에서 push를 제외하고 승인하고 착수를 지시했다. T19를 진행 중으로 전환한다. frontend 대상 OS는 Windows이며 native 설치·PowerShell·경로·process lifecycle과 실제 Kiro IDE 검증을 인계 기준으로 둔다. 현재 macOS의 실측을 Windows 검증으로 대체하지 않는다. push는 실행 전 별도 승인을 받는다.
+
+**진행 기록**
+
+- 2026-09-07 local backend, bounded workflow/Analyst worker, ACP identity/role/run scope, HTTP/SSE 인증, 외부 ESM/CJS SDK/Program adapter와 최소 IDE 예제를 구현했다. 실제 no-Personal-Need 및 Personal-Need 입력의 preview→JIT→refinement→Spec 수정/확정→Task/History를 확인했다.
+- 실제 Builder Decision→Helper read-only→사용자 선택→완료, 별도 폴더의 생성 코드 frozen install/build/test와 loopback 결과를 확인했다. 먼저 실패한 Builder 1.3.0의 허위 검증 보고는 보존하고 1.3.1 prompt/fixture에 실행 증거·guard recovery를 추가했다. 정상 Analyst job과 명시적 invalid-result 실패를 각각 확인했다.
+- 외부 npm/TS 5.4.5/CJS/esbuild 0.21.5 SDK 소비·실제 Core 조회와 macOS Kiro 1.0.337 extension-host 활성화·패널 명령·네 화면 데이터 접근을 확인했다. host test만으로 시각적 클릭 검증을 주장하지 않는다. 새 별도 source checkout의 frozen install/build/SQLite init/doctor를 통과했다.
+- Windows OS 버전/architecture·CLI 2.21.1/v2 native 제공 여부·ACL/native dependency·실제 Kiro 네 화면/중지/재시작 gate는 미검증이다. Windows 증거 없이 [x]로 바꾸지 않는다. 최신 검증과 알려진 실패는 [capability 기록](spikes/T19_LOCAL_RUNTIME_RESULTS.md), 실제 실행 방법은 [프론트 개발 안내](FRONTEND_INTEGRATION.md)를 따른다. push는 여전히 별도 승인 대상이다.
 
 **범위**
 
-- Kiro editor와 내장 Agent panel을 중심에 두고 project-local Builder와 Helper를 선택하는 최소 surface를 만든다.
-- Crew App과 동일한 project, task, context, decision과 ledger를 읽는다.
+- 프론트 담당자의 [program](https://github.com/Hello-KU-tty/program) IDE 확장/Webview에 Discovery·Spec·Builder(Helper 포함)·History를 실제 Core와 Kiro Agent로 연결할 계약·client·runtime adapter와 실행 안내를 제공한다.
+- UI 상태 조회·사용자 command와 모델 실행을 분리하고, 현재 Crew UI의 Discovery phase 진행·재시도·durable 결과 관찰을 재사용 가능한 연결부로 정리한다.
+- 새 Learning Goal→10개 preview→background/JIT enrichment→후보 refinement·명시적 SELECT→Spec 생성·수정·확정→Core 발급 workspace·Task→Builder/Helper·실제 Decision 적용을 하나의 project lineage로 연결한다.
+- Crew App과 동일한 Project, Discovery Session, Spec, Task, Context, Decision과 Ledger를 사용한다. IDE의 현재 폴더를 임의 기존 project로 import하지 않는다.
+- History는 기존 Project 목록·권장 진입 단계·현재/완료 Task와 snapshot을 제공한다. backend 재시작 뒤 Discovery·Spec·Build·완료 단계의 저장 결과를 복원하고, History 조회만으로 Agent를 실행하지 않는다.
+- Builder checkpoint와 Helper exchange를 기존 Event/Episode·AnalysisJob·개인화에 연결하고 Analyst worker의 실행 소유자와 수명을 정한다.
 - Agent 중심과 Code 중심을 숙련 단계가 아닌 사용자 취향으로 표현한다.
-- 별도 extension/webview를 만들지 않고 T01에서 검증한 Agent config와 MCP 경계만 사용한다.
-- 설치 시점의 Kiro Agent Engine과 project-local Agent config를 다시 검증하고 CLI 2 config를 v3에 묵시적으로 fallback시키지 않는다.
+- 설치 시점의 Kiro engine·Agent identity·model·역할별 MCP·stream·중지·process lifecycle을 다시 검증한다. CLI 2 config를 다른 engine의 기본 Agent로 묵시적으로 fallback시키지 않는다.
+- mock과 실제 연결은 같은 계약을 사용하되 모드를 명시한다. `/api/test/agent`를 제품 runtime API로 열거나 실제 실패를 mock 성공으로 바꾸지 않는다.
 
 **선행 조건**
 
-- T01에서 가능 범위가 검증되고 T14~T18의 공통 Core가 동작해야 한다.
+- T14~T18 공통 Core와 Crew flow가 동작하고 위 범위 변경이 승인돼 있어야 한다.
+- T01은 기존 capability 근거로만 사용한다. 자체 패널 transport 선택은 아래 첫 단계의 새 spike 결과로 결정한다.
+
+**구현·인계 순서**
+
+1. 공통 DTO와 mock 교체 경계, frontend/backend 역할을 정하고 local Core·실제 Kiro transport의 최소 spike를 수행한다. Agent 실행과 Core 상태 반영이 각각 가능한지 확인한 뒤 endpoint/IPC·인증·version·process·worker 소유자를 결정 기록에 남긴다.
+2. 프론트가 먼저 사용할 versioned 요청·응답·오류 계약과 schema-valid 개발 fixture를 인계한다. loading·부분 완료·실패·stale revision도 fixture에 포함하며 이 단계는 실제 연결 완료가 아니다.
+3. Discovery·Spec부터 실제 연결한다. preview identity 유지, background 중 선택·조정, 누락 enrichment 재시도, Spec 수정·뒤로가기·명시적 확정과 Builder Task 준비를 검증한다.
+4. 같은 Project/Task에 Builder·Helper session을 각각 묶고 실제 stream·Context·Decision·중지·권한·Event/Episode/Analyst 연결을 검증한다.
+5. 실제 Kiro IDE의 최소 연동 예제에서 새 입력부터 History 재진입까지 한 흐름을 재현하고, Crew와 IDE 재진입의 저장 상태 일치·중복 적용 거절·오류 복구를 확인한다. 독립 소비 프로젝트의 SDK 설치와 push할 revision의 clean checkout 실행을 검증하고, frontend 제품 화면에서 같은 연결부를 사용할 안내를 인계한다.
 
 **산출물**
 
-- `.kiro/agents/` Builder/Helper config와 Kiro IDE 실행 안내
-- session/state continuity test
-- 구현하지 못한 mode parity의 명시적 목록
+- versioned 프론트 요청·응답·오류/진행 계약, mock fixture와 실제 adapter 교체 예제
+- canonical prompt에서 파생한 host별 Discovery·Builder·Helper config, 역할별 MCP·Core client와 실제 runtime 연결부
+- local Core/Agent 실행·종료·인증·endpoint 전달·workspace 연결·지원 버전과 frontend repository 소비 방법을 담은 개발 안내
+- 외부 repository에 설치 가능한 client package, 네 화면의 기능을 검증하는 최소 실제 IDE 연동 예제, 새 컴퓨터/clean checkout 기준 설치·실행·History 복원 기록
+- Discovery·Spec부터 Builder/Helper까지 contract·integration·IDE 연결 검증 기록, Crew 회귀와 same-state continuity test
+- Analyst worker 실행 경계, 미구현 mode parity와 후속 UI polish·packaging 목록
 
 **완료 조건**
 
-- AC-MVP-012가 T01에서 확인한 현실적 범위 안에서 통과한다.
-- 동일 Decision을 두 mode에서 중복 해결하거나 서로 다른 state로 만들지 않는다.
+- 갱신한 AC-MVP-012가 실제 Kiro IDE의 최소 연동 예제와 Core 저장 결과로 통과한다. push된 backend와 지침만으로 frontend 개발자가 자신의 로컬 환경에서 Discovery·Spec·Builder·History 화면을 실제 연결로 구현할 수 있다. backend 인계 완료는 frontend 제품 화면의 최종 디자인 완료와 구분한다.
+- 새 Learning Goal과 Personal Need 유무를 검증하고, 10개 preview identity·refinement lineage·선택·Spec 초안/수정 revision·명시적 확정·Core workspace/Task 생성이 이어진다. Spec 뒤로가기의 Agent 호출은 0회다.
+- partial enrichment 실패·선택 이후 늦은 제출·Spec no-tool 응답·protocol/revision mismatch·Agent 연결 종료에서 기존 결과를 보존하고 중복 없이 복구한다. Agent turn 종료만으로 Candidate/Spec/Task 저장 성공을 표시하지 않는다.
+- Builder·Helper가 실제로 다른 Agent 권한과 session을 사용하고 같은 Task/Context/Decision을 읽는다. Helper write/shell·Decision 확정, Builder workspace 밖 작업은 실행 경계에서 거절되며 stream은 저장·표시 전 redaction된다.
+- 같은 Decision을 Crew와 IDE에서 중복 해결·적용하지 않는다. Core 재진입 시 저장된 Session·Spec·Task·Context·Ledger가 일치하고 raw chat session이나 실행 중 stream 재연결은 완료 요건으로 추가하지 않는다.
+- History의 빈 목록·진행 중·완료 Project와 backend 재시작 뒤 동일 Project/revision·권장 화면 복원을 검증한다. 이전 설치의 dist·DB·secret·개인 절대 경로 없이 새 checkout에서 설치·실행·SDK 소비와 실제 대상 OS의 Kiro IDE 연동이 재현돼야 한다.
+- IDE Helper exchange와 Builder checkpoint의 provenance가 보존되고, 종료 Episode의 Analyst job이 실제 worker에서 처리되거나 명시적 실패·재시도 상태로 보인다. 정상 job 처리도 실제 실행으로 검증한다.
 - Code 중심 사용자를 상위 단계, Agent 중심 사용자를 초보 단계로 표시하지 않는다.
-- 선택한 Kiro engine에서 custom Agent identity, model, MCP allowlist와 8개 Candidate round의 fresh 실행이 확인되거나 지원 version 제한이 명시된다.
+- 변경에 맞는 contract·integration·Agent eval·IDE smoke와 `pnpm check`를 통과하고 지원 버전·알려진 제한을 기록한다. 화면 mock이나 기본 Agent fallback만 통과하면 완료 처리하지 않는다.
 
 ### [ ] T20. 보안·개인정보·접근성·복구 hardening
 

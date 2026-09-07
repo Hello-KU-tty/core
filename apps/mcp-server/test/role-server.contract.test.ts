@@ -32,7 +32,11 @@ import {
   projectFixture,
   timestamp,
 } from '../../../packages/contracts/test/fixtures.js'
-import { createRoleBoundMcpServer, ROLE_TOOL_CATALOG } from '../src/role-server.js'
+import {
+  createRoleBoundMcpServer,
+  ROLE_TOOL_CATALOG,
+  type RoleBoundMcpServerOptions,
+} from '../src/role-server.js'
 
 interface ConnectedHarness {
   readonly client: Client
@@ -43,6 +47,7 @@ interface ConnectedHarness {
 }
 
 interface ConnectRoleOptions {
+  readonly binding?: RoleBoundMcpServerOptions['binding']
   readonly seedDiscovery?: boolean
   readonly seedMerge?: boolean
   readonly seedSpecReview?: boolean
@@ -172,6 +177,7 @@ const connectRole = async (
   const server = createRoleBoundMcpServer({
     role,
     application,
+    ...(options.binding === undefined ? {} : { binding: options.binding }),
     ...(options.toolNames === undefined ? {} : { toolNames: options.toolNames }),
     ...(options.now === undefined ? {} : { now: options.now }),
     ...(options.generateId === undefined ? {} : { generateId: options.generateId }),
@@ -216,6 +222,62 @@ const expectedCatalog: Readonly<Record<AgentRole, readonly string[]>> = {
 }
 
 describe('role-bound MCP server', () => {
+  it('binds local Agent tools to the exact run scope and revokes late submissions', async () => {
+    let active = true
+    const harness = await connectRole('DISCOVERY', {
+      seedDiscovery: true,
+      binding: {
+        projectId: ids.project,
+        discoverySessionId: ids.discoverySession,
+        correlationId: ids.correlation,
+        isActive: () => active,
+      },
+    })
+    const input = {
+      schemaVersion: 1,
+      kind: 'DISCOVERY_GET_CONTEXT',
+      actor: { kind: 'AGENT', role: 'DISCOVERY' },
+      projectId: ids.project,
+      discoverySessionId: ids.discoverySession,
+      correlationId: ids.correlation,
+    }
+    try {
+      const valid = await harness.client.callTool({
+        name: 'get_discovery_context',
+        arguments: input,
+      })
+      expect(valid.isError).not.toBe(true)
+      for (const change of [
+        { projectId: 'project_00000000-0000-4000-8000-000000000099' },
+        { discoverySessionId: 'discovery_session_00000000-0000-4000-8000-000000000099' },
+        { correlationId: 'corr_00000000-0000-4000-8000-000000000099' },
+      ]) {
+        await expect(
+          harness.client.callTool({
+            name: 'get_discovery_context',
+            arguments: { ...input, ...change },
+          }),
+        ).resolves.toMatchObject({
+          isError: true,
+          structuredContent: { code: 'AGENT_RUN_SCOPE_MISMATCH' },
+        })
+      }
+      active = false
+      await expect(
+        harness.client.callTool({ name: 'get_discovery_context', arguments: input }),
+      ).resolves.toMatchObject({
+        isError: true,
+        structuredContent: { code: 'AGENT_RUN_SCOPE_MISMATCH' },
+      })
+      expect(
+        harness.storage.repository.readDiscoveryAggregate(ids.project, ids.discoverySession)
+          ?.session.revision,
+      ).toBe(1)
+    } finally {
+      await harness.close()
+    }
+  })
+
   it('exposes exactly the documented allowlist for each authenticated role', async () => {
     for (const role of Object.keys(expectedCatalog) as AgentRole[]) {
       const harness = await connectRole(role)

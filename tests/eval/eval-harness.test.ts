@@ -890,7 +890,7 @@ describe('T11 Builder prompt regression', () => {
       readonly containsPersonalData: boolean
     }
 
-    expect(prompt).toContain('Prompt version: `1.3.0`')
+    expect(prompt).toContain('Prompt version: `1.3.1`')
     expect(prompt).toContain('.vibe-helper/result.json')
     expect(prompt).toContain('HOST=127.0.0.1')
     expect(prompt).toContain('동적 `PORT`')
@@ -933,6 +933,28 @@ describe('T11 Builder prompt regression', () => {
       sameSessionTransferredAllowed: false,
     })
     expect(campusDrop.containsPersonalData).toBe(false)
+  })
+})
+
+describe('T19 Builder validation regression', () => {
+  it('distinguishes a blocked command from a real passing validation', async () => {
+    const prompt = await readFile(path.join(workspaceRoot, 'docs/agent-prompts/builder.md'), 'utf8')
+    const fixture = await loadInput(
+      'tests/eval/fixtures/prompt-regressions/t19-builder-validation.json',
+    )
+    expect(fixture).toMatchObject({
+      promptVersion: '1.3.1',
+      expected: {
+        mayClaimPassed: false,
+        mayComplete: false,
+        noExecutionStatus: 'NOT_RUN',
+        nextCommands: ['npm install', 'npm run build', 'npm test'],
+      },
+      containsPersonalData: false,
+    })
+    expect(prompt).toContain('guard 거절은 실행 성공이 아니다')
+    expect(prompt).toContain('`PASSED`는 실제 해당 명령의 성공 결과를 관찰한 경우')
+    expect(prompt).toContain('`TASK_COMPLETED`/`complete_task`로 완료하지 말고')
   })
 })
 

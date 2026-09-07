@@ -1,0 +1,14 @@
+{
+  "name": "@vibe-helper/local-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@vibe-helper/application": "workspace:*",
+    "@vibe-helper/contracts": "workspace:*",
+    "@vibe-helper/kiro-adapter": "workspace:*",
+    "@vibe-helper/mcp-server": "workspace:*",
+    "@vibe-helper/runtime": "workspace:*",
+    "@vibe-helper/storage-sqlite": "workspace:*"
+  }
+}

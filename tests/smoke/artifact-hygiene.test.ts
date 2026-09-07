@@ -243,7 +243,7 @@ describe('artifact and local-data hygiene', () => {
       ),
     ).toBe(true)
     expect(runtimeManifest.dependencies).toEqual({
-      'better-sqlite3': '12.11.1',
+      'better-sqlite3': '13.0.3',
       'drizzle-orm': '0.45.2',
     })
     expect(backend).not.toMatch(/from\s+["']@vibe-helper\//)

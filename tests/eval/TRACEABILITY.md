@@ -15,8 +15,10 @@ T18 시점의 평가는 계약·품질 실패 검출 기반, 실제 Candidate Ag
 | AC-MVP-009 | SQLite AnalysisJob/Evidence Trace 재시작 복구, retry/dead-letter/manual retry test, 실제 Kiro Job `SUCCEEDED`·Episode `ANALYZED` | Event→Episode→Proposal→Decision→Ledger와 실패 원인·revision trace의 저장·조회 | T17, T21 |
 | AC-MVP-010 | Concept Ledger/storage integration test | 과거 Evidence를 조회할 durable state 경계 | T17, T21 |
 | AC-MVP-011 | Task Completion Report contract와 application integration test, strict result manifest validator, loopback child-process supervisor integration, Campus Drop 실제 HTTP runtime | workspace-contained compiled entry만 동적 loopback port에서 health 확인 뒤 열고 재사용·오류·종료를 감독 | T21 |
-| AC-MVP-012 | Agent boundary와 role server contract test, actual Kiro Decision lifecycle | 두 surface가 공유할 stable Core/MCP Decision ID와 revision handoff | T19, T21 |
+| AC-MVP-012 | Agent boundary와 role server contract test, actual Kiro Decision lifecycle | 공유할 Core/MCP 식별자·revision 경계까지 검증됨. 자체 IDE의 Discovery·Spec→Builder/Helper→History, 외부 client 소비·clean checkout와 frontend 대상 OS 재현은 T19에서 검증 예정 | T19, T21 |
 | AC-MVP-013 | `redaction-leak`, storage unsafe-payload test, Agent authorization/path test, bounded Helper excerpt/live sentinel | secret·민감 경로와 역할 권한 위반 검출, workspace-contained code excerpt의 재redaction | T20, T21 |
 | AC-MVP-014 | Campus Drop JSON session fixture를 직접 소비하는 full browser E2E + 3 unseen inputs + deterministic calibration baseline | 같은 Campus Drop session에서 Discovery→Spec→Decision/Helper→Evidence→Final Upgrade를 재현하며 unseen·Personal Need 유무 일반성은 유지 | T21 |
 
 경로는 이 디렉터리를 기준으로 한 eval 이름 또는 repository 내 test 파일 이름이다. T21 traceability report는 이 표를 실제 E2E 결과와 알려진 제한으로 갱신한다.
+
+T19 진행 근거(2026-09-07): macOS의 독립 Core/CLI real Discovery·Spec·Builder/Helper·History, 외부 SDK 소비와 실제 Kiro extension host를 검증했다. Builder 1.3.0의 guard-denied 허위 검증 보고는 실패로 남기고 1.3.1 fixture/실제 별도 generated build·13 tests를 추가했다. 최종 회귀 integration 241/eval23/E2E12 통과. Windows native/실제 IDE 화면 gate는 미검증이므로 AC-MVP-012/T19 완료 증거는 아직 아니다. 상세는 `docs/spikes/T19_LOCAL_RUNTIME_RESULTS.md`를 따른다.

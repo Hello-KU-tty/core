@@ -7,7 +7,7 @@ import {
   type McpHttpHandler,
   McpServer,
 } from '@modelcontextprotocol/server'
-import type { ApplicationService } from '@vibe-helper/application'
+import { type ApplicationService, createOperationError } from '@vibe-helper/application'
 import {
   type AgentRole,
   analystGetEpisodeContextQuerySchema,
@@ -232,6 +232,14 @@ export interface RoleBoundMcpServerOptions {
   readonly role: AgentRole
   readonly application: ApplicationService
   readonly toolNames?: readonly string[]
+  /** Optional local-runtime scope. Crew retains its existing caller boundary. */
+  readonly binding?: {
+    readonly projectId: string
+    readonly correlationId: string
+    readonly discoverySessionId?: string
+    readonly taskId?: string
+    readonly isActive: () => boolean
+  }
   readonly now?: () => Date
   readonly generateId?: (
     prefix:
@@ -749,6 +757,33 @@ export function createRoleBoundMcpServer(options: RoleBoundMcpServerOptions): Mc
         },
       },
       async (input) => {
+        const binding = options.binding
+        const scope =
+          typeof input === 'object' && input !== null ? (input as Record<string, unknown>) : {}
+        if (
+          binding !== undefined &&
+          (!binding.isActive() ||
+            scope.projectId !== binding.projectId ||
+            scope.correlationId !== binding.correlationId ||
+            (binding.discoverySessionId !== undefined &&
+              scope.discoverySessionId !== binding.discoverySessionId) ||
+            (binding.taskId !== undefined && scope.taskId !== binding.taskId))
+        ) {
+          const payload = toJsonObject(
+            createOperationError({
+              category: 'PERMISSION',
+              code: 'AGENT_RUN_SCOPE_MISMATCH',
+              disposition: 'PERMANENT',
+              correlationId: binding.correlationId,
+              message: 'Agent run is inactive or does not own the requested Core scope.',
+            }),
+          )
+          return {
+            content: [{ type: 'text', text: JSON.stringify(payload) }],
+            structuredContent: payload,
+            isError: true,
+          }
+        }
         const result =
           options.role === 'DISCOVERY' && tool.name === 'submit_candidate_previews'
             ? await submitCandidatePreviewsFromTool(options, input)

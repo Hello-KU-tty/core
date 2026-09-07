@@ -67,7 +67,7 @@ describe('Builder Agent adapter', () => {
       expect.objectContaining<Partial<BuilderAgentAdapterError>>({ code: 'INVALID_PROMPT' }),
     )
     expect(() =>
-      createBuilderAgentDefinition('# Builder\n\n> Prompt version: `1.3.0`', {
+      createBuilderAgentDefinition('# Builder\n\n> Prompt version: `1.3.1`', {
         guardCommand: ' ',
       }),
     ).toThrowError(
@@ -299,6 +299,14 @@ describe('Builder native tool guard and transient stream', () => {
         workspace,
       ),
     ).resolves.toMatchObject({ allowed: false, reasonCode: 'GUARD_PROTECTED_PATH' })
+    for (const path of ['.kiro\\agents\\builder.json', '.KIRO/agents/builder.json']) {
+      await expect(
+        guardBuilderToolInput(
+          { tool_name: 'fs_write', tool_input: { path }, cwd: workspace },
+          workspace,
+        ),
+      ).resolves.toMatchObject({ allowed: false, reasonCode: 'GUARD_PROTECTED_PATH' })
+    }
     await expect(
       guardBuilderToolInput(
         { tool_name: 'fs_write', tool_input: { path: 'escape/secret.ts' }, cwd: workspace },

@@ -557,6 +557,27 @@ describe('ApplicationService boundary', () => {
       success: false,
       error: { code: 'BUILDER_SESSION_NOT_AVAILABLE' },
     })
+    await expect(
+      service.executeUi({
+        schemaVersion: 1,
+        kind: 'UI_PREPARE_BUILDER_SESSION',
+        purpose: 'WORKSPACE_VIEW',
+        correlationId: ids.correlation,
+        actor: { kind: 'UI' },
+        projectId: ids.project,
+        taskId: ids.task,
+      }),
+    ).resolves.toMatchObject({
+      success: true,
+      data: {
+        status: 'READY',
+        workspaceDirectory: join(workspacePolicy.generatedWorkspaceRoot, 'generated/webhook-lens'),
+      },
+    })
+    expect(storage.repository.readBuilderTaskAggregate(ids.project, ids.task)?.task).toMatchObject({
+      revision: 2,
+      status: 'COMPLETED',
+    })
   })
 
   it('persists and replays an idempotent UI command, but rejects key reuse', async () => {

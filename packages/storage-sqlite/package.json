@@ -19,7 +19,7 @@
     "@vibe-helper/application": "workspace:*",
     "@vibe-helper/contracts": "workspace:*",
     "@vibe-helper/domain": "workspace:*",
-    "better-sqlite3": "12.11.1",
+    "better-sqlite3": "13.0.3",
     "drizzle-orm": "0.45.2"
   },
   "devDependencies": {

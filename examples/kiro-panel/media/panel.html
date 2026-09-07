@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-{{nonce}}'; script-src 'nonce-{{nonce}}';">
+<style nonce="{{nonce}}">
+body { color:var(--vscode-foreground); background:var(--vscode-editor-background); font:13px var(--vscode-font-family); padding:12px; }
+button,input,textarea,select { font:inherit; color:var(--vscode-input-foreground); background:var(--vscode-input-background); border:1px solid var(--vscode-panel-border); padding:7px; margin:3px; }
+button { cursor:pointer; } textarea { display:block; box-sizing:border-box; width:96%; min-height:70px; } h2 { font-size:16px; }
+section { border-top:1px solid var(--vscode-panel-border); margin-top:16px; padding-top:8px; } pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:320px; overflow:auto; }
+.candidate { padding:8px; border-bottom:1px solid var(--vscode-panel-border); } #errors { color:var(--vscode-errorForeground); } #stream { height:220px; overflow:auto; } .muted { opacity:.7; }
+</style></head><body>
+<h1>Vibe Helper · Local</h1><p class="muted">최소 연동 예제 · 실제 Kiro 호출 · 저장 상태는 Core가 원본입니다.</p>
+<button id="refresh">History / 상태 새로고침</button><div id="errors" role="alert"></div><div id="history"></div>
+<section><h2>Discovery</h2><input id="goal" placeholder="Learning Goal"><input id="need" placeholder="Personal Need (선택)"><button id="start">새 Discovery</button>
+<div id="candidates"></div><textarea id="feedback" placeholder="후보 수정·병합·추가 요청"></textarea>
+<button data-feedback="SELECT">선택한 후보로 Spec</button><button data-feedback="REVISE">수정</button><button data-feedback="MERGE">병합</button><button data-feedback="MORE">추가</button>
+<button data-retry="PREVIEW">미리보기 재시도</button><button data-retry="ENRICH_ALL">누락된 상세 재시도</button></section>
+<section><h2>Spec</h2><pre id="spec"></pre><textarea id="specText" placeholder="Spec 자유 수정 요청"></textarea><button id="refineSpec">수정 요청</button><button id="return">후보로 돌아가기</button><button id="confirm">최신 Spec 확정 · Task 준비</button></section>
+<section><h2>Builder / Helper</h2><div id="decisions"></div><textarea id="message" placeholder="Builder 또는 Helper에게 보낼 실제 메시지"></textarea>
+<button data-agent="BUILDER">Builder 실행 / 이어가기</button><button data-agent="HELPER">Helper에게 질문</button><button id="openWorkspace">생성 workspace 열기</button><button id="launch">완료 결과 실행</button>
+<div id="runs"></div><pre id="stream"></pre><details><summary>Task · Context · 완료 보고 / 복원 snapshot</summary><pre id="snapshot"></pre></details></section>
+<script nonce="{{nonce}}" src="{{script}}"></script></body></html>

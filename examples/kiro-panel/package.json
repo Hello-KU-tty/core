@@ -1,0 +1,15 @@
+{
+  "name": "vibe-helper-local-panel", "displayName": "Vibe Helper Local Panel (Integration Example)",
+  "description": "Minimal Discovery, Spec, Builder/Helper and History client for the local Core.",
+  "version": "0.1.0", "publisher": "vibe-helper", "private": true,
+  "engines": { "vscode": "^1.90.0" },
+  "categories": ["Other"], "main": "./dist/extension.cjs",
+  "activationEvents": ["onCommand:vibeHelper.localPanel"],
+  "contributes": {
+    "commands": [{ "command": "vibeHelper.localPanel", "title": "Vibe Helper: Open Local Integration Panel" }],
+    "configuration": {
+      "title": "Vibe Helper Local Core",
+      "properties": { "vibeHelper.connectionFile": { "type": "string", "default": "", "scope": "machine", "description": "Absolute path to the backend's private connection.json. No token values." } }
+    }
+  }
+}

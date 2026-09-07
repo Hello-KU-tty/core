@@ -14,12 +14,15 @@ const workspaceRoot = process.cwd()
 const packageLocations = [
   'apps/crew-app',
   'apps/crew-backend',
+  'apps/local-backend',
   'apps/mcp-server',
   'packages/contracts',
   'packages/domain',
   'packages/application',
   'packages/storage-sqlite',
   'packages/kiro-adapter',
+  'packages/runtime',
+  'packages/frontend-client',
   'tests/eval',
 ] as const
 
@@ -31,6 +34,7 @@ const dependencyRules: readonly DependencyRule[] = [
   {
     packageName: '@vibe-helper/crew-backend',
     allowedInternalDependencies: [
+      '@vibe-helper/runtime',
       '@vibe-helper/application',
       '@vibe-helper/contracts',
       '@vibe-helper/mcp-server',
@@ -46,6 +50,29 @@ const dependencyRules: readonly DependencyRule[] = [
     ],
   },
   { packageName: '@vibe-helper/contracts', allowedInternalDependencies: [] },
+  {
+    packageName: '@vibe-helper/frontend-client',
+    allowedInternalDependencies: ['@vibe-helper/contracts'],
+  },
+  {
+    packageName: '@vibe-helper/runtime',
+    allowedInternalDependencies: [
+      '@vibe-helper/application',
+      '@vibe-helper/contracts',
+      '@vibe-helper/kiro-adapter',
+    ],
+  },
+  {
+    packageName: '@vibe-helper/local-backend',
+    allowedInternalDependencies: [
+      '@vibe-helper/application',
+      '@vibe-helper/contracts',
+      '@vibe-helper/kiro-adapter',
+      '@vibe-helper/runtime',
+      '@vibe-helper/mcp-server',
+      '@vibe-helper/storage-sqlite',
+    ],
+  },
   {
     packageName: '@vibe-helper/domain',
     allowedInternalDependencies: ['@vibe-helper/contracts'],

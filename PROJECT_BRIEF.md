@@ -2,6 +2,7 @@
 
 > 상태: 구현 전 승인된 입력 브리프
 > 작성 기준일: 2026-08-24
+> 범위 갱신: 2026-09-07 사용자 승인으로 T19에 자체 Kiro IDE 패널의 Discovery·Spec·Builder·Helper·History 실제 연결과 frontend 로컬 실행 인계를 포함한다.
 > 출처: 사용자가 승인한 [PROJECT_SPEC.md](PROJECT_SPEC.md)와 합의된 Agent Prompt
 > 주의: 제품명은 아직 확정되지 않았으며 `Vibe Helper`, `BuildWhy`는 작업명이다.
 
@@ -197,8 +198,10 @@ Prompt Dependence:
 - Agent 중심과 Code 중심 두 UI는 숙련도 단계가 아니라 취향 차이다.
 - MVP 주 surface는 Crew App 기반 Agent 중심 vertical flow다.
 - Agent 중심은 왼쪽 실제 Builder session, 오른쪽 Helper chat을 기본으로 한다.
-- Code 중심은 Kiro editor와 Builder/Helper panel을 사용하는 얇은 prototype으로 검증한다.
-- 두 Mode는 같은 session, Task, Decision, Context와 Ledger를 사용한다.
+- Code 중심은 Kiro editor 옆의 자체 확장/Webview 패널로 검증한다. 프론트 담당자의 Discovery·Spec·History 화면과 Builder/Helper 탭을 기존 Core와 실제 Kiro Agent에 연결하는 것을 T19에 포함한다.
+- 두 Mode는 같은 Core Project, Discovery Session, Spec, Task, Decision, Context와 Ledger를 사용한다. host의 raw chat session 공유는 요구하지 않는다.
+- 프론트 개발 중 mock data와 DemoAdapter는 명시적인 개발 모드에서 허용한다. 실제 경로와 같은 데이터 계약을 사용하고, T19 완료는 새 입력의 Discovery→Spec 확정→Builder·Helper 연결을 실제 Agent와 durable Core 상태로 검증한다.
+- T19의 backend 인계는 push된 repository와 지침만으로 frontend 개발자가 자기 컴퓨터에서 실행해 네 화면을 구현할 수 있는 상태다. 실제 Kiro IDE의 최소 연동 예제, 외부 소비 가능한 client와 History 목록·단계별 상태·재시작 복원을 검증하고, frontend 제품 화면의 최종 디자인 완료는 별도로 진행한다.
 - 실제 Builder stream은 숨기지 않고 Task Progress는 현재 위치만 보조한다.
 - 실제 Builder chat과 composer가 기본 조작면이며, Decision·추천 선택지·Helper quick action은 composer 바로 위에 필요한 동안만 주입한다.
 - 완료 화면은 학습 점수보다 완성된 서비스 실행을 먼저 보여준다.
@@ -238,7 +241,7 @@ MVP 필수:
 - TypeScript Core와 SQLite
 - MCP 기반 structured contract
 - Crew App Agent 중심 UI
-- Code 중심 얇은 prototype
+- Discovery·Spec부터 Builder·Helper까지 실제 연결되는 Code 중심 패널 prototype
 - Live Context와 실제 Builder stream
 - Decision, Episode, Evidence, Reducer
 - Concept recap과 Evidence trace
@@ -254,7 +257,7 @@ MVP 필수:
 - 점수·랭킹·게임화와 강제 퀴즈
 - 모든 코드·파일·terminal log 저장
 - 모든 Event별 inference
-- ACP 기반 자체 IDE client와 별도 Electron IDE
+- 별도 Electron IDE와 범용 ACP editor client. 기존 Kiro IDE 패널을 위한 제한된 Agent 연결부는 T19에서 검증 후 구현할 수 있다.
 - Crew App 안의 완전한 Monaco IDE
 - 여러 배포 provider
 - Bedrock provider
@@ -319,7 +322,7 @@ Campus Drop은 고정 추천 template가 아니라 테스트 fixture다. Discove
 - 최종 제품명과 branding
 - 실제 배포 workflow와 AWS service
 - 배포를 MVP 완료 조건으로 둘지 여부
-- Crew App과 Kiro IDE session 공유 방식
+- Kiro IDE 패널의 Agent transport와 local Core 연결 방식(T19 capability spike에서 결정)
 - Code Mode의 기본 Helper 위치
 - 실제 Kiro model과 quota 대응
 - Evidence confidence threshold와 reducer 세부 수치

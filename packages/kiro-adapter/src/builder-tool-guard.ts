@@ -67,7 +67,7 @@ function referencedPaths(input: Record<string, unknown>): string[] {
 }
 
 function protectedPath(path: string): boolean {
-  return path.split('/').some((segment) => segment === '.kiro')
+  return path.split(/[\\/]/).some((segment) => segment.toLowerCase() === '.kiro')
 }
 
 export async function resolveAppGeneratedWorkspace(

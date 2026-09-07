@@ -3266,7 +3266,10 @@ export class ApplicationService {
       repository.readBuilderTaskAggregate(request.projectId, request.taskId),
     )
     if (aggregate === null) throw this.#notFound(request.correlationId, 'BUILDER_TASK_NOT_FOUND')
-    if (!['PENDING', 'ACTIVE', 'BLOCKED'].includes(aggregate.task.status)) {
+    if (
+      !['PENDING', 'ACTIVE', 'BLOCKED'].includes(aggregate.task.status) &&
+      !(request.purpose === 'WORKSPACE_VIEW' && aggregate.task.status === 'COMPLETED')
+    ) {
       throw this.#validationError(
         request.correlationId,
         'BUILDER_SESSION_NOT_AVAILABLE',
