@@ -70,4 +70,5 @@ node scripts/spike-local-discovery.mjs
 - Node 24.19.0 / pnpm 11.12.0 `pnpm check` 전체 통과: unit 2, package/app integration 241, eval 23, Campus Drop 3, smoke 6, Chromium E2E 12. 새 SQLite GC stress와 run-state fixture도 포함한다. macOS sandbox의 Chromium Mach port 거절로 실패한 시도는 제품 오류로 숨기지 않고 일반 실행 권한으로 같은 명령을 다시 검증했다.
 - `client:pack` → 독립 TS5.4/CJS consumer → 실제 Core read 통과. `panel:build` → 실제 Kiro 별도 profile host 재검증도 통과했다. 최신 History가 취소된 Discovery여도 실제 Spec/Task가 있는 합성 Project를 선택해 검증하며 모델을 호출하지 않는다.
 - 실제 ACP 초기화 중 cancel은 약 232ms 뒤 CANCELLED로 종료, preview/Task 생성 없이 같은 Project를 History에서 복원했다. 초기화 단계부터 AbortSignal을 연결하고 owned process를 닫는다. MCP scope/cancel contract 및 POSIX root 종료 후 descendant 정리는 자동 회귀로 확인했다. Windows process tree 성공은 이 측정에 포함하지 않는다.
-- 최종 commit 기반 별도 clean checkout 검증은 commit 뒤 수행하고 결과를 인계 응답에 남긴다. Windows gate 때문에 T19는 `[~]`이며 push는 하지 않았다.
+- 구현 commit `5ce2632`를 별도 폴더로 clone한 뒤 frozen install→build→client:pack→panel:build→core:init→core:doctor(--live 포함)→backend 시작을 통과했다. 이 clone에서도 동일 `pnpm check` 전체(unit2/integration241/eval23/CampusDrop3/smoke6/E2E12)와 새 SDK consumer의 실제 Core health/History 조회를 통과했다. 작업 디렉터리는 깨끗하고 기존 dist/node_modules/DB/connection 파일을 복사하지 않았다.
+- 이 결과 기록 이후 변경은 문서뿐이다. Windows 환경 확보/버전 확인까지 T19를 `[-]` 외부 검증 대기로 전환했다. 검증용 backend는 정상 종료했고 합성 DB·workspace·임시 폴더는 보존했다. push는 하지 않았다.

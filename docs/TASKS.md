@@ -766,7 +766,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - Node.js 24.19.0·pnpm 11.12.0에서 format/lint/typecheck/Drizzle check, unit 2개, integration 212개, eval 22개, Campus Drop 3개, build, smoke 6개와 Chromium E2E 12개가 통과했다.
 - target Kiro Crew 설치본을 data-preserving update endpoint로 app 0.4.1에 갱신했다. 설치 UI·backend·Builder·hidden no-tool Evidence Analyst hash가 source package와 일치하고 backend `/health`가 `ok`이며 실제 History UI가 기존 Project를 복원했다. 첫 target worker 검증에서 실제 Agent가 설명 뒤 single fenced JSON을 반환해 whole-message parser가 legacy 대기 Job 6개를 최대 재시도 뒤 거절하는 회귀를 발견했다. parser를 정확히 하나의 fenced JSON block만 허용하고 복수 block은 거절하도록 고친 versioned 0.4.1 UI에서 같은 no-evidence 형태의 실제 Job 2개가 13.8초·17.8초에 `SUCCEEDED`가 됐다. SQLite `quick_check=ok`이고 Project 61, Discovery Session 62, Learning Spec 27, Task 6, accepted Evidence 13, Concept Ledger 13, Completion Report 2가 유지됐으며, 실패·성공 Job revision도 provenance 때문에 삭제하지 않았다. 새 Campus Drop Agent run은 추가 durable fixture data를 만들지 않고 deterministic full E2E와 실제 result runtime integration으로 대체했다.
 
-### [~] T19. 자체 Kiro IDE 패널과 프론트 실제 연동
+### [-] T19. 자체 Kiro IDE 패널과 프론트 실제 연동
 
 **승인 기록**
 
@@ -782,6 +782,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - 실제 Builder Decision→Helper read-only→사용자 선택→완료, 별도 폴더의 생성 코드 frozen install/build/test와 loopback 결과를 확인했다. 먼저 실패한 Builder 1.3.0의 허위 검증 보고는 보존하고 1.3.1 prompt/fixture에 실행 증거·guard recovery를 추가했다. 정상 Analyst job과 명시적 invalid-result 실패를 각각 확인했다.
 - 외부 npm/TS 5.4.5/CJS/esbuild 0.21.5 SDK 소비·실제 Core 조회와 macOS Kiro 1.0.337 extension-host 활성화·패널 명령·네 화면 데이터 접근을 확인했다. host test만으로 시각적 클릭 검증을 주장하지 않는다. 새 별도 source checkout의 frozen install/build/SQLite init/doctor를 통과했다.
 - Windows OS 버전/architecture·CLI 2.21.1/v2 native 제공 여부·ACL/native dependency·실제 Kiro 네 화면/중지/재시작 gate는 미검증이다. Windows 증거 없이 [x]로 바꾸지 않는다. 최신 검증과 알려진 실패는 [capability 기록](spikes/T19_LOCAL_RUNTIME_RESULTS.md), 실제 실행 방법은 [프론트 개발 안내](FRONTEND_INTEGRATION.md)를 따른다. push는 여전히 별도 승인 대상이다.
+- 로컬 구현 commit `5ce2632`를 새로 clone해 frozen install/build/SDK·panel packaging/SQLite init/doctor live/backend 시작/외부 consumer 실제 조회와 `pnpm check` 전체를 다시 통과했다. 현재 접근 가능한 실행 환경은 macOS뿐이므로 Windows 버전/CLI 제공 여부와 실제 테스트 환경을 확인할 때까지 `[-]`로 대기한다. 검증용 backend는 정상 종료했고 합성 data는 보존했다. T20에 임의 착수하거나 T19를 완료로 표시하지 않는다.
 
 **범위**
 

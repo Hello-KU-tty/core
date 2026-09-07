@@ -47,7 +47,7 @@ MVP host는 Kiro/Crew이고 Agent 중심 Crew App을 primary surface로 삼는�
 | T16 | 완료 | conversation-first Builder/Helper UI, 실제 Decision handoff, native transcript와 완료 결과 |
 | T17 | 완료 | Project Evidence Trace, bounded cross-project retrieval, immutable personalization provenance |
 | T18 | 완료 | hidden Evidence Analyst worker, strict loopback 결과 실행기, optional Final Upgrade, Campus Drop 실행 fixture |
-| 진행 중 | T19 | 독립 backend·SDK·최소 Kiro 패널 구현/로컬 검증, Windows native 인계 gate 대기 |
+| 외부 검증 대기 | T19 | 독립 backend·SDK·최소 Kiro 패널 구현/로컬 검증 통과, Windows native 인계 gate 미검증 |
 
 T18의 Campus Drop fixture는 TypeScript runtime boundary, SQLite metadata와 blob file 분리, SHA-256 token digest, expiry와 1회 consume를 실제 build/test/HTTP 실행으로 검증한다. 제품 결과 실행기는 workspace 안의 strict `.vibe-helper/result.json`과 compiled JavaScript만 읽고, symlink containment를 확인한 뒤 최소 환경의 Node child를 `127.0.0.1` 동적 port에서 감독한다.
 
