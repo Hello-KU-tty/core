@@ -4,11 +4,11 @@
 
 ## 제품 방향과 CLI 전환 승인 정책
 
-초기 Core는 Kiro Crew test frontend를 사용했지만 backend Agent는 Crew program 자체가 아니라 별도 Kiro CLI process로 실행했다. 팀은 이를 “IDE 안에서 배우기”라는 제품 철학과 경진대회 출품 이후 다른 IDE로 확장하려는 제품 방향에 맞지 않는다고 판단했다. 다른 IDE adapter 구현은 현재 MVP 범위가 아니다.
+초기 Core는 Kiro Crew test frontend를 사용했지만 backend Agent는 Crew program 자체가 아니라 별도 Kiro CLI process로 실행했다. 백엔드 담당자는 이를 “IDE 안에서 배우기”라는 제품 철학과 경진대회 출품 이후 다른 IDE로 확장하려는 제품 방향에 맞지 않는다고 판단했다. 다른 IDE adapter 구현은 현재 MVP 범위가 아니다.
 
 현재 branch는 외부 Agent CLI 없이 Mac의 Kiro IDE Agent로 제품을 만드는 경로를 검증했고 부분적으로 성공했다. 아래 exact pin에서는 experimental GO지만 이전 CLI 경로만큼 안정적이라고 보지는 않는다. 이는 제품 판단이며 동일 조건의 IDE-vs-CLI 안정성·성능 A/B benchmark는 실행하지 않았다. 또한 pinned private Kiro API 자체가 cross-IDE portability를 제공하는 것은 아니고 IDE-only 구조도 별도 Node Core를 유지한다.
 
-Frontend 개발 담당 에이전트는 **Kiro-IDE-only frontend로 시작하고 계속하는 것**이 기본이다. 어렵다고 판단해도 CLI를 자동·조용히 fallback하거나 도입하지 않는다. 먼저 frontend 개발을 담당하는 사용자에게 아래 내용을 갖춘 **전환 검토와 실행 범위에 대한 명시적 합의**를 요청하고, 사용자의 명시적 결정과 backend 담당자의 계약 합의가 모두 있어야 affected path를 바꿀 수 있다. 이 요청 자체는 CLI 도입 승인이 아니다. 합의 대기 중에는 영향을 받는 작업만 멈추고 독립적인 화면·상태·접근성 작업은 계속할 수 있다.
+Frontend 개발 담당 에이전트는 **Kiro-IDE-only frontend로 시작하고 계속하는 것**이 기본이다. 어렵다고 판단해도 CLI를 자동·조용히 fallback하거나 도입하지 않는다. CLI로의 방향 전환이 필요하다고 판단되면 먼저 frontend 개발을 담당하는 사용자에게 아래 내용을 갖춘 **전환 검토와 실행 범위에 대한 명시적 합의**를 요청하고, 사용자의 명시적 결정이 있어야 affected path를 바꿀 수 있다. 이 요청 자체는 CLI 도입 승인이 아니다. 합의 대기 중에는 영향을 받는 작업만 멈추고 독립적인 화면·상태·접근성 작업은 계속할 수 있다.
 
 ```text
 [IDE-only → CLI 대안 검토 합의 요청]
