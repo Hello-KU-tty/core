@@ -1,0 +1,282 @@
+{
+  "promptVersion": "1.0.6",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED",
+  "fixtureProvenance": "SYNTHETIC_UI_TRANSCRIPT",
+  "modelRunStatus": "NOT_RUN",
+  "claimBoundary": "This fixture defines semantic and provenance acceptance expectations. It does not prove live model compliance or human learning.",
+  "cases": [
+    {
+      "id": "request_only",
+      "observedKind": "REQUEST_ONLY",
+      "precedingAgentContribution": null,
+      "userMessage": "가구 배치 규칙이 방 크기 변경 때 어떻게 달라지는지 설명해 주세요.",
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_61000000-0000-4000-8000-000000000001",
+          "messageId": "message_61000000-0000-4000-8000-000000000002"
+        }
+      ],
+      "expected": {
+        "proposalCount": 0,
+        "maximumSupportedState": null,
+        "reason": "The user asks for an explanation but supplies no claim, choice, or performed action."
+      }
+    },
+    {
+      "id": "future_plan_after_light_hint",
+      "observedKind": "FUTURE_PLAN",
+      "precedingAgentContribution": "방 크기가 바뀌는 경우도 생각해 보세요.",
+      "userMessage": "방이 작아지면 기존 가구가 경계를 넘을 수 있으니 다음에는 모든 가구를 다시 검사해야겠어요.",
+      "userClaimExcerpt": "방이 작아지면 기존 가구가 경계를 넘을 수 있으니",
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_61000000-0000-4000-8000-000000000003",
+          "messageId": "message_61000000-0000-4000-8000-000000000004"
+        }
+      ],
+      "expected": {
+        "proposalCount": 1,
+        "allowedSignals": ["PREDICTION", "REPHRASE"],
+        "allowedStrengths": ["MEDIUM", "STRONG"],
+        "allowedPromptDependence": ["LIGHT_HINT"],
+        "allowedMaximumSupportedStates": ["EXPLAINED"],
+        "forbiddenSignals": ["JUSTIFIED_DECISION", "APPLICATION"],
+        "reason": "The user supplies a causal prediction and a future plan, but no adopted choice or completed validation."
+      }
+    },
+    {
+      "id": "own_explanation_independent",
+      "observedKind": "OWN_EXPLANATION",
+      "precedingAgentContribution": null,
+      "userMessage": "가구의 오른쪽 좌표는 x와 너비의 합이므로 그 값이 방 너비보다 크면 가구가 방 밖으로 나간 상태예요.",
+      "userClaimExcerpt": "가구의 오른쪽 좌표는 x와 너비의 합",
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_61000000-0000-4000-8000-000000000005",
+          "messageId": "message_61000000-0000-4000-8000-000000000006"
+        }
+      ],
+      "expected": {
+        "proposalCount": 1,
+        "allowedSignals": ["REPHRASE"],
+        "allowedStrengths": ["MEDIUM", "STRONG"],
+        "allowedPromptDependence": ["INDEPENDENT"],
+        "allowedMaximumSupportedStates": ["EXPLAINED"],
+        "forbiddenSignals": ["JUSTIFIED_DECISION", "APPLICATION"],
+        "reason": "The user independently explains a checkable invariant without claiming a choice or completed application."
+      }
+    },
+    {
+      "id": "actual_reasoned_choice",
+      "observedKind": "REASONED_CHOICE",
+      "precedingAgentContribution": "자동 축소와 배치 거절 중 어느 제품 동작을 원하는지 결정해 주세요.",
+      "userMessage": "자동으로 가구 크기를 바꾸면 사용자가 정한 비율이 깨지므로 방보다 큰 배치는 저장을 거절하겠습니다.",
+      "userClaimExcerpt": "사용자가 정한 비율이 깨지므로 방보다 큰 배치는 저장을 거절하겠습니다",
+      "decisionEvent": {
+        "type": "DECISION_RESOLVED",
+        "decisionId": "decision_61000000-0000-4000-8000-000000000007",
+        "rationaleProvided": true
+      },
+      "decisionResolution": {
+        "source": "USER",
+        "rationale": "자동으로 가구 크기를 바꾸면 사용자가 정한 비율이 깨지므로 방보다 큰 배치는 저장을 거절하겠습니다."
+      },
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_61000000-0000-4000-8000-000000000008",
+          "messageId": "message_61000000-0000-4000-8000-000000000009"
+        },
+        {
+          "kind": "USER_DECISION",
+          "decisionId": "decision_61000000-0000-4000-8000-000000000007"
+        }
+      ],
+      "expected": {
+        "proposalCount": 1,
+        "allowedSignals": ["JUSTIFIED_DECISION"],
+        "allowedStrengths": ["STRONG"],
+        "allowedPromptDependence": ["LIGHT_HINT"],
+        "allowedMaximumSupportedStates": ["DEMONSTRATED"],
+        "reason": "The Agent only frames a real choice; the user supplies the product-specific reason and the same selection has a structured USER_DECISION source."
+      }
+    },
+    {
+      "id": "actual_performed_application",
+      "observedKind": "PERFORMED_APPLICATION",
+      "precedingAgentContribution": null,
+      "userMessage": "방 너비를 450에서 100으로 바꾼 뒤 기존 가구가 경계를 넘는 것을 확인했고 Undo로 원래 배치를 복구했습니다.",
+      "userClaimExcerpt": "기존 가구가 경계를 넘는 것을 확인했고 Undo로 원래 배치를 복구했습니다",
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_61000000-0000-4000-8000-000000000011",
+          "messageId": "message_61000000-0000-4000-8000-000000000012"
+        }
+      ],
+      "expected": {
+        "proposalCount": 1,
+        "allowedSignals": ["APPLICATION"],
+        "allowedStrengths": ["STRONG"],
+        "allowedPromptDependence": ["INDEPENDENT"],
+        "allowedMaximumSupportedStates": ["DEMONSTRATED"],
+        "currentCoreDisposition": "NATURAL_LANGUAGE_SELF_REPORT_ELIGIBLE",
+        "provenanceLimitation": "The source records the user's self-report; it does not independently attest that the interaction occurred.",
+        "reason": "The user reports a completed project interaction and its observed result. The future revalidation rule in the historical regression remains a separate, non-application claim."
+      }
+    },
+    {
+      "id": "directly_led_repeat",
+      "observedKind": "DIRECT_REPEAT",
+      "precedingAgentContribution": "x와 너비의 합이 방 너비를 넘으면 경계 밖입니다.",
+      "userMessage": "말한 대로 x와 너비의 합이 방 너비를 넘으면 경계 밖이네요.",
+      "userClaimExcerpt": "x와 너비의 합이 방 너비를 넘으면 경계 밖",
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_61000000-0000-4000-8000-000000000013",
+          "messageId": "message_61000000-0000-4000-8000-000000000014"
+        }
+      ],
+      "expected": {
+        "stateSupportingProposalCount": 0,
+        "allowedPromptDependence": ["DIRECTLY_LED"],
+        "allowedStrengths": ["NONE", "WEAK"],
+        "maximumSupportedState": null,
+        "reason": "A near-repeat of the supplied conclusion does not establish user understanding."
+      }
+    },
+    {
+      "id": "unseen_cache_future_rule_not_application",
+      "observedKind": "FUTURE_PLAN",
+      "precedingAgentContribution": "캐시 키에 들어가는 입력이 모두 같은 안정적 표현을 갖는지 살펴보세요.",
+      "userMessage": "옵션 순서가 달라도 같은 요청이면 같은 키가 되어야 하니, 다음에는 키를 만들기 전에 옵션 이름을 정렬해서 비교해야겠어요.",
+      "userClaimExcerpt": "옵션 순서가 달라도 같은 요청이면 같은 키가 되어야 하니",
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_61000000-0000-4000-8000-000000000015",
+          "messageId": "message_61000000-0000-4000-8000-000000000016"
+        }
+      ],
+      "expected": {
+        "proposalCount": 1,
+        "allowedSignals": ["PREDICTION", "REPHRASE"],
+        "allowedStrengths": ["MEDIUM", "STRONG"],
+        "allowedPromptDependence": ["LIGHT_HINT"],
+        "allowedMaximumSupportedStates": ["EXPLAINED"],
+        "forbiddenSignals": ["JUSTIFIED_DECISION", "APPLICATION"],
+        "reason": "The unseen cache-domain statement contains a causal invariant and a future remedy, but no completed application."
+      }
+    }
+  ],
+  "historicalRegressionBoundaries": [
+    {
+      "id": "explanation_is_not_decision",
+      "historicalMisclassification": "JUSTIFIED_DECISION",
+      "requiredDisposition": "REPHRASE_AT_MOST_EXPLAINED",
+      "mustNotUseExistingAcceptedEvidenceAsSuccess": true
+    },
+    {
+      "id": "future_rule_is_not_application",
+      "historicalMisclassification": "APPLICATION",
+      "requiredDisposition": "PREDICTION_OR_REPHRASE_AT_MOST_EXPLAINED",
+      "mustNotUseExistingAcceptedEvidenceAsSuccess": true
+    }
+  ],
+  "cleanPersonalizationEvaluation": {
+    "provenance": "SYNTHETIC_REDACTED_EVAL_INPUT",
+    "liveModelStatus": "NOT_RUN",
+    "humanLearningClaimAllowed": false,
+    "commonInput": {
+      "helperQuestion": "방 크기가 바뀔 때 기존 가구를 어떻게 처리해야 하나요?",
+      "unseenDiscoveryInput": {
+        "learningGoal": "상태 불변식과 경계 검증",
+        "personalNeed": "작은 공간의 배치를 실수 없이 계획하고 싶다"
+      },
+      "modelAssumption": "Use the exact same model ID, host settings, prompt version, current Project context, and user input in every paired cell. Record the actual values at run time; this fixture does not supply or simulate a model output."
+    },
+    "cleanCuratedEvidence": {
+      "sourceCaseId": "own_explanation_independent",
+      "signal": "REPHRASE",
+      "state": "EXPLAINED",
+      "promptDependence": "INDEPENDENT",
+      "requiredBeforeLive": true,
+      "acceptedByCore": true,
+      "acceptanceStatus": "VERIFIED_BY_EXACT_CLEAN_APPLICATION_FIXTURE",
+      "acceptanceEvidence": "packages/application/test/application-service.integration.test.ts exact clean independent explanation case"
+    },
+    "recentEpisodeHistory": {
+      "containsAcceptedEvidence": false,
+      "helperSummary": "The prior Helper introduced the exact boundary formula.",
+      "userExcerpt": "말한 대로 x와 너비의 합이 방 너비를 넘으면 경계 밖이네요.",
+      "expectedDependenceIfRepeated": "DIRECTLY_LED"
+    },
+    "helperMatrix": [
+      {
+        "id": "L0_R0",
+        "curatedLedgerIncluded": false,
+        "recentEpisodesIncluded": false,
+        "expectedPersonalizationMode": "NO_RELEVANT_EVIDENCE",
+        "mayReferenceAcceptedPastEvidence": false,
+        "mayUseRecentConversationContinuity": false
+      },
+      {
+        "id": "L1_R0",
+        "curatedLedgerIncluded": true,
+        "recentEpisodesIncluded": false,
+        "expectedPersonalizationMode": "EVIDENCE_AWARE",
+        "mayReferenceAcceptedPastEvidence": true,
+        "mayUseRecentConversationContinuity": false
+      },
+      {
+        "id": "L0_R1",
+        "curatedLedgerIncluded": false,
+        "recentEpisodesIncluded": true,
+        "expectedPersonalizationMode": "NO_RELEVANT_EVIDENCE",
+        "mayReferenceAcceptedPastEvidence": false,
+        "mayUseRecentConversationContinuity": true,
+        "mustNotDescribeRecentHistoryAsAcceptedEvidence": true
+      },
+      {
+        "id": "L1_R1",
+        "curatedLedgerIncluded": true,
+        "recentEpisodesIncluded": true,
+        "expectedPersonalizationMode": "EVIDENCE_AWARE",
+        "mayReferenceAcceptedPastEvidence": true,
+        "mayUseRecentConversationContinuity": true,
+        "mustKeepLedgerAndEpisodeProvenanceSeparate": true
+      }
+    ],
+    "discoveryPair": [
+      {
+        "id": "DISCOVERY_LEDGER_OFF",
+        "curatedLedgerIncluded": false,
+        "recentEpisodesIncluded": false
+      },
+      {
+        "id": "DISCOVERY_LEDGER_ON",
+        "curatedLedgerIncluded": true,
+        "recentEpisodesIncluded": false
+      }
+    ],
+    "reviewBoundary": {
+      "deterministicChecks": [
+        "input_and_model_configuration_match",
+        "ledger_toggle_matches_cell",
+        "recent_episode_toggle_matches_cell",
+        "source_ids_and_prompt_dependence_are_preserved",
+        "no_polluted_historical_evidence_is_present"
+      ],
+      "humanReviewRequired": [
+        "helper_answer_is_more_useful_because_of_clean_curated_evidence",
+        "recent_history_does_not_masquerade_as_curated_evidence",
+        "unseen_discovery_changes_are_relevant_without_becoming_a_curriculum"
+      ]
+    }
+  }
+}

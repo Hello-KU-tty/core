@@ -8,33 +8,33 @@ import {
   WorkspacePathPolicy,
 } from '@vibe-helper/application'
 import {
-  builderTaskSchema,
+  activityEventSchema,
   analysisJobSchema,
+  builderTaskSchema,
   candidateRoundSchema,
   canonicalConceptSchema,
   decisionRequestSchema,
   discoveryFeedbackSchema,
   discoverySessionSchema,
-  activityEventSchema,
   episodeSchema,
   learningSpecRevisionSchema,
+  personalizationTraceSchema,
+  preparedBuilderTaskDescriptorSchema,
   projectCandidateRevisionSchema,
   projectSchema,
-  preparedBuilderTaskDescriptorSchema,
-  personalizationTraceSchema,
 } from '@vibe-helper/contracts'
 import { describe, expect, it } from 'vitest'
 
 import {
-  builderTaskFixture,
+  activityEventFixture,
   analysisJobFixture,
   analysisJobPendingFixture,
-  activityEventFixture,
+  builderTaskFixture,
   candidateFixture,
   candidateRoundFixture,
-  confirmedLearningSpecFixture,
-  completionReportFixture,
   canonicalConceptFixture,
+  completionReportFixture,
+  confirmedLearningSpecFixture,
   decisionRequestFixture,
   decisionResolutionFixture,
   discoveryFeedbackFixture,
@@ -79,6 +79,29 @@ const previewRoundId = 'candidate_preview_round_00000000-0000-4000-8000-00000000
 const previewFinalRoundId = 'candidate_round_00000000-0000-4000-8000-000000000502'
 const previewCandidateId = (position: number): string =>
   `candidate_00000000-0000-4000-8000-${String(510 + position).padStart(12, '0')}`
+const reasonedDecisionEvent = {
+  ...activityEventFixture,
+  id: 'event_00000000-0000-4000-8000-000000000760',
+  sequence: 2,
+  conversationId: undefined,
+  decisionId: ids.decision,
+  payload: {
+    type: 'DECISION_RESOLVED' as const,
+    decisionId: ids.decision,
+    resolutionId: ids.resolution,
+    rationaleProvided: true,
+  },
+  sourceReferences: [],
+} as const
+const reasonedEvidenceBatch = {
+  ...evidenceProposalBatchFixture,
+  proposals: evidenceProposalBatchFixture.proposals.map((proposal) => ({
+    ...proposal,
+    concept: { ...proposal.concept, originalExpression: 'unexpected shapes' },
+    userEvidenceSources: [{ kind: 'USER_DECISION' as const, decisionId: ids.decision }],
+    redactedEvidenceExcerpt: decisionResolutionFixture.rationale,
+  })),
+} as const
 const previewFor = (position: number) => ({
   candidateId: previewCandidateId(position),
   position,
@@ -88,6 +111,362 @@ const previewFor = (position: number) => ({
   appeal: `Direction ${String(position)} makes an invisible concept tangible.`,
   technologyNecessity: `The target technology controls interaction ${String(position)}.`,
   generationTags: ['DIRECT'] as const,
+})
+
+describe('Helper direct Task user Evidence retrieval', () => {
+  it('prioritizes only already-referenced code files named in the question within the three-excerpt cap', async () => {
+    const { service, storage, workspaceRoot } = await createHarness()
+    seedBuilderGraph(storage)
+    const sourceDirectory = join(
+      workspaceRoot,
+      ...projectFixture.generatedWorkspacePath.split('/'),
+      'src',
+    )
+    await mkdir(sourceDirectory, { recursive: true })
+    for (const name of [
+      'renderer-a.ts',
+      'renderer-b.ts',
+      'renderer-c.ts',
+      'cache.ts',
+      'workbench.ts',
+      'secret.ts',
+    ]) {
+      await writeFile(join(sourceDirectory, name), `export const file = '${name}';\n`, 'utf8')
+    }
+    storage.repository.appendLiveContext({
+      ...liveContextFixture,
+      relatedFiles: [
+        'src/renderer-a.ts',
+        'src/renderer-b.ts',
+        'src/renderer-c.ts',
+        'src/cache.ts',
+        'src/workbench.ts',
+      ].map((path) => ({ kind: 'CODE' as const, path })),
+    })
+    const response = await service.executeAgent('HELPER', {
+      schemaVersion: 1,
+      kind: 'HELPER_GET_CONTEXT',
+      correlationId: 'corr_00000000-0000-4000-8000-000000000723',
+      actor: { kind: 'AGENT', role: 'HELPER' },
+      projectId: ids.project,
+      taskId: ids.task,
+      question:
+        'cache.ts와 workbench.ts에서 값을 만드는 경로는 무엇인가요? secret.ts도 궁금합니다.',
+      relatedConceptNames: [],
+      observedContextVersion: 1,
+    })
+    expect(response).toMatchObject({ success: true })
+    if (!response.success) throw new Error('Helper context failed')
+    const excerptPaths = response.data.sourceExcerpts.map((excerpt) => excerpt.reference.path)
+    expect(excerptPaths).toEqual(['src/cache.ts', 'src/workbench.ts', 'src/renderer-a.ts'])
+    expect(response.data.contextReferences).toHaveLength(5)
+    expect(response.data.referenceDetails).toHaveLength(5)
+    expect(response.data.sourceExcerpts).toHaveLength(3)
+    expect(JSON.stringify(response.data)).not.toContain('src/secret.ts')
+  })
+
+  it('uses accepted current and predecessor Task Evidence for a paraphrased question, but excludes an unrelated Task', async () => {
+    const { service, storage } = await createHarness()
+    seedBuilderGraph(storage)
+    const nextTaskId = 'task_00000000-0000-4000-8000-000000000701'
+    const unrelatedTaskId = 'task_00000000-0000-4000-8000-000000000702'
+    storage.transaction((repository) => {
+      repository.appendTask(
+        builderTaskSchema.parse({ ...builderTaskFixture, revision: 2, status: 'COMPLETED' }),
+      )
+      repository.appendTask(
+        builderTaskSchema.parse({
+          ...builderTaskFixture,
+          id: nextTaskId,
+          sequence: 2,
+          prerequisiteTaskIds: [ids.task],
+          finalUpgrade: {
+            sourceTaskId: ids.task,
+            personalizationTraceId: ids.personalization,
+            userGoal: 'Make cache behavior visible.',
+          },
+        }),
+      )
+      repository.appendTask(
+        builderTaskSchema.parse({
+          ...builderTaskFixture,
+          id: unrelatedTaskId,
+          sequence: 3,
+          status: 'COMPLETED',
+          prerequisiteTaskIds: [],
+        }),
+      )
+    })
+
+    const acceptUserStatement = async (input: {
+      readonly number: number
+      readonly taskId: string
+      readonly conceptName: string
+      readonly statement: string
+      readonly expression: string
+    }) => {
+      const stableId = (prefix: string): string =>
+        `${prefix}_00000000-0000-4000-8000-${String(input.number).padStart(12, '0')}`
+      const eventId = stableId('event')
+      const episodeId = stableId('episode')
+      const jobId = stableId('analysis_job')
+      const conceptId = stableId('concept')
+      const conversationId = stableId('conversation')
+      const messageId = stableId('message')
+      const source = { kind: 'USER_MESSAGE', conversationId, messageId } as const
+      storage.transaction((repository) => {
+        repository.appendActivityEvent(
+          activityEventSchema.parse({
+            ...activityEventFixture,
+            id: eventId,
+            taskId: input.taskId,
+            conversationId,
+            sequence: input.number - 710,
+            payload: {
+              type: 'USER_MESSAGE',
+              conversationId,
+              messageId,
+              redactedExcerpt: input.statement,
+            },
+            sourceReferences: [source],
+          }),
+        )
+        repository.appendEpisode(
+          episodeSchema.parse({
+            ...episodeFixture,
+            id: episodeId,
+            taskId: input.taskId,
+            decisionId: undefined,
+            conversationId,
+            type: 'HELPER_CONVERSATION',
+            eventIds: [eventId],
+            conceptCandidates: [{ conceptId, originalExpression: input.expression }],
+            contextReferences: [],
+          }),
+        )
+        repository.appendAnalysisJob(
+          analysisJobSchema.parse({ ...analysisJobPendingFixture, id: jobId, episodeId }),
+        )
+        repository.appendAnalysisJob(
+          analysisJobSchema.parse({ ...analysisJobFixture, id: jobId, episodeId }),
+        )
+        repository.appendCanonicalConcept(
+          canonicalConceptSchema.parse({
+            ...canonicalConceptFixture,
+            id: conceptId,
+            canonicalName: input.conceptName,
+          }),
+        )
+      })
+      const response = await service.executeAgent('EVIDENCE_ANALYST', {
+        schemaVersion: 1,
+        kind: 'ANALYST_SUBMIT_EVIDENCE_PROPOSALS',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'EVIDENCE_ANALYST' },
+        idempotencyKey: stableId('idem'),
+        analysisJobId: jobId,
+        expectedJobRevision: 2,
+        attempt: 1,
+        batch: {
+          ...evidenceProposalBatchFixture,
+          episodeId,
+          proposals: [
+            {
+              ...evidenceProposalBatchFixture.proposals[0],
+              id: stableId('evidence_proposal'),
+              taskId: input.taskId,
+              episodeId,
+              concept: {
+                canonicalConceptId: conceptId,
+                proposedCanonicalName: input.conceptName,
+                originalExpression: input.expression,
+              },
+              signal: 'REPHRASE',
+              strength: 'MEDIUM',
+              userEvidenceSources: [source],
+              contextSources: [],
+              redactedEvidenceExcerpt: input.statement,
+              rationale: 'The user explained a consequence in their own words.',
+              maximumSupportedState: 'EXPLAINED',
+            },
+          ],
+        },
+      })
+      expect(response).toMatchObject({
+        success: true,
+        data: {
+          outcomes: [
+            {
+              decision: { outcome: 'ACCEPTED', reasonCode: 'VALID_USER_EVIDENCE' },
+              conceptId,
+            },
+          ],
+        },
+      })
+      const trace = storage.repository.readEvidenceTrace(conceptId)
+      expect(trace?.acceptedEvidence).toMatchObject([{ kind: 'USER_UNDERSTANDING' }])
+      return { conceptId, evidenceId: trace?.acceptedEvidence[0]?.id }
+    }
+
+    const predecessor = await acceptUserStatement({
+      number: 711,
+      taskId: ids.task,
+      conceptName: 'Cache key derivation from serialized options',
+      statement:
+        '옵션 객체를 문자열로 만들 때 속성 순서가 달라지면 같은 설정도 다른 캐시 키가 됩니다.',
+      expression: '속성 순서가 달라지면 같은 설정도 다른 캐시 키가 됩니다',
+    })
+    const current = await acceptUserStatement({
+      number: 712,
+      taskId: nextTaskId,
+      conceptName: 'Stable configuration identity',
+      statement: '설정의 의미가 같다면 입력 순서가 달라도 같은 정체성으로 처리해야 합니다.',
+      expression: '입력 순서가 달라도 같은 정체성으로 처리해야 합니다',
+    })
+    const unrelated = await acceptUserStatement({
+      number: 713,
+      taskId: unrelatedTaskId,
+      conceptName: 'Unrelated event shape',
+      statement: '이벤트 표시에서는 태그로 각 변형을 분기하는 편이 안전합니다.',
+      expression: '태그로 각 변형을 분기하는 편이 안전합니다',
+    })
+
+    const helper = await service.executeAgent('HELPER', {
+      schemaVersion: 1,
+      kind: 'HELPER_GET_CONTEXT',
+      correlationId: 'corr_00000000-0000-4000-8000-000000000714',
+      actor: { kind: 'AGENT', role: 'HELPER' },
+      projectId: ids.project,
+      taskId: nextTaskId,
+      question: '설정값의 순서가 바뀌면 왜 이전 저장 결과를 재사용하지 못하나요?',
+      relatedConceptNames: [],
+    })
+    expect(helper).toMatchObject({
+      success: true,
+      data: { personalization: { mode: 'EVIDENCE_AWARE' } },
+    })
+    if (!helper.success) throw new Error('Helper context failed')
+    const basis = helper.data.personalization.basis
+    expect(basis).toHaveLength(2)
+    expect(basis.map((item) => item.conceptId)).toEqual(
+      expect.arrayContaining([predecessor.conceptId, current.conceptId]),
+    )
+    expect(basis.map((item) => item.conceptId)).not.toContain(unrelated.conceptId)
+    expect(basis.every((item) => item.purpose === 'HELPER_TASK_USER_EVIDENCE_CONNECTION')).toBe(
+      true,
+    )
+    expect(basis.find((item) => item.conceptId === predecessor.conceptId)?.evidenceIds).toEqual([
+      predecessor.evidenceId,
+    ])
+    expect(basis.find((item) => item.conceptId === current.conceptId)?.evidenceIds).toEqual([
+      current.evidenceId,
+    ])
+    expect(helper.data.relevantLedgerEntries.map((item) => item.concept.id)).toEqual(
+      expect.arrayContaining([predecessor.conceptId, current.conceptId]),
+    )
+
+    const unrelatedContext = await service.executeAgent('HELPER', {
+      schemaVersion: 1,
+      kind: 'HELPER_GET_CONTEXT',
+      correlationId: 'corr_00000000-0000-4000-8000-000000000715',
+      actor: { kind: 'AGENT', role: 'HELPER' },
+      projectId: ids.project,
+      taskId: unrelatedTaskId,
+      question: '이 작업에서 어떤 판단을 다시 확인해야 하나요?',
+      relatedConceptNames: [],
+    })
+    expect(unrelatedContext).toMatchObject({
+      success: true,
+      data: {
+        personalization: {
+          mode: 'EVIDENCE_AWARE',
+          basis: [
+            { conceptId: unrelated.conceptId, purpose: 'HELPER_TASK_USER_EVIDENCE_CONNECTION' },
+          ],
+        },
+      },
+    })
+
+    for (const number of [716, 717, 718, 719]) {
+      await acceptUserStatement({
+        number,
+        taskId: nextTaskId,
+        conceptName: `Current Task concept ${String(number)}`,
+        statement: `현재 작업의 판단 ${String(number)}은 입력값을 먼저 확인해야 한다는 뜻입니다.`,
+        expression: `입력값을 먼저 확인해야 한다는 뜻입니다`,
+      })
+    }
+    const lexical = await service.executeAgent('HELPER', {
+      schemaVersion: 1,
+      kind: 'HELPER_GET_CONTEXT',
+      correlationId: 'corr_00000000-0000-4000-8000-000000000720',
+      actor: { kind: 'AGENT', role: 'HELPER' },
+      projectId: ids.project,
+      taskId: nextTaskId,
+      question: 'How does Unrelated event shape affect this design?',
+      relatedConceptNames: [],
+    })
+    expect(lexical).toMatchObject({ success: true })
+    if (!lexical.success) throw new Error('Lexical Helper context failed')
+    expect(lexical.data.personalization.basis).toHaveLength(5)
+    expect(lexical.data.personalization.basis.slice(0, 2).map((item) => item.conceptId)).toEqual(
+      expect.arrayContaining([predecessor.conceptId, current.conceptId]),
+    )
+    expect(
+      lexical.data.personalization.basis
+        .filter((item) => item.conceptId === unrelated.conceptId)
+        .every((item) => item.purpose === 'HELPER_EXPLANATION_START'),
+    ).toBe(true)
+
+    const oldLexicalNames: string[] = []
+    const oldLexicalConceptIds: string[] = []
+    for (const number of [721, 722, 723, 724, 725]) {
+      const conceptName = `Older unrelated lexical concept ${String(number)}`
+      const older = await acceptUserStatement({
+        number,
+        taskId: unrelatedTaskId,
+        conceptName,
+        statement: `다른 작업의 판단 ${String(number)}은 독립된 입력에 관한 설명입니다.`,
+        expression: '독립된 입력에 관한 설명입니다',
+      })
+      oldLexicalNames.push(conceptName)
+      oldLexicalConceptIds.push(older.conceptId)
+    }
+    const saturated = await service.executeAgent('HELPER', {
+      schemaVersion: 1,
+      kind: 'HELPER_GET_CONTEXT',
+      correlationId: 'corr_00000000-0000-4000-8000-000000000726',
+      actor: { kind: 'AGENT', role: 'HELPER' },
+      projectId: ids.project,
+      taskId: nextTaskId,
+      question: '현재 작업에서 이전 설명과 직접 연결되는 판단은 무엇인가요?',
+      relatedConceptNames: [
+        'Cache key derivation from serialized options',
+        ...oldLexicalNames.slice(0, 4),
+      ],
+    })
+    if (!saturated.success)
+      throw new Error(`Saturated Helper context failed: ${saturated.error.code}`)
+    const saturatedBasis = saturated.data.personalization.basis
+    expect(saturatedBasis).toHaveLength(5)
+    expect(new Set(saturatedBasis.map((item) => item.conceptId)).size).toBe(5)
+    expect(saturatedBasis.slice(0, 2)).toEqual([
+      expect.objectContaining({
+        conceptId: predecessor.conceptId,
+        purpose: 'HELPER_TASK_USER_EVIDENCE_CONNECTION',
+      }),
+      expect.objectContaining({
+        conceptId: current.conceptId,
+        purpose: 'HELPER_TASK_USER_EVIDENCE_CONNECTION',
+      }),
+    ])
+    expect(
+      saturatedBasis.filter((item) => oldLexicalConceptIds.includes(item.conceptId)),
+    ).toHaveLength(3)
+    expect(saturated.data.relevantLedgerEntries.map((item) => item.concept.id)).toEqual(
+      expect.arrayContaining([predecessor.conceptId, current.conceptId]),
+    )
+  })
 })
 
 const enrichmentFor = (position: number) => {
@@ -154,6 +533,7 @@ const previewCommand = {
 const seedSpecReview = (
   storage: Awaited<ReturnType<typeof openInMemorySqliteStorage>>,
   includeDraft = false,
+  expectedDecisions: typeof draftLearningSpecFixture.expectedDecisions = draftLearningSpecFixture.expectedDecisions,
 ): void => {
   storage.transaction((repository) => {
     repository.appendProject(
@@ -184,21 +564,41 @@ const seedSpecReview = (
       }),
     )
     if (includeDraft) {
-      repository.appendLearningSpec(learningSpecRevisionSchema.parse(draftLearningSpecFixture))
+      repository.appendLearningSpec(
+        learningSpecRevisionSchema.parse({ ...draftLearningSpecFixture, expectedDecisions }),
+      )
     }
   })
 }
 
-const seedBuilderGraph = (storage: Awaited<ReturnType<typeof openInMemorySqliteStorage>>): void => {
+const seedBuilderGraph = (
+  storage: Awaited<ReturnType<typeof openInMemorySqliteStorage>>,
+  emptyDecisionForecast = false,
+): void => {
   storage.transaction((repository) => {
     repository.appendProject(projectSchema.parse(projectFixture))
     repository.appendDiscoverySession(discoverySessionSchema.parse(discoverySessionFixture))
     repository.appendCandidate(projectCandidateRevisionSchema.parse(candidateFixture))
     repository.appendCandidateRound(candidateRoundSchema.parse(candidateRoundFixture))
     repository.appendDiscoveryFeedback(discoveryFeedbackSchema.parse(discoveryFeedbackFixture))
-    repository.appendLearningSpec(learningSpecRevisionSchema.parse(draftLearningSpecFixture))
-    repository.appendLearningSpec(learningSpecRevisionSchema.parse(confirmedLearningSpecFixture))
-    repository.appendTask(builderTaskSchema.parse(builderTaskFixture))
+    repository.appendLearningSpec(
+      learningSpecRevisionSchema.parse({
+        ...draftLearningSpecFixture,
+        ...(emptyDecisionForecast ? { expectedDecisions: [] } : {}),
+      }),
+    )
+    repository.appendLearningSpec(
+      learningSpecRevisionSchema.parse({
+        ...confirmedLearningSpecFixture,
+        ...(emptyDecisionForecast ? { expectedDecisions: [] } : {}),
+      }),
+    )
+    repository.appendTask(
+      builderTaskSchema.parse({
+        ...builderTaskFixture,
+        ...(emptyDecisionForecast ? { expectedDecisionCategories: [] } : {}),
+      }),
+    )
   })
 }
 
@@ -284,6 +684,23 @@ describe('ApplicationService boundary', () => {
     expect(completed?.candidateEnrichments).toHaveLength(10)
     expect(completed?.candidates).toHaveLength(10)
     expect(completed?.rounds[0]?.candidates).toHaveLength(10)
+
+    // Core returns the stored receipt before checking the now-advanced Session.
+    await expect(
+      submitBatch('SECOND', 6, 'idem_00000000-0000-4000-8000-000000000503'),
+    ).resolves.toMatchObject({ success: true, data: { resourceRevision: 2 } })
+    await expect(
+      submitBatch('FIRST', 1, 'idem_00000000-0000-4000-8000-000000000503'),
+    ).resolves.toMatchObject({
+      success: false,
+      error: { code: 'IDEMPOTENCY_KEY_REUSE' },
+    })
+    await expect(
+      submitBatch('SECOND', 6, 'idem_00000000-0000-4000-8000-000000000508'),
+    ).resolves.toMatchObject({
+      success: false,
+      error: { code: 'DISCOVERY_SESSION_STALE' },
+    })
   })
 
   it('keeps the atomic Candidate Round fallback available after previews and rejects late enrichment', async () => {
@@ -847,8 +1264,15 @@ describe('ApplicationService boundary', () => {
     storage.transaction((repository) => {
       repository.appendLiveContext(liveContextFixture)
       repository.appendDecisionRequest(decisionRequestSchema.parse(decisionRequestFixture))
+      repository.appendDecisionResolution(decisionResolutionFixture)
       repository.appendActivityEvent(activityEventSchema.parse(activityEventFixture))
-      repository.appendEpisode(episodeSchema.parse(episodeFixture))
+      repository.appendActivityEvent(activityEventSchema.parse(reasonedDecisionEvent))
+      repository.appendEpisode(
+        episodeSchema.parse({
+          ...episodeFixture,
+          eventIds: [ids.eventUser, reasonedDecisionEvent.id],
+        }),
+      )
       repository.appendAnalysisJob(analysisJobSchema.parse(analysisJobPendingFixture))
       repository.appendAnalysisJob(analysisJobSchema.parse(analysisJobFixture))
       repository.appendCanonicalConcept(canonicalConceptSchema.parse(canonicalConceptFixture))
@@ -863,7 +1287,7 @@ describe('ApplicationService boundary', () => {
         analysisJobId: ids.analysisJob,
         expectedJobRevision: 2,
         attempt: 1,
-        batch: evidenceProposalBatchFixture,
+        batch: reasonedEvidenceBatch,
       }),
     ).resolves.toMatchObject({ success: true })
 
@@ -891,7 +1315,7 @@ describe('ApplicationService boundary', () => {
             {
               conceptName: 'runtime validation',
               state: 'DEMONSTRATED',
-              purpose: 'HELPER_EXPLANATION_START',
+              purpose: 'HELPER_TASK_USER_EVIDENCE_CONNECTION',
               sourceProjectIds: [ids.project],
             },
           ],
@@ -949,8 +1373,7 @@ describe('ApplicationService boundary', () => {
             evidence: [
               {
                 projectId: ids.project,
-                redactedEvidenceExcerpt:
-                  'Rejecting unknown fields should catch typos at the boundary.',
+                redactedEvidenceExcerpt: decisionResolutionFixture.rationale,
               },
             ],
           },
@@ -1068,8 +1491,15 @@ describe('ApplicationService boundary', () => {
     seedBuilderGraph(storage)
     storage.transaction((repository) => {
       repository.appendDecisionRequest(decisionRequestSchema.parse(decisionRequestFixture))
+      repository.appendDecisionResolution(decisionResolutionFixture)
       repository.appendActivityEvent(activityEventSchema.parse(activityEventFixture))
-      repository.appendEpisode(episodeSchema.parse(episodeFixture))
+      repository.appendActivityEvent(activityEventSchema.parse(reasonedDecisionEvent))
+      repository.appendEpisode(
+        episodeSchema.parse({
+          ...episodeFixture,
+          eventIds: [ids.eventUser, reasonedDecisionEvent.id],
+        }),
+      )
       repository.appendAnalysisJob(analysisJobSchema.parse(analysisJobPendingFixture))
       repository.appendAnalysisJob(analysisJobSchema.parse(analysisJobFixture))
       repository.appendCanonicalConcept(canonicalConceptSchema.parse(canonicalConceptFixture))
@@ -1083,7 +1513,7 @@ describe('ApplicationService boundary', () => {
       analysisJobId: ids.analysisJob,
       expectedJobRevision: 2,
       attempt: 1,
-      batch: evidenceProposalBatchFixture,
+      batch: reasonedEvidenceBatch,
     } as const
 
     const applied = await service.executeAgent('EVIDENCE_ANALYST', request)
@@ -1107,6 +1537,148 @@ describe('ApplicationService boundary', () => {
     expect(storage.repository.readEvidenceTrace(ids.concept)).toMatchObject({
       ledger: { state: { state: 'DEMONSTRATED' } },
       acceptedEvidence: [{ evidenceProposalId: ids.evidenceProposal }],
+    })
+  })
+
+  it('accepts the exact clean independent explanation used by the personalization eval plan', async () => {
+    const { service, storage } = await createHarness()
+    seedBuilderGraph(storage)
+    const statement =
+      '가구의 오른쪽 좌표는 x와 너비의 합이므로 그 값이 방 너비보다 크면 가구가 방 밖으로 나간 상태예요.'
+    const expression = '가구의 오른쪽 좌표는 x와 너비의 합'
+    storage.transaction((repository) => {
+      repository.appendActivityEvent(
+        activityEventSchema.parse({
+          ...activityEventFixture,
+          payload: { ...activityEventFixture.payload, redactedExcerpt: statement },
+        }),
+      )
+      repository.appendEpisode(
+        episodeSchema.parse({
+          ...episodeFixture,
+          decisionId: undefined,
+          type: 'HELPER_CONVERSATION',
+          conceptCandidates: [{ conceptId: ids.concept, originalExpression: expression }],
+          contextReferences: [],
+        }),
+      )
+      repository.appendAnalysisJob(analysisJobSchema.parse(analysisJobPendingFixture))
+      repository.appendAnalysisJob(analysisJobSchema.parse(analysisJobFixture))
+      repository.appendCanonicalConcept(canonicalConceptSchema.parse(canonicalConceptFixture))
+    })
+    const sourceProposal = evidenceProposalBatchFixture.proposals[0]
+    if (sourceProposal === undefined) throw new Error('Evidence fixture Proposal is missing')
+
+    const result = await service.executeAgent('EVIDENCE_ANALYST', {
+      schemaVersion: 1,
+      kind: 'ANALYST_SUBMIT_EVIDENCE_PROPOSALS',
+      correlationId: ids.correlation,
+      actor: { kind: 'AGENT', role: 'EVIDENCE_ANALYST' },
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000761',
+      analysisJobId: ids.analysisJob,
+      expectedJobRevision: 2,
+      attempt: 1,
+      batch: {
+        ...evidenceProposalBatchFixture,
+        proposals: [
+          {
+            ...sourceProposal,
+            concept: { ...sourceProposal.concept, originalExpression: expression },
+            signal: 'REPHRASE',
+            strength: 'STRONG',
+            promptDependence: 'INDEPENDENT',
+            redactedEvidenceExcerpt: statement,
+            rationale: 'The user independently explained the boundary invariant.',
+            maximumSupportedState: 'EXPLAINED',
+          },
+        ],
+      },
+    })
+
+    expect(result).toMatchObject({
+      success: true,
+      data: {
+        outcomes: [
+          {
+            proposalId: ids.evidenceProposal,
+            decision: { outcome: 'ACCEPTED', reasonCode: 'VALID_USER_EVIDENCE' },
+            conceptId: ids.concept,
+            ledgerRevision: 1,
+          },
+        ],
+      },
+    })
+    expect(storage.repository.readEvidenceTrace(ids.concept)).toMatchObject({
+      ledger: { state: { state: 'EXPLAINED' } },
+      acceptedEvidence: [
+        {
+          signal: 'REPHRASE',
+          promptDependence: 'INDEPENDENT',
+          supportsState: 'EXPLAINED',
+        },
+      ],
+    })
+  })
+
+  it('preserves an unverified user-message quote as a rejected Proposal without raising Concept State', async () => {
+    const { service, storage } = await createHarness()
+    seedBuilderGraph(storage)
+    storage.transaction((repository) => {
+      repository.appendDecisionRequest(decisionRequestSchema.parse(decisionRequestFixture))
+      repository.appendActivityEvent(activityEventSchema.parse(activityEventFixture))
+      repository.appendEpisode(episodeSchema.parse(episodeFixture))
+      repository.appendAnalysisJob(analysisJobSchema.parse(analysisJobPendingFixture))
+      repository.appendAnalysisJob(analysisJobSchema.parse(analysisJobFixture))
+      repository.appendCanonicalConcept(canonicalConceptSchema.parse(canonicalConceptFixture))
+    })
+    const sourceProposal = evidenceProposalBatchFixture.proposals[0]
+    if (sourceProposal === undefined) throw new Error('Evidence fixture Proposal is missing')
+    const batch = {
+      ...evidenceProposalBatchFixture,
+      proposals: [
+        {
+          ...sourceProposal,
+          concept: {
+            ...sourceProposal.concept,
+            originalExpression: 'prevent input mistakes',
+          },
+          redactedEvidenceExcerpt: 'Strict validation should prevent input mistakes.',
+        },
+      ],
+    }
+
+    const result = await service.executeAgent('EVIDENCE_ANALYST', {
+      schemaVersion: 1,
+      kind: 'ANALYST_SUBMIT_EVIDENCE_PROPOSALS',
+      correlationId: ids.correlation,
+      actor: { kind: 'AGENT', role: 'EVIDENCE_ANALYST' },
+      idempotencyKey: ids.idempotency,
+      analysisJobId: ids.analysisJob,
+      expectedJobRevision: 2,
+      attempt: 1,
+      batch,
+    })
+
+    expect(result).toMatchObject({
+      success: true,
+      data: {
+        outcomes: [
+          {
+            proposalId: ids.evidenceProposal,
+            decision: { outcome: 'REJECTED', reasonCode: 'INVALID_REFERENCE' },
+          },
+        ],
+      },
+    })
+    expect(storage.repository.readEvidenceTrace(ids.concept)).toMatchObject({
+      proposals: [{ id: ids.evidenceProposal }],
+      decisions: [{ outcome: 'REJECTED', reasonCode: 'INVALID_REFERENCE' }],
+      acceptedEvidence: [],
+      ledger: null,
+    })
+    expect(storage.repository.readAnalysisJob(ids.project, ids.analysisJob)).toMatchObject({
+      status: 'SUCCEEDED',
+      resultSummary: { proposalCount: 1, acceptedCount: 0, rejectedCount: 1 },
     })
   })
 
@@ -1709,7 +2281,7 @@ describe('T10 Builder Task and Live Context application flow', () => {
         return `${prefix}_00000000-0000-4000-8000-${String(generatedSequence).padStart(12, '0')}`
       },
     })
-    seedSpecReview(storage, true)
+    seedSpecReview(storage, true, [])
 
     const unconfirmed = await service.executeUi({
       schemaVersion: 1,
@@ -1760,6 +2332,7 @@ describe('T10 Builder Task and Live Context application flow', () => {
       status: 'PENDING',
       expectedConcepts: ['discriminated union'],
       excludedWork: ['Hosted sample storage'],
+      expectedDecisionCategories: [],
     })
     expect(descriptor.task.requirements).toContain(
       'Agent-supported implementation scope: Local application shell',
@@ -2179,7 +2752,11 @@ describe('T11 Decision gate and Builder resume application flow', () => {
         return `${prefix}_00000000-0000-4000-8000-${String(generatedSequence).padStart(12, '0')}`
       },
     })
-    seedBuilderGraph(storage)
+    seedBuilderGraph(storage, true)
+    expect(storage.repository.readBuilderTaskAggregate(ids.project, ids.task)).toMatchObject({
+      learningSpec: { expectedDecisions: [] },
+      task: { expectedDecisionCategories: [] },
+    })
     storage.repository.appendLiveContext(initialContext)
 
     const requestDecision = {
@@ -2251,6 +2828,29 @@ describe('T11 Decision gate and Builder resume application flow', () => {
         },
       ],
     })
+    for (const activeDecisionIds of [[], [ids.decision, ids.decision]]) {
+      expect(
+        await service.executeAgent('BUILDER', {
+          schemaVersion: 1,
+          kind: 'BUILDER_UPDATE_LIVE_CONTEXT',
+          correlationId: ids.correlation,
+          actor: { kind: 'AGENT', role: 'BUILDER' },
+          idempotencyKey: `idem_00000000-0000-4000-8000-000000000${
+            activeDecisionIds.length === 0 ? '211' : '212'
+          }`,
+          context: {
+            ...initialContext,
+            contextVersion: 3,
+            expectedPreviousVersion: 2,
+            checkpoint: 'VALIDATION_STARTED',
+            activeDecisionIds,
+          },
+        }),
+      ).toMatchObject({
+        success: false,
+        error: { code: 'LIVE_CONTEXT_ACTIVE_DECISIONS_MISMATCH' },
+      })
+    }
     await expect(
       service.executeUi({
         schemaVersion: 1,
@@ -2297,6 +2897,34 @@ describe('T11 Decision gate and Builder resume application flow', () => {
         resolution,
       }),
     ).toMatchObject({ success: true, data: { resourceRevision: 3 } })
+    const decisionEpisodeBefore = storage.repository
+      .readRecentEpisodeAggregatesForProject(ids.project, 50)
+      .find((aggregate) => aggregate.episode.decisionId === ids.decision)
+    expect(decisionEpisodeBefore).toBeDefined()
+    const jobBefore = storage.repository.readAnalysisJobForEpisode(
+      ids.project,
+      decisionEpisodeBefore?.episode.id ?? ids.episode,
+    )
+    expect(
+      await service.executeUi({
+        schemaVersion: 1,
+        kind: 'UI_RESOLVE_DECISION',
+        correlationId: ids.correlation,
+        actor: { kind: 'UI' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000299',
+        resolution,
+      }),
+    ).toMatchObject({ success: true, data: { resourceRevision: 3 } })
+    const decisionEpisodeAfter = storage.repository
+      .readRecentEpisodeAggregatesForProject(ids.project, 50)
+      .find((aggregate) => aggregate.episode.decisionId === ids.decision)
+    expect(decisionEpisodeAfter).toEqual(decisionEpisodeBefore)
+    expect(
+      storage.repository.readAnalysisJobForEpisode(
+        ids.project,
+        decisionEpisodeBefore?.episode.id ?? ids.episode,
+      ),
+    ).toEqual(jobBefore)
     expect(storage.repository.recoverProject(ids.project)).toMatchObject({
       activeTask: { status: 'ACTIVE', revision: 3 },
       pendingDecisions: [],
@@ -2410,6 +3038,48 @@ describe('T11 Decision gate and Builder resume application flow', () => {
       decisionApplications: [{ id: ids.decisionApplication, decisionId: ids.decision }],
       liveContext: { contextVersion: 3, activeDecisionIds: [] },
     })
+    for (const activeDecisionIds of [
+      [ids.decision],
+      ['decision_00000000-0000-4000-8000-000000000999'],
+    ]) {
+      expect(
+        await service.executeAgent('BUILDER', {
+          schemaVersion: 1,
+          kind: 'BUILDER_UPDATE_LIVE_CONTEXT',
+          correlationId: ids.correlation,
+          actor: { kind: 'AGENT', role: 'BUILDER' },
+          idempotencyKey: `idem_00000000-0000-4000-8000-000000000${
+            activeDecisionIds[0] === ids.decision ? '213' : '214'
+          }`,
+          context: {
+            ...initialContext,
+            contextVersion: 4,
+            expectedPreviousVersion: 3,
+            checkpoint: 'VALIDATION_STARTED',
+            activeDecisionIds,
+          },
+        }),
+      ).toMatchObject({
+        success: false,
+        error: { code: 'LIVE_CONTEXT_ACTIVE_DECISIONS_MISMATCH' },
+      })
+    }
+    expect(
+      await service.executeAgent('BUILDER', {
+        schemaVersion: 1,
+        kind: 'BUILDER_UPDATE_LIVE_CONTEXT',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'BUILDER' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000215',
+        context: {
+          ...initialContext,
+          contextVersion: 3,
+          expectedPreviousVersion: 2,
+          checkpoint: 'VALIDATION_STARTED',
+          activeDecisionIds: [],
+        },
+      }),
+    ).toMatchObject({ success: false, error: { code: 'LIVE_CONTEXT_STALE' } })
     await expect(
       service.executeUi({
         schemaVersion: 1,
@@ -2503,6 +3173,31 @@ describe('T11 Decision gate and Builder resume application flow', () => {
           source: { kind: 'CORE' },
         },
       ],
+    })
+    const followupTaskId = 'task_00000000-0000-4000-8000-000000000721'
+    storage.repository.appendTask(
+      builderTaskSchema.parse({
+        ...builderTaskFixture,
+        id: followupTaskId,
+        sequence: 2,
+        prerequisiteTaskIds: [ids.task],
+      }),
+    )
+    const helperAfterObservation = await service.executeAgent('HELPER', {
+      schemaVersion: 1,
+      kind: 'HELPER_GET_CONTEXT',
+      correlationId: 'corr_00000000-0000-4000-8000-000000000722',
+      actor: { kind: 'AGENT', role: 'HELPER' },
+      projectId: ids.project,
+      taskId: followupTaskId,
+      question: '새 작업에서는 어떤 선택을 살펴봐야 하나요?',
+      relatedConceptNames: [],
+    })
+    expect(helperAfterObservation).toMatchObject({
+      success: true,
+      data: {
+        personalization: { mode: 'NO_RELEVANT_EVIDENCE', basis: [] },
+      },
     })
   })
 

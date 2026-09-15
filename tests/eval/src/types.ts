@@ -22,6 +22,7 @@ export interface EvaluationSubject {
     readonly episode: unknown
     readonly episodeRevision: unknown
     readonly events: readonly unknown[]
+    readonly decisionResolutions?: readonly unknown[]
     readonly concept: unknown
     readonly priorAcceptedEvidence: readonly unknown[]
     readonly metadata: unknown

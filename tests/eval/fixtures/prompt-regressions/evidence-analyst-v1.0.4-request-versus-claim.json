@@ -1,0 +1,42 @@
+{
+  "promptVersion": "1.0.4",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED",
+  "scenario": "Synthetic questions distinguish a request for the Agent's analysis from a user-authored prediction or reasoned choice inside a question.",
+  "liveNativeResult": "PENDING",
+  "cases": [
+    {
+      "id": "analysis_request_only",
+      "userMessage": "서버와 브라우저의 시간대가 다를 때 두 날짜 정책은 어떻게 달라지나요? 실제 구현에서 확인된 점과 예상에 불과한 점도 나눠서 설명해 주세요.",
+      "userAuthoredClaimExcerpt": null,
+      "expected": {
+        "proposalCount": 0,
+        "reason": "The user requested comparison and verification but gave no result, rationale, prediction, or applied decision."
+      }
+    },
+    {
+      "id": "prediction_inside_question",
+      "userMessage": "서울 시각이 00:30일 때 UTC 날짜는 전날이라 UTC 날짜 문자열로 오늘을 정하면 한국 사용자의 오늘이 어제로 표시될 수 있겠네요. 맞나요?",
+      "userAuthoredClaimExcerpt": "UTC 날짜 문자열로 오늘을 정하면 한국 사용자의 오늘이 어제로 표시될 수 있겠네요",
+      "expected": {
+        "proposalCount": 1,
+        "allowedSignals": ["PREDICTION", "REPHRASE"],
+        "allowedStrengths": ["MEDIUM", "STRONG"],
+        "allowedMaximumSupportedStates": ["EXPLAINED", "DEMONSTRATED"],
+        "reason": "The user themselves predicts a date-boundary failure and asks for confirmation afterward."
+      }
+    },
+    {
+      "id": "reasoned_choice_then_question",
+      "userMessage": "서울 자정 직후에는 UTC 날짜가 전날이라 한국 사용자에게 어제로 보일 수 있으니, 이 서비스의 오늘 판정에는 한국 날짜를 쓰겠습니다. 해외 사용자에게 기기 날짜를 적용할 때는 무엇을 더 확인해야 하나요?",
+      "userAuthoredClaimExcerpt": "어제로 보일 수 있으니, 이 서비스의 오늘 판정에는 한국 날짜를 쓰겠습니다",
+      "expected": {
+        "proposalCount": 1,
+        "allowedSignals": ["JUSTIFIED_DECISION"],
+        "allowedStrengths": ["STRONG"],
+        "allowedMaximumSupportedStates": ["DEMONSTRATED"],
+        "reason": "The user makes an actual product choice and supplies a relevant causal reason before asking a further question."
+      }
+    }
+  ]
+}

@@ -26,12 +26,16 @@ async function harness(agents: WorkflowAgentPort, directory?: string) {
   const instanceId = randomUUID()
   const token = randomBytes(32).toString('hex')
   const runtime = new WorkflowRuntime({ application, agents, instanceId })
+  const mcpHandlers = new Map<
+    string,
+    { fetch(request: Request): Promise<Response>; close(): Promise<void> }
+  >()
   const server = createLocalServer({
     application,
     runtime,
     token,
     instanceId,
-    mcpHandlers: new Map(),
+    mcpHandlers,
   })
   await new Promise<void>((done) => server.listen(0, '127.0.0.1', done))
   const address = server.address()
@@ -49,6 +53,7 @@ async function harness(agents: WorkflowAgentPort, directory?: string) {
     baseUrl,
     token,
     runtime,
+    mcpHandlers,
     application,
     close: async () => {
       await runtime.close()
@@ -65,6 +70,20 @@ const noSubmit = () =>
   }))
 
 describe('Crew-independent loopback backend and real client', () => {
+  it('routes MCP handlers registered after the server starts', async () => {
+    const h = await harness({ invoke: noSubmit() })
+    try {
+      h.mcpHandlers.set('/mcp/late-native-check', {
+        fetch: async () => new Response('LATE_HANDLER_READY', { status: 200 }),
+        close: async () => undefined,
+      })
+      const response = await fetch(`${h.baseUrl}/mcp/late-native-check`)
+      expect(response.status).toBe(200)
+      expect(await response.text()).toBe('LATE_HANDLER_READY')
+    } finally {
+      await h.close()
+    }
+  })
   it('persists UI Discovery and History over restart without any model call', async () => {
     const invoke = noSubmit()
     let h = await harness({ invoke })

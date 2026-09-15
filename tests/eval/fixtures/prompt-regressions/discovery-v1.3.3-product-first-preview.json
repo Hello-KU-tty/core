@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "promptVersion": "1.3.3",
+  "baseline": {
+    "promptVersion": "1.3.2",
+    "source": "Kiro IDE native Discovery, fresh synthetic learning goal without Personal Need",
+    "learningGoal": "TypeScript에서 순수 계산 결과 캐시, 입력 변경 무효화, 메모이제이션 가치와 cache key를 작은 브라우저 도구를 만들며 익힌다",
+    "reviewGranularity": "NORMALIZED_TOPIC_ONLY",
+    "personalizationConfound": "The source F session was EVIDENCE_AWARE and included an over-accepted earlier Evidence item; this baseline cannot isolate prompt quality from personalization.",
+    "normalizedTopics": [
+      { "topic": "Fibonacci calculator", "triage": "WEAK", "reason": "A calculation example alone does not identify a recurring user task or useful result." },
+      { "topic": "Coordinate distance", "triage": "CONDITIONAL", "reason": "Could serve a real place comparison task if the use moment and result reuse are specified." },
+      { "topic": "Weather API memoization", "triage": "CONDITIONAL", "reason": "A real need is possible, but API access, freshness and operational burden need a small viable scope." },
+      { "topic": "Sorting result memoization", "triage": "WEAK", "reason": "A cached algorithm demonstration lacks an identified task where repeated sorting matters." },
+      { "topic": "Query result memoization", "triage": "WEAK", "reason": "The user, data and useful search outcome are unspecified at this topic level." },
+      { "topic": "Image filter preview", "triage": "PROMISING", "reason": "Editing and comparing a photo can be a real browser task with costly recomputation." },
+      { "topic": "Markdown rendering cache", "triage": "CONDITIONAL", "reason": "A writing workflow is plausible, but the cache effect and reuse need evidence." },
+      { "topic": "Complex number library", "triage": "WEAK", "reason": "A library by itself is an implementation artifact rather than a user-facing result." },
+      { "topic": "User search history cache", "triage": "WEAK", "reason": "Persisting search history is distinct from memoizing a costly repeatable result." },
+      { "topic": "Recursive directory analysis", "triage": "CONDITIONAL", "reason": "File cleanup may be useful, but browser permission and large-file scope must remain viable." }
+    ],
+    "limitation": "Topic-level triage is not a strict contract or full-field review of the saved previews. It does not score a revised model run."
+  },
+  "humanReviewCriteria": [
+    "A specific person's task, use moment, action and completed product result are apparent from the preview fields.",
+    "The goal technology has a concrete implementation point and a meaningful effect on behavior, correctness, responsiveness or change cost; equivalent visible features alone do not disqualify it.",
+    "The first usable version has a credible path without access, service or operating burden overwhelming its value.",
+    "The ten candidates differ in problem, user, interaction, data and appeal, rather than only theme or algorithm."
+  ],
+  "counterexamples": [
+    {
+      "kind": "SHOULD_NOT_REJECT_FOR_EQUIVALENT_UI",
+      "draft": "A person repeatedly edits a local photo and compares versions; caching a filter result by image revision and settings makes revisits responsive without showing a different feature.",
+      "reason": "A feature-preserving performance improvement can be a substantive implementation and learning decision."
+    },
+    {
+      "kind": "SHOULD_REQUEST_PRODUCT_REFRAME",
+      "draft": "A page computes Fibonacci numbers to display cache hits and misses, without an intended user task beyond observing the technique.",
+      "reason": "The demonstration has no useful result or product completion moment beyond the technology itself."
+    }
+  ],
+  "generalizationChecks": [
+    { "learningGoal": "TypeScript에서 discriminated union과 runtime validation을 익힌다", "personalNeed": "작은 설정 파일의 오류를 실행 전에 확인하고 싶다" },
+    { "learningGoal": "TypeScript에서 의존성 주입과 교체 가능한 저장소 경계를 익힌다", "personalNeed": null }
+  ],
+  "revisedPromptNativeResult": "PENDING",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED"
+}

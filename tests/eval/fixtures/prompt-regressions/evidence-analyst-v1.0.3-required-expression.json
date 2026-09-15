@@ -1,0 +1,14 @@
+{
+  "promptVersion": "1.0.3",
+  "containsPersonalData": false,
+  "scenario": "A synthetic user states a date-injection idea; every proposed Concept must retain an exact short USER phrase or be omitted.",
+  "userMessage": "기준 날짜를 함수 인자로 받으면 오늘 날짜가 달라도 같은 입력을 재현해서 경계 테스트를 할 수 있겠어요.",
+  "conceptPhrase": "기준 날짜를 함수 인자로 받으면",
+  "episodeId": "episode_55000000-0000-4000-8000-000000000001",
+  "correlationId": "corr_55000000-0000-4000-8000-000000000002",
+  "userEvidenceSource": {
+    "kind": "USER_MESSAGE",
+    "conversationId": "conversation_55000000-0000-4000-8000-000000000003",
+    "messageId": "message_55000000-0000-4000-8000-000000000004"
+  }
+}

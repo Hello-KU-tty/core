@@ -3,6 +3,9 @@
 > 상태: 구현 전 승인된 입력 브리프
 > 작성 기준일: 2026-08-24
 > 범위 갱신: 2026-09-07 사용자 승인으로 T19에 자체 Kiro IDE 패널의 Discovery·Spec·Builder·Helper·History 실제 연결과 frontend 로컬 실행 인계를 포함한다.
+> 실험 승인: 2026-09-12 사용자는 별도 worktree에서 Kiro IDE 내장 Agent를 실행기로 쓰는 T19-N 실험을 승인했다. 기존 CLI/Crew 경로와 T19 Windows 완료 gate는 유지하며, 내장 경로의 지원·권한·Core 연결·stream·중지는 실측 전 제품 기능으로 간주하지 않는다.
+> 수직 흐름 승인: 2026-09-12 사용자는 같은 분리 worktree에서 native Discovery부터 Builder 파일·Decision, Helper, 사용자 Evidence·Episode·Analyst와 다음 개인화까지 실제 Core 상태로 검증하도록 승인했다. 사람의 선택·발언은 명시적 합성 UI 입력으로만 대체하고 Agent 작성물로 이해 상태를 올리지 않는다. 기존 CLI/Crew 기본 경로와 Windows gate는 유지한다.
+> 4시간 전환 판단 승인: 2026-09-15 사용자는 09:58~13:58 UTC 동안 득실 중심의 최소 실제 검증을 끝낸 뒤 IDE-only frontend 개발 전환·인계를 판단하도록 승인했다. 안전·데이터·provenance 경계는 유지하고 기존 CLI 코드는 즉시 삭제하지 않는다. 미실행 Windows·장기 안정성·정밀 CLI 비교는 미지원/미검증으로 분리하며, 실제 안전 또는 동작 실패는 전환 판단에서 숨기지 않는다. [4시간 계획](docs/spikes/T19_NATIVE_IDE_ONLY_4H_CUTOVER_PLAN_20260915.md)을 따른다.
 > 출처: 사용자가 승인한 [PROJECT_SPEC.md](PROJECT_SPEC.md)와 합의된 Agent Prompt
 > 주의: 제품명은 아직 확정되지 않았으며 `Vibe Helper`, `BuildWhy`는 작업명이다.
 

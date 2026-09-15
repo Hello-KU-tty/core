@@ -2389,6 +2389,40 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
     )
   }
 
+  readRecentUserEvidenceTracesForTasks(
+    projectId: string,
+    taskIds: readonly string[],
+    limit: number,
+  ): readonly EvidenceTrace[] {
+    if (
+      !projectSchema.shape.id.safeParse(projectId).success ||
+      taskIds.length < 1 ||
+      taskIds.length > 22 ||
+      taskIds.some((taskId) => !builderTaskSchema.shape.id.safeParse(taskId).success) ||
+      !Number.isInteger(limit) ||
+      limit < 1 ||
+      limit > 10
+    ) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Task Evidence Trace query is invalid')
+    }
+    return this.#read(() => {
+      const placeholders = taskIds.map(() => '?').join(', ')
+      const rows = this.#sqlite
+        .prepare<(string | number)[], { readonly concept_id: string }>(
+          `SELECT concept_id FROM accepted_evidence
+           WHERE project_id = ? AND kind = 'USER_UNDERSTANDING'
+             AND task_id IN (${placeholders})
+           GROUP BY concept_id
+           ORDER BY MAX(accepted_at) DESC, concept_id ASC LIMIT ?`,
+        )
+        .all(projectId, ...taskIds, limit)
+      return rows.flatMap((row) => {
+        const trace = this.readEvidenceTrace(row.concept_id)
+        return trace === null ? [] : [trace]
+      })
+    })
+  }
+
   readPersonalizationTrace(personalizationTraceId: string): PersonalizationTrace | null {
     if (!personalizationTraceIdSchema.safeParse(personalizationTraceId).success) {
       throw new PersistenceError('VALIDATION_FAILED', 'Personalization Trace ID is invalid')

@@ -93,6 +93,10 @@ importers:
       '@vibe-helper/storage-sqlite':
         specifier: workspace:*
         version: link:../../packages/storage-sqlite
+    devDependencies:
+      '@modelcontextprotocol/client':
+        specifier: 2.0.0
+        version: 2.0.0
 
   apps/mcp-server:
     dependencies:

@@ -7,18 +7,19 @@ import {
   canonicalConceptSchema,
   conceptLedgerEntrySchema,
   decisionRequestSchema,
+  decisionResolutionSchema,
+  type EvaluationCriterionResult,
+  type EvaluationDimension,
+  type EvaluationFixture,
   episodeSchema,
   evaluationCriterionResultSchema,
   evidenceProposalSchema,
   learningSpecRevisionSchema,
   liveProjectContextSchema,
-  taskCompletionReportSchema,
   projectCandidateRevisionSchema,
-  type EvaluationCriterionResult,
-  type EvaluationDimension,
-  type EvaluationFixture,
+  taskCompletionReportSchema,
 } from '@vibe-helper/contracts'
-import { evaluateEvidenceProposal, type EvidenceDecisionMetadata } from '@vibe-helper/domain'
+import { type EvidenceDecisionMetadata, evaluateEvidenceProposal } from '@vibe-helper/domain'
 
 import { asRecord } from './subject.js'
 import type { EvaluationScorer, EvaluationScorerContext, EvaluationSubject } from './types.js'
@@ -286,6 +287,9 @@ function scoreEvidencePolicy(context: EvaluationScorerContext): EvaluationCriter
   }
   const episode = episodeSchema.safeParse(subject.episode)
   const events = subject.events.map((event) => activityEventSchema.safeParse(event))
+  const decisionResolutions = (subject.decisionResolutions ?? []).map((resolution) =>
+    decisionResolutionSchema.safeParse(resolution),
+  )
   const concept = canonicalConceptSchema.safeParse(subject.concept)
   const prior = subject.priorAcceptedEvidence.map((evidence) =>
     acceptedEvidenceSchema.safeParse(evidence),
@@ -294,6 +298,7 @@ function scoreEvidencePolicy(context: EvaluationScorerContext): EvaluationCriter
   if (
     !episode.success ||
     events.some((event) => !event.success) ||
+    decisionResolutions.some((resolution) => !resolution.success) ||
     !concept.success ||
     prior.some((evidence) => !evidence.success) ||
     metadata === null
@@ -306,6 +311,9 @@ function scoreEvidencePolicy(context: EvaluationScorerContext): EvaluationCriter
       episode: episode.data,
       episodeRevision: subject.episodeRevision as number,
       events: events.flatMap((event) => (event.success ? [event.data] : [])),
+      decisionResolutions: decisionResolutions.flatMap((resolution) =>
+        resolution.success ? [resolution.data] : [],
+      ),
       concept: concept.data,
       existingProposalIds: [],
       priorAcceptedEvidence: prior.flatMap((evidence) => (evidence.success ? [evidence.data] : [])),

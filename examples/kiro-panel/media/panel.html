@@ -6,16 +6,38 @@ body { color:var(--vscode-foreground); background:var(--vscode-editor-background
 button,input,textarea,select { font:inherit; color:var(--vscode-input-foreground); background:var(--vscode-input-background); border:1px solid var(--vscode-panel-border); padding:7px; margin:3px; }
 button { cursor:pointer; } textarea { display:block; box-sizing:border-box; width:96%; min-height:70px; } h2 { font-size:16px; }
 section { border-top:1px solid var(--vscode-panel-border); margin-top:16px; padding-top:8px; } pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:320px; overflow:auto; }
-.candidate { padding:8px; border-bottom:1px solid var(--vscode-panel-border); } #errors { color:var(--vscode-errorForeground); } #stream { height:220px; overflow:auto; } .muted { opacity:.7; }
+.candidate { padding:8px; border-bottom:1px solid var(--vscode-panel-border); } #errors { color:var(--vscode-errorForeground); } #stream { height:160px; overflow:auto; } .muted { opacity:.7; }
+.agent-panes { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.agent-pane { display:flex; flex-direction:column; min-width:0; height:min(70vh,680px); min-height:360px; border:1px solid var(--vscode-panel-border); padding:8px; box-sizing:border-box; }
+.agent-pane h3 { margin:0 0 6px; } .agent-stream { flex:1; min-height:80px; max-height:none; margin:4px 0; overflow:auto; }
+.agent-pane textarea { width:100%; min-height:70px; max-height:120px; margin:4px 0; } #decisions { max-height:150px; overflow:auto; }
+.agent-actions { display:flex; flex-wrap:wrap; gap:4px; } .agent-actions button { margin:0; }
+.agent-quick-actions { display:flex; flex-wrap:wrap; gap:4px; } .agent-quick-actions button { margin:0; }
+@media (max-width:700px) { .agent-panes { grid-template-columns:minmax(0,1fr); } .agent-pane { height:min(60vh,560px); } }
 </style></head><body>
 <h1>Vibe Helper · Local</h1><p class="muted">최소 연동 예제 · 실제 Kiro 호출 · 저장 상태는 Core가 원본입니다.</p>
-<button id="refresh">History / 상태 새로고침</button><div id="errors" role="alert"></div><div id="history"></div>
-<section><h2>Discovery</h2><input id="goal" placeholder="Learning Goal"><input id="need" placeholder="Personal Need (선택)"><button id="start">새 Discovery</button>
+<button id="refresh">History / 상태 새로고침</button><div id="errors" role="alert"></div><div id="connectionStatus" role="status"></div><div id="workerStatus" role="status"></div><div id="history"></div>
+<section id="discoverySection"><h2>Discovery</h2><input id="goal" placeholder="Learning Goal"><input id="need" placeholder="Personal Need (선택)"><button id="start">새 Discovery</button>
+<div id="archiveNotice" hidden role="status"><p>이전 후보를 그대로 보고 있습니다. 돌아오기만 해서는 Agent가 다시 실행되지 않습니다.</p><button id="backToSpec">Spec으로 돌아가기</button><button id="restartDiscovery">입력을 확인하고 새 후보 받기</button></div>
 <div id="candidates"></div><textarea id="feedback" placeholder="후보 수정·병합·추가 요청"></textarea>
 <button data-feedback="SELECT">선택한 후보로 Spec</button><button data-feedback="REVISE">수정</button><button data-feedback="MERGE">병합</button><button data-feedback="MORE">추가</button>
-<button data-retry="PREVIEW">미리보기 재시도</button><button data-retry="ENRICH_ALL">누락된 상세 재시도</button></section>
+<button data-retry="PREVIEW">미리보기 재시도</button><button data-retry="ENRICH_ALL">누락된 상세 재시도</button><button data-retry="ROUND">실패한 수정 라운드 재시도</button></section>
 <section><h2>Spec</h2><pre id="spec"></pre><textarea id="specText" placeholder="Spec 자유 수정 요청"></textarea><button id="refineSpec">수정 요청</button><button id="return">후보로 돌아가기</button><button id="confirm">최신 Spec 확정 · Task 준비</button></section>
-<section><h2>Builder / Helper</h2><div id="decisions"></div><textarea id="message" placeholder="Builder 또는 Helper에게 보낼 실제 메시지"></textarea>
-<button data-agent="BUILDER">Builder 실행 / 이어가기</button><button data-agent="HELPER">Helper에게 질문</button><button id="openWorkspace">생성 workspace 열기</button><button id="launch">완료 결과 실행</button>
-<div id="runs"></div><pre id="stream"></pre><details><summary>Task · Context · 완료 보고 / 복원 snapshot</summary><pre id="snapshot"></pre></details></section>
+<section><h2>Builder / Helper</h2><div class="agent-panes">
+<div class="agent-pane" aria-label="Builder 대화"><h3>Builder</h3><div id="builderStreamHeading" role="status"></div><pre id="builderStream" class="agent-stream" aria-live="polite"></pre>
+<div id="decisions"></div><label for="builderMessage">Builder에게 메시지</label><textarea id="builderMessage" placeholder="구현 요청, 선택 이유 또는 다른 방향을 직접 적어 주세요"></textarea>
+<div class="agent-actions"><button id="sendBuilder" data-agent="BUILDER">Builder 실행 / 이어가기</button><button id="stopBuilder" disabled>Builder 중지</button></div></div>
+<div class="agent-pane" aria-label="Helper 대화"><h3>Helper</h3><div id="helperStreamHeading" role="status"></div><pre id="helperStream" class="agent-stream" aria-live="polite"></pre>
+<div class="agent-quick-actions"><button data-helper-quick="현재 진행 중인 결정이 무엇을 바꾸는지 설명해 줘">현재 결정 설명</button><button data-helper-quick="현재 코드로 예를 들어 설명해 줘">현재 코드로 예시</button><button data-helper-quick="선택지의 장단점을 비교해 줘">선택지 비교</button></div>
+<label for="helperMessage">Helper에게 질문</label><textarea id="helperMessage" placeholder="Builder 작업 중에도 궁금한 점을 자유롭게 물어보세요"></textarea>
+<div class="agent-actions"><button id="sendHelper" data-agent="HELPER">Helper에게 질문</button><button id="stopHelper" disabled>Helper 중지</button></div></div></div>
+<div id="userInputs" aria-live="polite"></div>
+<button id="openWorkspace">생성 workspace 열기</button><button id="launch">완료 결과 실행</button><div id="resultLaunch" role="status"></div>
+<details><summary>모든 실행 · 이전 출력</summary><div id="runs"></div><div id="streamHeading" role="status"></div><pre id="stream"></pre></details>
+<details><summary>Task · Context · 완료 보고 / 복원 snapshot</summary><pre id="snapshot"></pre></details></section>
+<section><h2>Evidence 분석</h2><div id="analysisJobs"></div><div id="evidenceTrace"></div></section>
+<section id="finalUpgrade" hidden><h2>다음 개선 Task</h2><p>완료한 Task의 Evidence 기반 Helper 기록을 선택하고, 원하는 개선 목표를 직접 적어 주세요.</p>
+<select id="upgradeTrace" aria-label="Evidence 기반 Helper 기록"></select>
+<textarea id="upgradeGoal" maxlength="4000" placeholder="직접 작성한 다음 개선 목표"></textarea>
+<button id="prepareFinalUpgrade">개선 Task 준비</button></section>
 <script nonce="{{nonce}}" src="{{script}}"></script></body></html>

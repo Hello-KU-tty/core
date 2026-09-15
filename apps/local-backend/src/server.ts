@@ -2,15 +2,16 @@ import { timingSafeEqual } from 'node:crypto'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { type ApplicationService, MAX_APPLICATION_PAYLOAD_BYTES } from '@vibe-helper/application'
 import {
+  generatedResultDescriptorSchema,
   LOCAL_PROTOCOL_VERSION,
   localApplicationEnvelopeSchema,
   localRunEnvelopeSchema,
-  generatedResultDescriptorSchema,
   localRunIdSchema,
   projectIdSchema,
 } from '@vibe-helper/contracts'
 import { ResultRuntimeError, WorkflowError, type WorkflowRuntime } from '@vibe-helper/runtime'
 import type { LocalMcpHandler } from './agent-host.js'
+import type { NativeAgentRelay } from './native-agent-relay.js'
 
 function json(response: ServerResponse, status: number, body: unknown): void {
   response.writeHead(status, {
@@ -37,6 +38,9 @@ export function createLocalServer(options: {
   token: string
   instanceId: string
   mcpHandlers: ReadonlyMap<string, LocalMcpHandler>
+  nativeRelay?: NativeAgentRelay
+  /** Experimental Core-only startup rejects Agent runs before accepting them. */
+  runStartDisabledCode?: 'NATIVE_RUNTIME_NOT_ATTACHED'
   isClosing?: () => boolean
   resultLauncher?: {
     launch(value: ReturnType<typeof generatedResultDescriptorSchema.parse>): Promise<unknown>
@@ -121,11 +125,64 @@ export function createLocalServer(options: {
       json(response, 200, {
         protocolVersion: LOCAL_PROTOCOL_VERSION,
         backendInstanceId: options.instanceId,
-        status: 'READY',
-        agent: 'KIRO_CLI_ACP_V2',
+        status: options.runStartDisabledCode ? 'CORE_ONLY_READY' : 'READY',
+        agent: options.runStartDisabledCode
+          ? 'UNATTACHED'
+          : options.nativeRelay
+            ? 'KIRO_IDE_BUILTIN_AGENT'
+            : 'KIRO_CLI_ACP_V2',
         liveModelVerified: false,
       })
       return
+    }
+    if (options.nativeRelay && url.pathname === '/api/native/next' && request.method === 'GET') {
+      if ([...url.searchParams.keys()].some((k) => k !== 'workspace' && k !== 'activeRoles'))
+        throw new WorkflowError('INVALID_QUERY')
+      const workspace = url.searchParams.get('workspace')
+      if (!workspace || workspace.length > 4096) throw new WorkflowError('NATIVE_WORKSPACE_INVALID')
+      const activeValue = url.searchParams.get('activeRoles') ?? ''
+      const activeRoles = activeValue ? activeValue.split(',') : []
+      if (
+        activeRoles.length > 4 ||
+        new Set(activeRoles).size !== activeRoles.length ||
+        activeRoles.some(
+          (role) => !['DISCOVERY', 'BUILDER', 'HELPER', 'EVIDENCE_ANALYST'].includes(role),
+        )
+      )
+        throw new WorkflowError('NATIVE_ACTIVE_ROLES_INVALID')
+      json(response, 200, {
+        job: options.nativeRelay.claim(
+          workspace,
+          activeRoles as ('DISCOVERY' | 'BUILDER' | 'HELPER' | 'EVIDENCE_ANALYST')[],
+        ),
+        pendingWorkspace: options.nativeRelay.pendingWorkspace(),
+      })
+      return
+    }
+    const nativeMatch = url.pathname.match(
+      /^\/api\/native\/jobs\/(native_[0-9a-f-]{36})(?:\/(event|complete|status|prompt))?$/,
+    )
+    if (options.nativeRelay && nativeMatch && !url.search) {
+      const jobId = nativeMatch[1] as string
+      if (nativeMatch[2] === 'status' && request.method === 'GET') {
+        json(response, 200, { status: options.nativeRelay.status(jobId) })
+        return
+      }
+      if (nativeMatch[2] === 'prompt' && request.method === 'GET') {
+        json(response, 200, { message: await options.nativeRelay.protectedPrompt(jobId) })
+        return
+      }
+      if (
+        request.method === 'POST' &&
+        (nativeMatch[2] === 'event' || nativeMatch[2] === 'complete') &&
+        request.headers['content-type']?.split(';')[0] === 'application/json'
+      ) {
+        const input: unknown = JSON.parse((await body(request)).toString('utf8'))
+        if (nativeMatch[2] === 'event') options.nativeRelay.event(jobId, input)
+        else options.nativeRelay.complete(jobId, input)
+        json(response, 200, { accepted: true })
+        return
+      }
     }
     if (request.method === 'GET' && url.pathname === '/api/runs') {
       if ([...url.searchParams.keys()].some((k) => k !== 'projectId'))
@@ -203,6 +260,10 @@ export function createLocalServer(options: {
       return
     }
     if (url.pathname === '/api/runs') {
+      if (options.runStartDisabledCode !== undefined) {
+        json(response, 503, { error: options.runStartDisabledCode })
+        return
+      }
       json(response, 202, await options.runtime.start(localRunEnvelopeSchema.parse(input).request))
       return
     }

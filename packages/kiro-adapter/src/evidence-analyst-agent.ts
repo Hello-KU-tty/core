@@ -1,17 +1,17 @@
+import type { AnalysisApplicationResponse, ApplicationResult } from '@vibe-helper/application'
 import {
   type AnalysisJob,
-  analysisJobSchema,
   type AnalysisRuntimeRequest,
   type AnalystSemanticResult,
+  analysisJobSchema,
   analystSemanticResultSchema,
   type EpisodeContext,
-  episodeContextSchema,
   type EvidenceBatchApplicationResult,
+  episodeContextSchema,
   evidenceBatchApplicationResultSchema,
 } from '@vibe-helper/contracts'
-import type { AnalysisApplicationResponse, ApplicationResult } from '@vibe-helper/application'
 
-export const EVIDENCE_ANALYST_PROMPT_VERSION = '1.0.1' as const
+export const EVIDENCE_ANALYST_PROMPT_VERSION = '1.0.7' as const
 export const EVIDENCE_ANALYST_PROMPT_SOURCE = 'docs/agent-prompts/evidence-analyst.md' as const
 export const EVIDENCE_ANALYST_AGENT_NAME = 'vibe-helper-evidence-analyst' as const
 

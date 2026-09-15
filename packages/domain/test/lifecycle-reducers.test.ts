@@ -1,20 +1,4 @@
 import { describe, expect, it } from 'vitest'
-
-import {
-  applyDecision,
-  closeEpisode,
-  confirmLearningSpec,
-  openDecision,
-  planBuilderTask,
-  planFinalUpgradeTask,
-  reduceCandidateRevision,
-  requiredEvidenceConceptNames,
-  resolveDecision,
-  transitionBuilderTask,
-  updateLiveContext,
-  supersedeLearningSpec,
-  writeLearningSpecDraft,
-} from '../src/index.ts'
 import {
   activityEventFixture,
   builderTaskFixture,
@@ -33,6 +17,21 @@ import {
   projectFixture,
   timestamp,
 } from '../../contracts/test/fixtures.js'
+import {
+  applyDecision,
+  closeEpisode,
+  confirmLearningSpec,
+  openDecision,
+  planBuilderTask,
+  planFinalUpgradeTask,
+  reduceCandidateRevision,
+  requiredEvidenceConceptNames,
+  resolveDecision,
+  supersedeLearningSpec,
+  transitionBuilderTask,
+  updateLiveContext,
+  writeLearningSpecDraft,
+} from '../src/index.ts'
 
 const secondCandidateId = 'candidate_00000000-0000-4000-8000-000000000041'
 const secondEventId = 'event_00000000-0000-4000-8000-000000000042'
@@ -273,6 +272,17 @@ describe('Task and Decision reducers', () => {
       'local_result',
       'tests_pass',
     ])
+    const withoutForecast = planBuilderTask({
+      project: { ...projectFixture, status: 'SPEC_REVIEW', generatedWorkspacePath: undefined },
+      spec: { ...confirmedLearningSpecFixture, expectedDecisions: [] },
+      taskId: ids.task,
+      sequence: 1,
+      now: timestamp,
+    })
+    expect(withoutForecast.outcome).toBe('APPLIED')
+    if (withoutForecast.outcome === 'APPLIED') {
+      expect(withoutForecast.value.expectedDecisionCategories).toEqual([])
+    }
     expect(
       planBuilderTask({
         project: { ...projectFixture, status: 'SPEC_REVIEW', generatedWorkspacePath: undefined },
@@ -331,6 +341,25 @@ describe('Task and Decision reducers', () => {
       'local_result',
       'tests_pass',
     ])
+    const longGoal = 'A'.repeat(4_000)
+    const bounded = planFinalUpgradeTask({
+      project: { ...projectFixture, title: 'P'.repeat(120) },
+      spec: confirmedLearningSpecFixture,
+      sourceTask,
+      personalization: evidenceAware,
+      userGoal: longGoal,
+      taskId: 'task_00000000-0000-4000-8000-000000000102',
+      now: timestamp,
+    })
+    expect(bounded.outcome).toBe('APPLIED')
+    if (bounded.outcome === 'APPLIED') {
+      expect(bounded.value.title.length).toBeLessThanOrEqual(120)
+      expect(bounded.value.title.endsWith(' 개선')).toBe(true)
+      expect(bounded.value.productGoal).toBe(longGoal)
+      expect(bounded.value.finalUpgrade?.userGoal).toBe(longGoal)
+      expect(bounded.value.requirements[0]).toContain('productGoal')
+      expect(bounded.value.acceptanceCriteria[0]?.description).toContain('productGoal')
+    }
     expect(
       planFinalUpgradeTask({
         project: projectFixture,

@@ -1,0 +1,15 @@
+{
+  "promptVersion": "1.0.2",
+  "containsPersonalData": false,
+  "scenario": "A long synthetic learner question names a short concept phrase and cites one strict USER_MESSAGE reference.",
+  "longUserMessage": "실제 GitHub 웹훅의 push와 issue payload를 그대로 받아서 브라우저 안에서 검사할 때 TypeScript 타입 단언만 쓰면 JSON 파싱 후에도 필수 필드가 빠진 입력을 잡지 못할 것 같은데, 런타임 검증으로 먼저 필드를 확인하고 내부 kind union으로 바꿔야 하는 이유를 다시 설명해 줄 수 있나요? 예시 버튼으로 오류를 비교하고 싶어요.",
+  "conceptPhrase": "런타임 검증",
+  "redactedExcerpt": "타입 단언만 쓰면 JSON 파싱 후에도 필수 필드가 빠진 입력을 잡지 못할 것 같은데",
+  "userEvidenceSource": {
+    "kind": "USER_MESSAGE",
+    "conversationId": "conversation_33000000-0000-4000-8000-000000000001",
+    "messageId": "message_33000000-0000-4000-8000-000000000002"
+  },
+  "episodeId": "episode_33000000-0000-4000-8000-000000000003",
+  "correlationId": "corr_33000000-0000-4000-8000-000000000004"
+}

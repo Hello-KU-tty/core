@@ -24,7 +24,11 @@ export interface AgentInvocation {
   readonly projectId: string
   readonly correlationId: string
   readonly discoverySessionId?: string
+  readonly requestedCandidateIds?: readonly string[]
   readonly taskId?: string
+  /** Exact UI-authored question; transport adapters must not parse it from a prompt. */
+  readonly helperQuestion?: string
+  readonly helperDecisionId?: string
   readonly message: string
   readonly signal: AbortSignal
   readonly onEvent: (event: KiroAcpEvent) => void
@@ -320,6 +324,7 @@ export class WorkflowRuntime {
     mode: AgentInvocation['mode'],
     snapshot: ProjectSessionSnapshot,
     message: string,
+    turnCorrelationId?: string,
   ): Promise<string> {
     if (entry.controller.signal.aborted) throw new WorkflowError('CANCELLED')
     const request = entry.input
@@ -328,12 +333,22 @@ export class WorkflowRuntime {
       mode,
       projectId: snapshot.project.id,
       correlationId:
-        request.kind === 'DISCOVERY'
+        turnCorrelationId ??
+        (request.kind === 'DISCOVERY'
           ? (snapshot.discoverySession?.correlationId ?? snapshot.project.correlationId)
-          : (snapshot.currentTask?.correlationId ?? snapshot.project.correlationId),
+          : (snapshot.currentTask?.correlationId ?? snapshot.project.correlationId)),
       ...(request.kind === 'DISCOVERY'
         ? { discoverySessionId: request.discoverySessionId }
         : { taskId: request.taskId }),
+      ...(request.kind === 'DISCOVERY' && mode === 'ENRICH_SELECTED'
+        ? { requestedCandidateIds: request.candidateIds }
+        : {}),
+      ...(request.kind === 'HELPER'
+        ? {
+            helperQuestion: request.message,
+            ...(request.decisionId === undefined ? {} : { helperDecisionId: request.decisionId }),
+          }
+        : {}),
       message,
       signal: entry.controller.signal,
       onEvent: (event) => {
@@ -372,11 +387,15 @@ export class WorkflowRuntime {
       } else {
         const snapshot = await this.#snapshot(request.projectId)
         this.#validate(request, snapshot)
+        const turnCorrelationId =
+          request.kind === 'HELPER'
+            ? id('corr')
+            : (snapshot.currentTask?.correlationId ?? snapshot.project.correlationId)
         const metadata = {
           schemaVersion: 1,
           projectId: request.projectId,
           taskId: request.taskId,
-          correlationId: snapshot.currentTask?.correlationId,
+          correlationId: turnCorrelationId,
           idempotencyKey: id('idem'),
           actor: { kind: 'AGENT', role: request.kind },
           ...(request.kind === 'HELPER' && request.decisionId !== undefined
@@ -394,12 +413,13 @@ export class WorkflowRuntime {
               : 'Read get_helper_context for this exact Project/Task and question. You are read-only; do not act as Builder or claim to change its state.',
             `Exact user message:\n${request.message}`,
           ].join('\n'),
+          turnCorrelationId,
         )
         if (request.kind === 'HELPER') {
           if (!text.trim()) throw new WorkflowError('HELPER_EMPTY_RESPONSE')
           unwrap(
             await this.#application.executeUi({
-              ...uiMeta(snapshot.currentTask?.correlationId ?? snapshot.project.correlationId),
+              ...uiMeta(turnCorrelationId),
               kind: 'UI_RECORD_HELPER_EXCHANGE',
               projectId: request.projectId,
               taskId: request.taskId,

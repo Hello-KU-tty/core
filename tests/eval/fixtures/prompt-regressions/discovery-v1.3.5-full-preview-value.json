@@ -1,0 +1,189 @@
+{
+  "promptVersion": "1.3.5",
+  "containsPersonalData": false,
+  "source": {
+    "kind": "SYNTHETIC_NATIVE_SAVED_PREVIEW",
+    "projectId": "project_3295a0f6-beef-4ff1-9431-25dfa2d7ba28",
+    "previewRoundId": "candidate_preview_round_d230682e-4eb2-47c5-9a9a-d049aaca45e2",
+    "priorPromptVersion": "1.3.4",
+    "reviewGranularity": "FULL_SIX_FIELD_PREVIEW",
+    "personalNeedProvided": false,
+    "redactionStatus": "NOT_REQUIRED"
+  },
+  "observedPreviews": [
+    {
+      "position": 1,
+      "title": "텍스트 검색 결과 캐싱",
+      "summary": "사용자가 검색어를 입력할 때마다 문서를 다시 스캔하지 않도록 검색 결과를 메모이제이션.",
+      "coreInteraction": "검색어가 바뀔 때만 새로 검색하고, 같은 검색어면 캐시된 결과 반환.",
+      "appeal": "검색 기능이 즉각 반응해야 할 때 실제 성능 차이를 느낄 수 있다.",
+      "technologyNecessity": "검색어 변경을 감지해 정확한 캐시 키를 만들어야 메모이제이션이 효과적이다.",
+      "generationTags": [
+        "DIRECT"
+      ]
+    },
+    {
+      "position": 2,
+      "title": "복잡한 수식 계산 시뮬레이터",
+      "summary": "수학 식을 파싱·계산하는 결과를 인자별로 캐시하고 재사용.",
+      "coreInteraction": "같은 식과 변수값을 입력하면 이전 계산 결과를 바로 보여준다.",
+      "appeal": "계산 시간 단축이 수치로 명확하게 드러나 메모이제이션의 필요성을 직관적으로 이해할 수 있다.",
+      "technologyNecessity": "식·변수·정밀도 등 모든 입력을 캐시 키에 포함해 결과 정확성을 보장해야 한다.",
+      "generationTags": [
+        "DIRECT"
+      ]
+    },
+    {
+      "position": 3,
+      "title": "이미지 필터 효과 프리뷰",
+      "summary": "사진에 여러 필터(밝기, 명도, 채도)를 적용한 결과를 각 조합별로 캐시.",
+      "coreInteraction": "슬라이더를 조정할 때 이전 설정으로 돌아가면 캐시된 이미지를 즉시 표시.",
+      "appeal": "비주얼 피드백이 빨라서 메모이제이션의 성능 개선을 눈으로 직접 확인할 수 있다.",
+      "technologyNecessity": "RGB 채널, 필터 종류, 강도 값을 모두 직렬화해 고유한 캐시 키를 만들어야 한다.",
+      "generationTags": [
+        "DIRECT"
+      ]
+    },
+    {
+      "position": 4,
+      "title": "CSV 데이터 정렬 및 필터링",
+      "summary": "대용량 CSV를 정렬·필터링한 결과를 옵션 조합별로 메모이제이션.",
+      "coreInteraction": "정렬 기준이나 필터 조건을 바꿀 때만 다시 계산하고, 같은 조건으로 돌아오면 이전 결과 재사용.",
+      "appeal": "데이터가 클수록 캐시 효과가 극적으로 드러나 최적화의 가치를 깨닫게 된다.",
+      "technologyNecessity": "정렬 필드, 정렬 방향, 필터 표현식을 정규화해 캐시 키 충돌을 피해야 한다.",
+      "generationTags": [
+        "DIRECT"
+      ]
+    },
+    {
+      "position": 5,
+      "title": "정규식 매칭 캐시",
+      "summary": "텍스트에서 정규식 패턴 매칭 결과를 패턴·옵션별로 캐시해 중복 계산 방지.",
+      "coreInteraction": "같은 패턴과 텍스트로 매칭을 다시 요청하면 캐시된 결과를 반환.",
+      "appeal": "정규식 계산이 무거울 때 메모이제이션이 정말 필요함을 체험할 수 있다.",
+      "technologyNecessity": "대소문자, 글로벌 플래그, 유니코드 옵션까지 캐시 키에 포함해야 정확하다.",
+      "generationTags": [
+        "DIRECT"
+      ]
+    },
+    {
+      "position": 6,
+      "title": "다단계 데이터 변환 파이프라인",
+      "summary": "JSON 데이터를 여러 단계로 변환·검증하되, 각 단계의 결과를 중간 캐시로 보관.",
+      "coreInteraction": "입력이 같으면 어느 단계든 이전 캐시 결과에서 시작해 남은 단계만 실행.",
+      "appeal": "복잡한 변환 작업에서 부분 재사용의 가치를 깨닫게 된다.",
+      "technologyNecessity": "각 변환 단계마다 입력을 정규화한 후 독립적으로 캐시해야 효율성이 높다.",
+      "generationTags": [
+        "EXPAND"
+      ]
+    },
+    {
+      "position": 7,
+      "title": "마크다운 → HTML 렌더 결과 캐싱",
+      "summary": "마크다운 문서를 파싱·변환한 HTML을 렌더링 옵션별로 캐시.",
+      "coreInteraction": "마크다운이나 테마 옵션이 바뀔 때만 다시 변환하고, 같은 조합이면 캐시된 HTML 재사용.",
+      "appeal": "문서 렌더링이 즉각 반응해 메모이제이션의 UX 개선 효과를 직접 느낀다.",
+      "technologyNecessity": "문서 내용, 테마, 마크업 확장 옵션을 모두 키에 포함해야 결과가 일관성 있다.",
+      "generationTags": [
+        "DIRECT"
+      ]
+    },
+    {
+      "position": 8,
+      "title": "LRU 캐시 용량 초과 관리 시뮬레이터",
+      "summary": "정해진 크기의 메모리에 캐시를 채우고, 최근에 쓰지 않은 결과를 자동으로 제거하는 동작 학습.",
+      "coreInteraction": "캐시 크기 제한을 설정한 후 여러 입력을 요청하면, 오래된 캐시가 버려지는 과정을 시각적으로 확인.",
+      "appeal": "캐시 전략이 단순한 저장이 아니라 전략적 선택임을 이해하게 된다.",
+      "technologyNecessity": "LRU 정책을 구현해 캐시 접근 시간과 제거 순서를 올바르게 추적해야 한다.",
+      "generationTags": [
+        "DISCOVER"
+      ]
+    },
+    {
+      "position": 9,
+      "title": "함수 합성과 메모이제이션 조합",
+      "summary": "여러 순수 함수를 조합한 파이프라인에서 중간 결과를 메모이제이션.",
+      "coreInteraction": "파이프라인의 각 단계 입력이 같으면 해당 단계부터 캐시를 사용해 전체 계산 속도 개선.",
+      "appeal": "함수형 프로그래밍 패턴과 메모이제이션이 어떻게 함께 작동하는지 구체적으로 경험한다.",
+      "technologyNecessity": "각 함수의 입력을 독립적으로 추적하고 캐시 키를 합성해야 효율성이 극대화된다.",
+      "generationTags": [
+        "EXPAND"
+      ]
+    },
+    {
+      "position": 10,
+      "title": "캐시 무효화 전략 비교 대시보드",
+      "summary": "TTL 기반, 이벤트 기반, 수동 무효화 등 여러 전략을 한 화면에서 비교하고 선택.",
+      "coreInteraction": "각 전략을 별도 탭에서 시뮬레이션하고, 같은 상황에서 각각 언제 캐시를 버리는지 확인.",
+      "appeal": "어떤 무효화 전략이 상황에 맞는지 직접 실험해 판단하는 경험을 얻는다.",
+      "technologyNecessity": "타임스탬프, 의존성 그래프, 수동 트리거를 각각 구현해 비교 가능하게 만들어야 한다.",
+      "generationTags": [
+        "DISCOVER"
+      ]
+    }
+  ],
+  "historicalRuleDelta": {
+    "priorRule": "- 후보마다 특정 사용자가 실제 상황에서 해내려는 일과 완료 뒤 얻는 결과를 먼저 정하라. `summary`와 `coreInteraction`만으로 사용 상황·행동·완료 순간이 보여야 하며, 기술 기능 자체의 시연을 제품 결과로 제시하지 마라.",
+    "revisedRule": "- 후보마다 접근 가능한 사용 상황과 입력 → 사용자 행동 → 가져갈 결과 또는 다시 찾을 이유가 `summary`·`coreInteraction`·`appeal`에 드러나는지 제출 전에 점검하라. 완료 순간이 목표 기술의 동작 관찰·성능 시각화·학습 그 자체뿐인 방향은 정확히 10개를 제출하기 전에 실제 쓰임이 있는 후보로 다시 만들거나 교체하라."
+  },
+  "humanReviewFocus": [
+    {
+      "positions": [
+        2,
+        8,
+        9
+      ],
+      "question": "Is the only completed result observing or learning the target technology, with no separate user task or useful artifact?"
+    },
+    {
+      "positions": [
+        3,
+        7
+      ],
+      "question": "Does the photo or document workflow remain useful even when caching preserves the visible feature and mainly improves responsiveness?"
+    },
+    {
+      "positions": [
+        1,
+        4,
+        5,
+        6,
+        10
+      ],
+      "question": "Can an accessible input, action, output and adoption path be identified without inventing a new product premise during enrichment?"
+    }
+  ],
+  "unseenGoalOnlyContrast": {
+    "learningGoal": "TypeScript discriminated union과 runtime validation을 작은 브라우저 도구를 만들며 익힌다",
+    "personalNeed": null,
+    "useful": {
+      "title": "설정 파일 사전 검사",
+      "summary": "로컬 JSON 설정을 열어 앱 실행 전에 입력 오류를 찾는다.",
+      "coreInteraction": "파일을 놓으면 항목별 오류와 고칠 위치를 보여준다.",
+      "appeal": "실행 실패 전에 설정을 바로잡아 다시 쓸 수 있다.",
+      "technologyNecessity": "외부 JSON을 검증하고 항목 종류별 오류를 구별한다.",
+      "generationTags": [
+        "DIRECT"
+      ]
+    },
+    "technologyDemo": {
+      "title": "유니온 분기 체험기",
+      "summary": "여러 타입 분기의 switch 실행 경로를 표시한다.",
+      "coreInteraction": "variant를 고르면 해당 분기 코드를 시각화한다.",
+      "appeal": "discriminated union의 작동 방식을 눈으로 배운다.",
+      "technologyNecessity": "타입 분기 예제를 만들어 개념을 설명한다.",
+      "generationTags": [
+        "DIRECT"
+      ]
+    },
+    "reviewQuestion": "Which preview gives a user with no stated Personal Need a reachable task and useful result while still requiring the target concepts?"
+  },
+  "humanReviewCriteria": [
+    "Each preview has a plausible accessible input or situation, user action, and useful output or reason to return, not only a lesson about the target technique.",
+    "The technologyNecessity field identifies a concrete implementation point and meaningful effect; feature-preserving correctness or responsiveness can count.",
+    "A first browser/TypeScript MVP can deliver the promised result without external permission or operating burden overwhelming its value.",
+    "The ten saved directions differ in user task and interaction, not merely in algorithm or theme."
+  ],
+  "revisedPromptNativeResult": "OBSERVED_MIXED",
+  "automatedQualityVerdict": "NOT_ASSERTED"
+}

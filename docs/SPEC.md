@@ -3,6 +3,7 @@
 ## 1. 상태
 
 - 상태: T00~T18 구현 완료, T19 자체 IDE 패널 연동 구현·검증 사용자 승인(2026-09-07), 진행 중. frontend 대상은 Windows이며 push는 별도 승인 대기다.
+- 2026-09-15의 마지막 4시간은 pin한 macOS Kiro 일반 profile에서 P3 Builder/late Helper 반복·확인된 Helper 취소 재사용·새 실제 Decision 해결/Builder 적용을 최소 실측한 뒤 IDE-only frontend 착수 가능 범위를 판정한다. 기존 CLI 구현은 삭제하지 않고 Windows·장기 안정성·정밀 CLI 비교를 완료로 간주하지 않는다. [판정 계획](spikes/T19_NATIVE_IDE_ONLY_4H_CUTOVER_PLAN_20260915.md)을 따른다.
 - 기준일: 2026-08-24
 - 입력 원본: [PROJECT_BRIEF.md](../PROJECT_BRIEF.md)
 - 상세 맥락: [PROJECT_SPEC.md](../PROJECT_SPEC.md), [CONVERSATION_RECORD.md](../CONVERSATION_RECORD.md)
@@ -143,8 +144,8 @@ Concept Ledger + Project History
 - `FR-SPEC-003`: Spec은 LEARNER_FOCUS, AGENT_SUPPORT, EXCLUDED를 구분해야 한다.
 - `FR-SPEC-004`: AGENT_SUPPORT는 필수 Evidence 목표 또는 Knowledge Debt로 계산하지 않아야 한다.
 - `FR-SPEC-005`: 사용자가 명시적으로 Spec을 확정하기 전 Builder를 시작하지 않아야 한다.
-- `FR-SPEC-006`: Spec은 제품 목적, 사용자, 성공 순간, MVP 기능, 예상 Decision, TypeScript와 배포 제약을 포함해야 한다.
-- `FR-SPEC-007`: Spec의 기본 UI는 직접 편집 textbox를 제공하지 않고, 사용자·사용 순간·성공 순간·MVP·세 scope와 예상 Decision을 초보자가 읽기 쉬운 시각적 요약으로 보여줘야 한다.
+- `FR-SPEC-006`: Spec은 제품 목적, 사용자, 성공 순간, MVP 기능, 예상 Decision 목록, TypeScript와 배포 제약을 포함해야 한다. 사용자에게 맡길 실제 갈림길이 아직 없으면 예상 목록은 빈 배열로 둔다.
+- `FR-SPEC-007`: Spec의 기본 UI는 직접 편집 textbox를 제공하지 않고, 사용자·사용 순간·성공 순간·MVP·세 scope와 예상 Decision을 초보자가 읽기 쉬운 시각적 요약으로 보여줘야 한다. 예상 목록이 비어 있을 때도 구현 중 실제 판단이 생기면 다시 묻는다는 점을 보여준다.
 - `FR-SPEC-008`: 사용자는 하나의 충분히 큰 자유 입력으로 Agent에게 Spec 수정을 반복 요청하고, 새 revision을 다시 검토한 뒤에만 확정해야 한다.
 - `FR-SPEC-009`: Spec 수정 성공은 Agent 설명이 아니라 durable Spec revision 증가로 판정해야 한다. 첫 응답이 tool 없이 끝나면 최신 Core 상태에서 한 번만 자동 복구하고, 두 번째 실패는 현재 revision을 유지한 채 명시적으로 보여줘야 한다.
 - `FR-SPEC-010`: 확정된 Spec은 Build를 시작하는 durable 기준선이지만 변경 불가능한 권한 경계가 아니다. 사용자는 Build 중에도 제품·기술 선택과 학습 범위를 다시 논의하거나 바꿀 수 있고, 이후의 명시적 Decision과 Completion Report가 변경 영향과 Spec 이탈을 추적해야 한다. `AGENT_SUPPORT`와 `EXCLUDED`도 질문·학습 권한을 제한하지 않으며 안전·권한·데이터 경계만 별도로 강제한다.
@@ -303,6 +304,9 @@ T01 macOS probe의 두 실행은 20~37ms에 dispatch가 반환되고 약 12초 �
 - `NFR-COMP-002`: Core와 MCP contract는 Kiro UI package와 분리해야 한다.
 - `NFR-COMP-003`: MVP host는 Kiro/Crew이며 Claude Code·Codex adapter는 구현하지 않는다.
 - `NFR-COMP-004`: Code 중심 패널의 Core 연결, Agent identity·model·MCP 권한, stream·중지와 process lifecycle은 T19 capability spike에서 설치된 Kiro 버전으로 검증해야 한다. T01의 내장 Agent 검증을 자체 패널 transport의 검증으로 간주하지 않아야 한다.
+- `NFR-COMP-005`: T19-N은 기존 CLI/Crew runtime을 보존하는 실험적 Kiro IDE 내장 Agent adapter다. 비공개 host 명령은 설치 버전·실제 반환값·workspace trust·Agent identity·MCP·권한을 gate로 검증하고 실패를 명시해야 한다. 파일 side effect만으로 stream 종료, 역할 분리, Core Decision 또는 Analyst 성공을 주장하지 않는다. Windows T19 완료 조건을 대체하지 않는다.
+- `NFR-COMP-006`: T19-N의 추가 수직 흐름 실험은 IDE 내장 Agent가 실제 Core에 낸 역할별 MCP 요청, 생성 workspace의 파일 변경, 결정적 UI Decision 해결, 별도 read-only Helper, UI 출처의 합성 사용자 Evidence·Episode, tool-less Analyst 결과의 Core 수락 및 다음 Helper/Discovery 개인화를 단계별 durable receipt로 판정한다. 성공하지 않은 구간은 fixture seed나 Agent 설명으로 대신하지 않는다.
+- `NFR-COMP-007`: IDE-only frontend 인계는 pin한 macOS 설치의 bounded 기능 검증과 개발 착수 판단이다. private API·고정 버전·외부 backend lifecycle을 명시하고 CLI fallback source를 보존한다. Windows 지원, 장기 안정성, 진행 중 reconnect와 CLI 비용·지연 동등성은 별도 미검증 gate이며 안전 또는 실제 실패를 UI polish로 대체하지 않는다.
 
 ### 6.5 운영과 신뢰성
 

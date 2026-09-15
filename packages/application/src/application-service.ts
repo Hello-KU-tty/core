@@ -1,77 +1,77 @@
 import { randomUUID } from 'node:crypto'
 
 import {
-  type AnalysisJob,
-  analysisJobSchema,
-  type AnalysisRuntimeRequest,
-  analysisRuntimeRequestSchema,
-  analystSubmitEvidenceProposalsCommandSchema,
-  ANALYSIS_MAX_ATTEMPTS,
-  ANALYSIS_SOFT_TIMEOUT_MS,
-  acceptedEvidenceSchema,
   type ActivityEvent,
-  activityEventSchema,
   type AgentRequest,
   type AgentRole,
+  ANALYSIS_MAX_ATTEMPTS,
+  ANALYSIS_SOFT_TIMEOUT_MS,
+  type AnalysisJob,
+  type AnalysisRuntimeRequest,
   type AuditRecord,
+  acceptedEvidenceSchema,
+  activityEventSchema,
+  analysisJobSchema,
+  analysisRuntimeRequestSchema,
+  analystSubmitEvidenceProposalsCommandSchema,
   auditRecordSchema,
-  type BuilderTaskContext,
-  type BuilderTask,
-  builderTaskContextSchema,
   type BuilderSessionBindingDescriptor,
+  type BuilderTask,
+  type BuilderTaskContext,
   builderSessionBindingDescriptorSchema,
+  builderTaskContextSchema,
   type CandidateRound,
   type CanonicalConcept,
-  canonicalConceptSchema,
   type CommandReceipt,
-  commandReceiptSchema,
   type ContractError,
+  canonicalConceptSchema,
+  commandReceiptSchema,
   contextRefreshRequestSchema,
   correlationIdSchema,
   type DecisionCommandReceipt,
-  decisionCommandReceiptSchema,
+  type DecisionResult,
+  type DiscoveryContext,
+  type DiscoveryFeedback,
   decisionApplicationSchema,
+  decisionCommandReceiptSchema,
   decisionRequestSchema,
   decisionResolutionSchema,
-  type DecisionResult,
   decisionResultSchema,
-  type DiscoveryContext,
   discoveryContextSchema,
-  type DiscoveryFeedback,
-  type EpisodeContext,
   type Episode,
-  episodeSchema,
-  episodeContextSchema,
+  type EpisodeContext,
   type EvidenceBatchApplicationResult,
-  evidenceBatchApplicationResultSchema,
   type EvidenceProposal,
+  episodeContextSchema,
+  episodeSchema,
+  evidenceBatchApplicationResultSchema,
   evidenceProposalBatchSchema,
   evidenceProposalSchema,
-  type HelperExchangeReceipt,
-  helperExchangeReceiptSchema,
   type GeneratedResultDescriptor,
   generatedResultDescriptorSchema,
   type HelperContext,
-  helperContextSchema,
   type HelperConversationSummary,
+  type HelperExchangeReceipt,
+  helperContextSchema,
   helperConversationSummarySchema,
+  helperExchangeReceiptSchema,
   type LearningSpecRevision,
   type LiveProjectContext,
+  liveProjectContextSchema,
   type OperationError,
-  type Project,
-  type ProjectHistory,
-  projectHistorySchema,
-  type ProjectEvidenceTrace,
-  projectEvidenceTraceSchema,
-  type ProjectCandidateRevision,
-  type ProjectSessionSnapshot,
-  projectSessionSnapshotSchema,
-  type PreparedBuilderTaskDescriptor,
-  preparedBuilderTaskDescriptorSchema,
   type PersonalizationBasis,
   type PersonalizationTrace,
+  type PreparedBuilderTaskDescriptor,
+  type Project,
+  type ProjectCandidateRevision,
+  type ProjectEvidenceTrace,
+  type ProjectHistory,
+  type ProjectSessionSnapshot,
   personalizationTraceSchema,
-  liveProjectContextSchema,
+  preparedBuilderTaskDescriptorSchema,
+  projectEvidenceTraceSchema,
+  projectHistorySchema,
+  projectSessionSnapshotSchema,
   type UiRequest,
   uiRequestSchema,
   validateAgentRequest,
@@ -81,20 +81,20 @@ import {
   appendEpisodeEvent,
   applyDecision,
   applyMisconceptionProposal,
-  confirmLearningSpec,
   closeEpisode,
+  confirmLearningSpec,
   evaluateEvidenceProposal,
   openDecision,
-  reduceCandidateRevision,
-  reduceConceptState,
-  resolveDecision,
   planBuilderTask,
   planFinalUpgradeTask,
-  transitionBuilderTask,
+  reduceCandidateRevision,
+  reduceConceptState,
+  updateLiveContext as reduceLiveContext,
+  resolveDecision,
   supersedeLearningSpec,
   transitionAnalysisJob,
+  transitionBuilderTask,
   transitionEpisodeAnalysis,
-  updateLiveContext as reduceLiveContext,
   writeLearningSpecDraft,
 } from '@vibe-helper/domain'
 
@@ -675,6 +675,7 @@ export class ApplicationService {
       readonly correlationId: string
       readonly question: string
       readonly relatedConceptNames: readonly string[]
+      readonly directTaskIds: readonly string[]
     },
   ): PersonalizationTrace {
     const personalizationId = deterministicPersonalizationId(
@@ -691,7 +692,7 @@ export class ApplicationService {
       )
       return names.some((name) => explicitNames.has(name) || question.includes(name))
     })
-    const basis = relevantTraces
+    const lexicalBasis = relevantTraces
       .flatMap((trace) => {
         const purpose = trace.acceptedEvidence.some(
           (evidence) => evidence.projectId !== input.projectId,
@@ -700,6 +701,37 @@ export class ApplicationService {
           : ('HELPER_EXPLANATION_START' as const)
         const item = this.#personalizationBasis(repository, trace, trace.acceptedEvidence, purpose)
         return item === null ? [] : [item]
+      })
+      .slice(0, 5)
+    const directTaskIds = new Set(input.directTaskIds)
+    const taskTraces =
+      directTaskIds.size === 0
+        ? []
+        : repository.readRecentUserEvidenceTracesForTasks(input.projectId, input.directTaskIds, 10)
+    const taskBasis = taskTraces
+      .flatMap((trace) => {
+        const userEvidence = trace.acceptedEvidence.filter(
+          (evidence) =>
+            evidence.kind === 'USER_UNDERSTANDING' &&
+            evidence.projectId === input.projectId &&
+            evidence.taskId !== undefined &&
+            directTaskIds.has(evidence.taskId),
+        )
+        const item = this.#personalizationBasis(
+          repository,
+          trace,
+          userEvidence,
+          'HELPER_TASK_USER_EVIDENCE_CONNECTION',
+        )
+        return item === null ? [] : [item]
+      })
+      .slice(0, 5)
+    const seenConceptIds = new Set<string>()
+    const basis = [...taskBasis.slice(0, 2), ...lexicalBasis, ...taskBasis.slice(2)]
+      .filter((item) => {
+        if (seenConceptIds.has(item.conceptId)) return false
+        seenConceptIds.add(item.conceptId)
+        return true
       })
       .slice(0, 5)
     const personalization = personalizationTraceSchema.parse({
@@ -2073,6 +2105,27 @@ export class ApplicationService {
             request.context.taskId,
             request.correlationId,
           )
+          // Decision request/application events own the active set. A later Agent
+          // checkpoint must not resurrect an applied Decision or hide one that
+          // still awaits application.
+          const appliedDecisionIds = new Set(
+            current.decisionApplications.map((application) => application.decisionId),
+          )
+          const expectedActiveDecisionIds = new Set(
+            current.decisionRequests
+              .filter((decision) => !appliedDecisionIds.has(decision.id))
+              .map((decision) => decision.id),
+          )
+          if (
+            request.context.activeDecisionIds.length !== expectedActiveDecisionIds.size ||
+            !sameStringSet(new Set(request.context.activeDecisionIds), expectedActiveDecisionIds)
+          ) {
+            throw this.#validationError(
+              request.correlationId,
+              'LIVE_CONTEXT_ACTIVE_DECISIONS_MISMATCH',
+              'Active Decision IDs must match the requested Decisions not yet applied.',
+            )
+          }
           const reduced = reduceLiveContext({
             task: current.task,
             ...(current.liveContext === null ? {} : { current: current.liveContext }),
@@ -2455,6 +2508,14 @@ export class ApplicationService {
         })
         if (reduced.outcome === 'REJECTED') {
           throw this.#domainError(request.correlationId, reduced.reasonCode)
+        }
+        if (reduced.outcome === 'NO_OP') {
+          const response = this.#receipt(request.correlationId, aggregate.task.revision)
+          return {
+            response,
+            resourceId: decision.id,
+            resourceRevision: aggregate.task.revision,
+          }
         }
         repository.appendDecisionResolution(resolution)
         const resolvedDecisionIds = new Set([
@@ -3034,10 +3095,23 @@ export class ApplicationService {
         correlationId: request.correlationId,
         question: request.question,
         relatedConceptNames: relevanceNames,
+        directTaskIds: unique([
+          aggregate.task.id,
+          ...aggregate.task.prerequisiteTaskIds,
+          ...(aggregate.task.finalUpgrade === undefined
+            ? []
+            : [aggregate.task.finalUpgrade.sourceTaskId]),
+        ]),
       }),
     )
     const personalizationConceptIds = new Set(personalization.basis.map((basis) => basis.conceptId))
-    const relevantLedgerEntries = traces
+    const basisTraces = this.#storage.transaction((repository) =>
+      personalization.basis.flatMap((basis) => {
+        const trace = repository.readEvidenceTrace(basis.conceptId)
+        return trace === null ? [] : [trace]
+      }),
+    )
+    const relevantLedgerEntries = basisTraces
       .flatMap((trace) => (trace.ledger === null ? [] : [trace.ledger]))
       .filter((entry) => personalizationConceptIds.has(entry.concept.id))
       .filter(
@@ -3085,6 +3159,26 @@ export class ApplicationService {
       ...(aggregate.completionReport?.diffReferences ?? []),
       ...recentEpisodes.flatMap((episode) => episode.contextReferences),
     ]
+    const lowerQuestion = request.question.toLocaleLowerCase('en-US')
+    const isFileTokenCharacter = (character: string): boolean =>
+      character.length > 0 && ('._/-'.includes(character) || /[a-z0-9]/iu.test(character))
+    const mentionsFile = (name: string): boolean => {
+      let position = lowerQuestion.indexOf(name)
+      while (position !== -1) {
+        const before = lowerQuestion.charAt(position - 1)
+        const after = lowerQuestion.charAt(position + name.length)
+        if (!isFileTokenCharacter(before) && !isFileTokenCharacter(after)) return true
+        position = lowerQuestion.indexOf(name, position + 1)
+      }
+      return false
+    }
+    const codeMentionScore = (reference: (typeof rawReferences)[number]): number => {
+      if (reference.kind !== 'CODE') return 0
+      const path = reference.path.toLocaleLowerCase('en-US')
+      if (mentionsFile(path)) return 2
+      const basename = path.split('/').at(-1) ?? path
+      return mentionsFile(basename) ? 1 : 0
+    }
     const contextReferences = rawReferences
       .filter(
         (reference, index, references) =>
@@ -3092,7 +3186,10 @@ export class ApplicationService {
             (candidate) => canonicalJson(candidate) === canonicalJson(reference),
           ) === index,
       )
+      .map((reference, index) => ({ reference, index, score: codeMentionScore(reference) }))
+      .sort((left, right) => right.score - left.score || left.index - right.index)
       .slice(0, 30)
+      .map(({ reference }) => reference)
     const sourceExcerpts = []
     const referenceDetails = []
     for (const reference of contextReferences) {
@@ -3831,6 +3928,11 @@ export class ApplicationService {
             'EPISODE_STALE',
           )
           const existingProposalIds = aggregate.evidenceProposals.map((proposal) => proposal.id)
+          const decisionResolutions =
+            aggregate.episode.taskId === undefined
+              ? []
+              : (repository.readBuilderTaskAggregate(projectId, aggregate.episode.taskId)
+                  ?.decisionResolutions ?? [])
           const outcomes: EvidenceBatchApplicationResult['outcomes'][number][] = []
           for (const proposal of request.batch.proposals) {
             const concept = this.#resolveConcept(repository, proposal, request.batch.submittedAt)
@@ -3844,6 +3946,7 @@ export class ApplicationService {
               episode: aggregate.episode,
               episodeRevision: request.batch.episodeRevision,
               events: aggregate.events,
+              decisionResolutions,
               concept,
               existingProposalIds: [
                 ...existingProposalIds,

@@ -2,7 +2,9 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: './tests/e2e',
-  fullyParallel: true,
+  // E2E specs share one temporary backend; their project histories must not interleave.
+  fullyParallel: false,
+  workers: 1,
   forbidOnly: true,
   retries: 0,
   reporter: 'list',

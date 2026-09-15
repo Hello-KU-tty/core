@@ -9,6 +9,7 @@ import {
 import { applied, type DomainResult, rejected } from './result.js'
 
 const OPERATION = 'BUILDER_TASK_PLAN'
+const MAX_TITLE = 120
 const MAX_LONG_TEXT = 4_000
 const MAX_SHORT_TEXT = 240
 
@@ -57,6 +58,21 @@ function pack(values: readonly string[], prefix: string, limit: number): string[
   }
   if (current !== prefix) chunks.push(current)
   return chunks
+}
+
+function appendBoundedTitle(title: string, suffix: string): string {
+  const limit = MAX_TITLE - suffix.length
+  let prefix = ''
+  for (const character of title) {
+    if (prefix.length + character.length > limit) break
+    prefix += character
+  }
+  return `${prefix.trimEnd()}${suffix}`
+}
+
+function goalStatement(prefix: string, userGoal: string, fallback: string): string {
+  const statement = `${prefix}${userGoal}`
+  return statement.length <= MAX_LONG_TEXT ? statement : fallback
 }
 
 export function planBuilderTask(input: PlanBuilderTaskInput): DomainResult<BuilderTask> {
@@ -199,10 +215,14 @@ export function planFinalUpgradeTask(input: PlanFinalUpgradeTaskInput): DomainRe
     learningSpecRevision: input.spec.revision,
     correlationId: input.project.correlationId,
     revision: 1,
-    title: `${input.project.title} improvement`,
+    title: appendBoundedTitle(input.project.title, ' 개선'),
     productGoal: userGoal,
     requirements: [
-      `Implement the user-selected improvement: ${userGoal}`,
+      goalStatement(
+        'Implement the user-selected improvement: ',
+        userGoal,
+        'Implement the user-selected improvement described in productGoal.',
+      ),
       'Preserve the working MVP unless the user explicitly changes its behavior.',
       'Use TypeScript for the generated project runtime.',
       'Update .vibe-helper/result.json when the compiled loopback web entry changes.',
@@ -210,7 +230,11 @@ export function planFinalUpgradeTask(input: PlanFinalUpgradeTaskInput): DomainRe
     acceptanceCriteria: [
       {
         key: 'user_selected_improvement',
-        description: `Implement and verify the selected improvement: ${userGoal}`,
+        description: goalStatement(
+          'Implement and verify the selected improvement: ',
+          userGoal,
+          'Implement and verify the user-selected improvement described in productGoal.',
+        ),
       },
       {
         key: 'local_result',

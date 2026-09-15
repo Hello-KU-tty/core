@@ -94,7 +94,10 @@ describe('Discovery and Learning Spec invariants', () => {
         ...confirmedLearningSpecFixture,
         expectedDecisions: [],
       }).success,
-    ).toBe(false)
+    ).toBe(true)
+    const { expectedDecisions: _expectedDecisions, ...withoutDecisionForecast } =
+      confirmedLearningSpecFixture
+    expect(learningSpecRevisionSchema.safeParse(withoutDecisionForecast).success).toBe(false)
     expect(
       learningSpecRevisionSchema.safeParse({
         ...confirmedLearningSpecFixture,

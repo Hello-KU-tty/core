@@ -36,6 +36,7 @@ export const personalizationPurposeSchema = z.enum([
   'DISCOVERY_TIE_BREAK',
   'HELPER_EXPLANATION_START',
   'HELPER_PAST_EXPERIENCE_CONNECTION',
+  'HELPER_TASK_USER_EVIDENCE_CONNECTION',
 ])
 
 export const personalizationBasisSchema = z.strictObject({

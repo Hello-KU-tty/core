@@ -2,18 +2,6 @@ import { fileURLToPath } from 'node:url'
 
 import { analysisJobSchema } from '@vibe-helper/contracts'
 import { describe, expect, it, vi } from 'vitest'
-
-import {
-  createEvidenceAnalystAgentDefinition,
-  EVIDENCE_ANALYST_AGENT_NAME,
-  type EvidenceAnalystAdapterError,
-  type EvidenceAnalystApplication,
-  EvidenceAnalystJobAdapter,
-  EVIDENCE_ANALYST_PROMPT_SOURCE,
-  EVIDENCE_ANALYST_PROMPT_VERSION,
-  parseEvidenceAnalystResult,
-} from '../src/evidence-analyst-agent.js'
-import { loadEvidenceAnalystAgentDefinition } from '../src/evidence-analyst-prompt-node.js'
 import {
   activityEventFixture,
   analysisJobFixture,
@@ -23,6 +11,17 @@ import {
   episodeFixture,
   ids,
 } from '../../contracts/test/fixtures.js'
+import {
+  createEvidenceAnalystAgentDefinition,
+  EVIDENCE_ANALYST_AGENT_NAME,
+  EVIDENCE_ANALYST_PROMPT_SOURCE,
+  EVIDENCE_ANALYST_PROMPT_VERSION,
+  type EvidenceAnalystAdapterError,
+  type EvidenceAnalystApplication,
+  EvidenceAnalystJobAdapter,
+  parseEvidenceAnalystResult,
+} from '../src/evidence-analyst-agent.js'
+import { loadEvidenceAnalystAgentDefinition } from '../src/evidence-analyst-prompt-node.js'
 
 const repositoryRoot = fileURLToPath(new URL('../../..', import.meta.url))
 
@@ -48,6 +47,10 @@ describe('Evidence Analyst adapter', () => {
     })
     expect(definition.prompt).toContain('빈 `proposals`')
     expect(definition.prompt).toContain('strict JSON')
+    expect(definition.prompt).toContain('미래 계획·조건부 해결책·Agent 지시는 수행이 아니다')
+    expect(definition.prompt).toContain('구조화된 `USER_DECISION`')
+    expect(definition.prompt).toContain('발화 시점에 아직 관찰하지 않은')
+    expect(definition.prompt).toContain('일반 조건·정의나 이미 확인한 과거 관찰')
   })
 
   it('rejects prompt drift and non-contract semantic output', () => {

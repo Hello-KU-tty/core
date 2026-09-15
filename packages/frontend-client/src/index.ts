@@ -1,21 +1,21 @@
 import { randomUUID } from 'node:crypto'
 import {
+  type DiscoveryInput,
   LOCAL_PROTOCOL_VERSION,
-  localConnectionSchema,
-  localRunRequestSchema,
-  localRunSchema,
-  localRunEventSchema,
-  localRunIdSchema,
-  projectIdSchema,
-  localResponseSchemas,
-  uiRequestSchema,
   type LocalConnection,
   type LocalRun,
-  type LocalRunInput,
   type LocalRunEvent,
+  type LocalRunInput,
   type LocalUiResponse,
+  localConnectionSchema,
+  localResponseSchemas,
+  localRunEventSchema,
+  localRunIdSchema,
+  localRunRequestSchema,
+  localRunSchema,
+  projectIdSchema,
   type UiRequest,
-  type DiscoveryInput,
+  uiRequestSchema,
 } from '@vibe-helper/contracts'
 
 export * from '@vibe-helper/contracts'
@@ -50,7 +50,7 @@ export class LocalCoreClient {
     if (port < 1 || port > 65_535) throw new LocalClientError('INVALID_LOCAL_PORT')
     this.#fetch = options.fetch ?? globalThis.fetch
   }
-  async health(): Promise<{ protocolVersion: number; backendInstanceId: string }> {
+  async health(): Promise<{ protocolVersion: number; backendInstanceId: string; agent?: string }> {
     const value = await this.#json('/health')
     if (
       !isRecord(value) ||
@@ -61,6 +61,7 @@ export class LocalCoreClient {
     return {
       protocolVersion: LOCAL_PROTOCOL_VERSION,
       backendInstanceId: this.#connection.backendInstanceId,
+      ...(typeof value.agent === 'string' ? { agent: value.agent } : {}),
     }
   }
   async execute<K extends UiRequest['kind']>(

@@ -8,7 +8,7 @@ const builderSourcePath = join(workspaceRoot, 'docs', 'agent-prompts', 'builder.
 const helperSourcePath = join(workspaceRoot, 'docs', 'agent-prompts', 'helper.md')
 const analystSourcePath = join(workspaceRoot, 'docs', 'agent-prompts', 'evidence-analyst.md')
 const agentsDirectory = join(workspaceRoot, 'agents')
-const expectedVersion = '1.3.0'
+const expectedVersion = '1.3.5'
 const discoveryModel = process.env.VIBE_HELPER_DISCOVERY_MODEL ?? 'claude-haiku-4.5'
 const specModel = process.env.VIBE_HELPER_SPEC_MODEL ?? discoveryModel
 for (const model of [discoveryModel, specModel]) {
@@ -27,14 +27,14 @@ if (version !== expectedVersion) {
     `Discovery prompt version mismatch: expected ${expectedVersion}, received ${version ?? 'none'}`,
   )
 }
-if (builderPrompt.match(/^> Prompt version: `([^`]+)`$/m)?.[1] !== '1.3.1') {
-  throw new TypeError('Builder prompt version mismatch: expected 1.3.1')
+if (builderPrompt.match(/^> Prompt version: `([^`]+)`$/m)?.[1] !== '1.3.6') {
+  throw new TypeError('Builder prompt version mismatch: expected 1.3.6')
 }
 if (helperPrompt.match(/^> Prompt version: `([^`]+)`$/m)?.[1] !== '1.2.0') {
   throw new TypeError('Helper prompt version mismatch: expected 1.2.0')
 }
-if (analystPrompt.match(/^> Prompt version: `([^`]+)`$/m)?.[1] !== '1.0.1') {
-  throw new TypeError('Evidence Analyst prompt version mismatch: expected 1.0.1')
+if (analystPrompt.match(/^> Prompt version: `([^`]+)`$/m)?.[1] !== '1.0.7') {
+  throw new TypeError('Evidence Analyst prompt version mismatch: expected 1.0.7')
 }
 
 function sectionStart(heading) {
@@ -54,11 +54,16 @@ const expressionStart = sectionStart('## 표현 방식')
 const identity = prompt.slice(0, sectionStart('## 최우선 원칙')).trimEnd()
 const specQuality = prompt.slice(learningSpecStart, specFastStart).trim()
 const expressionAndSafety = prompt.slice(expressionStart).trim()
+const nativeTransportLine = prompt.match(/^- Native IDE의 `submit_candidate_previews`[^\n]+$/m)?.[0]
+if (!nativeTransportLine) throw new TypeError('Native Discovery transport guidance is missing')
+// Crew agents use their own MCP schemas. Keep the native-only inputJson wrapper
+// out of their role prompts, including the Round and Merge shared prelude.
+const crewSharedPrelude = prompt.slice(0, previewStart).replace(`${nativeTransportLine}\n`, '')
 const phasePrompts = {
   preview: `${identity}\n\n${prompt.slice(previewStart, enrichmentStart).trim()}\n`,
   enrichment: `${identity}\n\n${prompt.slice(enrichmentStart, candidateStart).trim()}\n`,
-  round: `${prompt.slice(0, previewStart).trimEnd()}\n\n${prompt.slice(candidateStart, learningSpecStart).trim()}\n\n${expressionAndSafety}\n`,
-  merge: `${prompt.slice(0, previewStart).trimEnd()}\n\n${prompt.slice(mergeStart, learningSpecStart).trim()}\n\n${expressionAndSafety}\n`,
+  round: `${crewSharedPrelude.trimEnd()}\n\n${prompt.slice(candidateStart, learningSpecStart).trim()}\n\n${expressionAndSafety}\n`,
+  merge: `${crewSharedPrelude.trimEnd()}\n\n${prompt.slice(mergeStart, learningSpecStart).trim()}\n\n${expressionAndSafety}\n`,
   spec: `${identity}\n\n${specQuality}\n\n${prompt.slice(specFastStart, specRecoveryStart).trim()}\n\n모든 구조화된 결과는 제공된 Core tool로 제출하라.\n`,
   specRecovery: `${identity}\n\n${specQuality}\n\n${prompt.slice(specRecoveryStart, expressionStart).trim()}\n\n모든 구조화된 결과는 제공된 Core tool로 제출하라.\n`,
 }

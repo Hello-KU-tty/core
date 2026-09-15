@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "runtimeSource": "KIRO_IDE_1.0.437_AGENT_1.0.794_MACOS_ARM64",
+  "platform": "darwin",
+  "arch": "arm64",
+  "vscodeVersion": "1.109.5",
+  "kiroIdeVersion": "1.0.437",
+  "agentExtensionVersion": "1.0.794",
+  "nodeVersion": "24.19.0",
+  "nodeExecutable": "/opt/homebrew/opt/node@24/bin/node"
+}

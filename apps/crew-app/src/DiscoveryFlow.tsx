@@ -1007,6 +1007,9 @@ export function SpecWorkspace({
               <h3 id="spec-decision-title">이런 순간에는 다시 물어볼게요</h3>
             </div>
             <div className="spec-decision-list">
+              {spec.expectedDecisions.length === 0 && (
+                <p>지금 예고할 선택은 없어요. 구현 중 실제 판단이 필요해지면 그때 물어볼게요.</p>
+              )}
               {spec.expectedDecisions.map((decision) => (
                 <article key={`${decision.category}-${decision.description}`}>
                   <strong>{decision.description}</strong>

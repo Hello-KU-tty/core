@@ -1,15 +1,22 @@
 {
   "name": "vibe-helper-local-panel", "displayName": "Vibe Helper Local Panel (Integration Example)",
   "description": "Minimal Discovery, Spec, Builder/Helper and History client for the local Core.",
-  "version": "0.1.0", "publisher": "vibe-helper", "private": true,
+  "version": "0.1.3", "publisher": "vibe-helper", "private": true,
   "engines": { "vscode": "^1.90.0" },
   "categories": ["Other"], "main": "./dist/extension.cjs",
-  "activationEvents": ["onCommand:vibeHelper.localPanel"],
+  "activationEvents": ["onCommand:vibeHelper.localPanel", "onCommand:vibeHelper.nativeCleanEvaluationRun", "onStartupFinished"],
   "contributes": {
-    "commands": [{ "command": "vibeHelper.localPanel", "title": "Vibe Helper: Open Local Integration Panel" }],
+    "commands": [
+      { "command": "vibeHelper.localPanel", "title": "Vibe Helper: Open Local Integration Panel" },
+      { "command": "vibeHelper.nativeCleanEvaluationRun", "title": "Vibe Helper: Run Bounded Synthetic Validation (7 Analyst cells)" }
+    ],
     "configuration": {
       "title": "Vibe Helper Local Core",
-      "properties": { "vibeHelper.connectionFile": { "type": "string", "default": "", "scope": "machine", "description": "Absolute path to the backend's private connection.json. No token values." } }
+      "properties": {
+        "vibeHelper.connectionFile": { "type": "string", "default": "", "scope": "machine", "description": "Absolute path to the backend's private connection.json. No token values." },
+        "vibeHelper.nativeRuntimeSource": { "type": "string", "enum": ["KIRO_IDE_1.0.437_AGENT_1.0.794_MACOS_ARM64"], "default": "KIRO_IDE_1.0.437_AGENT_1.0.794_MACOS_ARM64", "scope": "machine", "description": "Pinned private Kiro runtime source. Unsupported sources fail closed." },
+        "vibeHelper.nativeNodeExecutable": { "type": "string", "enum": ["/opt/homebrew/opt/node@24/bin/node"], "default": "/opt/homebrew/opt/node@24/bin/node", "scope": "machine", "description": "Pinned Node.js 24.19.0 executable for the packaged native Core bridge." }
+      }
     }
   }
 }

@@ -35,12 +35,8 @@ test('restores Project History, route state, and Crew conversations across reloa
   const historyGate = new Promise<void>((resolve) => {
     releaseHistory = resolve
   })
-  let delayed = false
   await page.route(`**${browserApplicationPath}`, async (route) => {
-    if (!delayed) {
-      delayed = true
-      await historyGate
-    }
+    await historyGate
     await route.continue()
   })
   await page.goto('/#/history', { waitUntil: 'domcontentloaded' })

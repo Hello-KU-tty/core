@@ -32,6 +32,7 @@ const campusDropFixture = JSON.parse(
     readonly excluded: readonly string[]
   }
   readonly helperUserMessage: string
+  readonly helperUserConceptQuote: string
   readonly finalUpgradeUserGoal: string
   readonly allowedEvidence: {
     readonly builderOutputMaximum: string
@@ -264,6 +265,9 @@ async function fulfillAnalystTurn(
     contextPayload.data?.episode?.type === 'HELPER_CONVERSATION' &&
     userMessageSource !== undefined &&
     typeof evidenceExcerpt === 'string'
+  if (hasUserExplanation) {
+    expect(evidenceExcerpt).toContain(campusDropFixture.helperUserConceptQuote)
+  }
   const semanticResult = {
     schemaVersion: 1,
     episodeId: job.episodeId,
@@ -273,7 +277,7 @@ async function fulfillAnalystTurn(
       ? [
           {
             concept: {
-              originalExpression: conceptName ?? 'access token and expiry state transition',
+              originalExpression: campusDropFixture.helperUserConceptQuote,
               proposedCanonicalName: conceptName ?? 'access token and expiry state transition',
             },
             signal: 'REPHRASE',

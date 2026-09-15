@@ -1,0 +1,7 @@
+.vscode/**
+fixtures/**
+src/**
+test/**
+runtime-config.json
+dist/ide-test.cjs
+**/*.map

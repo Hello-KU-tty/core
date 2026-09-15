@@ -1,13 +1,14 @@
 import {
   type AcceptedEvidence,
-  acceptedEvidenceSchema,
   type ActivityEvent,
+  acceptedEvidenceSchema,
   type CanonicalConcept,
   type ConceptState,
+  type DecisionResolution,
   type Episode,
   type EvidenceDecision,
-  evidenceDecisionSchema,
   type EvidenceProposal,
+  evidenceDecisionSchema,
   evidenceProposalSchema,
 } from '@vibe-helper/contracts'
 
@@ -30,6 +31,7 @@ export interface EvaluateEvidenceProposalInput {
   readonly episode: Episode
   readonly episodeRevision: number
   readonly events: readonly ActivityEvent[]
+  readonly decisionResolutions: readonly DecisionResolution[]
   readonly concept: CanonicalConcept
   readonly existingProposalIds: readonly string[]
   readonly priorAcceptedEvidence: readonly AcceptedEvidence[]
@@ -288,6 +290,83 @@ export function evaluateEvidenceProposal(
       'INVALID_REFERENCE',
       'A direct user Evidence source is not present in the Episode.',
     )
+  }
+  const citedMessageExcerpts = proposal.userEvidenceSources.flatMap((source) => {
+    const event = findSourceEvent(source, episodeEvents)
+    return event?.payload.type === 'USER_MESSAGE' ? [event.payload.redactedExcerpt] : []
+  })
+  if (
+    citedMessageExcerpts.length > 0 &&
+    (!citedMessageExcerpts.some((excerpt) =>
+      excerpt.includes(proposal.concept.originalExpression),
+    ) ||
+      !citedMessageExcerpts.some((excerpt) => excerpt.includes(proposal.redactedEvidenceExcerpt)))
+  ) {
+    return rejectEvidence(
+      input,
+      'INVALID_REFERENCE',
+      'Quoted Evidence and the original Concept expression must occur in a cited user message.',
+    )
+  }
+  if (proposal.signal === 'JUSTIFIED_DECISION') {
+    const citedDecisionContexts = proposal.userEvidenceSources.flatMap((source) => {
+      if (source.kind !== 'USER_DECISION') return []
+      const event = findSourceEvent(source, episodeEvents)
+      return event?.payload.type === 'DECISION_RESOLVED'
+        ? [{ event, decisionPayload: event.payload }]
+        : []
+    })
+    if (citedDecisionContexts.length === 0) {
+      return rejectEvidence(
+        input,
+        'INSUFFICIENT_EVIDENCE',
+        'A justified Decision requires a directly cited user Decision.',
+      )
+    }
+    const matchingResolutionContexts = citedDecisionContexts.flatMap(
+      ({ event, decisionPayload }) => {
+        const resolution = input.decisionResolutions.find(
+          (candidate) =>
+            candidate.id === decisionPayload.resolutionId &&
+            candidate.decisionId === decisionPayload.decisionId &&
+            candidate.projectId === proposal.projectId &&
+            candidate.taskId === proposal.taskId &&
+            candidate.correlationId === proposal.correlationId,
+        )
+        return resolution === undefined ? [] : [{ event, decisionPayload, resolution }]
+      },
+    )
+    if (matchingResolutionContexts.length === 0) {
+      return rejectEvidence(
+        input,
+        'INVALID_REFERENCE',
+        'A cited user Decision does not match a stored Decision Resolution in the Evidence scope.',
+      )
+    }
+    const reasonedResolutionContexts = matchingResolutionContexts.filter(
+      ({ decisionPayload, resolution }) =>
+        decisionPayload.rationaleProvided && resolution.rationale !== undefined,
+    )
+    if (reasonedResolutionContexts.length === 0) {
+      return rejectEvidence(
+        input,
+        'INSUFFICIENT_EVIDENCE',
+        'A justified Decision requires stored user-authored rationale.',
+      )
+    }
+    const citedDecisionTexts = reasonedResolutionContexts
+      .flatMap(({ resolution }) => [resolution.rationale, resolution.customProposal])
+      .filter((text): text is string => text !== undefined)
+    if (
+      !citedDecisionTexts.some((text) => text.includes(proposal.concept.originalExpression)) ||
+      !citedDecisionTexts.some((text) => text.includes(proposal.redactedEvidenceExcerpt))
+    ) {
+      return rejectEvidence(
+        input,
+        'INVALID_REFERENCE',
+        'Quoted Evidence and the original Concept expression must occur in the cited user Decision rationale or custom proposal.',
+      )
+    }
   }
   if (
     proposal.userEvidenceSources.some((source) => {

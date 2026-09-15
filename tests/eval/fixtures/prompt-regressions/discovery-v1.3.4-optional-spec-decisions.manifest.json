@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture_00000000-0000-4000-8000-000000000120",
+  "name": "Discovery v1.3.4 optional actual Decision forecast",
+  "description": "Synthetic selected-Candidate Spec regression: a fully specified small app may forecast no Decision while a genuine product fork remains present in the existing webhook fixture. No native result is claimed.",
+  "kind": "SPEC_SCOPE",
+  "inputPath": "tests/eval/fixtures/prompt-regressions/discovery-v1.3.4-optional-spec-decisions.json",
+  "expectedContractDomains": ["LEARNING_SPEC"],
+  "criteria": [
+    {
+      "key": "optional_forecast_contract",
+      "dimension": "CONTRACT_INTEGRITY",
+      "reviewMode": "AUTOMATED",
+      "description": "An explicit empty forecast passes Learning Spec validation; the field remains required and an actual product fork still parses.",
+      "successDefinition": "The canonical schemas accept both zero and one real Decision candidates and reject an omitted expectedDecisions field."
+    },
+    {
+      "key": "decision_semantics",
+      "dimension": "SPEC_SCOPE",
+      "reviewMode": "HUMAN",
+      "description": "Review whether any proposed Decision changes meaningful product behavior rather than posing a predetermined implementation answer.",
+      "successDefinition": "The no-fork case remains empty and the genuine product tradeoff is explained without an educational choice."
+    }
+  ],
+  "scenarioTags": ["prompt regression", "optional Decision forecast", "small app", "genuine product fork"],
+  "fixtureVersion": "1.3.4",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED"
+}

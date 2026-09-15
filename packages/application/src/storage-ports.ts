@@ -208,6 +208,11 @@ export interface PersistenceRepository {
   readEvidenceTrace(conceptId: string): EvidenceTrace | null
   readEvidenceTracesForProject(projectId: string): readonly EvidenceTrace[]
   readRecentEvidenceTraces(limit: number): readonly EvidenceTrace[]
+  readRecentUserEvidenceTracesForTasks(
+    projectId: string,
+    taskIds: readonly string[],
+    limit: number,
+  ): readonly EvidenceTrace[]
   readPersonalizationTrace(personalizationTraceId: string): PersonalizationTrace | null
   readPersonalizationTraceForDiscoverySession(
     discoverySessionId: string,

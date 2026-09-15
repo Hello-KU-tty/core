@@ -47,7 +47,7 @@ const learningSpecContentShape = {
   successMoment: nonEmptyTextSchema,
   mvpFeatures: z.array(shortTextSchema).min(1).max(30),
   scope: z.array(learningScopeItemSchema).min(1).max(60),
-  expectedDecisions: z.array(expectedDecisionAreaSchema).min(1).max(20),
+  expectedDecisions: z.array(expectedDecisionAreaSchema).max(20),
   runtimeConstraint: z.literal('TYPESCRIPT'),
   deploymentConstraints: z.array(shortTextSchema).min(1).max(12),
 } as const

@@ -1,15 +1,17 @@
 import { execFile } from 'node:child_process'
 import { randomBytes, randomUUID } from 'node:crypto'
-import { lstat, mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { ApplicationService, WorkspacePathPolicy } from '@vibe-helper/application'
-import { LOCAL_PROTOCOL_VERSION } from '@vibe-helper/contracts'
+import { LOCAL_PROTOCOL_VERSION, projectSessionSnapshotSchema } from '@vibe-helper/contracts'
 import { KiroAcpSession } from '@vibe-helper/kiro-adapter/acp-node'
-import { ResultRuntimeSupervisor, WorkflowRuntime } from '@vibe-helper/runtime'
+import { ResultRuntimeSupervisor, WorkflowError, WorkflowRuntime } from '@vibe-helper/runtime'
 import { openSqliteStorage } from '@vibe-helper/storage-sqlite'
 import { LocalAgentHost } from './agent-host.js'
+import { NativeAgentRelay } from './native-agent-relay.js'
+import { createNativeCoreBinding } from './native-core-binding.js'
 import { privateDirectory } from './private-files.js'
 import { createLocalServer } from './server.js'
 
@@ -17,7 +19,18 @@ const execute = promisify(execFile)
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const args = process.argv.slice(2).filter((value) => value !== '--')
 const command = args.shift() ?? 'start'
-const allowed = new Set(['--root', '--port', '--kiro-cli', '--model', '--live'])
+const allowed = new Set([
+  '--root',
+  '--port',
+  '--kiro-cli',
+  '--model',
+  '--live',
+  '--native-role',
+  '--native-project-id',
+  '--native-correlation-id',
+  '--native-task-id',
+  '--native-tools',
+])
 function option(name: string, fallback: string): string {
   const index = args.indexOf(name)
   if (index < 0) return fallback
@@ -148,9 +161,9 @@ async function recover(): Promise<void> {
     next: 'Start Core, restore Project, then explicitly retry. Old runs are not replayed.',
   })
 }
-async function start(): Promise<void> {
+async function start(coreOnly = false, nativeMode = false): Promise<void> {
   await initialized()
-  await kiroVersion()
+  if (!coreOnly && !nativeMode) await kiroVersion()
   const port = Number(option('--port', '47831'))
   if (!Number.isInteger(port) || port < 0 || port > 65_535) throw new Error('PORT_INVALID')
   await mkdir(lockPath, { mode: 0o700 }).catch(() => {
@@ -162,7 +175,12 @@ async function start(): Promise<void> {
     flag: 'wx',
   })
   let storage: Awaited<ReturnType<typeof openSqliteStorage>> | undefined
+  let nativeBinding: ReturnType<typeof createNativeCoreBinding> | undefined
+  let nativeWorkspace: string | undefined
+  const nativeBindingFile = join(root, `native-mcp-${instanceId}.json`)
+  let nativeBindingFileWritten = false
   let runtime: WorkflowRuntime | undefined
+  let nativeRelay: NativeAgentRelay | undefined
   let result: ResultRuntimeSupervisor | undefined
   let server: ReturnType<typeof createLocalServer> | undefined
   let closing = false
@@ -171,6 +189,11 @@ async function start(): Promise<void> {
     closing = true
     // Revoke Agent authority and stop owned children before closing persistence.
     await runtime?.close()
+    await nativeRelay?.close()
+    nativeBinding?.revoke()
+    await nativeBinding?.handler.close()
+    if (nativeBindingFileWritten)
+      await writeFile(nativeBindingFile, JSON.stringify({ status: 'REVOKED' }), { mode: 0o600 })
     await result?.close()
     if (server?.listening) {
       server.closeAllConnections()
@@ -184,24 +207,90 @@ async function start(): Promise<void> {
     storage = await openSqliteStorage({ dataDirectory: join(root, 'data') })
     const policy = await WorkspacePathPolicy.create(join(root, 'workspaces'))
     const application = new ApplicationService({ storage, workspacePolicy: policy })
+    const nativeRole = option('--native-role', '')
+    if (
+      nativeRole === '' &&
+      ['--native-project-id', '--native-correlation-id', '--native-task-id', '--native-tools'].some(
+        (flag) => args.includes(flag),
+      )
+    )
+      throw new Error('NATIVE_BINDING_ROLE_REQUIRED')
+    if (nativeRole !== '') {
+      if (!coreOnly || (nativeRole !== 'BUILDER' && nativeRole !== 'HELPER'))
+        throw new Error('NATIVE_BINDING_ROLE_INVALID')
+      const projectId = option('--native-project-id', '')
+      const correlationId = option('--native-correlation-id', '')
+      const taskId = option('--native-task-id', '')
+      if (!projectId || !correlationId || !taskId) throw new Error('NATIVE_BINDING_SCOPE_REQUIRED')
+      const restored = await application.executeUi({
+        schemaVersion: 1,
+        actor: { kind: 'UI' },
+        kind: 'UI_RESTORE_PROJECT_SESSION',
+        projectId,
+        correlationId,
+        helperConversationLimit: 1,
+      })
+      if (!restored.success) throw new Error('NATIVE_TASK_BINDING_MISMATCH')
+      const snapshot = projectSessionSnapshotSchema.parse(restored.data)
+      if (
+        snapshot.currentTask?.id !== taskId ||
+        (nativeRole === 'BUILDER' && snapshot.currentTask.correlationId !== correlationId)
+      )
+        throw new Error('NATIVE_TASK_BINDING_MISMATCH')
+      nativeWorkspace = await policy.resolveProjectWorkspace(snapshot.project, correlationId)
+      nativeBinding = createNativeCoreBinding({
+        application,
+        role: nativeRole,
+        projectId,
+        correlationId,
+        taskId,
+        ...(option('--native-tools', '')
+          ? { toolNames: option('--native-tools', '').split(',') }
+          : {}),
+      })
+    }
     result = await ResultRuntimeSupervisor.create(join(root, 'workspaces'))
-    const agents = new LocalAgentHost({
-      application,
-      policy,
-      agentRoot: join(root, 'agents'),
-      definitionsRoot: join(repository, 'agents'),
-      guardPath: join(repository, 'packages/kiro-adapter/dist/builder-tool-guard-node.js'),
-      executable,
-      model,
-    })
+    const localAgents =
+      coreOnly || nativeMode
+        ? undefined
+        : new LocalAgentHost({
+            application,
+            policy,
+            agentRoot: join(root, 'agents'),
+            definitionsRoot: join(repository, 'agents'),
+            guardPath: join(repository, 'packages/kiro-adapter/dist/builder-tool-guard-node.js'),
+            executable,
+            model,
+          })
+    nativeRelay = nativeMode
+      ? new NativeAgentRelay({
+          application,
+          policy,
+          root,
+          repository,
+          singleWindowBuiltinH: process.env.VIBE_NATIVE_SINGLE_WINDOW_BUILTIN_H === '1',
+        })
+      : undefined
+    const agents = localAgents ??
+      nativeRelay ?? {
+        invoke: async (): Promise<never> => {
+          throw new WorkflowError('NATIVE_RUNTIME_NOT_ATTACHED')
+        },
+        handlers: new Map(),
+      }
     runtime = new WorkflowRuntime({ application, agents, instanceId })
     const token = randomBytes(32).toString('hex')
+    // Keep the live CLI handler map: LocalAgentHost registers each run after startup.
+    const mcpHandlers = agents.handlers
+    if (nativeBinding) mcpHandlers.set(nativeBinding.path, nativeBinding.handler)
     server = createLocalServer({
       application,
       runtime,
       token,
       instanceId,
-      mcpHandlers: agents.handlers,
+      mcpHandlers,
+      ...(nativeRelay ? { nativeRelay } : {}),
+      ...(coreOnly ? { runStartDisabledCode: 'NATIVE_RUNTIME_NOT_ATTACHED' as const } : {}),
       isClosing: () => closing,
       resultLauncher: result,
     })
@@ -212,7 +301,8 @@ async function start(): Promise<void> {
     const address = server.address()
     if (address === null || typeof address === 'string') throw new Error('LISTEN_FAILED')
     const baseUrl = `http://127.0.0.1:${address.port}`
-    agents.setBaseUrl(baseUrl)
+    localAgents?.setBaseUrl(baseUrl)
+    nativeRelay?.setBaseUrl(baseUrl)
     await writeFile(
       descriptorPath,
       JSON.stringify({
@@ -223,7 +313,24 @@ async function start(): Promise<void> {
       }),
       { mode: 0o600 },
     )
-    runtime.startAnalystWorker()
+    if (nativeBinding) {
+      await writeFile(
+        nativeBindingFile,
+        JSON.stringify({
+          role: nativeRole,
+          projectId: option('--native-project-id', ''),
+          correlationId: option('--native-correlation-id', ''),
+          taskId: option('--native-task-id', ''),
+          workspace: nativeWorkspace,
+          toolNames: nativeBinding.toolNames,
+          url: `${baseUrl}${nativeBinding.path}`,
+          authorization: nativeBinding.authorization,
+        }),
+        { mode: 0o600, flag: 'wx' },
+      )
+      nativeBindingFileWritten = true
+    }
+    if (!coreOnly) runtime.startAnalystWorker()
     for (const signal of ['SIGINT', 'SIGTERM'] as const)
       process.once(signal, () => {
         void close().catch(() => {
@@ -231,12 +338,17 @@ async function start(): Promise<void> {
         })
       })
     print({
-      status: 'READY',
+      status: coreOnly ? 'CORE_ONLY_READY' : nativeMode ? 'NATIVE_READY' : 'READY',
       baseUrl,
       connectionFile: descriptorPath,
+      ...(nativeBinding ? { nativeBindingFile } : {}),
       backendInstanceId: instanceId,
       protocolVersion: LOCAL_PROTOCOL_VERSION,
-      agentLogin: 'CHECK_WITH_DOCTOR_LIVE',
+      agentLogin: coreOnly
+        ? 'NATIVE_AGENT_NOT_ATTACHED'
+        : nativeMode
+          ? 'CHECK_IN_KIRO_IDE'
+          : 'CHECK_WITH_DOCTOR_LIVE',
     })
   } catch (error) {
     await close()
@@ -249,6 +361,8 @@ try {
   else if (command === 'doctor') await doctor()
   else if (command === 'recover') await recover()
   else if (command === 'start') await start()
+  else if (command === 'core-only') await start(true)
+  else if (command === 'native') await start(false, true)
   else throw new Error('UNKNOWN_COMMAND')
 } catch (error) {
   // Diagnostics do not print provider stderr, absolute credential paths or raw payloads.

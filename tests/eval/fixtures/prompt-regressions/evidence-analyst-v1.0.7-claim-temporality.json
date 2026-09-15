@@ -1,0 +1,275 @@
+{
+  "promptVersion": "1.0.7",
+  "revisesFixture": "evidence-analyst-v1.0.6-clean-semantics.json",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED",
+  "fixtureProvenance": "SYNTHETIC_UI_TRANSCRIPT",
+  "modelRunStatus": "NOT_RUN",
+  "claimBoundary": "This revision distinguishes timeless definitions and completed observations from actual future predictions, removes Agent-authored rationale contamination, and evaluates allowed claim profiles instead of requiring exactly one Proposal. It does not retcon the v1.0.6 fixture or live artifact and does not prove model compliance or human learning.",
+  "cases": [
+    {
+      "id": "request_only",
+      "observedKind": "REQUEST_ONLY",
+      "precedingAgentContribution": null,
+      "userMessage": "가구 배치 규칙이 방 크기 변경 때 어떻게 달라지는지 설명해 주세요.",
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_72000000-0000-4000-8000-000000000001",
+          "messageId": "message_72000000-0000-4000-8000-000000000002"
+        }
+      ],
+      "expected": {
+        "oracleMode": "NO_PROPOSALS",
+        "reason": "The user asks for an explanation without supplying a claim."
+      }
+    },
+    {
+      "id": "future_plan_after_light_hint",
+      "observedKind": "FUTURE_PLAN_WITH_PREDICTION",
+      "precedingAgentContribution": "방 크기가 바뀌는 경우도 생각해 보세요.",
+      "userMessage": "방이 작아지면 기존 가구가 경계를 넘을 수 있으니 다음에는 모든 가구를 다시 검사해야겠어요.",
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_72000000-0000-4000-8000-000000000003",
+          "messageId": "message_72000000-0000-4000-8000-000000000004"
+        }
+      ],
+      "expected": {
+        "oracleMode": "CLAIM_PROFILES",
+        "minimumStateSupportingProposals": 1,
+        "forbiddenSignals": ["JUSTIFIED_DECISION", "APPLICATION"],
+        "claimProfiles": [
+          {
+            "id": "future_boundary_result",
+            "claimExcerpts": ["방이 작아지면 기존 가구가 경계를 넘을 수 있으니"],
+            "allowedSignals": ["PREDICTION"],
+            "allowedStrengths": ["MEDIUM", "STRONG"],
+            "allowedPromptDependence": ["LIGHT_HINT"],
+            "allowedMaximumSupportedStates": ["EXPLAINED"]
+          }
+        ],
+        "reason": "The causal future result may support a prediction, while the plan to recheck is not an application or decision."
+      }
+    },
+    {
+      "id": "own_explanation_independent",
+      "observedKind": "TIMELESS_DEFINITION",
+      "precedingAgentContribution": null,
+      "userMessage": "가구의 오른쪽 좌표는 x와 너비의 합이므로 그 값이 방 너비보다 크면 가구가 방 밖으로 나간 상태예요.",
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_72000000-0000-4000-8000-000000000005",
+          "messageId": "message_72000000-0000-4000-8000-000000000006"
+        }
+      ],
+      "expected": {
+        "oracleMode": "CLAIM_PROFILES",
+        "minimumStateSupportingProposals": 1,
+        "forbiddenSignals": ["PREDICTION", "JUSTIFIED_DECISION", "APPLICATION"],
+        "claimProfiles": [
+          {
+            "id": "right_coordinate_definition",
+            "claimExcerpts": ["가구의 오른쪽 좌표는 x와 너비의 합"],
+            "allowedSignals": ["REPHRASE"],
+            "allowedStrengths": ["MEDIUM", "STRONG"],
+            "allowedPromptDependence": ["INDEPENDENT"],
+            "allowedMaximumSupportedStates": ["EXPLAINED"]
+          },
+          {
+            "id": "outside_state_definition",
+            "claimExcerpts": ["그 값이 방 너비보다 크면 가구가 방 밖으로 나간 상태"],
+            "allowedSignals": ["REPHRASE"],
+            "allowedStrengths": ["MEDIUM", "STRONG"],
+            "allowedPromptDependence": ["INDEPENDENT"],
+            "allowedMaximumSupportedStates": ["EXPLAINED"]
+          }
+        ],
+        "reason": "Both clauses define a timeless boundary invariant; conditional grammar alone does not make either clause a future prediction."
+      }
+    },
+    {
+      "id": "actual_reasoned_choice",
+      "observedKind": "REASONED_CHOICE",
+      "precedingAgentContribution": "자동 조정과 저장 보류 중 하나를 선택해 주세요.",
+      "userMessage": "자동 조정이 어느 값까지 바뀌었는지 추적하기 어려우므로 경계를 넘으면 저장을 보류하겠습니다.",
+      "decisionRequest": {
+        "question": "경계를 넘는 배치를 자동 조정할까요, 저장을 보류할까요?",
+        "reasonRequiredNow": "저장 전 동작을 하나로 정해야 다음 구현을 진행할 수 있습니다.",
+        "options": [
+          {
+            "label": "자동 조정",
+            "description": "입력된 영역 안으로 배치를 자동 이동합니다.",
+            "impacts": ["추가 수정 없이 저장을 이어갑니다."],
+            "tradeoffs": ["저장 흐름에 자동 조정 계산이 추가됩니다."]
+          },
+          {
+            "label": "저장 보류",
+            "description": "경계를 넘는 동안 저장을 진행하지 않습니다.",
+            "impacts": ["사용자가 배치를 고친 뒤 다시 시도합니다."],
+            "tradeoffs": ["완료까지 한 단계가 더 필요합니다."]
+          }
+        ],
+        "recommendedOptionIndex": 0,
+        "recommendationRationale": "입력 흐름을 중단하지 않아 작업 단계가 짧습니다.",
+        "agentHintMustNotContain": [
+          "어느 값까지 바뀌었는지 추적하기 어려우므로",
+          "추적하기",
+          "변경 이력"
+        ]
+      },
+      "decisionEvent": {
+        "type": "DECISION_RESOLVED",
+        "decisionId": "decision_72000000-0000-4000-8000-000000000007",
+        "rationaleProvided": true
+      },
+      "decisionResolution": {
+        "source": "USER",
+        "selectedOptionIndex": 1,
+        "rationale": "자동 조정이 어느 값까지 바뀌었는지 추적하기 어려우므로 경계를 넘으면 저장을 보류하겠습니다."
+      },
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_72000000-0000-4000-8000-000000000008",
+          "messageId": "message_72000000-0000-4000-8000-000000000009"
+        },
+        {
+          "kind": "USER_DECISION",
+          "decisionId": "decision_72000000-0000-4000-8000-000000000007"
+        }
+      ],
+      "expected": {
+        "oracleMode": "CLAIM_PROFILES",
+        "minimumStateSupportingProposals": 1,
+        "forbiddenSignals": ["APPLICATION"],
+        "claimProfiles": [
+          {
+            "id": "independent_choice_reason",
+            "claimExcerpts": ["어느 값까지 바뀌었는지 추적하기 어려우므로"],
+            "allowedSignals": ["JUSTIFIED_DECISION"],
+            "allowedStrengths": ["STRONG"],
+            "allowedPromptDependence": ["LIGHT_HINT"],
+            "allowedMaximumSupportedStates": ["DEMONSTRATED"]
+          },
+          {
+            "id": "selected_behavior",
+            "claimExcerpts": ["경계를 넘으면 저장을 보류하겠습니다"],
+            "allowedSignals": ["JUSTIFIED_DECISION"],
+            "allowedStrengths": ["STRONG"],
+            "allowedPromptDependence": ["LIGHT_HINT"],
+            "allowedMaximumSupportedStates": ["DEMONSTRATED"]
+          }
+        ],
+        "reason": "The Agent supplies alternatives and recommends the other option; the user independently supplies the reason for the selected behavior. One or multiple claim-level proposals are allowed."
+      }
+    },
+    {
+      "id": "actual_performed_application",
+      "observedKind": "COMPLETED_ACTION_AND_OBSERVATION",
+      "precedingAgentContribution": null,
+      "userMessage": "방 너비를 450에서 100으로 바꾼 뒤 기존 가구가 경계를 넘는 것을 확인했고 Undo로 원래 배치를 복구했습니다.",
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_72000000-0000-4000-8000-000000000011",
+          "messageId": "message_72000000-0000-4000-8000-000000000012"
+        }
+      ],
+      "expected": {
+        "oracleMode": "CLAIM_PROFILES",
+        "minimumStateSupportingProposals": 1,
+        "forbiddenSignals": ["PREDICTION", "JUSTIFIED_DECISION"],
+        "claimProfiles": [
+          {
+            "id": "completed_resize_action",
+            "claimExcerpts": ["방 너비를 450에서 100으로 바꾼 뒤"],
+            "allowedSignals": ["APPLICATION"],
+            "allowedStrengths": ["STRONG"],
+            "allowedPromptDependence": ["INDEPENDENT"],
+            "allowedMaximumSupportedStates": ["DEMONSTRATED"]
+          },
+          {
+            "id": "observed_overflow_and_restore",
+            "claimExcerpts": ["기존 가구가 경계를 넘는 것을 확인했고 Undo로 원래 배치를 복구했습니다"],
+            "allowedSignals": ["APPLICATION"],
+            "allowedStrengths": ["STRONG"],
+            "allowedPromptDependence": ["INDEPENDENT"],
+            "allowedMaximumSupportedStates": ["DEMONSTRATED"]
+          }
+        ],
+        "currentCoreDisposition": "NATURAL_LANGUAGE_SELF_REPORT_ELIGIBLE",
+        "provenanceLimitation": "The source records the user's completed-action self-report; it does not independently attest that the interaction occurred.",
+        "reason": "The action and result were already completed and observed, so they are application claims rather than predictions."
+      }
+    },
+    {
+      "id": "directly_led_repeat",
+      "observedKind": "DIRECT_REPEAT",
+      "precedingAgentContribution": "x와 너비의 합이 방 너비를 넘으면 경계 밖입니다.",
+      "userMessage": "말한 대로 x와 너비의 합이 방 너비를 넘으면 경계 밖이네요.",
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_72000000-0000-4000-8000-000000000013",
+          "messageId": "message_72000000-0000-4000-8000-000000000014"
+        }
+      ],
+      "expected": {
+        "oracleMode": "CLAIM_PROFILES",
+        "minimumStateSupportingProposals": 0,
+        "maximumStateSupportingProposals": 0,
+        "claimProfiles": [
+          {
+            "id": "direct_repeat",
+            "claimExcerpts": ["x와 너비의 합이 방 너비를 넘으면 경계 밖"],
+            "allowedSignals": ["REPHRASE"],
+            "allowedStrengths": ["NONE", "WEAK"],
+            "allowedPromptDependence": ["DIRECTLY_LED"],
+            "allowedMaximumSupportedStates": [null]
+          }
+        ],
+        "reason": "Either no Proposal or a non-state-supporting directly-led record is acceptable."
+      }
+    },
+    {
+      "id": "independent_future_prediction",
+      "observedKind": "ACTUAL_FUTURE_PREDICTION",
+      "precedingAgentContribution": null,
+      "userMessage": "캐시 용량을 1개로 두고 A, B, A 순서로 요청하면 B를 저장할 때 A가 밀려나므로 마지막 A는 다시 계산될 거예요.",
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_72000000-0000-4000-8000-000000000015",
+          "messageId": "message_72000000-0000-4000-8000-000000000016"
+        }
+      ],
+      "expected": {
+        "oracleMode": "CLAIM_PROFILES",
+        "minimumStateSupportingProposals": 1,
+        "forbiddenSignals": ["JUSTIFIED_DECISION", "APPLICATION"],
+        "claimProfiles": [
+          {
+            "id": "future_eviction_cause",
+            "claimExcerpts": ["B를 저장할 때 A가 밀려나므로"],
+            "allowedSignals": ["PREDICTION"],
+            "allowedStrengths": ["STRONG"],
+            "allowedPromptDependence": ["INDEPENDENT"],
+            "allowedMaximumSupportedStates": ["DEMONSTRATED"]
+          },
+          {
+            "id": "future_recomputation_result",
+            "claimExcerpts": ["마지막 A는 다시 계산될 거예요"],
+            "allowedSignals": ["PREDICTION"],
+            "allowedStrengths": ["STRONG"],
+            "allowedPromptDependence": ["INDEPENDENT"],
+            "allowedMaximumSupportedStates": ["DEMONSTRATED"]
+          }
+        ],
+        "reason": "This is a concrete not-yet-observed result prediction. The existing strong independent prediction policy remains intact."
+      }
+    }
+  ]
+}

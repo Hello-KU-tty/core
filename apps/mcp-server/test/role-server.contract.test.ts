@@ -526,6 +526,56 @@ describe('role-bound MCP server', () => {
     }
   })
 
+  it('rejects eleven previews without staging data and accepts a corrected ten-preview retry', async () => {
+    const harness = await connectRole('DISCOVERY', { seedDiscovery: true })
+    try {
+      const previews = Array.from({ length: 11 }, (_, index) => ({
+        title: `Preview ${String(index + 1)}`,
+        summary: `Distinct direction ${String(index + 1)}.`,
+        coreInteraction: `Run interaction ${String(index + 1)} and inspect the result.`,
+        appeal: `Makes direction ${String(index + 1)} tangible.`,
+        technologyNecessity: `Input types control direction ${String(index + 1)}.`,
+        generationTags: ['DIRECT'],
+      }))
+      const argumentsBase = {
+        schemaVersion: 1,
+        projectId: ids.project,
+        discoverySessionId: ids.discoverySession,
+        correlationId: ids.correlation,
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000610',
+        expectedSessionRevision: 1,
+        generationRationale: 'Distinct directions for a local learning tool.',
+      }
+      const invalid = await harness.client.callTool({
+        name: 'submit_candidate_previews',
+        arguments: { ...argumentsBase, previews: JSON.stringify(previews) },
+      })
+      expect(invalid.isError).toBe(true)
+      expect(harness.storage.repository.readDiscoveryAggregate(ids.project)).toMatchObject({
+        session: { revision: 1 },
+        rounds: [],
+        candidates: [],
+      })
+      expect(
+        harness.storage.repository.readDiscoveryAggregate(ids.project)?.previewRound,
+      ).toBeNull()
+
+      const corrected = await harness.client.callTool({
+        name: 'submit_candidate_previews',
+        arguments: { ...argumentsBase, previews: JSON.stringify(previews.slice(0, 10)) },
+      })
+      expect(corrected).toMatchObject({
+        structuredContent: { accepted: true, resourceRevision: 1 },
+      })
+      const aggregate = harness.storage.repository.readDiscoveryAggregate(ids.project)
+      expect(aggregate?.previewRound?.previews).toHaveLength(10)
+      expect(aggregate?.rounds).toHaveLength(0)
+      expect(aggregate?.candidates).toHaveLength(0)
+    } finally {
+      await harness.close()
+    }
+  })
+
   it('stages ten previews and materializes them only after two fixed enrichment tool calls', async () => {
     let candidateSequence = 600
     const generatedPreviewRoundId = 'candidate_preview_round_00000000-0000-4000-8000-000000000601'

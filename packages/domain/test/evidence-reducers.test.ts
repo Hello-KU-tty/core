@@ -1,20 +1,20 @@
 import { describe, expect, it } from 'vitest'
-
-import {
-  applyMisconceptionProposal,
-  evaluateEvidenceProposal,
-  reduceConceptState,
-} from '../src/index.ts'
 import {
   acceptedEvidenceFixture,
   activityEventFixture,
   canonicalConceptFixture,
   codeReferenceFixture,
+  decisionResolutionFixture,
   episodeFixture,
   evidenceProposalFixture,
   ids,
   timestamp,
 } from '../../contracts/test/fixtures.js'
+import {
+  applyMisconceptionProposal,
+  evaluateEvidenceProposal,
+  reduceConceptState,
+} from '../src/index.ts'
 
 const previousTaskId = 'task_00000000-0000-4000-8000-000000000051'
 const observationEvidenceId = 'evidence_00000000-0000-4000-8000-000000000052'
@@ -25,6 +25,30 @@ const resolutionEvidenceId = 'evidence_00000000-0000-4000-8000-000000000056'
 const contradictionProposalId = 'evidence_proposal_00000000-0000-4000-8000-000000000057'
 const contradictionDecisionId = 'evidence_decision_00000000-0000-4000-8000-000000000058'
 const contradictionEvidenceId = 'evidence_00000000-0000-4000-8000-000000000059'
+
+const reasonedDecisionEvent = {
+  ...activityEventFixture,
+  id: 'event_00000000-0000-4000-8000-000000000060',
+  conversationId: undefined,
+  decisionId: ids.decision,
+  payload: {
+    type: 'DECISION_RESOLVED' as const,
+    decisionId: ids.decision,
+    resolutionId: ids.resolution,
+    rationaleProvided: true,
+  },
+  sourceReferences: [],
+} as const
+
+const reasonedDecisionProposal = {
+  ...evidenceProposalFixture,
+  concept: {
+    ...evidenceProposalFixture.concept,
+    originalExpression: 'unexpected shapes',
+  },
+  userEvidenceSources: [{ kind: 'USER_DECISION', decisionId: ids.decision }],
+  redactedEvidenceExcerpt: decisionResolutionFixture.rationale,
+} as const
 
 const metadata = {
   proposalId: ids.evidenceProposal,
@@ -43,6 +67,7 @@ function evaluate(
     episode: episodeFixture,
     episodeRevision: 1,
     events: [activityEventFixture],
+    decisionResolutions: [],
     concept: canonicalConceptFixture,
     existingProposalIds: [],
     priorAcceptedEvidence: [],
@@ -53,7 +78,11 @@ function evaluate(
 
 describe('Evidence acceptance policy', () => {
   it('accepts strong independent justified reasoning up to DEMONSTRATED', () => {
-    const result = evaluate(evidenceProposalFixture)
+    const result = evaluate(reasonedDecisionProposal, {
+      episode: { ...episodeFixture, eventIds: [reasonedDecisionEvent.id] },
+      events: [reasonedDecisionEvent],
+      decisionResolutions: [decisionResolutionFixture],
+    })
     expect(result.outcome).toBe('ACCEPTED')
     if (result.outcome !== 'ACCEPTED') return
     expect(result.decision.reasonCode).toBe('VALID_USER_EVIDENCE')
@@ -65,6 +94,136 @@ describe('Evidence acceptance policy', () => {
       promptDependence: 'INDEPENDENT',
       supportsState: 'DEMONSTRATED',
     })
+  })
+
+  it('rejects JUSTIFIED_DECISION without a cited structured user Decision', () => {
+    const result = evaluate(evidenceProposalFixture)
+
+    expect(result.outcome).toBe('REJECTED')
+    expect(result.decision.reasonCode).toBe('INSUFFICIENT_EVIDENCE')
+  })
+
+  it('rejects JUSTIFIED_DECISION when the cited Decision has no stored Resolution', () => {
+    const result = evaluate(reasonedDecisionProposal, {
+      episode: { ...episodeFixture, eventIds: [reasonedDecisionEvent.id] },
+      events: [reasonedDecisionEvent],
+    })
+
+    expect(result.outcome).toBe('REJECTED')
+    expect(result.decision.reasonCode).toBe('INVALID_REFERENCE')
+  })
+
+  it('rejects JUSTIFIED_DECISION when the stored Resolution is outside the Evidence scope', () => {
+    const result = evaluate(reasonedDecisionProposal, {
+      episode: { ...episodeFixture, eventIds: [reasonedDecisionEvent.id] },
+      events: [reasonedDecisionEvent],
+      decisionResolutions: [
+        {
+          ...decisionResolutionFixture,
+          correlationId: 'correlation_00000000-0000-4000-8000-000000000061',
+        },
+      ],
+    })
+
+    expect(result.outcome).toBe('REJECTED')
+    expect(result.decision.reasonCode).toBe('INVALID_REFERENCE')
+  })
+
+  it('rejects JUSTIFIED_DECISION when its quotes are absent from the stored user reason', () => {
+    const result = evaluate(
+      {
+        ...reasonedDecisionProposal,
+        concept: {
+          ...reasonedDecisionProposal.concept,
+          originalExpression: 'an unrelated explanation',
+        },
+        redactedEvidenceExcerpt: 'This text is not in the Decision rationale.',
+      },
+      {
+        episode: { ...episodeFixture, eventIds: [reasonedDecisionEvent.id] },
+        events: [reasonedDecisionEvent],
+        decisionResolutions: [decisionResolutionFixture],
+      },
+    )
+
+    expect(result.outcome).toBe('REJECTED')
+    expect(result.decision.reasonCode).toBe('INVALID_REFERENCE')
+  })
+
+  it.each([
+    [
+      'paraphrased Concept expression',
+      {
+        ...evidenceProposalFixture,
+        concept: {
+          ...evidenceProposalFixture.concept,
+          originalExpression: 'prevent input mistakes at the boundary',
+        },
+      },
+    ],
+    [
+      'paraphrased Evidence excerpt',
+      {
+        ...evidenceProposalFixture,
+        redactedEvidenceExcerpt: 'The user expects strict validation to catch mistakes.',
+      },
+    ],
+    [
+      'both fields paraphrased',
+      {
+        ...evidenceProposalFixture,
+        concept: {
+          ...evidenceProposalFixture.concept,
+          originalExpression: 'catch input mistakes',
+        },
+        redactedEvidenceExcerpt: 'Strict validation should catch input mistakes.',
+      },
+    ],
+  ])('rejects %s instead of treating it as a direct user quote', (_name, proposal) => {
+    const result = evaluate(proposal)
+    expect(result.outcome).toBe('REJECTED')
+    expect(result.decision.reasonCode).toBe('INVALID_REFERENCE')
+  })
+
+  it('does not accept a quote from an Episode message that the Proposal did not cite', () => {
+    const uncitedEvent = {
+      ...activityEventFixture,
+      id: 'event_00000000-0000-4000-8000-000000000061',
+      sequence: 2,
+      payload: {
+        ...activityEventFixture.payload,
+        messageId: 'message_00000000-0000-4000-8000-000000000062',
+        redactedExcerpt: 'A second user message mentions cache invalidation.',
+      },
+    } as const
+    const result = evaluate(
+      {
+        ...evidenceProposalFixture,
+        concept: {
+          ...evidenceProposalFixture.concept,
+          originalExpression: 'cache invalidation',
+        },
+        redactedEvidenceExcerpt: 'A second user message mentions cache invalidation.',
+      },
+      {
+        episode: { ...episodeFixture, eventIds: [ids.eventUser, uncitedEvent.id] },
+        events: [activityEventFixture, uncitedEvent],
+      },
+    )
+
+    expect(result.outcome).toBe('REJECTED')
+    expect(result.decision.reasonCode).toBe('INVALID_REFERENCE')
+  })
+
+  it('checks a cited message even when its Event ID is submitted as a USER_ACTION reference', () => {
+    const result = evaluate({
+      ...evidenceProposalFixture,
+      userEvidenceSources: [{ kind: 'USER_ACTION', eventId: ids.eventUser }],
+      redactedEvidenceExcerpt: 'The user expects strict validation to catch mistakes.',
+    })
+
+    expect(result.outcome).toBe('REJECTED')
+    expect(result.decision.reasonCode).toBe('INVALID_REFERENCE')
   })
 
   it('distinguishes Agent-authored sources from other invalid payloads', () => {
@@ -87,6 +246,7 @@ describe('Evidence acceptance policy', () => {
   })
 
   it('rejects a recommendation acceptance without user-authored rationale as understanding', () => {
+    const { rationale: _rationale, ...resolutionWithoutRationale } = decisionResolutionFixture
     const decisionEventId = 'event_00000000-0000-4000-8000-000000000060'
     const decisionEvent = {
       ...activityEventFixture,
@@ -109,6 +269,7 @@ describe('Evidence acceptance policy', () => {
       {
         episode: { ...episodeFixture, eventIds: [decisionEventId] },
         events: [decisionEvent],
+        decisionResolutions: [resolutionWithoutRationale],
       },
     )
 
@@ -230,7 +391,11 @@ describe('Concept State and misconception reducers', () => {
     expect(contradiction.evidence.kind).toBe('MISCONCEPTION_SIGNAL')
     expect('supportsState' in contradiction.evidence).toBe(false)
 
-    const positive = evaluate(evidenceProposalFixture)
+    const positive = evaluate(reasonedDecisionProposal, {
+      episode: { ...episodeFixture, eventIds: [reasonedDecisionEvent.id] },
+      events: [reasonedDecisionEvent],
+      decisionResolutions: [decisionResolutionFixture],
+    })
     expect(positive.outcome).toBe('ACCEPTED')
     if (positive.outcome !== 'ACCEPTED') return
     const observation = {

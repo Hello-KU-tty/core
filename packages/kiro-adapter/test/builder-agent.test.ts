@@ -67,7 +67,7 @@ describe('Builder Agent adapter', () => {
       expect.objectContaining<Partial<BuilderAgentAdapterError>>({ code: 'INVALID_PROMPT' }),
     )
     expect(() =>
-      createBuilderAgentDefinition('# Builder\n\n> Prompt version: `1.3.1`', {
+      createBuilderAgentDefinition('# Builder\n\n> Prompt version: `1.3.6`', {
         guardCommand: ' ',
       }),
     ).toThrowError(

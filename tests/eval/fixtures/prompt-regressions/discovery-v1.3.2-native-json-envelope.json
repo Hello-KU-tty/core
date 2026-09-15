@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "promptVersion": "1.3.2",
+  "transportVariants": {
+    "generalMcp": "Original Core input object with direct fields",
+    "nativeIde": "Complete original input object serialized exactly once in inputJson for Preview, Round, Merge and Spec",
+    "nativeEnrichment": "Separate enrichment-only inputJson schema; Core Preview immutable fields omitted"
+  },
+  "expected": {
+    "originalCoreSchemaStillValidates": true,
+    "requiredEmptyCollectionsAuthored": true,
+    "semanticDefaultsInserted": false,
+    "roundCandidatesRemainArrayInsideOriginalObject": true,
+    "enrichmentFacadeUnchanged": true,
+    "cliToolContractChanged": false
+  },
+  "liveNativeResult": "PENDING",
+  "containsPersonalData": false
+}

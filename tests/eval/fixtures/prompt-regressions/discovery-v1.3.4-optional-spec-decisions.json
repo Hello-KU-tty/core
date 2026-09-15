@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "promptVersion": "1.3.4",
+  "noForkDraft": {
+    "productPurpose": "Show a user-entered calendar date in a fixed, readable format without storage or network access.",
+    "targetUsers": ["A learner practicing pure TypeScript date formatting"],
+    "primaryUsageMoment": "When checking the display of one date they entered locally.",
+    "successMoment": "The entered date appears in the specified format with a clear invalid-input message.",
+    "mvpFeatures": ["Accept one ISO date string", "Display the specified formatted date or an invalid-input message"],
+    "scope": [
+      {
+        "category": "LEARNER_FOCUS",
+        "title": "Pure date formatting",
+        "rationale": "The visible result follows from the input without a hidden current-time dependency.",
+        "conceptNames": ["pure function"]
+      },
+      {
+        "category": "AGENT_SUPPORT",
+        "title": "Local page shell",
+        "rationale": "A small form is needed to try the formatter but is not the learning target.",
+        "conceptNames": []
+      },
+      {
+        "category": "EXCLUDED",
+        "title": "Persistence and network data",
+        "rationale": "The specified one-input behavior does not need either boundary.",
+        "conceptNames": []
+      }
+    ],
+    "expectedDecisions": [],
+    "runtimeConstraint": "TYPESCRIPT",
+    "deploymentConstraints": ["Run locally in a browser"]
+  },
+  "realForkSpecPath": "tests/eval/fixtures/prompt-regressions/learning-spec-v1.1-webhook.json",
+  "realForkExpectedDecisionCount": 1,
+  "previewRulesSha256": "a0488e2717a61c07ea18e1736f0cf2153659f21ced323c81a9a301c65c31e194",
+  "priorPromptSha256": "46539ce5275ebc8094f7ddac82f650bc72604762d39c7a183764f9fc2491f8b7",
+  "priorFreshPreviewObservation": {
+    "promptVersion": "1.3.3",
+    "source": "Parent-observed fresh Kiro IDE native Discovery turn",
+    "status": "FAILED",
+    "observedPreviewCount": 11,
+    "requiredPreviewCount": 10,
+    "causalAttributionToDecisionRule": "NOT_ESTABLISHED",
+    "previewRuleChangedInThisRevision": false
+  },
+  "revisedPromptNativeSpecResult": "NOT_RUN",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED"
+}

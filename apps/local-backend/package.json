@@ -10,5 +10,8 @@
     "@vibe-helper/mcp-server": "workspace:*",
     "@vibe-helper/runtime": "workspace:*",
     "@vibe-helper/storage-sqlite": "workspace:*"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.0.0"
   }
 }
