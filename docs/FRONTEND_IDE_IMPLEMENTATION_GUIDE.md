@@ -2,15 +2,40 @@
 
 최종 판정일: 2026-09-16 KST. 이 문서는 새 frontend 작업의 기술 front door다. 시간순 실측과 예외는 [historical handoff](FRONTEND_IDE_HANDOFF_20260915.md), 최종 판단은 [cutover verdict](spikes/T19_NATIVE_IDE_CUTOVER_VERDICT_20260916.md)를 따른다.
 
+## 제품 방향과 CLI 전환 승인 정책
+
+초기 Core는 Kiro Crew test frontend를 사용했지만 backend Agent는 Crew program 자체가 아니라 별도 Kiro CLI process로 실행했다. 팀은 이를 “IDE 안에서 배우기”라는 제품 철학과 경진대회 출품 이후 다른 IDE로 확장하려는 제품 방향에 맞지 않는다고 판단했다. 다른 IDE adapter 구현은 현재 MVP 범위가 아니다.
+
+현재 branch는 외부 Agent CLI 없이 Mac의 Kiro IDE Agent로 제품을 만드는 경로를 검증했고 부분적으로 성공했다. 아래 exact pin에서는 experimental GO지만 이전 CLI 경로만큼 안정적이라고 보지는 않는다. 이는 제품 판단이며 동일 조건의 IDE-vs-CLI 안정성·성능 A/B benchmark는 실행하지 않았다. 또한 pinned private Kiro API 자체가 cross-IDE portability를 제공하는 것은 아니고 IDE-only 구조도 별도 Node Core를 유지한다.
+
+Frontend 개발 담당 에이전트는 **Kiro-IDE-only frontend로 시작하고 계속하는 것**이 기본이다. 어렵다고 판단해도 CLI를 자동·조용히 fallback하거나 도입하지 않는다. 먼저 frontend 개발을 담당하는 사용자에게 아래 내용을 갖춘 **전환 검토와 실행 범위에 대한 명시적 합의**를 요청하고, 사용자의 명시적 결정과 backend 담당자의 계약 합의가 모두 있어야 affected path를 바꿀 수 있다. 이 요청 자체는 CLI 도입 승인이 아니다. 합의 대기 중에는 영향을 받는 작업만 멈추고 독립적인 화면·상태·접근성 작업은 계속할 수 있다.
+
+```text
+[IDE-only → CLI 대안 검토 합의 요청]
+1. IDE 경로가 어려운 이유: 재현 절차, 실제 오류/제약, 영향 범위
+2. IDE와 CLI 비교: 각각의 강점·약점, 아직 측정하지 않은 항목
+3. CLI 사용 시 제품 철학 제안: “IDE 안에서 배우기”를 어떻게 유지할지
+4. 실제 사용자 여정: setup/login → IDE learning → 실행/Helper → stop/recovery
+5. backend 담당자 합의 요청: contracts, lifecycle, permissions, data/provenance,
+   packaging, rollback, validation의 변경과 소유자
+요청 판정: IDE-only 유지 / bounded 대안 조사 / CLI 계약 변경 승인 중 하나
+```
+
+## Frontend 설계 권한과 reference UI의 지위
+
+원래 Crew frontend와 현재 experiment/reference panel은 backend 개발자 관점에서 expected flow를 확인하려고 만든 단순 prototype이다. 둘 다 production frontend의 UI/UX, layout, information architecture 또는 interaction specification을 구속하지 않는다.
+
+Frontend 개발 담당 에이전트는 backend test UI를 복제하지 않고, 학습자 필요를 기준으로 실제 frontend를 자율적으로 설계하며 frontend 개발을 담당하는 사용자와 함께 방향을 결정한다. prototype에서 화면 수, route, pane 구성, 시각 스타일이나 interaction pattern을 architecture 요구사항으로 추론하지 않는다. 단, Core DTO와 durable state/revision, provenance, security boundary 및 기존 native adapter 계약은 보존한다. 이 계약을 바꾸어야 하면 구현 전에 backend 담당자의 명시적 합의가 필요하다.
+
 ## 1. 먼저 고정할 지원 경계
 
 | 대상 | 판정 | frontend 표현 |
 | --- | --- | --- |
-| IDE-first 화면·계약 개발 | **GO** | 네 화면과 아래 Core 계약으로 개발을 시작한다. |
+| IDE-first frontend·계약 개발 | **GO** | 아래 기능 coverage와 Core 계약을 기준으로 실제 UI/UX를 자율 설계한다. |
 | macOS arm64의 exact Kiro pin native 흐름 | **EXPERIMENTAL GO** | `macOS exact pin · experimental`을 항상 표시한다. |
 | Evidence 품질·개인화 효과 | **NOT READY** | 근거와 `FAILED/NEEDS_REVIEW`를 보이고 학습 성공을 만들지 않는다. |
 | Windows native, 다른 Kiro pin, production/marketplace | **NO-GO** | 실행 버튼 전에 fail-closed한다. |
-| 기존 CLI/Crew 삭제 | **NO-GO** | source와 fallback 경계를 유지한다. |
+| 기존 CLI/Crew 삭제 | **NO-GO** | source는 rollback·비교 근거로 보존하되 자동·조용한 runtime fallback으로 쓰지 않는다. |
 
 지원 pin은 다음 하나다.
 
@@ -42,7 +67,7 @@ repository, backend와 독립 app-copy 검증은 Node 24.19.0에서 했다. 실�
 | 미검증 | active SSE 또는 response-uncertain mutation 중 backend rotation의 end-to-end UX |
 | 미검증 | cold-network 독립 install, OS-level package-script confinement, CLI latency/cost/완료율 동등성 |
 | 미검증 | generated-result origin restart 복원, 사람 학습과 개인화의 인과 효과 |
-| 미제공 | repository 없이 설치하는 backend binary/service/lifecycle UI와 pushed handoff revision |
+| source baseline | `origin/codex/kiro-native-recovery-20260913`의 `445497b` 사용 가능; repository 없이 설치하는 backend binary/service/lifecycle UI는 미제공 |
 
 ## 3. 실행 구조와 소유권
 
@@ -64,21 +89,21 @@ Kiro extension host
 
 | frontend 소유 | extension-host integration 소유 | Core/native adapter 소유 |
 | --- | --- | --- |
-| 네 화면 layout, a11y, form validation, local selection | connection file 읽기, safe projection, action allowlist, stream subscription | Project/Task/Decision/Evidence 상태와 revision |
+| 사용자와 정한 UI/UX·IA, a11y, form validation, local selection | connection file 읽기, safe projection, action allowlist, stream subscription | Project/Task/Decision/Evidence 상태와 revision |
 | loading/partial/stale/error/cancel-requested/restore UX | generation gate, read-only reconnect, no-replay mutation handling | private Kiro source/model/mode/catalog/permission gate |
 | transient event와 durable state의 의미 분리 | loopback result URL와 workspace open 검증 | role-bound MCP, workspace/command guard, terminal revoke |
 | Evidence provenance와 quality 경고 | credential/path/redaction boundary | Analyst job, deterministic Evidence reducer |
 
 중요한 구현 선택:
 
-- 새 네 화면은 **`LocalCoreClient`가 canonical API**다.
+- 새 frontend의 모든 기능 영역은 **`LocalCoreClient`가 canonical API**다.
 - `LocalProgramAdapter`는 legacy `AgentAdapter` migration용 lossy seam이다. started/message/work/completed/failed만 내보내고 richer `STATE`, native ACK, revision과 error detail을 숨긴다. subscribe-only dispose도 없고 `cancel()`은 backend mutation을 호출한다. 새 UI의 상태 source로 쓰지 말고, 기존 composer를 잠시 연결할 때도 `LocalCoreClient` 기반 view model을 함께 둔다.
 - frontend-client tarball만으로 native Kiro worker가 생기지 않는다. 현재 검증된 native path는 packaged 0.1.3 extension의 worker/permission/observer 구현이다.
 - frontend가 private mux/ACP observer, permission 응답, role session 또는 MCP bridge를 다시 만들지 않는다. 현재 repository에서는 [extension handler](../examples/kiro-panel/src/extension.cjs), [native worker](../examples/kiro-panel/src/native-worker.cjs), [permission gate](../examples/kiro-panel/src/native-permission.cjs)와 [protected lifecycle](../examples/kiro-panel/src/protected-lifecycle.cjs)을 그대로 재사용한다. 외부 repository로 분리하려면 adapter 담당자가 먼저 이 경계를 package로 추출해야 한다.
 
 ## 4. source에서 시작하는 portable 경로
 
-아래 placeholder를 각 컴퓨터의 **절대 경로**로 바꾼다. 현재 공유 pushed revision이나 backend installer는 없으므로 source 전달은 별도다.
+아래 placeholder를 각 컴퓨터의 **절대 경로**로 바꾼다. source baseline은 `origin/codex/kiro-native-recovery-20260913`의 `445497b`에 있고 backend installer는 아직 없으므로 repository checkout이 필요하다.
 
 ```sh
 cd "<vibe-helper-recovery-checkout>"
@@ -134,9 +159,11 @@ public package export는 [frontend client](../packages/frontend-client/src/index
 
 `ProjectSessionSnapshot`은 extension host가 읽는 canonical durable DTO이고 현재 schema에는 `workspaceDirectory`가 없다. 그래도 typed snapshot과 sanitized event를 화면별 Webview model로 projection해 필요한 필드만 보낸다. 절대 `workspaceDirectory`는 `UI_PREPARE_BUILDER_SESSION`의 `BuilderSessionBindingDescriptor`에만 있으며 connection object와 함께 host-only로 유지한다.
 
-## 6. 네 화면 action mapping
+## 6. reference 기능 영역과 action mapping
 
-| 화면 | Webview semantic action | extension-host API / request | 성공 source |
+아래는 필요한 기능 coverage와 현재 reference action 이름을 정리한 표다. 네 개의 별도 화면, 현재 route/layout 또는 동일한 interaction을 요구하는 제품 UI 명세가 아니다.
+
+| 기능 영역 | Webview reference action | extension-host API / request | 성공 source |
 | --- | --- | --- | --- |
 | Discovery | `start` | `startDiscovery({ learningGoal, personalNeed? })` | durable Discovery Session + preview revision |
 | Discovery | `retryDiscovery` | `startRun({ kind:'DISCOVERY', phase:'PREVIEW'|'ENRICH_ALL'|'ROUND', ... })` | fresh snapshot의 current Session/Round |
@@ -289,9 +316,9 @@ await restoreForHost()
 
 ## 10. 첫 frontend PR 순서와 검증
 
-현재 가장 짧고 검증된 경로는 native adapter/handler를 유지하고 `examples/kiro-panel/media`의 화면과 host-side safe projection을 개선하는 것이다.
+이 순서는 위 **제품 방향과 CLI 전환 승인 정책**을 전제로 한다. 첫 PR은 Kiro-IDE-only로 시작하며 CLI 대안은 합의 template의 명시 승인 전에는 넣지 않는다. 다음은 기능 계약을 위험이 낮은 순서로 연결하는 예시일 뿐 화면 수, IA, layout, repository 또는 구현 순서를 강제하지 않는다. 현재 `examples/kiro-panel/media`를 reference로 활용할 수 있지만 backend test UI를 제품 UI로 복제할 필요는 없다. 기존 native adapter/handler는 재사용한다.
 
-1. 지원 banner와 four-screen route shell을 만든다. unsupported OS/pin에서는 native action을 disabled한다.
+1. 지원 boundary와 필요한 기능 navigation/state model을 설계한다. 하나 또는 여러 화면인지는 제품 설계 결정이며, unsupported OS/pin에서는 native action을 disabled한다.
 2. `ProjectHistory`/`ProjectSessionSnapshot`을 host-side safe view model로 변환하고 History read-only restore를 먼저 연결한다.
 3. Discovery preview/partial enrichment/ID+revision selection과 stale UX를 연결한다.
 4. Spec refine/confirm/prepare의 두 단계 durable 성공을 연결한다.
