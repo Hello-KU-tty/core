@@ -2,30 +2,27 @@
 
 최종 판정일: 2026-09-16 KST. 이 문서는 새 frontend 작업의 기술 front door다. 시간순 실측과 예외는 [historical handoff](FRONTEND_IDE_HANDOFF_20260915.md), 최종 판단은 [cutover verdict](spikes/T19_NATIVE_IDE_CUTOVER_VERDICT_20260916.md)를 따른다.
 
-## 제품 방향과 CLI 전환 승인 정책
+## 개발 배경과 방향
 
-초기 Core는 Kiro Crew test frontend를 사용했지만 backend Agent는 Crew program 자체가 아니라 별도 Kiro CLI process로 실행했다. 백엔드 담당자는 이를 “IDE 안에서 배우기”라는 제품 철학과 경진대회 출품 이후 다른 IDE로 확장하려는 제품 방향에 맞지 않는다고 판단했다. 다른 IDE adapter 구현은 현재 MVP 범위가 아니다.
+초기 Core의 테스트용 frontend는 Kiro Crew였다. 구현 뒤 backend가 Crew 자체가 아니라 별도의 Kiro CLI를 사용한다는 사실을 확인했고, 백엔드 담당자는 이를 “IDE 내 학습”과 경진대회 출품 이후 다른 IDE로의 이식성을 추구하는 방향에 적합하지 않다고 판단했다.
 
-현재 branch는 외부 Agent CLI 없이 Mac의 Kiro IDE Agent로 제품을 만드는 경로를 검증했고 부분적으로 성공했다. 아래 exact pin에서는 experimental GO지만 이전 CLI 경로만큼 안정적이라고 보지는 않는다. 이는 제품 판단이며 동일 조건의 IDE-vs-CLI 안정성·성능 A/B benchmark는 실행하지 않았다. 또한 pinned private Kiro API 자체가 cross-IDE portability를 제공하는 것은 아니고 IDE-only 구조도 별도 Node Core를 유지한다.
+현재 branch에서는 외부 Agent CLI 없이 Mac의 Kiro IDE로 제품을 만드는 IDE-only 경로를 테스트했다. 어느 정도 성공했지만 기존 CLI 경로만큼 안정적이지 않고 아직 experimental 기능이다.
 
-Frontend 개발 담당 에이전트는 **Kiro-IDE-only frontend로 시작하고 계속하는 것**이 기본이다. 어렵다고 판단해도 CLI를 자동·조용히 fallback하거나 도입하지 않는다. CLI로의 방향 전환이 필요하다고 판단되면 먼저 frontend 개발을 담당하는 사용자에게 아래 내용을 갖춘 **전환 검토와 실행 범위에 대한 명시적 합의**를 요청하고, 사용자의 명시적 결정이 있어야 affected path를 바꿀 수 있다. 이 요청 자체는 CLI 도입 승인이 아니다. 합의 대기 중에는 영향을 받는 작업만 멈추고 독립적인 화면·상태·접근성 작업은 계속할 수 있다.
+Frontend 개발 담당 에이전트는 우선 Kiro-IDE-only frontend를 개발한다. Kiro IDE만으로 진행하기 어렵다고 판단되면 frontend 개발을 담당하는 사용자에게 명시적 합의를 요청한다. 제안에는 다음을 포함한다.
 
-```text
-[IDE-only → CLI 대안 검토 합의 요청]
-1. IDE 경로가 어려운 이유: 재현 절차, 실제 오류/제약, 영향 범위
-2. IDE와 CLI 비교: 각각의 강점·약점, 아직 측정하지 않은 항목
-3. CLI 사용 시 제품 철학 제안: “IDE 안에서 배우기”를 어떻게 유지할지
-4. 실제 사용자 여정: setup/login → IDE learning → 실행/Helper → stop/recovery
-5. backend 담당자 합의 요청: contracts, lifecycle, permissions, data/provenance,
-   packaging, rollback, validation의 변경과 소유자
-요청 판정: IDE-only 유지 / bounded 대안 조사 / CLI 계약 변경 승인 중 하나
-```
+- 현재 Kiro IDE로 진행하기 어려운 이유.
+- IDE 방식과 CLI 방식 각각의 장점과 단점.
+- CLI를 사용할 경우 추구할 제품 철학 제안.
+- 실제 사용자가 제품을 사용하는 구체적인 흐름.
+- 백엔드 담당자와의 합의 요청.
 
-## Frontend 설계 권한과 reference UI의 지위
+사용자와 합의하기 전에는 CLI 경로로 일방적으로 전환하거나 조용히 fallback하지 않는다.
 
-원래 Crew frontend와 현재 experiment/reference panel은 backend 개발자 관점에서 expected flow를 확인하려고 만든 단순 prototype이다. 둘 다 production frontend의 UI/UX, layout, information architecture 또는 interaction specification을 구속하지 않는다.
+## 테스트용 프론트와 실제 프론트 설계
 
-Frontend 개발 담당 에이전트는 backend test UI를 복제하지 않고, 학습자 필요를 기준으로 실제 frontend를 자율적으로 설계하며 frontend 개발을 담당하는 사용자와 함께 방향을 결정한다. prototype에서 화면 수, route, pane 구성, 시각 스타일이나 interaction pattern을 architecture 요구사항으로 추론하지 않는다. 단, Core DTO와 durable state/revision, provenance, security boundary 및 기존 native adapter 계약은 보존한다. 이 계약을 바꾸어야 하면 구현 전에 backend 담당자의 명시적 합의가 필요하다.
+원래 Crew frontend와 현재 experiment/reference panel은 백엔드 담당자 관점에서 expected flow를 확인하려고 만든 단순한 테스트용 prototype이다. production frontend의 UI/UX, layout, information architecture 또는 interaction specification은 아니다.
+
+Frontend 개발 담당 에이전트는 frontend 개발을 담당하는 사용자와 함께 실제 frontend를 자율적으로 설계한다. 학습자 필요에 따라 기존 테스트 UI를 재사용하거나 변경할 수 있으며, 화면 수·route·pane 구성·시각 스타일·interaction pattern도 제품 설계에서 결정한다.
 
 ## 1. 먼저 고정할 지원 경계
 
@@ -68,6 +65,8 @@ repository, backend와 독립 app-copy 검증은 Node 24.19.0에서 했다. 실�
 | 미검증 | cold-network 독립 install, OS-level package-script confinement, CLI latency/cost/완료율 동등성 |
 | 미검증 | generated-result origin restart 복원, 사람 학습과 개인화의 인과 효과 |
 | source baseline | `origin/codex/kiro-native-recovery-20260913`의 `445497b` 사용 가능; repository 없이 설치하는 backend binary/service/lifecycle UI는 미제공 |
+
+위 판정은 동일 조건의 IDE-vs-CLI 안정성·성능 A/B benchmark 결과가 아니다. 현재 pinned private Kiro API 자체가 다른 IDE로의 이식성을 제공하지 않으며 IDE-only 구조도 별도 Node Core를 유지한다.
 
 ## 3. 실행 구조와 소유권
 
@@ -316,7 +315,7 @@ await restoreForHost()
 
 ## 10. 첫 frontend PR 순서와 검증
 
-이 순서는 위 **제품 방향과 CLI 전환 승인 정책**을 전제로 한다. 첫 PR은 Kiro-IDE-only로 시작하며 CLI 대안은 합의 template의 명시 승인 전에는 넣지 않는다. 다음은 기능 계약을 위험이 낮은 순서로 연결하는 예시일 뿐 화면 수, IA, layout, repository 또는 구현 순서를 강제하지 않는다. 현재 `examples/kiro-panel/media`를 reference로 활용할 수 있지만 backend test UI를 제품 UI로 복제할 필요는 없다. 기존 native adapter/handler는 재사용한다.
+이 순서는 위 **개발 배경과 방향** 및 **테스트용 프론트와 실제 프론트 설계**를 따른다. 첫 PR은 Kiro-IDE-only로 시작하고, Kiro IDE만으로 진행하기 어렵다면 위 내용을 포함해 프론트 담당 사용자에게 명시적 합의를 요청한다. 다음은 기능 계약을 위험이 낮은 순서로 연결하는 예시일 뿐 화면 수, IA, layout, repository 또는 구현 순서를 강제하지 않는다. `examples/kiro-panel/media`를 reference로 삼아 재사용하거나 실제 frontend 설계에 맞게 변경할 수 있다. 현재 검증된 native adapter/handler 재사용을 권장한다.
 
 1. 지원 boundary와 필요한 기능 navigation/state model을 설계한다. 하나 또는 여러 화면인지는 제품 설계 결정이며, unsupported OS/pin에서는 native action을 disabled한다.
 2. `ProjectHistory`/`ProjectSessionSnapshot`을 host-side safe view model로 변환하고 History read-only restore를 먼저 연결한다.
