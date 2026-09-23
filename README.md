@@ -15,11 +15,11 @@ Vibe Helper는 코딩 초보자가 자기에게 실용적인 TypeScript 서비�
 
 `PROJECT_SPEC.md`와 `CONVERSATION_RECORD.md`는 합의의 상세 배경을 보존하는 참고 자료다.
 
-프론트 담당자는 [프론트 개발 안내](docs/FRONTEND_INTEGRATION.md)에서 PowerShell 설치·실행, SDK, program adapter와 네 화면 API를 확인할 수 있다. 독립 backend와 최소 Kiro 패널 예제는 구현됐지만 Windows native 실측 gate가 남아 있어 인계 완료 상태는 아니다.
+2026-09-23부터의 다음 작업은 [Windows 확장 설치·런타임 인계](docs/WINDOWS_EXTENSION_HANDOFF_20260923.md)다. 주 사용 환경은 Windows이며 Kiro 확장 설치만으로 Core와 native worker를 자동 준비하는 것이 제품 목표다. Kiro 내장 runtime → 기존 호환 Node → 필요한 경우 private runtime 자동 준비 순서로 검증한다. native recovery `21674e8`에서 분기한 `codex/windows-extension-runtime-20260923`에서 이어가며 Windows 지원·설치물은 아직 미검증/미제작이다.
 
-T19 완료 목표는 frontend 개발자가 backend를 Windows 컴퓨터에서 실행하고 실제 Kiro IDE의 Discovery·Spec·Builder·History를 구현할 수 있는 상태다. [상세 구현·검증 계획](docs/T19_IMPLEMENTATION_PLAN.md)은 push를 제외하고 승인됐다. push는 실행 전 별도로 승인받는다. [현재 capability 기록](docs/spikes/T19_LOCAL_RUNTIME_RESULTS.md)에서 macOS Core/CLI/IDE host 실측과 미검증 Windows 항목을 구분한다.
+프론트 담당자는 [IDE-only frontend 가이드](docs/FRONTEND_IDE_IMPLEMENTATION_GUIDE.md)에서 SDK·native worker 경계와 UI 계약을 확인한다. [기존 프론트 개발 안내](docs/FRONTEND_INTEGRATION.md)와 [최초 T19 계획](docs/T19_IMPLEMENTATION_PLAN.md)의 PowerShell/CLI 수동 실행은 개발 재현 경로다. 사용자 repository checkout·backend 명령·connection 경로 설정을 제품 완료 조건으로 삼지 않는다. native Windows 실측, 확장 lifecycle·패키징과 전체 수직 흐름 검증은 T19-W에서 진행한다. push는 요청 범위와 저장소 Git 지침을 따른다.
 
-독립 개발 경로는 `pnpm install --frozen-lockfile` → `pnpm build` → `pnpm core:init` → `pnpm core:doctor --live` → `pnpm core:start`다. live 진단은 본인 Kiro 모델 사용량을 소비한다. Crew secret이나 `/api/test/agent`는 사용하지 않는다. `pnpm client:pack`으로 외부 소비 SDK를 만들고 `pnpm panel:build` 후 Kiro에서 `examples/kiro-panel`을 F5로 실행한다. 지원 버전·Windows gate·인증 파일 취급은 위 개발 안내를 먼저 읽는다.
+기존 CLI 독립 개발 경로는 `pnpm install --frozen-lockfile` → `pnpm build` → `pnpm core:init` → `pnpm core:doctor --live` → `pnpm core:start`다. live 진단은 본인 Kiro 모델 사용량을 소비하며 native IDE 검증을 대신하지 않는다. Crew secret이나 `/api/test/agent`는 사용하지 않는다. `pnpm client:pack`으로 외부 소비 SDK를 만들고 `pnpm panel:build` 후 Kiro에서 `examples/kiro-panel`을 F5로 실행한다. 지원 버전·Windows gate·인증 파일 취급은 위 개발 안내를 먼저 읽는다.
 
 ## MVP 수직 흐름
 
@@ -48,6 +48,7 @@ MVP host는 Kiro/Crew이고 Agent 중심 Crew App을 primary surface로 삼는�
 | T17 | 완료 | Project Evidence Trace, bounded cross-project retrieval, immutable personalization provenance |
 | T18 | 완료 | hidden Evidence Analyst worker, strict loopback 결과 실행기, optional Final Upgrade, Campus Drop 실행 fixture |
 | 외부 검증 대기 | T19 | 독립 backend·SDK·최소 Kiro 패널 구현/로컬 검증 통과, Windows native 인계 gate 미검증 |
+| 후속 계획 | T19-W | Windows native 실측, runtime 재사용, 확장 자동 기동, Builder 도구 준비와 clean 설치 검증. 다음 착수는 TASKS.md 참조 |
 
 T18의 Campus Drop fixture는 TypeScript runtime boundary, SQLite metadata와 blob file 분리, SHA-256 token digest, expiry와 1회 consume를 실제 build/test/HTTP 실행으로 검증한다. 제품 결과 실행기는 workspace 안의 strict `.vibe-helper/result.json`과 compiled JavaScript만 읽고, symlink containment를 확인한 뒤 최소 환경의 Node child를 `127.0.0.1` 동적 port에서 감독한다.
 
@@ -58,6 +59,8 @@ T18의 Campus Drop fixture는 TypeScript runtime boundary, SQLite metadata와 bl
 ## 로컬 개발
 
 필수 도구는 Node.js 24.19.0과 pnpm 11.12.0이다. `.node-version`, `engines`와 preflight가 다른 runtime을 거절한다.
+
+이는 repository 개발용 pin이다. 제품 사용자 runtime은 T19-W에서 호환 범위와 capability를 검증해 분리하며, 현재 개발 pin을 우회하는 지침이 아니다.
 
 ```bash
 pnpm install --frozen-lockfile

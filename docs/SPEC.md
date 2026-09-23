@@ -3,6 +3,7 @@
 ## 1. 상태
 
 - 상태: T00~T18 구현 완료, T19 자체 IDE 패널 연동 구현·검증 사용자 승인(2026-09-07), 진행 중. frontend 대상은 Windows이며 push는 별도 승인 대기다.
+- 2026-09-23 사용자는 Windows 중심의 확장 단독 설치 경험과 런타임 재사용 방향을 승인했다. T19-W의 Core 자동 기동·패키징은 MVP 필수이며 실제 Windows 지원은 아직 미검증이다. [Windows 인계](WINDOWS_EXTENSION_HANDOFF_20260923.md)를 따른다.
 - 2026-09-15의 마지막 4시간은 pin한 macOS Kiro 일반 profile에서 P3 Builder/late Helper 반복·확인된 Helper 취소 재사용·새 실제 Decision 해결/Builder 적용을 최소 실측한 뒤 IDE-only frontend 착수 가능 범위를 판정한다. 기존 CLI 구현은 삭제하지 않고 Windows·장기 안정성·정밀 CLI 비교를 완료로 간주하지 않는다. [판정 계획](spikes/T19_NATIVE_IDE_ONLY_4H_CUTOVER_PLAN_20260915.md)을 따른다.
 - 기준일: 2026-08-24
 - 입력 원본: [PROJECT_BRIEF.md](../PROJECT_BRIEF.md)
@@ -57,6 +58,7 @@
 - Concept마다 퀴즈 응답
 - 이해도를 증명하기 위한 강제 서술
 - 코드 문법을 직접 작성하는 능력
+- 제품 사용을 위한 repository clone, 수동 backend 시작, Node/pnpm 설치, connection 파일 경로 설정. 개발용 source build 요구와 구분한다.
 
 ## 4. 핵심 사용 흐름
 
@@ -307,6 +309,8 @@ T01 macOS probe의 두 실행은 20~37ms에 dispatch가 반환되고 약 12초 �
 - `NFR-COMP-005`: T19-N은 기존 CLI/Crew runtime을 보존하는 실험적 Kiro IDE 내장 Agent adapter다. 비공개 host 명령은 설치 버전·실제 반환값·workspace trust·Agent identity·MCP·권한을 gate로 검증하고 실패를 명시해야 한다. 파일 side effect만으로 stream 종료, 역할 분리, Core Decision 또는 Analyst 성공을 주장하지 않는다. Windows T19 완료 조건을 대체하지 않는다.
 - `NFR-COMP-006`: T19-N의 추가 수직 흐름 실험은 IDE 내장 Agent가 실제 Core에 낸 역할별 MCP 요청, 생성 workspace의 파일 변경, 결정적 UI Decision 해결, 별도 read-only Helper, UI 출처의 합성 사용자 Evidence·Episode, tool-less Analyst 결과의 Core 수락 및 다음 Helper/Discovery 개인화를 단계별 durable receipt로 판정한다. 성공하지 않은 구간은 fixture seed나 Agent 설명으로 대신하지 않는다.
 - `NFR-COMP-007`: IDE-only frontend 인계는 pin한 macOS 설치의 bounded 기능 검증과 개발 착수 판단이다. private API·고정 버전·외부 backend lifecycle을 명시하고 CLI fallback source를 보존한다. Windows 지원, 장기 안정성, 진행 중 reconnect와 CLI 비용·지연 동등성은 별도 미검증 gate이며 안전 또는 실제 실패를 UI polish로 대체하지 않는다.
+- `NFR-COMP-008`: Windows를 주 제품 실행 환경으로 검증한다. 우선 win32-x64에서 수행하고 Windows ARM64는 별도 binary·host·Agent 실측 전 지원으로 표시하지 않는다. macOS 실측이나 Windows 플랫폼 차단 제거만으로 Windows PASS를 선언하지 않는다.
+- `NFR-COMP-009`: 제품용 backend/bridge는 Kiro 내장 런타임 → 기존 호환 Node → 확장 관리 런타임 순서로 선택한다. 지원 버전 범위·architecture·필요 API·SQLite driver capability를 검증하고 실패 이유를 보존한다. Kiro private Agent API 호환성은 Node 호환성과 독립적으로 판정한다. 개발 toolchain pin을 런타임 허용 범위 변경과 혼동하지 않는다.
 
 ### 6.5 운영과 신뢰성
 
@@ -314,6 +318,10 @@ T01 macOS probe의 두 실행은 20~37ms에 dispatch가 반환되고 약 12초 �
 - `NFR-OPS-002`: Agent 실패, tool 거절, stale context와 분석 실패를 사용자에게 복구 가능한 상태로 표시해야 한다.
 - `NFR-OPS-003`: Evidence 분석 실패가 Builder의 완료된 코드와 Project History를 손상시키지 않아야 한다.
 - `NFR-OPS-004`: Event→Episode→Proposal→State 전이를 correlation id로 추적할 수 있어야 한다.
+- `NFR-OPS-005`: Kiro 설치·로그인 이후 제품 확장 설치와 패널 열기만으로 local data 초기화, Core 시작, 인증된 연결과 native worker 준비가 이뤄져야 한다. `connection.json`은 host 내부에서 관리하고 사용자에게 경로 입력을 요구하지 않는다.
+- `NFR-OPS-006`: 확장은 owned process의 종료·crash 복구, 다중 창의 중복 실행·DB lock, connection rotation과 확장 업데이트의 DB migration/backup을 관리해야 한다. 응답 불명확 mutation을 자동 재전송하거나 기존 데이터 삭제로 복구하지 않는다. 진행 중 stream/turn 자동 복원 보장은 추가하지 않는다.
+- `NFR-OPS-007`: 추가 런타임은 필요한 경우에만 신뢰 가능한 배포물 검증 후 사용자 전용 폴더에 준비한다. 관리자 권한·전역 PATH 변경·사용자 설치 덮어쓰기를 요구하지 않는다. offline/중단/손상 다운로드는 명시적 실패와 재시도로 처리하고 Mock 성공으로 바꾸지 않는다.
+- `NFR-OPS-008`: Builder가 생성한 TypeScript 앱의 Node/pnpm과 앱 의존성을 확장 자체의 실행 의존성과 구분한다. 기존 호환 도구를 우선하고 필요한 도구만 자동 준비하되 native shell이 실제로 그 도구를 사용하는지 검증한다. install-script allowlist와 generated-workspace 경계를 유지한다.
 
 ## 7. 데이터 요구사항
 
@@ -370,9 +378,9 @@ T01 macOS probe의 두 실행은 20~37ms에 dispatch가 반환되고 약 12초 �
 
 ### 8.4 배포
 
-- 현재 provider와 workflow는 미정이다.
-- MVP 완료 조건 포함 여부는 T0 결정 사항이다.
-- 배포를 추가하더라도 한 TypeScript Golden Path와 한 provider로 제한한다.
+- 제품 자체는 Windows Kiro 확장 설치와 local Core 자동 실행을 MVP 완료 조건으로 둔다. VSIX/조건부 runtime/생성 데이터 구분은 [Windows 인계](WINDOWS_EXTENSION_HANDOFF_20260923.md)를 따른다. 공개 marketplace 게시 여부와 배포 채널 운영은 별도다.
+- 생성 결과물의 hosted provider와 workflow는 미정이며 MVP 완료 조건 포함 여부는 별도 결정 사항이다.
+- hosted 배포를 추가하더라도 한 TypeScript Golden Path와 한 provider로 제한한다.
 
 ## 9. 범위 제외
 
@@ -406,6 +414,7 @@ T01 macOS probe의 두 실행은 20~37ms에 dispatch가 반환되고 약 12초 �
 - `AC-MVP-012`: 실제 Kiro IDE의 최소 연동 예제에서 새 Learning Goal→Candidate 수정·선택→Spec 생성·수정·확정→Builder 작업→Helper 질문·실제 Decision 적용→History 재진입이 같은 Core 식별자와 revision으로 이어진다. frontend 개발자가 push된 backend의 clean checkout, client와 지침으로 자신의 대상 OS에서 실행해 Discovery·Spec·Builder·History 화면을 모두 구현할 수 있다. Crew와 IDE 저장 상태 일치·중복 적용 거절·재시작 복원을 검증하며 frontend 최종 디자인 완료는 backend 인계 조건과 구분한다.
 - `AC-MVP-013`: secret redaction, path rejection, Agent 권한 거절 test가 통과한다.
 - `AC-MVP-014`: Golden Path와 unseen input의 전체 flow를 재현 가능한 방식으로 검증한다.
+- `AC-MVP-015`: 개발용 Node/pnpm/source checkout이 없는 Windows 일반 사용자 환경에서 Kiro 확장 설치 후 Core와 Agent가 자동 연결돼 새 Discovery→Spec→Builder/Helper·실제 Decision→결과 실행·History 복원을 완료한다. 기존 도구 재사용 및 필요한 도구의 자동 준비 경로, 취소·재시작·다중 창·업데이트를 검증한다. 데이터·권한·Evidence 품질 gate는 기존 기준을 유지하며 설치 성공으로 대체하지 않는다.
 
 ### 10.2 대회 제출 준비 완료 조건
 
@@ -451,4 +460,4 @@ T01 macOS probe의 두 실행은 20~37ms에 dispatch가 반환되고 약 12초 �
 2. T19: 자체 IDE 패널의 Core/Agent transport, 권한·process lifecycle과 Discovery·Spec부터의 프론트 실제 연결 인계(T01 결과를 새 경계에서 재검증)
 3. T02: 실제 Node.js LTS version, runtime schema와 SQLite/migration library
 4. T07·T23: reducer fixture, reviewer 방식과 실제 pilot 규모
-5. T28: 대회 제출을 위한 공식 packaging·배포 경로
+5. T19-W: Windows native와 확장 설치·runtime 선택·자동 기동, T28: 그 검증된 설치물을 이용한 대회 제출 채널과 선택적 hosted 배포

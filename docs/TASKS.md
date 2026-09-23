@@ -12,6 +12,8 @@
 
 MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Builder → 실제 Decision → Helper → Evidence → 다음 개인화`가 한 번 이어지는 검증 가능한 수직 흐름이다. 공통 계약과 상태 처리부터 만들고, Agent와 UI는 그 위에 연결한다.
 
+2026-09-23 사용자 승인으로 Windows 주 사용 환경과 확장 설치 후 Core 자동 실행을 MVP 필수로 둔다. [Windows 인계](WINDOWS_EXTENSION_HANDOFF_20260923.md)의 T19-W 작업은 native recovery에서 분기해 수행한다. T19/T19-N의 기존 검증·미완료 기록은 보존하며 T28까지 제품 설치 작업을 미루지 않는다.
+
 ## 2. MVP 이전: 핵심 수직 흐름 완성
 
 ### [x] T00. 문서 승인과 착수 차단 결정 해소
@@ -870,6 +872,77 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - 2026-09-15 사용자는 09:58~13:58 UTC의 마지막 4시간을 새 가능성 탐색 대신 득실 중심 최소 실측과 IDE-only frontend 전환 판단에 쓰도록 승인했다. 한 창 protected H의 Builder + late Helper 세 번, 확인된 H cancel 뒤 재사용, 새 실제 Decision의 사용자 이유·해결·Builder 적용을 우선하고, P2의 좁은 clean Analyst 재평가와 합쳐 개발 착수 범위만 결정한다. 기존 CLI source를 즉시 삭제하지 않으며 Windows·장기 안정성·정밀 CLI 비교와 진행 중 reconnect race는 완료로 세지 않는다. 안전/동작 실패는 그대로 blocker로 기록한다. [4시간 계획](spikes/T19_NATIVE_IDE_ONLY_4H_CUTOVER_PLAN_20260915.md)을 따르며 T19-N은 `[~]` 유지한다.
 - 2026-09-16 승인 재개 뒤 일반 Kiro 0.1.3의 parser/install/reload/activation, 같은 `windowId=2`에서 W read와 late protected H의 3/3 overlap, confirmed H cancel/reuse, 실제 Core Decision request→합성 UI resolution→same-scope application→Builder resume, G Task `COMPLETED`와 Node 24 fresh app-only frozen install/33 tests/typecheck/build/smoke·실제 geometry/Undo/Redo/reload를 bounded 검증했다. 최종 active run/Analysis 0, Analysis 51 `SUCCEEDED`, binding 115 전부 `REVOKED`/0600, SQLite `quick_check=ok`였다. 반면 Analyst v1.0.7은 7/7 operational 완료에도 deterministic quality 3/7 `FAILED`이고, active-operation reconnect, Windows, private API 일반 지원, OS sandbox와 CLI 동등 비교는 미검증이다. 따라서 **pin한 macOS experimental IDE flow와 frontend 인계는 GO**, Evidence production/Windows/CLI 교체는 **NO-GO**이며 T19-N과 MVP는 완료가 아니다. 원래 09:58~13:58 UTC deadline은 action-time 승인 대기 중 지났으므로 wall-clock 4시간 성공으로 기록하지 않는다. [최종 cutover 판정](spikes/T19_NATIVE_IDE_CUTOVER_VERDICT_20260916.md)을 따른다.
 
+### [x] T19-W0. Windows 제품 요구와 다음 세션 인계
+
+**승인·범위**
+
+- 2026-09-23 사용자가 Windows 중심 실사용, 확장 설치 후 backend 자동 실행, 기존 runtime 재사용 방향을 승인하고 문서 반영·적절한 branch 선택·commit을 요청했다.
+- `21674e8` native recovery HEAD에서 `codex/windows-extension-runtime-20260923`을 분기한다. 현재 `main`에는 native 구현 baseline이 없으며 기존 recovery는 Mac 회귀 기준으로 보존한다.
+
+**산출물·완료 조건**
+
+- BRIEF/SPEC/ARCHITECTURE/DECISIONS/TASKS와 frontend entry 문서를 정합하게 갱신하고 [Windows 인계](WINDOWS_EXTENSION_HANDOFF_20260923.md)에 사례·설치물·조건부 다운로드·현재 결함·후속 검증을 기록한다.
+- 문서 상대 링크·요구사항 추적·다음 task 하나·diff whitespace를 검증하고 요청 범위의 문서만 commit한다. Windows 실행 성공이나 기존 미완료 task 완료로 표시하지 않는다. push는 이번 요청에 없다.
+
+**검증 기록**
+
+- 2026-09-23 문서 10개의 상대 링크 115개가 존재함을 확인했고 `git diff --check`를 통과했다. AC-MVP-015의 SPEC/TASKS 추적과 W1 단일 다음 착수 표시를 확인한다. source·의존성·runtime 변경은 없으므로 app test/Windows 실측은 이 문서 작업의 검증으로 주장하지 않는다.
+
+### [>] T19-W1. Windows runtime와 native Agent capability 실측
+
+**선행 조건**
+
+- T19-W0 인계와 Windows 일반 사용자 환경, Kiro IDE·본인 로그인이 준비돼야 한다. 개발 checkout의 Node/pnpm pin은 별도로 충족하며 제품 사용자에게 요구하지 않는다.
+
+**범위·산출물**
+
+- Windows x64 우선으로 OS/architecture, Kiro/Agent/API/host runtime version과 지원표를 기록한다. ARM64는 별도 검증 전 미지원이다.
+- Kiro child runtime → 기존 Node → managed Node 후보 순서의 capability를 확인한다. SQLite Node-API 10/load/transaction/reopen, MCP bridge와 native Discovery 제출·Builder 작은 write/test·Helper read-only·stream/cancel/revoke를 합성 scope에서 검증한다.
+- exact Mac pin·Homebrew path 의존 지점을 좁은 spike로 분리하되 source/role/permission 검증을 삭제하지 않는다. `core:doctor --live`의 CLI 검사를 native PASS로 쓰지 않는다.
+
+**완료 조건**
+
+- 재현 가능한 source/command/test와 sanitized Windows receipt가 있으며 runtime 재사용/불가·native 역할별 성공/실패를 구분한다. 전체 기능 미통과를 완료로 덮지 않고 막힌 gate를 기록한다. Windows가 없으면 `[-]`와 이유를 남긴다.
+
+### [ ] T19-W2. Core·bridge portable package와 runtime 준비
+
+**선행 조건:** T19-W1에서 Core/runtime와 native 연결을 진행할 근거가 확보돼야 한다.
+
+**산출물·완료 조건**
+
+- 검증된 runtime descriptor, packaged resource root, platform SQLite·migration/prompt/guard를 source checkout 없이 실행한다. 제품 호환 범위를 기록하고 개발 pin과 분리한다.
+- Kiro/기존 Node/검증된 cache 재사용 및 필요한 경우의 private runtime acquisition을 구현·검증한다. 다운로드 중단/손상/offline·재시도·출처 검증, Windows 경로/ACL을 포함한다.
+- OS별 VSIX 구성과 누출 검사를 마련하고 dev source·다른 플랫폼 binary·DB/token을 제외한다. 총 VSIX/설치/추가 다운로드 크기는 실제 artifact로 측정한다.
+
+### [ ] T19-W3. 확장 자동 기동·연결·복구와 frontend 통합
+
+**선행 조건:** T19-W2.
+
+**산출물·완료 조건**
+
+- extension lifecycle manager가 private data 초기화, Core owned process, native worker, 연결 정보와 SDK generation을 관리한다. 사용자 수동 server/connection 경로 입력을 제거한다.
+- 다중 창·DB lock·정상 종료·crash·credential rotation·확장 업데이트·migration backup을 검증하고 기존 데이터와 no-auto-replay를 유지한다.
+- frontend는 runtime 준비/Core 연결/native 준비/실제 결과 저장과 오류를 구분하며 하나의 제품 확장으로 설치된다. private API 재작성·Mock 성공 대체 없이 UI 책임과 adapter 책임을 분리한다.
+
+### [ ] T19-W4. 생성 TypeScript 앱의 도구 자동 준비
+
+**선행 조건:** T19-W3.
+
+**산출물·완료 조건**
+
+- 기존 Node/pnpm 우선, 필요 시 private 도구 준비. native Agent shell과 result launcher가 선택한 runtime을 실제로 사용하게 하고 `process.execPath`·env 가정을 수정한다.
+- 도구 설치 유무 두 환경에서 frozen install/build/test/실제 result HTTP smoke를 수행한다. generated workspace·lifecycle allowlist를 지키고 전역 PATH/사용자 설치를 변경하지 않는다.
+
+### [ ] T19-W5. clean Windows 확장 설치와 수직 흐름 출하 검증
+
+**선행 조건:** T19-W1~W4와 통합 frontend artifact.
+
+**산출물·완료 조건**
+
+- 개발 source/Node/pnpm 없는 일반 사용자 Windows에서 VSIX 설치만으로 Core·native Agent를 준비한다. 기존 도구 재사용·미설치 자동 준비, 한글/공백 경로·다중 창·취소·재시작·업데이트를 검증한다.
+- 새 학습 목표/Personal Need 유무의 Discovery·선택·Spec→Builder/Helper·실제 Decision→테스트/결과 실행→durable History를 확인한다. Evidence 출처·분석 실패/복구·다음 context 전달은 실제 결과와 품질 한계를 분리한다.
+- 변경 범위별 unit/contract/storage/Agent eval/IDE 검증과 `pnpm check`, packaged clean install receipt·용량/RSS·지원표를 남긴다. `AC-MVP-015`와 기존 T19/T19-N 완료 기준이 모두 충족됐을 때만 상위 task 완료 여부를 재판정한다.
+
 ### [ ] T20. 보안·개인정보·접근성·복구 hardening
 
 **범위**
@@ -1059,6 +1132,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 
 **범위**
 
+- Windows 제품 확장·Core 자동 기동은 T19-W의 선행 MVP 요구다. 이 작업으로 미루지 않고, 여기서는 검증된 설치물의 공개 채널·심사자 배포·제출 archive 운영을 정한다.
 - 대회 심사 방식과 T00 결정에 따라 local 실행만 유지할지, 제한된 hosted surface를 추가할지 확정한다.
 - 재현 가능한 설치, Kiro App/MCP 등록, sample project 초기화와 rollback을 문서화한다.
 
@@ -1224,3 +1298,4 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 | AC-MVP-012 | T19 | T21 |
 | AC-MVP-013 | T06, T20 | T21 |
 | AC-MVP-014 | T07, T18 | T21 |
+| AC-MVP-015 | T19-W1~W4 | T19-W5, T21 |

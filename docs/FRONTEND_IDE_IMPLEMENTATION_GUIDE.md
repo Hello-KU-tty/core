@@ -2,6 +2,8 @@
 
 최종 판정일: 2026-09-16 KST. 이 문서는 새 frontend 작업의 기술 front door다. 시간순 실측과 예외는 [historical handoff](FRONTEND_IDE_HANDOFF_20260915.md), 최종 판단은 [cutover verdict](spikes/T19_NATIVE_IDE_CUTOVER_VERDICT_20260916.md)를 따른다.
 
+> 2026-09-23 제품 요구 갱신: Windows가 주 사용 환경이며 제품 확장 설치만으로 Core·native worker까지 자동 준비해야 한다. 다음 작업은 [Windows 인계](WINDOWS_EXTENSION_HANDOFF_20260923.md)와 T19-W1부터 따른다. 아래 macOS exact pin·수동 `core:native`·connection 경로 설정은 기존 개발 baseline의 재현 방법이며 최종 사용자 설치 UX가 아니다. Windows native·자동 lifecycle은 아직 미구현/미검증이며 이 요구 갱신만으로 fail-closed를 해제하지 않는다.
+
 ## 개발 배경과 방향
 
 초기 Core의 테스트용 frontend는 Kiro Crew였다. 구현 뒤 backend가 Crew 자체가 아니라 별도의 Kiro CLI를 사용한다는 사실을 확인했고, 백엔드 담당자는 이를 “IDE 내 학습”과 경진대회 출품 이후 다른 IDE로의 이식성을 추구하는 방향에 적합하지 않다고 판단했다.
@@ -99,6 +101,8 @@ Kiro extension host
 - `LocalProgramAdapter`는 legacy `AgentAdapter` migration용 lossy seam이다. started/message/work/completed/failed만 내보내고 richer `STATE`, native ACK, revision과 error detail을 숨긴다. subscribe-only dispose도 없고 `cancel()`은 backend mutation을 호출한다. 새 UI의 상태 source로 쓰지 말고, 기존 composer를 잠시 연결할 때도 `LocalCoreClient` 기반 view model을 함께 둔다.
 - frontend-client tarball만으로 native Kiro worker가 생기지 않는다. 현재 검증된 native path는 packaged 0.1.3 extension의 worker/permission/observer 구현이다.
 - frontend가 private mux/ACP observer, permission 응답, role session 또는 MCP bridge를 다시 만들지 않는다. 현재 repository에서는 [extension handler](../examples/kiro-panel/src/extension.cjs), [native worker](../examples/kiro-panel/src/native-worker.cjs), [permission gate](../examples/kiro-panel/src/native-permission.cjs)와 [protected lifecycle](../examples/kiro-panel/src/protected-lifecycle.cjs)을 그대로 재사용한다. 외부 repository로 분리하려면 adapter 담당자가 먼저 이 경계를 package로 추출해야 한다.
+
+Windows 제품 목표에서는 backend/adapter 담당이 이 경계와 Core package·runtime 선택·자동 기동/복구를 제공하고 frontend가 사용자에게 준비/연결/실패를 표시한다. runtime은 Kiro 내장 → 기존 호환 Node → 필요 시 private 자동 준비 순서로 검증한다. 소스 repository가 나뉘어도 사용자는 하나의 제품 확장을 설치하며 `connection.json`은 host 내부에서 관리한다. `health()` 성공과 native worker 준비·실제 Agent 결과 저장을 구분하고 live 실패는 명시적으로 보여준다.
 
 ## 4. source에서 시작하는 portable 경로
 

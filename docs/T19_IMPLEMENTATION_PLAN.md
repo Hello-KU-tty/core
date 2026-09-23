@@ -2,6 +2,8 @@
 
 > 작성: 2026-09-07. 사용자가 이 계획에서 push를 제외한 구현·실측·검증을 승인하고 착수를 지시했다. commit은 승인 범위에 포함하되 push는 실행 직전에 별도 승인을 받아야 한다. 프론트 개발자의 대상 OS는 Windows다.
 
+> 2026-09-23 후속: 이 문서는 최초 CLI 기반 인계 계획의 기록이다. 현재 Windows 제품 목표는 [Windows 확장 인계](WINDOWS_EXTENSION_HANDOFF_20260923.md)와 T19-W 작업으로 갱신됐다. native recovery 구현을 이어받아 Kiro 확장 단독 설치·런타임 재사용·Core 자동 실행을 검증하며, 아래 수동 실행 절차를 최종 사용자 요구로 적용하지 않는다.
+
 ## 완료 시 제공할 상태
 
 프론트 개발자가 push된 backend repository를 자신의 컴퓨터에 받아 문서대로 설치·실행하고, 자신의 Kiro 로그인으로 실제 Kiro IDE 안에서 Discovery, Spec, Builder(Helper 포함), History 화면을 모두 구현할 수 있어야 한다. 필요한 서버·Agent 실행·SDK·데이터 계약·오류 처리·예제가 repository 안에 있어야 하며, 작성자의 기존 Crew 설치·DB·secret·절대 경로나 미추적 임시 파일에 의존하지 않는다.

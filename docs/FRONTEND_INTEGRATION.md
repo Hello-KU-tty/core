@@ -1,5 +1,7 @@
 # Kiro IDE 프론트 개발 안내
 
+> 2026-09-23 이후 Windows 제품 개발의 시작점은 [Windows 확장 인계](WINDOWS_EXTENSION_HANDOFF_20260923.md)다. 확장 설치 후 Core 자동 기동과 런타임 재사용이 필수이며, 아래 수동 CLI/connection 설정은 과거 개발 경로다. Windows native가 미검증이라는 사실은 유지하며 CLI로 조용히 전환하지 않는다.
+
 > 현재 pin한 macOS IDE-only experimental flow를 구현하려면 먼저 [IDE-only frontend 구현 가이드](FRONTEND_IDE_IMPLEMENTATION_GUIDE.md)를 따른다. 이 문서는 기존 CLI/Windows 경로를 포함한 더 오래된 전체 계약 기록이다.
 >
 > T19 진행 중, 2026-09-07. 아래 backend/SDK/예제는 구현돼 있다. **Windows native 설치·실제 Kiro 실행 gate는 미검증이며 인계 완료가 아니다.** macOS 실측과 Windows 완료를 구분한다. 최신 증거는 [실측 기록](spikes/T19_LOCAL_RUNTIME_RESULTS.md)을 따른다. push는 별도 승인 전까지 하지 않는다.

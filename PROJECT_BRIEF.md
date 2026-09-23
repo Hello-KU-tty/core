@@ -6,6 +6,7 @@
 > 실험 승인: 2026-09-12 사용자는 별도 worktree에서 Kiro IDE 내장 Agent를 실행기로 쓰는 T19-N 실험을 승인했다. 기존 CLI/Crew 경로와 T19 Windows 완료 gate는 유지하며, 내장 경로의 지원·권한·Core 연결·stream·중지는 실측 전 제품 기능으로 간주하지 않는다.
 > 수직 흐름 승인: 2026-09-12 사용자는 같은 분리 worktree에서 native Discovery부터 Builder 파일·Decision, Helper, 사용자 Evidence·Episode·Analyst와 다음 개인화까지 실제 Core 상태로 검증하도록 승인했다. 사람의 선택·발언은 명시적 합성 UI 입력으로만 대체하고 Agent 작성물로 이해 상태를 올리지 않는다. 기존 CLI/Crew 기본 경로와 Windows gate는 유지한다.
 > 4시간 전환 판단 승인: 2026-09-15 사용자는 09:58~13:58 UTC 동안 득실 중심의 최소 실제 검증을 끝낸 뒤 IDE-only frontend 개발 전환·인계를 판단하도록 승인했다. 안전·데이터·provenance 경계는 유지하고 기존 CLI 코드는 즉시 삭제하지 않는다. 미실행 Windows·장기 안정성·정밀 CLI 비교는 미지원/미검증으로 분리하며, 실제 안전 또는 동작 실패는 전환 판단에서 숨기지 않는다. [4시간 계획](docs/spikes/T19_NATIVE_IDE_ONLY_4H_CUTOVER_PLAN_20260915.md)을 따른다.
+> 제품 설치 요구 갱신: 2026-09-23 사용자는 Windows 중심 실사용과 Kiro 확장 설치만으로 Core backend까지 자동 작동하는 경험을 필수로 명확히 했다. 기존 런타임 재사용과 필요한 도구의 조건부 자동 준비 방향을 승인했다. 다음 개발은 native recovery 기준에서 분기한 Windows 브랜치로 이어가며, 요구 승인과 Windows 실행 검증은 구분한다. [Windows 인계](docs/WINDOWS_EXTENSION_HANDOFF_20260923.md)를 따른다.
 > 출처: 사용자가 승인한 [PROJECT_SPEC.md](PROJECT_SPEC.md)와 합의된 Agent Prompt
 > 주의: 제품명은 아직 확정되지 않았으며 `Vibe Helper`, `BuildWhy`는 작업명이다.
 
@@ -27,6 +28,7 @@
 - 문법 강의보다 자신이 쓸 서비스를 만들며 배우고 싶은 사용자
 - Agent에게 구현을 맡기되 중요한 판단의 의미는 이해하고 싶은 사용자
 - 대회 첫 검증에서는 실제 초보 사용자와 고려대학교 학생을 우선한다.
+- 실사용자의 주 환경은 Windows다. macOS에서의 실측만으로 제품 설치·실행 완료를 판단하지 않는다.
 
 ## 4. 제품 목표
 
@@ -220,6 +222,16 @@ Prompt Dependence:
 - Prompt/Skill은 행동 정책, Host LLM은 semantic proposal, MCP는 tool contract, Core는 검증·상태 전이를 책임진다.
 - Kiro Agent와 background Analyst를 먼저 사용하며 Bedrock provider는 MVP에서 구현하지 않는다.
 
+### 14.1 Windows와 확장 설치 경험 — 2026-09-23 승인
+
+- Kiro IDE 설치·본인 로그인은 전제한다. 제품 사용자는 확장 설치 후 패널을 열어 시작하며, repository checkout, 수동 backend 기동, Node/pnpm 별도 설치, `connection.json` 경로 입력을 요구하지 않는다. 개발자의 source build 절차와 제품 설치 절차를 구분한다.
+- 확장이 별도 local Core process의 초기화·연결·종료·복구를 관리한다. Core/SQLite/HTTP·SSE와 Agent 권한·provenance 경계는 유지한다. 제품 배포를 위한 이 작업은 T19-W에서 우선하며 T28까지 미루지 않는다.
+- backend/bridge의 실행 환경은 검증 가능한 Kiro 내장 런타임, 기존 호환 Node, 확장 전용 폴더의 자동 준비 런타임 순서로 선택한다. 모든 사용자에게 Node를 중복 배포하지 않으며 OS/architecture·필요 API·SQLite 로딩을 확인한다. 정확한 지원 범위는 Windows 실측으로 정한다.
+- 확장에는 빌드된 JS·UI·native worker/bridge·canonical prompt·해당 플랫폼 SQLite library·migration·배포 metadata를 포함한다. 사용자 DB/token과 source checkout은 포함하지 않는다. 기존 SQLite 드라이버를 유지하고 불필요한 저장소 재작성을 하지 않는다.
+- 생성 앱의 빌드·실행용 Node/pnpm은 Core용 런타임과 구분한다. 기존 호환 도구를 재사용하고 필요한 도구와 앱 의존성만 자동 준비한다. 관리자 설치·전역 PATH 변경은 요구하지 않는다. 다운로드가 필요한 첫 실행은 network가 필요하며 offline 무설치를 보장하지 않는다.
+- 제품 런타임은 검증된 버전 범위를 지원하는 방향으로 전환한다. 현재 개발용 Node.js 24.19.0/pnpm 11.12.0 pin·preflight는 후속 결정과 검증 없이 우회하지 않는다. Node 버전 유연화는 private Kiro API나 권한 검증 해제를 뜻하지 않는다.
+- Windows native Agent·SQLite·MCP·process lifecycle·Builder/Helper 수직 흐름은 아직 미검증이다. 현재 fail-closed를 조건문 삭제로 해제하거나 CLI/Mock을 실제 native 성공으로 표시하지 않는다. 기존 CLI/Crew source는 회귀·복구 근거로 보존한다.
+
 ## 15. MVP 정의
 
 MVP는 다음 흐름이 실제 Kiro/Crew 환경에서 한 번 끝까지 동작하는 상태다.
@@ -250,6 +262,7 @@ MVP 필수:
 - Concept recap과 Evidence trace
 - Golden Path 한 개와 unseen Discovery input
 - baseline과 평가 log를 수집할 수 있는 구조
+- Windows에서 Kiro 확장 설치 후 Core 자동 기동과 실제 수직 흐름을 사용하고 재시작 후 저장 상태를 복원하는 경험
 
 ## 16. MVP 제외
 
@@ -323,8 +336,8 @@ Campus Drop은 고정 추천 template가 아니라 테스트 fixture다. Discove
 ## 21. 명시적으로 보류한 결정
 
 - 최종 제품명과 branding
-- 실제 배포 workflow와 AWS service
-- 배포를 MVP 완료 조건으로 둘지 여부
+- 생성 결과물의 hosted 배포 workflow와 AWS service
+- 생성 결과물의 hosted 배포를 MVP 완료 조건으로 둘지 여부. 제품 자체의 Windows 확장 설치·자동 기동은 14.1절의 필수 요구다.
 - Kiro IDE 패널의 Agent transport와 local Core 연결 방식(T19 capability spike에서 결정)
 - Code Mode의 기본 Helper 위치
 - 실제 Kiro model과 quota 대응
