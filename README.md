@@ -2,7 +2,7 @@
 
 Vibe Helper는 코딩 초보자가 자기에게 실용적인 TypeScript 서비스를 고르고, Kiro Builder와 함께 실제로 만들며, 필요한 순간 Helper와 대화해 개념을 익히도록 돕는 build-first 개발 환경이다. 제품은 개발을 교육용 단계로 끊지 않고 실제 Decision, 작업 맥락과 사용자 행동에서 나온 Evidence를 다음 설명과 project 추천에 연결한다.
 
-현재 repository는 T00~T18의 승인·구현 결과를 포함한다. Discovery→Learning Spec→Builder/Decision→Helper→Episode 단위 Evidence 분석→다음 개인화→사용자 선택 Final Upgrade→실행 가능한 local 결과까지 하나의 durable 수직 흐름으로 연결돼 있다. 다음 작업은 T19 자체 Kiro IDE 패널과 프론트 실제 연동이며, Discovery·Spec mock 교체부터 Builder·Helper 연결까지 범위가 승인됐다. `spikes/kiro-crew/`의 코드는 외부 기능 경계를 확인하기 위한 폐기 가능한 실험물이다.
+현재 repository는 T00~T18과 Windows 확장 runtime의 T19-W1~W4 구현·검증 결과를 포함한다. Discovery→Learning Spec→Builder/Decision→Helper→Episode 단위 Evidence 분석→다음 개인화→사용자 선택 Final Upgrade→실행 가능한 local 결과까지 하나의 durable 수직 흐름으로 연결돼 있다. 현재 작업은 T19-W5 설치·수직 흐름 검증이며, 상위 T19 자체 Kiro IDE 패널/프론트 실제 연동과 T19-N은 미완료다. `spikes/kiro-crew/`의 코드는 외부 기능 경계를 확인하기 위한 폐기 가능한 실험물이다.
 
 ## 문서 읽는 순서
 
@@ -15,7 +15,7 @@ Vibe Helper는 코딩 초보자가 자기에게 실용적인 TypeScript 서비�
 
 `PROJECT_SPEC.md`와 `CONVERSATION_RECORD.md`는 합의의 상세 배경을 보존하는 참고 자료다.
 
-2026-09-23부터의 다음 작업은 [Windows 확장 설치·런타임 인계](docs/WINDOWS_EXTENSION_HANDOFF_20260923.md)다. 주 사용 환경은 Windows이며 Kiro 확장 설치만으로 Core와 native worker를 자동 준비하는 것이 제품 목표다. Kiro 내장 runtime → 기존 호환 Node → 필요한 경우 private runtime 자동 준비 순서로 검증한다. native recovery `21674e8`에서 분기한 `codex/windows-extension-runtime-20260923`에서 이어가며 Windows 지원·설치물은 아직 미검증/미제작이다.
+다른 기기에서는 [2026-09-24 재개 인계](docs/CROSS_DEVICE_HANDOFF_20260924.md)를 시작점으로 `codex/windows-extension-runtime-20260923`을 받는다. Windows x64의 Kiro 내장 runtime → 기존 호환 Node → 필요한 경우 private runtime 준비, portable Core와 VSIX 0.3.7을 구현했다. [W5 실측 기록](docs/spikes/T19_W5_WINDOWS_RELEASE_RESULTS_20260924.md)에 전체 회귀 PASS와 native 실패를 함께 보존한다. 최신 버전의 양쪽 fresh 수직 흐름, 초기화·취소 안정성, 전체 GUI/frontend와 clean Windows 설치는 아직 검증 중이다. [2026-09-23 인계](docs/WINDOWS_EXTENSION_HANDOFF_20260923.md)는 구현 전 요구와 분기 배경이다.
 
 프론트 담당자는 [IDE-only frontend 가이드](docs/FRONTEND_IDE_IMPLEMENTATION_GUIDE.md)에서 SDK·native worker 경계와 UI 계약을 확인한다. [기존 프론트 개발 안내](docs/FRONTEND_INTEGRATION.md)와 [최초 T19 계획](docs/T19_IMPLEMENTATION_PLAN.md)의 PowerShell/CLI 수동 실행은 개발 재현 경로다. 사용자 repository checkout·backend 명령·connection 경로 설정을 제품 완료 조건으로 삼지 않는다. native Windows 실측, 확장 lifecycle·패키징과 전체 수직 흐름 검증은 T19-W에서 진행한다. push는 요청 범위와 저장소 Git 지침을 따른다.
 
@@ -47,8 +47,9 @@ MVP host는 Kiro/Crew이고 Agent 중심 Crew App을 primary surface로 삼는�
 | T16 | 완료 | conversation-first Builder/Helper UI, 실제 Decision handoff, native transcript와 완료 결과 |
 | T17 | 완료 | Project Evidence Trace, bounded cross-project retrieval, immutable personalization provenance |
 | T18 | 완료 | hidden Evidence Analyst worker, strict loopback 결과 실행기, optional Final Upgrade, Campus Drop 실행 fixture |
-| 외부 검증 대기 | T19 | 독립 backend·SDK·최소 Kiro 패널 구현/로컬 검증 통과, Windows native 인계 gate 미검증 |
-| 후속 계획 | T19-W | Windows native 실측, runtime 재사용, 확장 자동 기동, Builder 도구 준비와 clean 설치 검증. 다음 착수는 TASKS.md 참조 |
+| T19 / T19-N | 미완료 | 독립 backend·SDK·Kiro 패널과 native 연결 구현. frontend 통합·native 안정성·의미 품질 등 상위 gate 유지 |
+| T19-W1~W4 | 완료 | Windows capability 실측, portable Core/VSIX, runtime 재사용, 확장 lifecycle과 생성 앱 도구 준비 |
+| T19-W5 | 진행 중 | 최신 전체 회귀 PASS, Personal Need 복구 흐름 완주. 최신 fresh 양쪽 흐름·native 초기화/취소·전체 GUI/frontend·clean 설치는 미완료 |
 
 T18의 Campus Drop fixture는 TypeScript runtime boundary, SQLite metadata와 blob file 분리, SHA-256 token digest, expiry와 1회 consume를 실제 build/test/HTTP 실행으로 검증한다. 제품 결과 실행기는 workspace 안의 strict `.vibe-helper/result.json`과 compiled JavaScript만 읽고, symlink containment를 확인한 뒤 최소 환경의 Node child를 `127.0.0.1` 동적 port에서 감독한다.
 

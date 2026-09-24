@@ -1,0 +1,728 @@
+{
+  "schemaVersion": 1,
+  "kind": "SANITIZED_WINDOWS_W1_RECEIPTS",
+  "date": "2026-09-24",
+  "source": {
+    "ide": "1.1.14",
+    "commit": "f694ef1b025756b1ae27ae7c3d9ed4215b0160fe",
+    "agent": "1.1.28",
+    "api": "1.131.0",
+    "platform": "win32",
+    "arch": "x64",
+    "node": "24.18.0",
+    "electron": "42.7.0",
+    "napi": "10",
+    "agentSha256": "af4e05df0677587e689883ccbbb19bb853517d8127c5caaec66511408e4ca5da"
+  },
+  "runtime": {
+    "platform": "win32",
+    "arch": "x64",
+    "node": "24.18.0",
+    "napi": "10",
+    "electron": "42.7.0",
+    "apis": {
+      "fetch": true,
+      "websocket": true
+    },
+    "sqlite": "PASS",
+    "coreStorage": "PASS",
+    "core": {
+      "sdk": "PASS",
+      "bridge": {
+        "DISCOVERY": {
+          "status": "PASS",
+          "toolCount": 6,
+          "scopeDenial": "AGENT_RUN_SCOPE_MISMATCH",
+          "revoked": true
+        },
+        "BUILDER": {
+          "status": "PASS",
+          "toolCount": 7,
+          "scopeDenial": "AGENT_RUN_SCOPE_MISMATCH",
+          "revoked": true
+        },
+        "HELPER": {
+          "status": "PASS",
+          "toolCount": 1,
+          "scopeDenial": "AGENT_RUN_SCOPE_MISMATCH",
+          "revoked": true
+        }
+      },
+      "shutdown": "PASS",
+      "unauthenticatedStatus": 401
+    }
+  },
+  "helper": {
+    "hostRunId": "c27e81a4-4eea-448e-95b7-9469ba40de1c",
+    "status": "PASS",
+    "stage": "COMPLETE",
+    "modelTurns": 1,
+    "catalog": [],
+    "policy": [
+      {
+        "capability": "fs_read",
+        "effect": "deny"
+      },
+      {
+        "capability": "fs_write",
+        "effect": "deny"
+      },
+      {
+        "capability": "shell",
+        "effect": "deny"
+      },
+      {
+        "capability": "web_search",
+        "effect": "deny"
+      },
+      {
+        "capability": "mcp",
+        "effect": "deny"
+      }
+    ],
+    "liveEligibility": {
+      "cloudPull": "PASS",
+      "memoryDisabled": "PASS",
+      "commandHooksAbsent": "PASS"
+    },
+    "helper": {
+      "stopReason": "end_turn",
+      "elapsedMs": 4370,
+      "chunks": 29,
+      "firstChunkMs": 2429,
+      "lastChunkBeforeTerminalMs": 198,
+      "receipt": {
+        "stored": true,
+        "responseCharacters": 99,
+        "storedSummaryCharacters": 99
+      }
+    }
+  },
+  "discovery": {
+    "hostRunId": "5796ad89-bea0-4f0e-9a20-71560af445a4",
+    "status": "PASS",
+    "stage": "COMPLETE",
+    "modelTurns": 1,
+    "catalog": [
+      {
+        "source": "mcp",
+        "tag": null
+      },
+      {
+        "source": "mcp",
+        "tag": null
+      }
+    ],
+    "policy": [
+      {
+        "capability": "fs_read",
+        "effect": "deny"
+      },
+      {
+        "capability": "fs_write",
+        "effect": "deny"
+      },
+      {
+        "capability": "shell",
+        "effect": "deny"
+      },
+      {
+        "capability": "web_search",
+        "effect": "deny"
+      },
+      {
+        "capability": "mcp",
+        "effect": "ask"
+      }
+    ],
+    "mcpPolicy": [
+      {
+        "tool": "get_discovery_context",
+        "effect": "allow"
+      },
+      {
+        "tool": "submit_candidate_previews",
+        "effect": "allow"
+      }
+    ],
+    "liveEligibility": {
+      "cloudPull": "PASS",
+      "memoryDisabled": "PASS",
+      "commandHooksAbsent": "PASS"
+    },
+    "discovery": {
+      "stopReason": "end_turn",
+      "elapsedMs": 40089,
+      "chunks": 49,
+      "firstChunkMs": 2699,
+      "lastChunkBeforeTerminalMs": 155,
+      "receipt": {
+        "stored": true,
+        "previewCount": 10,
+        "sessionRevision": 1,
+        "previewRoundId": "candidate_preview_round_6745b037-6c34-4fa3-a8ea-5fd96240e0d7"
+      }
+    }
+  },
+  "singleHost": {
+    "hostRunId": "5c2c1aa5-99aa-4711-8b7b-0fb5785ad94c",
+    "status": "FAIL",
+    "coreRuns": [
+      {
+        "id": "run_e60a9b69-2fee-4105-8f1d-5f85014b2d58",
+        "status": "CANCELLED",
+        "outcome": "NONE",
+        "errorCode": "CANCELLED"
+      },
+      {
+        "id": "run_47c4d735-f237-46f8-9b50-4d1bb288859c",
+        "status": "SUCCEEDED",
+        "outcome": "TURN_ENDED",
+        "errorCode": null
+      },
+      {
+        "id": "run_d6a270d3-3dcd-4b70-bec3-e4422ed96004",
+        "status": "SUCCEEDED",
+        "outcome": "HELPER_RECORDED"
+      }
+    ],
+    "helperDuringBuilder": false,
+    "failure": "ASSERTION_FAILED",
+    "runs": [
+      {
+        "phase": "BUILDER_CANCEL",
+        "role": "BUILDER",
+        "native": {
+          "status": "CANCELLED",
+          "stage": "COMPLETE",
+          "modelTurns": 1,
+          "catalog": [
+            {
+              "source": "builtin",
+              "tag": "read"
+            },
+            {
+              "source": "builtin",
+              "tag": "write"
+            },
+            {
+              "source": "builtin",
+              "tag": "shell"
+            }
+          ],
+          "policy": [
+            {
+              "capability": "fs_read",
+              "effect": "ask"
+            },
+            {
+              "capability": "fs_write",
+              "effect": "ask"
+            },
+            {
+              "capability": "shell",
+              "effect": "ask"
+            },
+            {
+              "capability": "web_search",
+              "effect": "deny"
+            },
+            {
+              "capability": "mcp",
+              "effect": "ask"
+            }
+          ],
+          "mcpPolicy": [
+            {
+              "tool": "get_builder_task",
+              "effect": "allow"
+            },
+            {
+              "tool": "update_build_context",
+              "effect": "allow"
+            }
+          ],
+          "liveEligibility": {
+            "cloudPull": "PASS",
+            "memoryDisabled": "PASS",
+            "commandHooksAbsent": "PASS"
+          },
+          "permissionReceipts": [],
+          "cancel": {
+            "stopReason": "cancelled",
+            "elapsedMs": 239
+          },
+          "revokedStatus": 401
+        }
+      },
+      {
+        "phase": "BUILDER_REUSE",
+        "role": "BUILDER",
+        "native": {
+          "status": "PASS",
+          "stage": "COMPLETE",
+          "modelTurns": 1,
+          "catalog": [
+            {
+              "source": "builtin",
+              "tag": "read"
+            },
+            {
+              "source": "builtin",
+              "tag": "write"
+            },
+            {
+              "source": "builtin",
+              "tag": "shell"
+            }
+          ],
+          "policy": [
+            {
+              "capability": "fs_read",
+              "effect": "ask"
+            },
+            {
+              "capability": "fs_write",
+              "effect": "ask"
+            },
+            {
+              "capability": "shell",
+              "effect": "ask"
+            },
+            {
+              "capability": "web_search",
+              "effect": "deny"
+            },
+            {
+              "capability": "mcp",
+              "effect": "ask"
+            }
+          ],
+          "mcpPolicy": [
+            {
+              "tool": "get_builder_task",
+              "effect": "allow"
+            },
+            {
+              "tool": "update_build_context",
+              "effect": "allow"
+            }
+          ],
+          "liveEligibility": {
+            "cloudPull": "PASS",
+            "memoryDisabled": "PASS",
+            "commandHooksAbsent": "PASS"
+          },
+          "permissionReceipts": [
+            {
+              "kind": "search",
+              "decision": "reject_once",
+              "ack": true
+            },
+            {
+              "kind": "execute",
+              "decision": "reject_once",
+              "ack": true
+            },
+            {
+              "kind": "edit",
+              "decision": "allow_once",
+              "ack": true
+            },
+            {
+              "kind": "edit",
+              "decision": "allow_once",
+              "ack": true
+            },
+            {
+              "kind": "execute",
+              "decision": "allow_once",
+              "ack": true
+            }
+          ],
+          "builder": {
+            "stopReason": "end_turn",
+            "started": 1790181765103,
+            "finished": 1790181854397,
+            "elapsedMs": 89294,
+            "chunks": 178,
+            "firstChunkMs": 2723,
+            "lastChunkBeforeTerminalMs": 119,
+            "receipt": {
+              "coreContextVersion": 2
+            }
+          },
+          "revokedStatus": 401
+        }
+      },
+      {
+        "phase": "BUILDER_REUSE",
+        "role": "HELPER",
+        "native": {
+          "status": "PASS",
+          "stage": "COMPLETE",
+          "modelTurns": 1,
+          "catalog": [],
+          "policy": [
+            {
+              "capability": "fs_read",
+              "effect": "deny"
+            },
+            {
+              "capability": "fs_write",
+              "effect": "deny"
+            },
+            {
+              "capability": "shell",
+              "effect": "deny"
+            },
+            {
+              "capability": "web_search",
+              "effect": "deny"
+            },
+            {
+              "capability": "mcp",
+              "effect": "deny"
+            }
+          ],
+          "liveEligibility": {
+            "cloudPull": "PASS",
+            "memoryDisabled": "PASS",
+            "commandHooksAbsent": "PASS"
+          },
+          "permissionReceipts": [],
+          "helper": {
+            "stopReason": "end_turn",
+            "started": 1790181766157,
+            "finished": 1790181858275,
+            "elapsedMs": 92118,
+            "chunks": 26,
+            "firstChunkMs": 90616,
+            "lastChunkBeforeTerminalMs": 74,
+            "receipt": {
+              "coreContextVersion": 2
+            }
+          },
+          "revokedStatus": 401
+        }
+      }
+    ]
+  },
+  "dualHost": {
+    "hostRunId": "36c528e4-bc6d-4e54-97d3-b72f276bc2b8",
+    "status": "FAIL",
+    "coreRuns": [
+      {
+        "id": "run_1a69d5f9-67a0-4295-85a1-059d3cf75c5a",
+        "status": "SUCCEEDED",
+        "outcome": "TURN_ENDED",
+        "errorCode": null
+      },
+      {
+        "id": "run_3251e60c-4beb-427e-bb4a-569bad71612a",
+        "status": "CANCELLED",
+        "outcome": "NONE",
+        "errorCode": "CANCELLED"
+      },
+      {
+        "id": "run_32eedc7a-59be-4584-9e3f-bf6f6d2def58",
+        "status": "SUCCEEDED",
+        "outcome": "HELPER_RECORDED",
+        "errorCode": null
+      }
+    ],
+    "helperDuringBuilder": true,
+    "separateWindows": true,
+    "files": [
+      {
+        "path": "src/native-event.ts",
+        "bytes": 2461,
+        "sha256": "a83792ad6fb0f9a2c81255bceb25947e78edaa2ccc5fa88b36b5a370984e35ae"
+      },
+      {
+        "path": "src/native-event.test.ts",
+        "bytes": 2590,
+        "sha256": "6354f7cf68cc403815802ac8aeff1567fb55a065ea637a65f227ba7765db7843"
+      }
+    ],
+    "independentTest": {
+      "exitCode": 0,
+      "passed": false
+    },
+    "failure": "ASSERTION_FAILED",
+    "runs": [
+      {
+        "phase": "HELPER_CANCEL",
+        "role": "HELPER",
+        "native": {
+          "status": "CANCELLED",
+          "stage": "COMPLETE",
+          "windowId": 2,
+          "modelTurns": 1,
+          "catalog": [],
+          "policy": [
+            {
+              "capability": "fs_read",
+              "effect": "deny"
+            },
+            {
+              "capability": "fs_write",
+              "effect": "deny"
+            },
+            {
+              "capability": "shell",
+              "effect": "deny"
+            },
+            {
+              "capability": "web_search",
+              "effect": "deny"
+            },
+            {
+              "capability": "mcp",
+              "effect": "deny"
+            }
+          ],
+          "liveEligibility": {
+            "cloudPull": "PASS",
+            "memoryDisabled": "PASS",
+            "commandHooksAbsent": "PASS"
+          },
+          "permissionReceipts": [],
+          "toolReceipts": [],
+          "cancel": {
+            "stopReason": "cancelled",
+            "elapsedMs": 284
+          },
+          "revokedStatus": 401
+        }
+      },
+      {
+        "phase": "HELPER_REUSE",
+        "role": "HELPER",
+        "native": {
+          "status": "PASS",
+          "stage": "COMPLETE",
+          "windowId": 2,
+          "modelTurns": 1,
+          "catalog": [],
+          "policy": [
+            {
+              "capability": "fs_read",
+              "effect": "deny"
+            },
+            {
+              "capability": "fs_write",
+              "effect": "deny"
+            },
+            {
+              "capability": "shell",
+              "effect": "deny"
+            },
+            {
+              "capability": "web_search",
+              "effect": "deny"
+            },
+            {
+              "capability": "mcp",
+              "effect": "deny"
+            }
+          ],
+          "liveEligibility": {
+            "cloudPull": "PASS",
+            "memoryDisabled": "PASS",
+            "commandHooksAbsent": "PASS"
+          },
+          "permissionReceipts": [],
+          "toolReceipts": [],
+          "helper": {
+            "stopReason": "end_turn",
+            "started": 1790182893296,
+            "finished": 1790182897300,
+            "elapsedMs": 4004,
+            "chunks": 13,
+            "firstChunkMs": 2548,
+            "lastChunkBeforeTerminalMs": 783,
+            "receipt": {
+              "coreContextVersion": 0
+            }
+          },
+          "revokedStatus": 401
+        }
+      },
+      {
+        "phase": "BUILDER_REUSE",
+        "role": "BUILDER",
+        "native": {
+          "status": "PASS",
+          "stage": "COMPLETE",
+          "windowId": 1,
+          "modelTurns": 1,
+          "catalog": [
+            {
+              "source": "builtin",
+              "tag": "read"
+            },
+            {
+              "source": "builtin",
+              "tag": "write"
+            },
+            {
+              "source": "builtin",
+              "tag": "shell"
+            },
+            {
+              "source": "mcp",
+              "tag": null
+            },
+            {
+              "source": "mcp",
+              "tag": null
+            }
+          ],
+          "policy": [
+            {
+              "capability": "fs_read",
+              "effect": "ask"
+            },
+            {
+              "capability": "fs_write",
+              "effect": "ask"
+            },
+            {
+              "capability": "shell",
+              "effect": "ask"
+            },
+            {
+              "capability": "web_search",
+              "effect": "deny"
+            },
+            {
+              "capability": "mcp",
+              "effect": "ask"
+            }
+          ],
+          "mcpPolicy": [
+            {
+              "tool": "get_builder_task",
+              "effect": "allow"
+            },
+            {
+              "tool": "update_build_context",
+              "effect": "allow"
+            }
+          ],
+          "liveEligibility": {
+            "cloudPull": "PASS",
+            "memoryDisabled": "PASS",
+            "commandHooksAbsent": "PASS"
+          },
+          "permissionReceipts": [
+            {
+              "kind": "search",
+              "decision": "reject_once",
+              "ack": true
+            },
+            {
+              "kind": "edit",
+              "decision": "allow_once",
+              "ack": true
+            },
+            {
+              "kind": "edit",
+              "decision": "allow_once",
+              "ack": true
+            },
+            {
+              "kind": "execute",
+              "decision": "allow_once",
+              "ack": true
+            }
+          ],
+          "toolReceipts": [
+            {
+              "kind": "other",
+              "status": "completed"
+            },
+            {
+              "kind": "other",
+              "status": "completed"
+            },
+            {
+              "kind": "search",
+              "status": "failed"
+            },
+            {
+              "kind": "edit",
+              "status": "completed"
+            },
+            {
+              "kind": "edit",
+              "status": "completed"
+            },
+            {
+              "kind": "execute",
+              "status": "completed",
+              "exitCode": 0
+            },
+            {
+              "kind": "other",
+              "status": "completed"
+            }
+          ],
+          "builder": {
+            "stopReason": "end_turn",
+            "started": 1790182889921,
+            "finished": 1790182966795,
+            "elapsedMs": 76874,
+            "chunks": 135,
+            "firstChunkMs": 3171,
+            "lastChunkBeforeTerminalMs": 192,
+            "receipt": {
+              "coreContextVersion": 2
+            }
+          },
+          "revokedStatus": 401
+        }
+      }
+    ]
+  },
+  "followupAudit": {
+    "status": "PASS",
+    "auditedRunId": "36c528e4-bc6d-4e54-97d3-b72f276bc2b8",
+    "nativeTestExitCode": 0,
+    "independentTestExitCode": 0,
+    "independentTestsPassed": 9,
+    "sameFileHashes": true,
+    "privateRoot": true,
+    "bindingsRevoked": 6,
+    "databases": [
+      {
+        "name": "core",
+        "privateFile": true,
+        "quickCheck": "ok",
+        "foreignKeyViolations": 0
+      },
+      {
+        "name": "core-http",
+        "privateFile": true,
+        "quickCheck": "ok",
+        "foreignKeyViolations": 0
+      },
+      {
+        "name": "native-builder",
+        "privateFile": true,
+        "quickCheck": "ok",
+        "foreignKeyViolations": 0
+      }
+    ],
+    "coreTerminalStates": [
+      "SUCCEEDED",
+      "CANCELLED",
+      "SUCCEEDED"
+    ],
+    "nativeTurnsUsed": 8
+  },
+  "modelTurnsUsed": 8,
+  "modelTurnLimit": 8,
+  "ownedProfileProcessesAfterShutdown": 0
+}

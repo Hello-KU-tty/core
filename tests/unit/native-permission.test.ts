@@ -1,9 +1,13 @@
 import { linkSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
-import { lstat, realpath } from 'node:fs/promises'
+import { lstat, readFile, realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { guardBuilderToolInput } from '../../packages/kiro-adapter/src/builder-tool-guard.js'
+
+// Directory junctions need no administrator privilege on Windows. File aliases
+// use hard links there; both must be denied by the regular single-link guard.
+const fileAlias = process.platform === 'win32' ? linkSync : symlinkSync
 
 // Evaluate the panel's CJS helper with its one guard dependency injected, so
 // these gates are tested before an extension bundle has been built.
@@ -17,11 +21,12 @@ const nativeModule = {
       detail: unknown,
       workspace: string,
       onDiagnostic?: (reason: string) => void,
+      projectCommand?: (command: string) => Promise<string | null>,
     ) => Promise<string | null>
   },
 }
 new Function('require', 'module', source)((name: string) => {
-  if (name === 'node:fs/promises') return { lstat, realpath }
+  if (name === 'node:fs/promises') return { lstat, readFile, realpath }
   if (name === 'node:path') return { join }
   if (name !== '@vibe-helper/kiro-adapter/builder-tool-guard') throw new Error('UNEXPECTED_REQUIRE')
   return { guardBuilderToolInput }
@@ -37,6 +42,91 @@ function workspace(): string {
 }
 
 describe('native Builder permission gate', () => {
+  it('refreshes a Windows lock with finite approved config while legacy and unsafe config remain denied', async () => {
+    const root = workspace()
+    writeFileSync(join(root, 'package.json'), '{}')
+    writeFileSync(join(root, 'pnpm-lock.yaml'), 'lockfileVersion: 9.0\n')
+    const command = 'pnpm install --lockfile-only --ignore-scripts --ignore-pnpmfile'
+    const detail = {
+      toolName: 'shell',
+      rawInput: { command, cwd: '.', run_in_background: false },
+      options: option,
+    }
+    const checkedLauncher = async () => command
+    for (const config of [
+      'allowBuilds:\n  esbuild: true\n',
+      'packages:\n  - .\nonlyBuiltDependencies:\n  - better-sqlite3\n',
+    ]) {
+      writeFileSync(join(root, 'pnpm-workspace.yaml'), config)
+      expect(await chooseNativeBuilderPermission(detail, root, undefined, checkedLauncher)).toBe(
+        'allow-1',
+      )
+      expect(await chooseNativeBuilderPermission(detail, root)).toBeNull()
+    }
+    for (const config of [
+      'allowBuilds:\n  unexpected: true\n',
+      'packages:\n  - ../outside\n',
+      'pnpmfile: ./hook.cjs\n',
+      'configDependencies:\n  unsafe: 1.0.0\n',
+    ]) {
+      writeFileSync(join(root, 'pnpm-workspace.yaml'), config)
+      expect(
+        await chooseNativeBuilderPermission(detail, root, undefined, checkedLauncher),
+      ).toBeNull()
+    }
+    writeFileSync(join(root, 'pnpm-workspace.yaml'), 'allowBuilds:\n  esbuild: true\n')
+    writeFileSync(join(root, '.pnpmfile.mjs'), 'throw Error("must not execute")')
+    expect(await chooseNativeBuilderPermission(detail, root, undefined, checkedLauncher)).toBeNull()
+  })
+
+  it('requires a verified Windows launcher before applying the existing command and cwd guard', async () => {
+    const root = workspace()
+    const prefix = '.\\.kiro\\vibe-tools.cmd '
+    const request = (command: string, cwd = '.') => ({
+      toolName: 'shell',
+      rawInput: { command, cwd, run_in_background: false },
+      options: option,
+    })
+    const normalize = async (command: string) =>
+      command.startsWith(prefix) ? command.slice(prefix.length) : null
+    expect(
+      await chooseNativeBuilderPermission(
+        request(`${prefix}pnpm run build`),
+        root,
+        undefined,
+        normalize,
+      ),
+    ).toBe('allow-1')
+    expect(
+      await chooseNativeBuilderPermission(request('pnpm run build'), root, undefined, normalize),
+    ).toBeNull()
+    expect(
+      await chooseNativeBuilderPermission(
+        request(`${prefix}pnpm run build & whoami`),
+        root,
+        undefined,
+        normalize,
+      ),
+    ).toBeNull()
+    expect(
+      await chooseNativeBuilderPermission(
+        request(`${prefix}pnpm run build`, '..'),
+        root,
+        undefined,
+        normalize,
+      ),
+    ).toBeNull()
+    expect(
+      await chooseNativeBuilderPermission(
+        request(`${prefix}pnpm run build`),
+        root,
+        undefined,
+        async () => {
+          throw new Error('changed launcher')
+        },
+      ),
+    ).toBeNull()
+  })
   it('prepares or refreshes only a regular generated-app pnpm lock with scripts explicitly ignored', async () => {
     const root = workspace()
     const request = (command: string, extras = {}) => ({
@@ -115,7 +205,7 @@ describe('native Builder permission gate', () => {
       join(second, 'package.json'),
       JSON.stringify({ name: 'synthetic-app', private: true }),
     )
-    symlinkSync(join(root, '.pnpmfile.cjs'), join(second, 'pnpm-workspace.yaml'))
+    fileAlias(join(root, '.pnpmfile.cjs'), join(second, 'pnpm-workspace.yaml'))
     expect(await chooseNativeBuilderPermission(request, second)).toBeNull()
     const third = workspace()
     writeFileSync(
@@ -141,7 +231,7 @@ describe('native Builder permission gate', () => {
     const symlinked = workspace()
     writeFileSync(join(symlinked, 'package.json'), '{"name":"synthetic-app","private":true}')
     writeFileSync(join(symlinked, 'real-lock.yaml'), 'lockfileVersion: 9.0\n')
-    symlinkSync(join(symlinked, 'real-lock.yaml'), join(symlinked, 'pnpm-lock.yaml'))
+    fileAlias(join(symlinked, 'real-lock.yaml'), join(symlinked, 'pnpm-lock.yaml'))
     expect(await chooseNativeBuilderPermission(request, symlinked)).toBeNull()
     const linked = workspace()
     writeFileSync(join(linked, 'package.json'), '{"name":"synthetic-app","private":true}')
@@ -159,7 +249,7 @@ describe('native Builder permission gate', () => {
       '{"name":"synthetic-app","private":true}',
     )
     writeFileSync(join(packageSymlink, 'pnpm-lock.yaml'), 'lockfileVersion: 9.0\n')
-    symlinkSync(join(packageSymlink, 'real-package.json'), join(packageSymlink, 'package.json'))
+    fileAlias(join(packageSymlink, 'real-package.json'), join(packageSymlink, 'package.json'))
     expect(await chooseNativeBuilderPermission(request, packageSymlink)).toBeNull()
   })
 
@@ -279,9 +369,9 @@ describe('native Builder permission gate', () => {
   it('rejects protected, escaping, and symlink targets', async () => {
     const root = workspace()
     const outside = workspace()
-    symlinkSync(outside, join(root, 'src', 'linked'))
+    symlinkSync(outside, join(root, 'src', 'linked'), 'junction')
     const alias = join(mkdtempSync(join(tmpdir(), 'vibe-native-cwd-alias-')), 'workspace')
-    symlinkSync(root, alias)
+    symlinkSync(root, alias, 'junction')
     expect(
       await chooseNativeBuilderPermission(
         { toolName: 'shell', rawInput: { command: 'npm test', cwd: alias }, options: option },
@@ -311,7 +401,7 @@ describe('native Builder permission gate', () => {
   it('permits only the pinned IDE existing-file edit shape within the generated workspace', async () => {
     const root = workspace()
     const outside = workspace()
-    symlinkSync(outside, join(root, 'src', 'linked'))
+    symlinkSync(outside, join(root, 'src', 'linked'), 'junction')
     const edit = { path: 'package.json', oldStr: '"test": "old"', newStr: '"test": "new"' }
     for (const input of [edit, { ...edit, replace_all: false }, { ...edit, replace_all: true }])
       expect(

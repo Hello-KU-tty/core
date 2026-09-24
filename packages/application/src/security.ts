@@ -86,17 +86,25 @@ function collectReferencePaths(value: unknown, paths: string[]): void {
 
 export class WorkspacePathPolicy {
   readonly generatedWorkspaceRoot: string
+  readonly #prepareNewWorkspace: ((path: string) => Promise<unknown>) | undefined
 
-  private constructor(generatedWorkspaceRoot: string) {
+  private constructor(
+    generatedWorkspaceRoot: string,
+    prepareNewWorkspace?: (path: string) => Promise<unknown>,
+  ) {
     this.generatedWorkspaceRoot = generatedWorkspaceRoot
+    this.#prepareNewWorkspace = prepareNewWorkspace
   }
 
-  static async create(generatedWorkspaceRoot: string): Promise<WorkspacePathPolicy> {
+  static async create(
+    generatedWorkspaceRoot: string,
+    options: { prepareNewWorkspace?: (path: string) => Promise<unknown> } = {},
+  ): Promise<WorkspacePathPolicy> {
     const normalized = resolve(generatedWorkspaceRoot)
     if (!isAbsolute(generatedWorkspaceRoot) || normalized === parse(normalized).root) {
       throw new TypeError('Generated workspace root must be an explicit non-root absolute path')
     }
-    return new WorkspacePathPolicy(await realpath(normalized))
+    return new WorkspacePathPolicy(await realpath(normalized), options.prepareNewWorkspace)
   }
 
   projectWorkspacePath(projectId: string): string {
@@ -113,7 +121,7 @@ export class WorkspacePathPolicy {
         'Project workspace is outside the configured generated workspace root.',
       )
     }
-    await mkdir(lexicalWorkspace, { recursive: true })
+    const created = await mkdir(lexicalWorkspace, { recursive: true })
     const canonicalWorkspace = await realpath(lexicalWorkspace)
     if (!isWithin(this.generatedWorkspaceRoot, canonicalWorkspace, false)) {
       throw this.#permissionError(
@@ -122,6 +130,7 @@ export class WorkspacePathPolicy {
         'Project workspace is outside the configured generated workspace root.',
       )
     }
+    if (created !== undefined) await this.#prepareNewWorkspace?.(canonicalWorkspace)
     return canonicalWorkspace
   }
 

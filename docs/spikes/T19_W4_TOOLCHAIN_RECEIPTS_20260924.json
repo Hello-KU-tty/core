@@ -1,0 +1,219 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-09-24",
+  "scope": "T19_W4",
+  "target": "win32-x64",
+  "status": "PASS",
+  "artifact": {
+    "version": "0.3.0",
+    "files": 70,
+    "vsixBytes": 2311886,
+    "installedBytes": 7421120,
+    "sha256": "0a50159803a4755b87938283bdccef8841597b477dde9c45e2ea278399aaac9a"
+  },
+  "host": {
+    "kiro": "1.1.14",
+    "agent": "1.1.28",
+    "api": "1.131.0",
+    "coreRuntime": "KIRO_NODE_24.18.0",
+    "profile": "ISOLATED_SYNTHETIC",
+    "agentSourceSha256": "af4e05df0677587e689883ccbbb19bb853517d8127c5caaec66511408e4ca5da"
+  },
+  "deterministicTools": {
+    "target": "win32-x64",
+    "provenance": "SYNTHETIC_FIXTURE",
+    "cases": [
+      {
+        "mode": "EXISTING",
+        "node": "24.19.0",
+        "nodeSource": "EXISTING_NODE",
+        "pnpm": "11.12.0",
+        "pnpmSource": "EXISTING_PNPM",
+        "commands": [
+          {
+            "command": "pnpm install --lockfile-only --ignore-scripts --ignore-pnpmfile",
+            "exitCode": 0
+          },
+          {
+            "command": "pnpm install --frozen-lockfile",
+            "exitCode": 0
+          },
+          {
+            "command": "pnpm run build",
+            "exitCode": 0
+          },
+          {
+            "command": "pnpm test",
+            "exitCode": 0
+          },
+          {
+            "command": "pnpm run smoke",
+            "exitCode": 0
+          }
+        ],
+        "http": true,
+        "tamperDenied": true
+      },
+      {
+        "mode": "ABSENT",
+        "node": "24.19.0",
+        "nodeSource": "MANAGED_NODE",
+        "pnpm": "11.12.0",
+        "pnpmSource": "MANAGED_PNPM",
+        "commands": [
+          {
+            "command": "pnpm install --lockfile-only --ignore-scripts --ignore-pnpmfile",
+            "exitCode": 0
+          },
+          {
+            "command": "pnpm install --frozen-lockfile",
+            "exitCode": 0
+          },
+          {
+            "command": "pnpm run build",
+            "exitCode": 0
+          },
+          {
+            "command": "pnpm test",
+            "exitCode": 0
+          },
+          {
+            "command": "pnpm run smoke",
+            "exitCode": 0
+          }
+        ],
+        "http": true,
+        "tamperDenied": true
+      }
+    ],
+    "failures": [
+      "offline",
+      "hash mismatch",
+      "network unavailable",
+      "cancel before acquisition",
+      "launcher mutation",
+      "descriptor hardlink"
+    ],
+    "status": "PASS"
+  },
+  "nativeExisting": {
+    "nativeRequests": 1,
+    "status": "SUCCEEDED",
+    "outcome": "TURN_ENDED",
+    "commands": [
+      {
+        "command": "pnpm install --lockfile-only --ignore-scripts --ignore-pnpmfile",
+        "exitCode": 0
+      },
+      {
+        "command": "pnpm install --frozen-lockfile",
+        "exitCode": 0
+      },
+      {
+        "command": "pnpm run build",
+        "exitCode": 0
+      },
+      {
+        "command": "pnpm test",
+        "exitCode": 0
+      },
+      {
+        "command": "pnpm run smoke",
+        "exitCode": 0
+      }
+    ],
+    "httpSmoke": true,
+    "projectTools": {
+      "node": "24.19.0",
+      "nodeSource": "EXISTING_NODE",
+      "pnpm": "11.12.0",
+      "pnpmSource": "EXISTING_PNPM"
+    },
+    "resultHttpViaPackagedSupervisor": true,
+    "overallStatus": "PASS"
+  },
+  "nativeAbsent": {
+    "status": "PASS",
+    "nativeRequests": 1,
+    "builderRun": {
+      "status": "SUCCEEDED",
+      "outcome": "TURN_ENDED",
+      "errorCode": null
+    },
+    "nativeShell": [
+      {
+        "command": "pnpm install --lockfile-only --ignore-scripts --ignore-pnpmfile",
+        "exitCode": 0
+      },
+      {
+        "command": "pnpm install --frozen-lockfile",
+        "exitCode": 0
+      },
+      {
+        "command": "pnpm run build",
+        "exitCode": 0
+      },
+      {
+        "command": "pnpm test",
+        "exitCode": 0
+      },
+      {
+        "command": "pnpm run smoke",
+        "exitCode": 0
+      }
+    ],
+    "nativeHttpSmokeObserved": true,
+    "projectTools": {
+      "node": "24.19.0",
+      "nodeSource": "MANAGED_NODE",
+      "pnpm": "11.12.0",
+      "pnpmSource": "MANAGED_PNPM"
+    },
+    "resultHttpViaPackagedSupervisor": true,
+    "resultSupervisorHost": "KIRO_CHILD",
+    "originalDriverError": "CORE_CONNECTION_UNAVAILABLE",
+    "observationRecovery": "READ_ONLY_SAME_RUN",
+    "coreInstanceUnchanged": true,
+    "replayedAgentRequests": 0
+  },
+  "recovery": {
+    "status": "PASS",
+    "cachedOffline": true,
+    "noImplicitInstall": true,
+    "foreignLifecycleDenied": true,
+    "localNpmrcDenied": true,
+    "corruptCacheQuarantined": true,
+    "repairedCacheVerified": true,
+    "interrupted": true,
+    "cancelled": true
+  },
+  "portable": {
+    "checksPassed": 11,
+    "coreMcpRestartRuntimes": [
+      "KIRO",
+      "EXISTING_NODE",
+      "MANAGED_NODE"
+    ],
+    "status": "PASS"
+  },
+  "checks": {
+    "pnpmCheck": "PASS",
+    "unit": 93,
+    "integrationPassed": 280,
+    "integrationSkipped": 1,
+    "eval": 35,
+    "campusDrop": 3,
+    "smoke": 6,
+    "e2e": 12,
+    "panelCjs": 89
+  },
+  "limitations": [
+    "SEEDED_TASK_TOOL_VALIDATION_ONLY",
+    "RESULT_SUPERVISOR_CALL_NOT_UI_LAUNCH_RESULT",
+    "PATH_ABSENCE_NOT_CLEAN_MACHINE",
+    "EARLIER_WORKSPACE_TRANSITION_EXTENSION_HOST_CRASH_UNRESOLVED",
+    "W5_FULL_VERTICAL_FLOW_PENDING",
+    "TRANSIENT_DRIVER_READ_FAILURE_CAUSE_UNRESOLVED"
+  ],
+  "requestCounterNote": "Counts explicit run requests, not provider-internal model calls. Fixture and Agent results are not user learning Evidence."
+}

@@ -3,6 +3,14 @@
 // running app root; it does not activate or reach into the isolated Agent host.
 const fs = require('node:fs')
 const path = require('node:path')
+const { createHash } = require('node:crypto')
+
+const WINDOWS_SOURCE = Object.freeze({
+  version: '1.1.14', vsCodeVersion: '1.131.0',
+  commit: 'f694ef1b025756b1ae27ae7c3d9ed4215b0160fe', quality: 'stable',
+  agentVersion: '1.1.28',
+  agentSha256: 'af4e05df0677587e689883ccbbb19bb853517d8127c5caaec66511408e4ca5da',
+})
 
 const PINNED_PRODUCT = Object.freeze({
   nameShort: 'Kiro',
@@ -105,9 +113,38 @@ function attestPinnedKiroInstallation(vscode, filesystem = fs,
   }
 }
 
+function attestWindowsKiroInstallation(vscode, filesystem = fs, executable = process.execPath) {
+  const suppliedRoot = vscode?.env?.appRoot
+  if (process.platform !== 'win32' || process.arch !== 'x64' ||
+      vscode.version !== WINDOWS_SOURCE.vsCodeVersion || typeof suppliedRoot !== 'string') throw sourceError()
+  const root = filesystem.realpathSync(suppliedRoot)
+  const expectedRoot = path.join(path.dirname(executable), 'resources', 'app')
+  if (filesystem.lstatSync(suppliedRoot).isSymbolicLink() ||
+      root.toLowerCase() !== path.resolve(suppliedRoot).toLowerCase() ||
+      filesystem.realpathSync(expectedRoot).toLowerCase() !== root.toLowerCase()) throw sourceError()
+  const product = readManifest(root, 'product.json', 128 * 1024, filesystem)
+  const agent = readManifest(root, 'extensions/kiro.kiro-agent/package.json', 128 * 1024, filesystem)
+  if (!exactMetadata(product, { nameShort: 'Kiro', applicationName: 'kiro',
+      version: WINDOWS_SOURCE.version, vsCodeVersion: WINDOWS_SOURCE.vsCodeVersion,
+      commit: WINDOWS_SOURCE.commit, quality: WINDOWS_SOURCE.quality }) ||
+      !exactMetadata(agent, { ...PINNED_AGENT, version: WINDOWS_SOURCE.agentVersion })) throw sourceError()
+  try { filesystem.lstatSync(path.join(root, 'product.overrides.json')); throw sourceError() }
+  catch (error) { if (error.code !== 'ENOENT') throw error }
+  const entry = path.join(root, 'extensions/kiro.kiro-agent/dist/extension.js')
+  const info = filesystem.lstatSync(entry)
+  if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 ||
+      info.size > 128 * 1024 * 1024 || filesystem.realpathSync(entry) !== entry ||
+      createHash('sha256').update(filesystem.readFileSync(entry)).digest('hex') !== WINDOWS_SOURCE.agentSha256)
+    throw sourceError()
+  return Object.freeze({ appVersion: product.version, vscodeVersion: product.vsCodeVersion,
+    commit: product.commit, agentExtensionVersion: agent.version })
+}
+
 module.exports = {
   PINNED_APP_ROOT,
   PINNED_PRODUCT,
   PINNED_AGENT,
   attestPinnedKiroInstallation,
+  attestWindowsKiroInstallation,
+  WINDOWS_SOURCE,
 }

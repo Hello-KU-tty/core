@@ -3,7 +3,7 @@ const { readFileSync } = require('node:fs')
 const { test } = require('node:test')
 const { join } = require('node:path')
 
-const source = readFileSync(join(__dirname, '../src/extension.cjs'), 'utf8')
+const source = readFileSync(join(__dirname, '../src/local-panel.cjs'), 'utf8')
 
 test('a reopened panel reattaches one live run stream and restores its terminal state', async () => {
   const projectId = 'project_synthetic'
@@ -124,8 +124,9 @@ test('a reopened panel reattaches one live run stream and restores its terminal 
     if (!(name in dependencies)) throw new Error(`UNEXPECTED_REQUIRE:${name}`)
     return dependencies[name]
   }, module)
-  module.exports.activate({ extensionUri: {}, extensionPath: '/synthetic',
-    globalState: { get: () => projectId, update: async () => {} }, subscriptions })
+  module.exports.registerLocalPanel({ extensionUri: {}, extensionPath: '/synthetic',
+    globalState: { get: () => projectId, update: async () => {} }, subscriptions },
+    { prepare: async () => ({ connectionFile: 'synthetic-connection', worker: null }) })
 
   await openPanel()
   await panels[0].receive({ action: 'start', goal: 'synthetic goal' })

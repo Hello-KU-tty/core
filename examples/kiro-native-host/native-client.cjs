@@ -9,7 +9,8 @@ const { selectDiscoveryHaikuModel, selectBuiltinAnalystHaikuModel,
   require('./native-model.cjs')
 const { attestSessionMemoryDisabled } = require('./native-memory-attestation.cjs')
 const { inspectProtectedBuiltinFlags } = require('./native-protected-tools.cjs')
-const { attestPinnedKiroInstallation } = require('./native-installation-source.cjs')
+const { attestPinnedKiroInstallation, attestWindowsKiroInstallation } = require('./native-installation-source.cjs')
+const { privateNativeDirectory } = require('./native-private-directory.cjs')
 const { assertCloudConfigAbsent, waitForOwnedCloudPull } =
   require('./native-cloud-pull-attestation.cjs')
 
@@ -103,7 +104,10 @@ function safeNativeCommand(command, redactText, workspace) {
       redactText(command, workspace) !== command ||
       command.includes('..') || command.includes('~') || /[;&|`$<>\n\r]/.test(command) ||
       /(^|\s)\//.test(command)) return null
+  const logical = command.startsWith('.\\.kiro\\vibe-tools.cmd ') ?
+    command.slice('.\\.kiro\\vibe-tools.cmd '.length) : command
   return [
+    /^pnpm install --lockfile-only --ignore-scripts --ignore-pnpmfile$/,
     /^node --test(?: [A-Za-z0-9._/:=-]+)*$/,
     /^pnpm test(?: [A-Za-z0-9._/:=,-]+)*$/,
     /^pnpm rebuild esbuild$/,
@@ -112,7 +116,7 @@ function safeNativeCommand(command, redactText, workspace) {
     /^npm test(?: -- [A-Za-z0-9._/:=,-]+)*$/,
     /^npm run [a-zA-Z0-9:_-]+(?: -- [A-Za-z0-9._/:=,-]+)*$/,
     /^npm install(?: --include=dev)?$/,
-  ].some(pattern => pattern.test(command)) ? command : null
+  ].some(pattern => pattern.test(logical)) ? command : null
 }
 
 class NativeGateError extends Error {
@@ -128,8 +132,10 @@ class NativeGateError extends Error {
 // from an installed product extension. Load and cross-check those modules only
 // after an explicit capability-probe request reaches the existing probe gate.
 function loadCapabilityProbe(invoke) {
-  const probe = invoke ? require('./single-host-invoke-probe.cjs') :
+  const probe = typeof __VIBE_PORTABLE_HOST__ !== 'undefined' && __VIBE_PORTABLE_HOST__ ? null :
+    invoke ? require('./single-host-invoke-probe.cjs') :
     require('./single-host-subagent-probe.cjs')
+  if (!probe) throw new NativeGateError('NATIVE_LEGACY_PROBE_NOT_PACKAGED')
   const agents = invoke ? INVOKE_AGENTS : SUBAGENT_PROBE_AGENTS
   const workspaceName = invoke ? basename(probe.APPROVED_WORKSPACE) : probe.D_WORKSPACE_NAME
   if (workspaceName !== D_WORKSPACE_NAME ||
@@ -175,7 +181,7 @@ function uniqueWorkspaceEndpoint(endpoints, workspace) {
     if (!Array.isArray(endpoint?.folders) || endpoint.folders.length !== 1) return false
     const folder = endpoint.folders[0]?.path
     if (typeof folder !== 'string') return false
-    try { return realpathSync(folder) === canonical } catch { return false }
+    try { return relative(realpathSync(folder), canonical) === '' } catch { return false }
   })
   if (matching.length === 0) throw new NativeGateError('NATIVE_ENDPOINT_MISSING')
   if (matching.length > 1) throw new NativeGateError('NATIVE_ENDPOINT_AMBIGUOUS')
@@ -190,13 +196,15 @@ function uniqueWorkspaceEndpoint(endpoints, workspace) {
 async function diagnose(vscode, expectedWorkspace, options = {}) {
   const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
   if (!folder || vscode.workspace.workspaceFolders.length !== 1 ||
-      realpathSync(folder) !== realpathSync(expectedWorkspace))
+      relative(realpathSync(folder), realpathSync(expectedWorkspace)) !== '')
     throw new NativeGateError('NATIVE_WORKSPACE_NOT_BOUND')
   let extensionVersion
   if (options.productSource === true) {
     try {
-      extensionVersion = attestPinnedKiroInstallation(vscode, options.filesystem,
-        options.pinnedAppRoot).agentExtensionVersion
+      extensionVersion = (options.windowsProduct === true
+        ? attestWindowsKiroInstallation(vscode)
+        : attestPinnedKiroInstallation(vscode, options.filesystem,
+          options.pinnedAppRoot)).agentExtensionVersion
     }
     catch { throw new NativeGateError('NATIVE_KIRO_VERSION_UNVERIFIED') }
   } else {
@@ -210,7 +218,8 @@ async function diagnose(vscode, expectedWorkspace, options = {}) {
       throw new NativeGateError('NATIVE_KIRO_VERSION_UNVERIFIED')
     await kiro.activate()
   }
-  if (vscode.version !== EXPECTED.vscode || !EXPECTED.kiroExtensions.includes(extensionVersion))
+  if (!(options.windowsProduct === true && vscode.version === '1.131.0' && extensionVersion === '1.1.28') &&
+      (vscode.version !== EXPECTED.vscode || !EXPECTED.kiroExtensions.includes(extensionVersion)))
     throw new NativeGateError('NATIVE_KIRO_VERSION_UNVERIFIED')
   // The old list command was removed in 1.0.794. That build proves the role
   // through session/new options and set_config_option's returned currentValue.
@@ -218,7 +227,11 @@ async function diagnose(vscode, expectedWorkspace, options = {}) {
     ? await vscode.commands.executeCommand('kiroAgent.customAgents.listCustomAgents') : null
   const agentIds = Array.isArray(agents) ? agents.map((agent) => agent?.id).filter((id) => typeof id === 'string') : null
   const mcpSetting = vscode.workspace.getConfiguration('kiroAgent').get('configureMCP')
-  const canEnableMcp = await vscode.commands.executeCommand('kiroAgent.mcp.getCanEnableMCP')
+  // Windows 1.1.28's isolated Agent host registers legacy metadata commands
+  // after this product extension may start. Actual MCP readiness is attested
+  // from the owned session's policy and catalog, not this obsolete UI setting.
+  const canEnableMcp = options.windowsProduct ? false :
+    await vscode.commands.executeCommand('kiroAgent.mcp.getCanEnableMCP')
   return {
     trusted: vscode.workspace.isTrusted,
     extensionVersion,
@@ -230,17 +243,24 @@ async function diagnose(vscode, expectedWorkspace, options = {}) {
 }
 
 async function connectObserver(vscode, workspace, onPermissionRequest, onPermissionTelemetry,
-  onProtocolTelemetry, onUserInputRequest) {
+  onProtocolTelemetry, onUserInputRequest, waitForHostStartup = false) {
   const permissionTelemetry = (phase, toolName) => {
     try { onPermissionTelemetry?.(phase, toolName) }
     catch { /* Diagnostics must never prevent a permission response. */ }
   }
   let endpoint
-  for (let attempt = 0; attempt < 10; attempt++) {
-    const endpoints = await vscode.commands.executeCommand('kiro.agentRegistry.getAgentEndpoints')
+  const attempts = waitForHostStartup ? 60 : 10
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    let endpoints
+    try { endpoints = await vscode.commands.executeCommand('kiro.agentRegistry.getAgentEndpoints') }
+    catch (error) {
+      if (!waitForHostStartup) throw error
+      if (attempt === attempts - 1) throw new NativeGateError('NATIVE_ENDPOINT_NOT_READY')
+      await new Promise(resolve => setTimeout(resolve, 500)); continue
+    }
     try { endpoint = uniqueWorkspaceEndpoint(endpoints, workspace); break }
     catch (error) {
-      if (error?.code !== 'NATIVE_ENDPOINT_MISSING' || attempt === 9) throw error
+      if (error?.code !== 'NATIVE_ENDPOINT_MISSING' || attempt === attempts - 1) throw error
       await new Promise((resolve) => setTimeout(resolve, 500))
     }
   }
@@ -249,6 +269,8 @@ async function connectObserver(vscode, workspace, onPermissionRequest, onPermiss
   const pending = new Map()
   const updates = new Map()
   const ownedSessions = new Set()
+  const pendingCatalogs = new Map()
+  let sessionCreations = 0
   const toolTargets = new Map()
   const userInputRequests = new Set()
   const toolKey = (sessionId, toolCallId) => `${sessionId}\u0000${toolCallId}`
@@ -281,6 +303,7 @@ async function connectObserver(vscode, workspace, onPermissionRequest, onPermiss
       waiter.reject(new NativeGateError(reason))
     }
     pending.clear()
+    pendingCatalogs.clear()
     socket.close()
   }
   socket.addEventListener('close', close)
@@ -465,14 +488,15 @@ async function connectObserver(vscode, workspace, onPermissionRequest, onPermiss
       else waiter.resolve(message.result)
     } else if (message.method === '_kiro/tools/didChange') {
       const sessionId = message.params?.sessionId
-      if (typeof sessionId !== 'string' || !ownedSessions.has(sessionId)) return
+      if (typeof sessionId !== 'string' || sessionId.length > 1024 ||
+          (!ownedSessions.has(sessionId) && sessionCreations === 0)) return
       const tags = message.params?.tags
       const valid = Array.isArray(tags) && tags.length <= 1024 && tags.every(item =>
         item && typeof item === 'object' && !Array.isArray(item) &&
         ['builtin', 'mcp'].includes(item.source) && typeof item.tag === 'string' &&
         typeof item.description === 'string')
       const builtin = valid ? tags.filter(item => item.source === 'builtin') : []
-      try { onProtocolTelemetry?.({ kind: 'TOOLS_DID_CHANGE', sessionId,
+      const summary = { kind: 'TOOLS_DID_CHANGE', sessionId,
         valid,
         builtinRead: builtin.some(item => item.tag === 'read'),
         builtinWrite: builtin.some(item => item.tag === 'write'),
@@ -483,7 +507,17 @@ async function connectObserver(vscode, workspace, onPermissionRequest, onPermiss
         builtinContext: builtin.some(item => item.tag === 'context'),
         mcpTagCount: valid ? tags.filter(item => item.source === 'mcp').length : -1,
         tagCount: valid ? tags.length : -1,
-      }) } catch { /* Metadata must never change model or permission responses. */ }
+      }
+      if (!ownedSessions.has(sessionId)) {
+        // session/new may publish its initial catalog before returning its ID.
+        // Retain bounded, sanitized metadata only; ownership and all permission
+        // handling still require the session/new response from this client.
+        if (pendingCatalogs.has(sessionId) || pendingCatalogs.size < 8)
+          pendingCatalogs.set(sessionId, summary)
+        return
+      }
+      try { onProtocolTelemetry?.(summary) }
+      catch { /* Metadata must never change model or permission responses. */ }
     } else if (message.method === 'session/update') {
       const sessionId = message.params?.sessionId
       const update = message.params?.update
@@ -512,7 +546,18 @@ async function connectObserver(vscode, workspace, onPermissionRequest, onPermiss
     if (closed) return Promise.reject(new NativeGateError('NATIVE_CONNECTION_CLOSED'))
     const id = nextId++
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => { pending.delete(id); reject(new NativeGateError('NATIVE_RPC_TIMEOUT')) }, timeoutMs)
+      const timer = setTimeout(() => {
+        const operation = new Map([
+          ['initialize', 'INITIALIZE'], ['session/new', 'SESSION_NEW'],
+          ['session/set_config_option', 'SESSION_CONFIG'],
+          ['_kiro/permissions/explain', 'PERMISSION_EXPLAIN'],
+          ['_kiro/permissions/list', 'PERMISSION_LIST'], ['_kiro/policy/check', 'POLICY_CHECK'],
+          ['session/prompt', 'PROMPT'], ['session/cancel', 'CANCEL'],
+        ]).get(method) ?? 'OTHER'
+        try { onProtocolTelemetry?.({ kind: 'RPC_TIMEOUT', operation }) } catch {}
+        pending.delete(id)
+        reject(new NativeGateError('NATIVE_RPC_TIMEOUT'))
+      }, timeoutMs)
       pending.set(id, { resolve, reject, timer })
       socket.send(JSON.stringify({ jsonrpc: '2.0', id, method, params }))
     })
@@ -535,12 +580,24 @@ async function connectObserver(vscode, workspace, onPermissionRequest, onPermiss
     isClosed: () => closed,
     ownsSession: (sessionId) => ownedSessions.has(sessionId),
     newSession: async (cwd, clientAgentMetadata) => {
-      const value = await request('session/new', { cwd, mcpServers: [],
-        ...(clientAgentMetadata ? { _meta: { kiro: clientAgentMetadata } } : {}) }, 30000)
-      if (typeof value?.sessionId !== 'string' || value.sessionId.length < 8)
-        throw new NativeGateError('NATIVE_SESSION_ID_INVALID')
-      ownedSessions.add(value.sessionId)
-      return value
+      sessionCreations += 1
+      try {
+        const value = await request('session/new', { cwd, mcpServers: [],
+          ...(clientAgentMetadata ? { _meta: { kiro: clientAgentMetadata } } : {}) }, 30000)
+        if (typeof value?.sessionId !== 'string' || value.sessionId.length < 8)
+          throw new NativeGateError('NATIVE_SESSION_ID_INVALID')
+        ownedSessions.add(value.sessionId)
+        const catalog = pendingCatalogs.get(value.sessionId)
+        pendingCatalogs.delete(value.sessionId)
+        if (catalog) {
+          try { onProtocolTelemetry?.(catalog) }
+          catch { /* Observation must not alter session ownership. */ }
+        }
+        return value
+      } finally {
+        sessionCreations -= 1
+        if (sessionCreations === 0) pendingCatalogs.clear()
+      }
     },
     selectMode: (sessionId, modeId) => request('session/set_config_option', { sessionId, configId: 'mode', value: modeId }),
     selectModel: (sessionId, modelId) => request('session/set_config_option', { sessionId, configId: 'model', value: modelId }),
@@ -562,6 +619,8 @@ async function connectObserver(vscode, workspace, onPermissionRequest, onPermiss
 // Metadata-only stock ChatAgent policy probe. It joins the existing W mux,
 // creates a session rooted at the already approved private H, and never prompts.
 function fixedBuiltinHelperScope() {
+  if (typeof __VIBE_PORTABLE_HOST__ !== 'undefined' && __VIBE_PORTABLE_HOST__)
+    throw new NativeGateError('NATIVE_LEGACY_HELPER_SCOPE_NOT_PACKAGED')
   const projectId = D_WORKSPACE_NAME
   const runtimeWorkspaces = '/Users/hurdoo/Library/Application Support/VibeHelper/' +
     'NativeExperiment-20260913/runtime/workspaces'
@@ -583,6 +642,8 @@ function fixedBuiltinHelperScope() {
 }
 
 function currentApprovedProductWorkspace(vscode) {
+  if (typeof __VIBE_PORTABLE_HOST__ !== 'undefined' && __VIBE_PORTABLE_HOST__)
+    throw new NativeGateError('NATIVE_WINDOWS_LIFECYCLE_NOT_VERIFIED')
   const folder = vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath
   if (vscode.workspace.workspaceFolders?.length !== 1 || typeof folder !== 'string')
     throw new NativeGateError('NATIVE_H_PREFLIGHT_WORKSPACE_INVALID')
@@ -640,9 +701,7 @@ function productBuiltinHScope(projectId, workspace, helper) {
       canonicalW !== expectedW || canonicalH !== expectedH)
     throw new NativeGateError('NATIVE_BUILTIN_H_SCOPE_INVALID')
   for (const path of [canonicalW, canonicalH]) {
-    const stat = lstatSync(path)
-    if (!stat.isDirectory() || stat.isSymbolicLink() ||
-        stat.uid !== process.getuid() || (stat.mode & 0o077) !== 0)
+    if (!privateNativeDirectory(path))
       throw new NativeGateError('NATIVE_BUILTIN_H_ROOT_UNSAFE')
   }
   return { workspace: canonicalW, helper: canonicalH }
@@ -1202,7 +1261,7 @@ function toolLessRole(workspace, role) {
 }
 
 function boundedCoreRole(workspace, role, binding, bindingFile, syntheticSrcWrite = false,
-  productBuilder = false, bridgeScriptPath = null) {
+  productBuilder = false, bridgeScriptPath = null, runtimeDescriptor = null) {
   if (!binding || !Array.isArray(binding.toolNames) || binding.toolNames.length === 0 ||
       typeof binding.url !== 'string' || typeof binding.authorization !== 'string')
     throw new NativeGateError('NATIVE_CORE_BINDING_REQUIRED')
@@ -1235,6 +1294,10 @@ function boundedCoreRole(workspace, role, binding, bindingFile, syntheticSrcWrit
           { capability: 'fs_write', match: ['src/**', `${realpathSync(workspace)}/src/**`], effect: 'allow' },
         ]
       : [{ capability: 'fs_write', effect: 'deny' }, { capability: 'shell', effect: 'deny' }]),
+    ...(runtimeDescriptor ? [
+      ...(!productBuilder ? [{ capability: 'fs_read', effect: 'deny' }] : []),
+      { capability: 'web_search', effect: 'deny' },
+    ] : []),
   ]
   const server = config.mcpServers?.['vibe-native-core']
   const directHttp = server?.url === binding.url &&
@@ -1242,11 +1305,14 @@ function boundedCoreRole(workspace, role, binding, bindingFile, syntheticSrcWrit
   const bridgeScript = bridgeScriptPath ?? join(__dirname, '..', '..', 'scripts',
     'native-core-stdio-bridge.mjs')
   const stdioBridge = typeof bindingFile === 'string' &&
-    server?.command === '/opt/homebrew/opt/node@24/bin/node' &&
+    server?.command === (runtimeDescriptor?.executable ?? '/opt/homebrew/opt/node@24/bin/node') &&
     JSON.stringify(server?.args) === JSON.stringify([
+      ...(runtimeDescriptor?.args ?? []),
       bridgeScript, realpathSync(bindingFile), realpathSync(workspace),
     ]) &&
-    Object.keys(server?.env ?? {}).every((name) => name === 'VIBE_NATIVE_BRIDGE_RECEIPT_FILE')
+    Object.keys(server?.env ?? {}).every((name) => name === 'VIBE_NATIVE_BRIDGE_RECEIPT_FILE' ||
+      Object.hasOwn(runtimeDescriptor?.env ?? {}, name) && server.env[name] === runtimeDescriptor.env[name]) &&
+    Object.entries(runtimeDescriptor?.env ?? {}).every(([name, value]) => server?.env?.[name] === value)
   if (config.name !== role || config.includeMcpJson !== false || config.includePowers !== false ||
       'allowedTools' in config || 'toolsSettings' in config || 'hooks' in config ||
       JSON.stringify(config.tools) !== JSON.stringify(expectedTools) ||
@@ -1262,8 +1328,9 @@ async function openNativeRole(vscode, options) {
   const builderDeadline = options.productBuilder === true ?
     builderLeaseDeadline(options.builderLeaseDeadlineAt) : null
   const diagnostic = await diagnose(vscode, workspace,
-    { productSource: options.productMode === true })
-  if (options.productMode && diagnostic.extensionVersion !== '1.0.794')
+    { productSource: options.productMode === true, windowsProduct: options.windowsProduct === true })
+  if (options.windowsProduct && !options.productMode) throw new NativeGateError('NATIVE_PRODUCT_MODE_REQUIRED')
+  if (options.productMode && diagnostic.extensionVersion !== (options.windowsProduct ? '1.1.28' : '1.0.794'))
     throw new NativeGateError('NATIVE_PERMISSION_ROUTE_VERSION_UNVERIFIED')
   if (!diagnostic.trusted) throw new NativeGateError('NATIVE_WORKSPACE_UNTRUSTED')
   if (diagnostic.agentIds && !diagnostic.agentIds.includes(role))
@@ -1286,17 +1353,27 @@ async function openNativeRole(vscode, options) {
     probe.verify(workspace)
   } else if (requireMcp) boundedCoreRole(workspace, role, options.binding, options.bindingFile,
     options.syntheticSrcWrite === true, options.productBuilder === true,
-    options.bridgeScriptPath)
+    options.bridgeScriptPath, options.runtimeDescriptor)
   else if (!toolLessRole(workspace, role))
     throw new NativeGateError('NATIVE_TOOLLESS_ROLE_NOT_VERIFIED')
+  let windowsCatalog = null
   const client = await connectObserver(vscode, workspace, options.onPermissionRequest,
-    options.onPermissionTelemetry, options.onProtocolTelemetry,
-    options.onUserInputRequest)
+    options.onPermissionTelemetry, event => {
+      if (event.kind === 'TOOLS_DID_CHANGE') windowsCatalog = event
+      options.onProtocolTelemetry?.(event)
+    },
+    options.onUserInputRequest, options.windowsProduct === true)
   let sessionId
   let modelId = null
   try {
     const newStarted = Date.now()
-    const session = await client.newSession(realpathSync(workspace))
+    let metadata
+    if (options.windowsProduct) {
+      assertNoProtectedCommandHooks(workspace)
+      const { name, ...config } = JSON.parse(readFileSync(join(workspace, '.kiro/agents', `${role}.json`), 'utf8'))
+      metadata = { modeId: role, customAgents: [{ id: name, ...config }] }
+    }
+    const session = await client.newSession(realpathSync(workspace), metadata)
     if (typeof session?.sessionId !== 'string' || session.sessionId.length < 8)
       throw new NativeGateError('NATIVE_SESSION_ID_INVALID')
     sessionId = session.sessionId
@@ -1314,6 +1391,30 @@ async function openNativeRole(vscode, options) {
     const selected = await client.selectMode(sessionId, role)
     const current = selected?.configOptions?.find((option) => option?.id === 'mode')?.currentValue
     if (current !== role) throw new NativeGateError('NATIVE_ROLE_SELECTION_UNCONFIRMED')
+    if (options.windowsProduct) {
+      const policyErrors = session._meta?.policyErrors
+      if (policyErrors !== undefined && (!Array.isArray(policyErrors) || policyErrors.length))
+        throw new NativeGateError('NATIVE_POLICY_ERRORS')
+      attestSessionMemoryDisabled(sessionId)
+      for (const capability of ['fs_read', 'fs_write', 'shell', 'web_search']) {
+        const value = await client.explainPermission(sessionId, capability, '')
+        const expected = options.productBuilder && capability !== 'web_search' ? 'ask' : 'deny'
+        if (value.effect !== expected) throw new NativeGateError('NATIVE_ROLE_POLICY_UNVERIFIED')
+      }
+      for (const tool of options.binding?.toolNames ?? []) {
+        const value = await client.explainPermission(sessionId, 'mcp', `vibe-native-core/${tool}`)
+        if (value.effect !== 'allow') throw new NativeGateError('NATIVE_MCP_POLICY_UNVERIFIED')
+      }
+      for (let n = 0; n < 40 && (!windowsCatalog || requireMcp && !windowsCatalog.mcpTagCount); n++)
+        await new Promise(resolve => setTimeout(resolve, 250))
+      const allowedBuiltinCount = options.productBuilder ? 3 : 0
+      if (!windowsCatalog?.valid || windowsCatalog.builtinWeb || windowsCatalog.builtinSubagent ||
+          windowsCatalog.builtinSpec || windowsCatalog.builtinContext ||
+          windowsCatalog.tagCount !== windowsCatalog.mcpTagCount + allowedBuiltinCount ||
+          (options.productBuilder && !(windowsCatalog.builtinRead && windowsCatalog.builtinWrite && windowsCatalog.builtinShell)) ||
+          (!requireMcp && windowsCatalog.mcpTagCount !== 0) ||
+          (requireMcp && windowsCatalog.mcpTagCount < 1)) throw new NativeGateError('NATIVE_ROLE_CATALOG_UNVERIFIED')
+    }
     if (probeMode)
       await probe.wait(probe.verify(workspace).markerDirectory)
     if (options.discoveryHaiku === true) {

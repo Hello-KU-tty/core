@@ -211,7 +211,7 @@ describe('artifact and local-data hygiene', () => {
   it('stages a minimal self-contained Crew package with one exact native runtime dependency', async () => {
     const packageRoot = path.join(workspaceRoot, 'dist/crew-package')
     const files = (await collectFiles(packageRoot))
-      .map((file) => path.relative(packageRoot, file))
+      .map((file) => path.relative(packageRoot, file).split(path.sep).join('/'))
       .sort()
     const runtimeManifest = JSON.parse(
       await readFile(path.join(packageRoot, 'package.json'), 'utf8'),
@@ -231,7 +231,7 @@ describe('artifact and local-data hygiene', () => {
     expect(files).toContain('agents/vibe-helper-helper.json')
     expect(files).toContain('agents/vibe-helper-evidence-analyst.json')
     expect(files).toContain('app.json')
-    expect(files).toContain(path.join('ui', appManifest.ui.entry))
+    expect(files).toContain(path.posix.join('ui', appManifest.ui.entry))
     expect(files).toContain('apps/crew-backend/dist/main.js')
     expect(files).toContain('apps/crew-backend/dist/builder-tool-guard.js')
     expect(files).toContain('apps/crew-backend/drizzle/meta/_journal.json')

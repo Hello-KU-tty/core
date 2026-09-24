@@ -888,7 +888,11 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 
 - 2026-09-23 문서 10개의 상대 링크 115개가 존재함을 확인했고 `git diff --check`를 통과했다. AC-MVP-015의 SPEC/TASKS 추적과 W1 단일 다음 착수 표시를 확인한다. source·의존성·runtime 변경은 없으므로 app test/Windows 실측은 이 문서 작업의 검증으로 주장하지 않는다.
 
-### [>] T19-W1. Windows runtime와 native Agent capability 실측
+### [x] T19-W1. Windows runtime와 native Agent capability 실측
+
+**실행 계획:** [Windows W1 실측 계획](T19_W1_WINDOWS_CAPABILITY_PLAN.md) — 2026-09-24 사용자가 실행을 승인하여 착수했다. 개발 도구 준비·최소 Windows adapter 수정·합성 native 실행·회귀 검증을 수행한다.
+
+**2026-09-24 결과:** [Windows W1 실측 결과](spikes/T19_W1_WINDOWS_CAPABILITY_RESULTS_20260924.md). Kiro 1.1.14 / Agent 1.1.28 / API 1.131.0 / host Node 24.18.0에서 SQLite·Core·stdio MCP와 실제 Discovery 10 preview, Builder 파일 2개·test exit 0·Context v2, read-only Helper, 두 역할 취소·새 실행·revoke를 확인했다. native 8회 한도를 지켰다. 단일 창 custom Helper는 직렬 처리되므로 병행 FAIL, 현재 built-in artifact gate는 미지원; **분리된 두 창에서만 병행 PASS**다. 마지막 진단의 TAP reporter 오판은 원본 FAIL을 보존하고 동일 hash 생성물 9 tests 및 DB/ACL/revoke 후속 감사 PASS로 해결했다. 전체 `pnpm check`와 관련 panel CJS 18 tests PASS. W1 bounded capability만 완료하며 제품의 두 창 UX/설치·전체 수직 흐름 완료로 확대하지 않는다.
 
 **선행 조건**
 
@@ -904,7 +908,11 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 
 - 재현 가능한 source/command/test와 sanitized Windows receipt가 있으며 runtime 재사용/불가·native 역할별 성공/실패를 구분한다. 전체 기능 미통과를 완료로 덮지 않고 막힌 gate를 기록한다. Windows가 없으면 `[-]`와 이유를 남긴다.
 
-### [ ] T19-W2. Core·bridge portable package와 runtime 준비
+### [x] T19-W2. Core·bridge portable package와 runtime 준비
+
+**2026-09-24 착수:** 사용자 `T19 w2` 요청으로 W1 실측을 기반으로 portable Core/bridge, runtime 선택·획득과 win32-x64 VSIX를 구현·검증한다. 기존 작업 변경을 보존하며 W3 lifecycle/프론트 통합과 추가 native 모델 실험은 포함하지 않는다.
+
+**2026-09-24 결과:** [W2 실측 결과](spikes/T19_W2_PORTABLE_CORE_RESULTS_20260924.md), [package/API 인계](T19_W2_PORTABLE_CORE_HANDOFF.md). Kiro Node 24.18.0, 기존/managed Node 24.19.0에서 repository 밖 한글·공백 경로의 packaged Core/SQLite migration·SDK·stdio MCP·scope/권한/revoke·재시작 PASS. 공식 다운로드·offline cache·손상/중단/취소·lock 복구와 ACL/junction/hardlink 검사 PASS. VSIX **1,875,725 bytes**, 설치 **5,482,884 bytes**, 조건부 Node **92,825,416 bytes**를 실측했다. `pnpm check`, panel build, 관련 CJS 19 tests와 최종 native-client/runtime 44 tests PASS. 모델 호출·IDE 설치·commit/push는 0회이며 W3~W5 완료로 확대하지 않는다.
 
 **선행 조건:** T19-W1에서 Core/runtime와 native 연결을 진행할 근거가 확보돼야 한다.
 
@@ -914,7 +922,11 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - Kiro/기존 Node/검증된 cache 재사용 및 필요한 경우의 private runtime acquisition을 구현·검증한다. 다운로드 중단/손상/offline·재시도·출처 검증, Windows 경로/ACL을 포함한다.
 - OS별 VSIX 구성과 누출 검사를 마련하고 dev source·다른 플랫폼 binary·DB/token을 제외한다. 총 VSIX/설치/추가 다운로드 크기는 실제 artifact로 측정한다.
 
-### [ ] T19-W3. 확장 자동 기동·연결·복구와 frontend 통합
+### [x] T19-W3. 확장 자동 기동·연결·복구와 frontend 통합
+
+**2026-09-24 착수:** 사용자 `T19 W3` 요청. W2 portable package와 SDK를 재사용해 자동 lifecycle·Windows native source gate·제품 패널을 통합하고, 합성 데이터의 다중 창/종료/crash/rotation/update 및 실제 설치 경로를 검증한다. [W3 계획](T19_W3_LIFECYCLE_PLAN.md). 기존 변경과 T19/T19-N 한계를 보존한다.
+
+**2026-09-24 결과:** [W3 실측 결과](spikes/T19_W3_LIFECYCLE_RESULTS_20260924.md), [lifecycle 인계](T19_W3_LIFECYCLE_HANDOFF.md). 통합 VSIX 0.2.0의 일반 Kiro 합성 profile 설치·자동 Core·History·실제 Discovery preview 10·Helper 응답 저장 PASS. 사용자 승인한 Helper 보조 창 자동 열기, 두 windowId의 같은 Core 사용, owner 창 종료 후 35초 유지와 마지막 창 종료 후 Core process 종료를 확인했다. packaged startup/reload/crash·credential rotation/update·migration backup·downgrade 7그룹, 관련 CJS 22 tests와 최종 `pnpm check`(unit 92, integration 274 + skip 1, eval 34, Campus Drop 3, smoke 6, E2E 12) PASS. 초기 endpoint 준비·drive case·owner 종료 실패와 E2E fixture 경쟁을 고치고 원인·범위를 기록했다. W4/W5와 상위 T19/T19-N gate는 유지한다.
 
 **선행 조건:** T19-W2.
 
@@ -924,7 +936,11 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - 다중 창·DB lock·정상 종료·crash·credential rotation·확장 업데이트·migration backup을 검증하고 기존 데이터와 no-auto-replay를 유지한다.
 - frontend는 runtime 준비/Core 연결/native 준비/실제 결과 저장과 오류를 구분하며 하나의 제품 확장으로 설치된다. private API 재작성·Mock 성공 대체 없이 UI 책임과 adapter 책임을 분리한다.
 
-### [ ] T19-W4. 생성 TypeScript 앱의 도구 자동 준비
+### [x] T19-W4. 생성 TypeScript 앱의 도구 자동 준비
+
+**2026-09-24 착수:** 사용자 `T19 W4` 요청. 기존 변경을 보존하고 생성 앱 전용 Node/pnpm 선택·private 준비, native shell 전달과 result launcher를 구현한다. 기존/미설치 도구, frozen install/build/test/HTTP와 실패·복구를 검증하며 W5 전체 수직 흐름과 구분한다. [W4 계획](T19_W4_TOOLCHAIN_PLAN.md).
+
+**2026-09-24 완료:** VSIX 0.3.0에서 기존 Node/pnpm 재사용과 PATH 도구 부재의 private 자동 준비를 검증했다. 두 환경의 실제 native Builder에서 lock/frozen install/build/test/HTTP smoke가 모두 exit 0이었고 별도 packaged result supervisor도 선택된 일반 Node로 HTTP 응답을 반환했다. 미설치 환경 검증기의 중간 상태 조회 오류는 동일 Core/run을 읽기 전용으로 재관측하여 확인했으며 Agent 요청은 재전송하지 않았다. 최종 `pnpm check`(unit 93, integration 280+1 skip, eval 35, Campus Drop 3, smoke 6, E2E 12), 확장 CJS 89, portable 11개 gate와 도구 실패·복구 검증 PASS. [결과](spikes/T19_W4_TOOLCHAIN_RESULTS_20260924.md), [receipt](spikes/T19_W4_TOOLCHAIN_RECEIPTS_20260924.json), [인계](T19_W4_TOOLCHAIN_HANDOFF.md). clean machine·전체 수직 흐름·초기 workspace 전환 host crash와 조회 안정성은 W5에서 검증한다. 상위 T19/T19-N은 완료 처리하지 않는다.
 
 **선행 조건:** T19-W3.
 
@@ -933,7 +949,17 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - 기존 Node/pnpm 우선, 필요 시 private 도구 준비. native Agent shell과 result launcher가 선택한 runtime을 실제로 사용하게 하고 `process.execPath`·env 가정을 수정한다.
 - 도구 설치 유무 두 환경에서 frozen install/build/test/실제 result HTTP smoke를 수행한다. generated workspace·lifecycle allowlist를 지키고 전역 PATH/사용자 설치를 변경하지 않는다.
 
-### [ ] T19-W5. clean Windows 확장 설치와 수직 흐름 출하 검증
+### [~] T19-W5. clean Windows 확장 설치와 수직 흐름 출하 검증
+
+**2026-09-24 기기 간 개발 인계:** 사용자가 commit/push 및 collaborator 권한이 있는 기존 `Hello-KU-tty/core` remote의 같은 branch를 확인했다. [재개 인계](CROSS_DEVICE_HANDOFF_20260924.md)에 개발 환경·검증 근거·남은 조사와 새 합성 환경 절차를 정리한다. W5 `[~]`, T19 `[-]`, T19-N `[~]` 상태와 clean Windows 미검증은 유지한다.
+
+**2026-09-24 착수:** 사용자 `T19 W5` 요청 및 별도 clean Windows 환경 없이 현재 PC에서 가능한 검증부터 진행하라는 응답. 기존 W1~W4 변경을 보존한다. 격리 profile의 packaged 수직 흐름과 재현 가능한 검증물을 준비하되 실제 도구 미설치 machine gate는 별도 미검증으로 둔다. [W5 계획](T19_W5_RELEASE_VALIDATION_PLAN.md).
+
+**2026-09-24 중단 인계:** 사용자 physical Escape의 Computer Use 중단 신호로 작업을 멈췄다. 첫 격리 VSIX 0.3.0 실행은 실제 preview 10개·JIT 상세화·후보 수정/선택을 저장했으나 SPEC에서 `NATIVE_ROLE_CATALOG_UNVERIFIED` 실패했다. 세션 생성 응답 전 catalog 알림의 bounded 보존/소유권 확인, 안전한 catalog 진단과 생성 workspace 패널 재열기를 보완한 VSIX 0.3.1을 빌드했다. native-client 44 tests, 패널/검증 driver 5 tests와 typecheck/package 검증 PASS. 수정 설치물의 두 번째 live 실행은 Workspace Trust 대기 중 중단되어 원인 해결을 실측 확정하지 않았다. 이번 변경의 최종 `pnpm check`, Builder 이후 수직 흐름, Personal Need 양쪽 완주, clean Windows 및 상위 gate는 아직 미검증이다. 재현과 산출물은 W5 계획의 중단 인계를 따른다.
+
+**2026-09-24 재개:** 사용자 `resume`으로 재개했다. 정상 DACL 검사도 5초를 넘는 것을 재현해 권한 조건을 유지한 채 검사 불가/UNSAFE를 구분하고 VSIX 0.3.2를 빌드했다. 실제 설치물은 Core 연결과 새 Project 생성 후 첫 native 요청에서 `NATIVE_CONNECT_TIMEOUT`으로 실패했고 조회 실패는 0이었다. E2E의 서버 기동·브라우저 cache·응답 대기 실패를 구분해 보존하며 최종 전체 check와 단독 native 재검증을 진행한다. [실측 기록](spikes/T19_W5_WINDOWS_RELEASE_RESULTS_20260924.md), [sanitized receipt](spikes/T19_W5_WINDOWS_RELEASE_RECEIPTS_20260924.json), [설치/지원 범위 인계](T19_W5_RELEASE_VALIDATION_HANDOFF.md). W5 및 상위 T19/T19-N 완료 판정은 보류한다.
+
+**2026-09-24 후속 실측:** VSIX 0.3.6에서 같은 Personal Need Project의 복구 흐름이 Task COMPLETED·결과 HTTP 200·Helper 2개·분석 4개 성공·History 무재실행까지 통과했다. USER_UNDERSTANDING Evidence는 0으로 선택만으로 이해도가 오르지 않았다. 설치 경로 변경/PID 재사용/승인 설정 lock 갱신 경계를 보완했고 Evidence 설명 길이 문제를 수정한 0.3.7의 최종 pnpm check는 unit 97, integration 296+skip 1, eval 35, Campus Drop 3, build, smoke 6, E2E 12를 통과했고 CJS 102개도 PASS다. 새 no-Personal-Need 시도는 Spec 질문 무응답에 따른 native 종료 확인 실패로 중단됐으며, 취소 보조 검사와 host 재시작 후 새 Project는 catalog 검증에서 모델 prompt 전에 실패했다. 최신 portable 11개와 packaged lifecycle 8개는 재실행에서 PASS했지만 최초 CORE_START_TIMEOUT과 최대 약 45.6초 연결 관측을 보존한다. Core/native 초기화 안정성·양쪽 fresh 완주·실행 중 취소는 미해결이다. 상세 회귀와 추가 실제 관측은 W5 실측 기록에 남긴다. clean Windows·전체 GUI·Agent 의미 품질 및 상위 완료 gate는 유지한다.
 
 **선행 조건:** T19-W1~W4와 통합 frontend artifact.
 

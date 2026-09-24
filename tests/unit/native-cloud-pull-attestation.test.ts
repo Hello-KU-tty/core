@@ -15,6 +15,14 @@ const OLD = '2026-09-14T16:00:00.000Z'
 const NEW = '2026-09-14T17:00:00.000Z'
 const now = Date.parse(NEW)
 
+it('uses case-insensitive Windows session buckets while preserving POSIX case', () => {
+  if (process.platform === 'win32') {
+    expect(cloudStoreHash('C:\\Probe Space\\한글')).toBe(cloudStoreHash('c:/probe space/한글/'))
+  } else {
+    expect(cloudStoreHash('/tmp/Probe')).not.toBe(cloudStoreHash('/tmp/probe'))
+  }
+})
+
 function pair(id: string, timestamp = NEW) {
   const call = {
     timestamp,

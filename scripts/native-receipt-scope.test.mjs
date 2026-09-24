@@ -8,7 +8,11 @@ import {
 
 test('only the exact persistent experiment receipt beside its binding is allowed', () => {
   const binding = `${PERSISTENT_NATIVE_RUNTIME}/native-binding-native_123.json`
-  assert.equal(allowedNativeReceipt(PERSISTENT_NATIVE_RECEIPT, binding), true)
+  // The historic POSIX experiment root is not a Windows path. Keep that gate closed.
+  assert.equal(
+    allowedNativeReceipt(PERSISTENT_NATIVE_RECEIPT, binding),
+    process.platform !== 'win32',
+  )
   assert.equal(allowedNativeReceipt('/private/tmp/native-run/receipt.jsonl', binding), true)
   assert.equal(allowedNativeReceipt(`${PERSISTENT_NATIVE_RUNTIME}/other.jsonl`, binding), false)
   assert.equal(

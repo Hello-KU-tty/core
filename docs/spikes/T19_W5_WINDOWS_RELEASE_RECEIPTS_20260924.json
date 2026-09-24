@@ -1,0 +1,425 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-09-24",
+  "task": "T19-W5",
+  "status": "IN_PROGRESS",
+  "environment": "ISOLATED_DEVELOPMENT_PC",
+  "cleanWindows": "NOT_VERIFIED_ENVIRONMENT_UNAVAILABLE",
+  "artifact": {
+    "version": "0.3.7",
+    "sha256": "a0a179dd623de0b8fa2d9bed0b58311e590bb8f08c98ac91f4945bcc8d904ebf",
+    "vsixBytes": 2317290,
+    "installedBytes": 7435710,
+    "files": 70
+  },
+  "toolchain": {
+    "developmentNode": "24.19.0",
+    "pnpm": "11.12.0",
+    "kiro": "1.1.14",
+    "agent": "1.1.28",
+    "api": "1.131.0"
+  },
+  "regressions": {
+    "unit": 97,
+    "integrationPassed": 296,
+    "integrationSkipped": 1,
+    "eval": 35,
+    "campusDrop": 3,
+    "smoke": 6,
+    "panelCjs": 102,
+    "driverFinal": 10,
+    "fullCheck": "PASS",
+    "e2e": 12,
+    "nativeClient": 46,
+    "managedPackaged": {
+      "status": "PASS_ON_DIAGNOSTIC_RERUN",
+      "artifactVersion": "0.3.7",
+      "cases": 8,
+      "firstAttempt": "CORE_START_TIMEOUT",
+      "productChangedBetweenAttempts": false,
+      "pidReuseRecovery": true,
+      "otherProcessTerminated": false,
+      "crashReconnectMs": 39069,
+      "updateReconnectMs": 45583
+    },
+    "projectToolsFocused": 9,
+    "processOwnerFocused": 4,
+    "builder138Focused": 55,
+    "projectToolRecovery": {
+      "status": "PASS",
+      "approvedConfigLockRefresh": true,
+      "frozenInstallAfterRefresh": true,
+      "foreignLifecycleDenied": true,
+      "localNpmrcDenied": true,
+      "corruptCacheQuarantined": true,
+      "interrupted": true,
+      "cancelled": true
+    },
+    "fullCheckArtifactVersion": "0.3.7",
+    "evidencePreviewIntegration": 35,
+    "nativeInstalledCancellation": {
+      "status": "NOT_VERIFIED",
+      "attempts": 1,
+      "modelActivityObserved": false,
+      "terminalBeforeCancel": "NATIVE_ROLE_CATALOG_UNVERIFIED",
+      "cleanupCancelRequestReturned": true
+    },
+    "e2eDurationMinutes": 3.7,
+    "portablePackaged": {
+      "status": "PASS_ON_RERUN",
+      "artifactVersion": "0.3.7",
+      "cases": 11,
+      "firstAttempt": "PACKAGED_START_FAILED",
+      "firstFailureReason": "READINESS_TIMEOUT_OR_PROCESS_EXIT_NOT_DISTINGUISHED",
+      "originalHarnessBudgetMs": 30000,
+      "alignedHarnessBudgetMs": 45000,
+      "productBudgetChanged": false,
+      "modelCalls": 0,
+      "runtimes": {
+        "kiro": {
+          "source": "KIRO",
+          "node": "24.18.0",
+          "napi": 10,
+          "sqlite": "transaction/reopen PASS"
+        },
+        "existing": {
+          "source": "EXISTING_NODE",
+          "node": "24.19.0",
+          "napi": 10,
+          "sqlite": "transaction/reopen PASS"
+        },
+        "managed": {
+          "source": "MANAGED_NODE",
+          "node": "24.19.0",
+          "napi": 10,
+          "downloadedBytes": 92825416,
+          "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+        }
+      },
+      "startupObservations": [
+        {
+          "runtime": "KIRO",
+          "command": "native",
+          "elapsedMs": 14939
+        },
+        {
+          "runtime": "KIRO",
+          "command": "native",
+          "elapsedMs": 21934
+        },
+        {
+          "runtime": "EXISTING_NODE",
+          "command": "native",
+          "elapsedMs": 17085
+        },
+        {
+          "runtime": "EXISTING_NODE",
+          "command": "native",
+          "elapsedMs": 8938
+        },
+        {
+          "runtime": "MANAGED_NODE",
+          "command": "native",
+          "elapsedMs": 35769
+        },
+        {
+          "runtime": "MANAGED_NODE",
+          "command": "native",
+          "elapsedMs": 7171
+        }
+      ]
+    }
+  },
+  "aclInspector": {
+    "beforeMs": [
+      5769,
+      5374,
+      5306
+    ],
+    "beforeResult": [
+      false,
+      false,
+      false
+    ],
+    "afterMs": [
+      4615,
+      4778,
+      5191
+    ],
+    "afterResult": [
+      true,
+      true,
+      true
+    ],
+    "aclChanged": false
+  },
+  "live": [
+    {
+      "artifactVersion": "0.3.0",
+      "personalNeed": false,
+      "status": "FAIL",
+      "lastCompleted": [
+        "PREVIEW_10",
+        "JIT",
+        "SHRINK_ROUND",
+        "SELECT"
+      ],
+      "failedAt": "SPEC",
+      "errorCode": "NATIVE_ROLE_CATALOG_UNVERIFIED",
+      "nativeRequests": 4,
+      "succeededRuns": 3
+    },
+    {
+      "artifactVersion": "0.3.1",
+      "personalNeed": true,
+      "status": "INTERRUPTED_BY_USER",
+      "nativeRequests": 0
+    },
+    {
+      "artifactVersion": "0.3.1",
+      "personalNeed": true,
+      "status": "FAIL",
+      "errorCode": "PRIVATE_DIRECTORY_UNSAFE",
+      "nativeRequests": 0
+    },
+    {
+      "artifactVersion": "0.3.2",
+      "personalNeed": true,
+      "status": "FAIL",
+      "failedAt": "PREVIEW_WAITING",
+      "errorCode": "NATIVE_CONNECT_TIMEOUT",
+      "nativeRequests": 1,
+      "readFailures": 0,
+      "modelRunningObserved": false,
+      "syntheticHostClosed": true
+    },
+    {
+      "artifactVersion": "0.3.2",
+      "personalNeed": true,
+      "status": "FAIL",
+      "execution": "SOLO",
+      "lastCompleted": [
+        "PREVIEW_10",
+        "JIT",
+        "SHRINK_ROUND",
+        "SELECT",
+        "SPEC",
+        "SPEC_REVISE",
+        "CONFIRM_SPEC",
+        "PREPARE_TASK",
+        "WORKSPACE_SWITCH"
+      ],
+      "failedAt": "BUILDER_INITIAL_WAITING",
+      "errorCode": "NATIVE_RPC_TIMEOUT",
+      "nativeRequests": 6,
+      "succeededRuns": 5,
+      "specRevisions": [
+        1,
+        2
+      ],
+      "activatedHosts": 2,
+      "sameCoreAcrossWorkspaceSwitch": true,
+      "readFailures": 0,
+      "syntheticHostClosed": true,
+      "memory": {
+        "scope": "EXTENSION_HOST_RSS_NOT_TOTAL_KIRO_OR_CORE",
+        "finalBytes": 258121728,
+        "maxObservedBytes": 261771264
+      }
+    },
+    {
+      "artifactVersion": "0.3.3",
+      "personalNeed": true,
+      "status": "HARNESS_FAIL_BEFORE_NEW_AGENT_REQUEST",
+      "errorCode": "RUN_NOT_FOUND_RESTORE_PROJECT",
+      "nativeRequestsAdded": 0,
+      "reason": "TRANSIENT_RUN_ID_EXPIRED_AFTER_CORE_RESTART",
+      "syntheticHostClosed": true
+    },
+    {
+      "artifactVersion": "0.3.3",
+      "personalNeed": true,
+      "status": "FAIL",
+      "failedAt": "BUILDER_INITIAL_WAITING",
+      "errorCode": "PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED",
+      "nativeRequests": 7,
+      "newRunAttempts": 1,
+      "retryAttempt": 1,
+      "modelPromptSent": false,
+      "syntheticHostClosed": true
+    },
+    {
+      "artifactVersion": "0.3.4",
+      "personalNeed": true,
+      "status": "FAIL_BEFORE_NEW_AGENT_REQUEST",
+      "errorCode": "CORE_UPDATE_WAITING_FOR_OWNER_EXIT",
+      "nativeRequestsAdded": 0,
+      "pidReuseObserved": true,
+      "syntheticHostClosed": true
+    },
+    {
+      "artifactVersion": "0.3.5",
+      "personalNeed": true,
+      "mode": "RECOVERY_OF_0.3.2_DISCOVERY",
+      "status": "FAIL",
+      "failedAt": "TASK_COMPLETION_ASSERTION",
+      "errorCode": "ERR_ASSERTION",
+      "taskStatus": "ACTIVE",
+      "completion": false,
+      "builderTurns": "SUCCEEDED_TURN_ENDED",
+      "helperRecorded": true,
+      "decisionsApplied": 1,
+      "pendingDecisions": 0,
+      "nativeRequests": 10,
+      "frozenInstallError": "ERR_PNPM_OUTDATED_LOCKFILE",
+      "lockRefreshDeniedWithApprovedConfig": true,
+      "subsequentReadOnlyRepositoryAnalysisCount": 2,
+      "syntheticHostClosed": true,
+      "partialEvidenceTraceRead": "TRANSACTION_FAILED",
+      "analysisJobsRead": "PASS_TWO_SUCCEEDED"
+    },
+    {
+      "artifactVersion": "0.3.6",
+      "personalNeed": true,
+      "mode": "RECOVERY_OF_0.3.2_DISCOVERY",
+      "status": "PASS",
+      "stage": "VERTICAL_COMPLETE",
+      "nativeRequests": 12,
+      "readFailures": 0,
+      "taskStatus": "COMPLETED",
+      "taskRevision": 3,
+      "completion": true,
+      "decisionsApplied": 1,
+      "helperResponses": 2,
+      "analysisJobsSucceeded": 4,
+      "conceptStates": 10,
+      "conceptStateLevel": "OBSERVED",
+      "userUnderstandingEvidence": 0,
+      "historyReadStartsNoRun": true,
+      "resultHttpStatus": 200,
+      "resultHttpBytes": 1290,
+      "lockRefreshExitCode": 0,
+      "frozenInstallExitCode": 0,
+      "buildExitCodes": [
+        1,
+        0
+      ],
+      "testExitCodes": [
+        1,
+        0
+      ],
+      "smokeExitCodes": [
+        1,
+        0
+      ],
+      "generatedSourceManuallyEdited": false,
+      "memory": {
+        "scope": "CONTINUATION_EXTENSION_HOST_RSS_NOT_TOTAL_KIRO_OR_CORE",
+        "maxObservedBytes": 268693504
+      },
+      "syntheticHostClosed": true
+    },
+    {
+      "artifactVersion": "0.3.7",
+      "personalNeed": false,
+      "mode": "FRESH_PROJECT",
+      "status": "FAIL",
+      "lastCompleted": [
+        "PREVIEW_10",
+        "JIT",
+        "SHRINK_ROUND",
+        "SELECT"
+      ],
+      "failedAt": "SPEC",
+      "nativeRequests": 4,
+      "readFailures": 0,
+      "userInputRequested": true,
+      "userInputOptions": 2,
+      "userInputAnswered": false,
+      "promptTimedOut": true,
+      "errorCode": "NATIVE_CANCEL_UNCONFIRMED",
+      "guiObservationAfterQuestionExpired": true,
+      "memory": {
+        "scope": "EXTENSION_HOST_RSS_NOT_TOTAL_KIRO_OR_CORE",
+        "maxObservedBytes": 255901696,
+        "finalBytes": 203739136
+      },
+      "syntheticHostClosed": true
+    },
+    {
+      "artifactVersion": "0.3.7",
+      "personalNeed": false,
+      "mode": "FRESH_PROJECT_AFTER_HOST_RESTART",
+      "status": "FAIL",
+      "failedAt": "PREVIEW",
+      "nativeRequests": 1,
+      "readFailures": 0,
+      "errorCode": "NATIVE_ROLE_CATALOG_UNVERIFIED",
+      "modelPromptSent": false,
+      "syntheticHostClosed": true,
+      "memory": {
+        "scope": "EXTENSION_HOST_RSS_NOT_TOTAL_KIRO_OR_CORE",
+        "maxObservedBytes": 211070976,
+        "finalBytes": 211070976
+      }
+    }
+  ],
+  "scope": {
+    "userInput": "SYNTHETIC",
+    "agentResults": "REAL_NATIVE_WHEN_CALLED",
+    "uiCoverage": "SDK_DRIVER_PLUS_ACTUAL_HISTORY_REFRESH_AND_PROJECT_SELECTION",
+    "osShellConfinement": "NOT_PROVEN",
+    "humanLearning": "NOT_PROVEN"
+  },
+  "environmentObservation": {
+    "totalMemoryGiB": 15.6,
+    "freeMemoryGiB": 1.4,
+    "causality": "NOT_ESTABLISHED"
+  },
+  "artifactHistory": [
+    {
+      "version": "0.3.2",
+      "sha256": "f6b3b3ab0633d7a62e60ed628f97da542b584b078eff65b434424f3b9de5a43b",
+      "vsixBytes": 2313408,
+      "installedBytes": 7425090,
+      "files": 70
+    },
+    {
+      "version": "0.3.3",
+      "sha256": "698f4fab20ede0fde10c6e999ae3f1407270223ed9377deecc84681ead4843e1",
+      "vsixBytes": 2313997,
+      "installedBytes": 7426938,
+      "files": 70
+    },
+    {
+      "version": "0.3.4",
+      "sha256": "c3bc9ef44f9c551d8889be414e023ac6c6009d5669459060c54fe41f43914b63",
+      "vsixBytes": 2314932,
+      "installedBytes": 7429859,
+      "files": 70
+    },
+    {
+      "version": "0.3.5",
+      "sha256": "7df9a692aeef0c99586c403527988723be4649f0f2560bfedc3c1af3b1b7044f",
+      "vsixBytes": 2316345,
+      "installedBytes": 7433534,
+      "files": 70
+    },
+    {
+      "version": "0.3.6",
+      "sha256": "9bffbca3280fa1f20e0dbb4e4f5ce8c989c1ad7ebd467ab81b9e66d9204c34aa",
+      "vsixBytes": 2317230,
+      "installedBytes": 7435613,
+      "files": 70
+    }
+  ],
+  "openGates": [
+    "FRESH_PERSONAL_NEED_AND_NO_PERSONAL_NEED_VERTICAL_COMPLETION_ON_CURRENT_VERSION",
+    "NATIVE_ROLE_CATALOG_INITIALIZATION_STABILITY",
+    "CORE_STARTUP_STABILITY_AFTER_FIRST_TIMEOUT",
+    "LIVE_NATIVE_CANCELLATION_AFTER_MODEL_ACTIVITY",
+    "FULL_GUI_AND_INTEGRATED_FRONTEND_VALIDATION",
+    "CLEAN_WINDOWS_WITHOUT_DEVELOPMENT_TOOLS_OR_CHECKOUT",
+    "AGENT_SEMANTIC_QUALITY_AND_T19_N_GATES"
+  ]
+}

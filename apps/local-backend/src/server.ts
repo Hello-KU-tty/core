@@ -42,6 +42,7 @@ export function createLocalServer(options: {
   /** Experimental Core-only startup rejects Agent runs before accepting them. */
   runStartDisabledCode?: 'NATIVE_RUNTIME_NOT_ATTACHED'
   isClosing?: () => boolean
+  hostLease?: (input: unknown) => { clients: number }
   resultLauncher?: {
     launch(value: ReturnType<typeof generatedResultDescriptorSchema.parse>): Promise<unknown>
   }
@@ -135,6 +136,15 @@ export function createLocalServer(options: {
       })
       return
     }
+    if (
+      options.hostLease &&
+      request.method === 'POST' &&
+      url.pathname === '/api/host/lease' &&
+      !url.search
+    ) {
+      json(response, 200, options.hostLease(JSON.parse((await body(request)).toString('utf8'))))
+      return
+    }
     if (options.nativeRelay && url.pathname === '/api/native/next' && request.method === 'GET') {
       if ([...url.searchParams.keys()].some((k) => k !== 'workspace' && k !== 'activeRoles'))
         throw new WorkflowError('INVALID_QUERY')
@@ -156,6 +166,7 @@ export function createLocalServer(options: {
           activeRoles as ('DISCOVERY' | 'BUILDER' | 'HELPER' | 'EVIDENCE_ANALYST')[],
         ),
         pendingWorkspace: options.nativeRelay.pendingWorkspace(),
+        pendingHelperWorkspace: options.nativeRelay.pendingHelperWorkspace(),
       })
       return
     }

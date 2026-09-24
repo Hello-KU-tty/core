@@ -35,7 +35,9 @@ import {
 const require = createRequire(import.meta.url)
 const { boundedCoreRole } = require('../../../examples/kiro-native-host/native-client.cjs')
 
-describe('native IDE Agent relay', () => {
+// Windows provisioning includes real ACL subprocesses, not just in-memory jobs.
+const jobPollAttempts = process.platform === 'win32' ? 1500 : 100
+describe('native IDE Agent relay', { timeout: 60_000 }, () => {
   it('routes protected Helper and Analyst through one W worker with fresh Core context', async () => {
     const root = await mkdtemp(join(tmpdir(), 'vibe-native-single-window-'))
     const workspaces = join(root, 'workspaces')
@@ -79,7 +81,7 @@ describe('native IDE Agent relay', () => {
         onEvent: () => undefined,
       })
     const waitClaim = async (roles: ('BUILDER' | 'HELPER' | 'EVIDENCE_ANALYST')[] = []) => {
-      for (let n = 0; n < 100; n++) {
+      for (let n = 0; n < jobPollAttempts; n++) {
         const job = relay.claim(workspace, roles)
         if (job) return job
         await new Promise((done) => setTimeout(done, 10))
@@ -136,15 +138,14 @@ describe('native IDE Agent relay', () => {
       onEvent: () => undefined,
     })
     const discoveryWorkspace = await realpath(workspaces)
-    await new Promise((done) => setTimeout(done, 20))
-    expect(relay.pendingWorkspace()).toBe(discoveryWorkspace)
+    await expect.poll(() => relay.pendingWorkspace(), { timeout: 5000 }).toBe(discoveryWorkspace)
     expect(relay.claim(discoveryWorkspace)).toBeNull()
     const analyst = invoke('EVIDENCE_ANALYST', '{"episode":"synthetic"}')
     expect(relay.claim(workspace, ['BUILDER', 'HELPER'])).toBeNull()
     relay.complete(helperJob.id, { text: 'A read-only explanation.', stopReason: 'end_turn' })
     await helper
     let rootJob = relay.claim(discoveryWorkspace)
-    for (let n = 0; n < 100 && !rootJob; n++) {
+    for (let n = 0; n < jobPollAttempts && !rootJob; n++) {
       await new Promise((done) => setTimeout(done, 10))
       rootJob = relay.claim(discoveryWorkspace)
     }
@@ -224,7 +225,7 @@ describe('native IDE Agent relay', () => {
       onEvent: (event) => events.push(event),
     })
     let job = relay.claim(canonicalWorkspaces)
-    for (let n = 0; n < 100 && !job; n++) {
+    for (let n = 0; n < jobPollAttempts && !job; n++) {
       await new Promise((done) => setTimeout(done, 10))
       job = relay.claim(canonicalWorkspaces)
     }
@@ -273,6 +274,37 @@ describe('native IDE Agent relay', () => {
       }),
     ).not.toThrow()
     const safeUpdate = (events[0] as { update: Record<string, unknown> }).update
+    // Recording an observed command is separate from granting shell permission.
+    const shellUpdate = {
+      ...safeUpdate,
+      protocolKind: 'execute',
+      toolName: 'shell',
+      coreAction: null,
+      coreIsError: null,
+      coreSuccess: null,
+      output: null,
+      shellExitCode: 0,
+    }
+    for (const command of [
+      '.\\.kiro\\vibe-tools.cmd pnpm install --lockfile-only --ignore-scripts --ignore-pnpmfile',
+      '.\\.kiro\\vibe-tools.cmd pnpm install --frozen-lockfile',
+      '.\\.kiro\\vibe-tools.cmd pnpm run build',
+      '.\\.kiro\\vibe-tools.cmd pnpm test',
+      '.\\.kiro\\vibe-tools.cmd pnpm run smoke',
+    ]) {
+      expect(() =>
+        relay.event(job.id, { kind: 'TOOL', update: { ...shellUpdate, command } }),
+      ).not.toThrow()
+      expect(events.pop()).toMatchObject({ update: { command, shellExitCode: 0 } })
+    }
+    for (const command of [
+      '.\\.kiro\\vibe-tools.cmd pnpm test; whoami',
+      '.\\.kiro\\other.cmd pnpm test',
+      '.\\.kiro\\vibe-tools.cmd node ../../outside.js',
+    ])
+      expect(() =>
+        relay.event(job.id, { kind: 'TOOL', update: { ...shellUpdate, command } }),
+      ).toThrow('NATIVE_EVENT_INVALID')
     expect(() =>
       relay.event(job.id, {
         kind: 'TOOL',
@@ -359,7 +391,7 @@ describe('native IDE Agent relay', () => {
       onEvent: () => undefined,
     })
     let selectedJob = relay.claim(canonicalWorkspaces)
-    for (let n = 0; n < 100 && !selectedJob; n++) {
+    for (let n = 0; n < jobPollAttempts && !selectedJob; n++) {
       await new Promise((done) => setTimeout(done, 10))
       selectedJob = relay.claim(canonicalWorkspaces)
     }
@@ -421,7 +453,7 @@ describe('native IDE Agent relay', () => {
     })
     const workspace = await realpath(join(workspaces, 'generated', 'webhook-lens'))
     let job = relay.claim(workspace)
-    for (let n = 0; n < 100 && !job; n++) {
+    for (let n = 0; n < jobPollAttempts && !job; n++) {
       await new Promise((done) => setTimeout(done, 10))
       job = relay.claim(workspace)
     }
@@ -453,7 +485,7 @@ describe('native IDE Agent relay', () => {
       onEvent: (event) => helperEvents.push(event),
     })
     let helperWorkspace: string | undefined
-    for (let n = 0; n < 100 && !helperWorkspace; n++) {
+    for (let n = 0; n < jobPollAttempts && !helperWorkspace; n++) {
       await new Promise((done) => setTimeout(done, 10))
       const host = (await readdir(workspaces)).find((entry) =>
         entry.startsWith('__vibe-native-helper-'),
@@ -464,7 +496,7 @@ describe('native IDE Agent relay', () => {
     expect(helperWorkspace).not.toBe(workspace)
     expect(relay.claim(workspace, ['BUILDER'])).toBeNull()
     let helperJob = relay.claim(helperWorkspace)
-    for (let n = 0; n < 100 && !helperJob; n++) {
+    for (let n = 0; n < jobPollAttempts && !helperJob; n++) {
       await new Promise((done) => setTimeout(done, 10))
       helperJob = relay.claim(helperWorkspace)
     }
@@ -546,7 +578,7 @@ describe('native IDE Agent relay', () => {
     expect(helperResult.text).not.toContain(workspace)
     expect(helperResult.text).not.toContain(helperWorkspace)
     let analystJob = relay.claim(helperWorkspace)
-    for (let n = 0; n < 100 && !analystJob; n++) {
+    for (let n = 0; n < jobPollAttempts && !analystJob; n++) {
       await new Promise((done) => setTimeout(done, 10))
       analystJob = relay.claim(helperWorkspace)
     }
@@ -604,7 +636,7 @@ describe('native IDE Agent relay', () => {
       ).status,
     ).not.toBe(401)
     let secondHelperJob = relay.claim(helperWorkspace)
-    for (let n = 0; n < 100 && !secondHelperJob; n++) {
+    for (let n = 0; n < jobPollAttempts && !secondHelperJob; n++) {
       await new Promise((done) => setTimeout(done, 10))
       secondHelperJob = relay.claim(helperWorkspace)
     }
@@ -663,7 +695,7 @@ describe('native IDE Agent relay', () => {
       })
       const host = helperHost
       let job = relay.claim(host)
-      for (let n = 0; n < 100 && !job; n++) {
+      for (let n = 0; n < jobPollAttempts && !job; n++) {
         await new Promise((done) => setTimeout(done, 10))
         job = relay.claim(host)
       }
@@ -702,7 +734,7 @@ describe('native IDE Agent relay', () => {
       const helperHost = join(workspaces, `__vibe-native-helper-${hostTag}`)
       if (hostType === 'symlink') {
         const outside = await mkdtemp(join(tmpdir(), 'vibe-native-helper-outside-'))
-        await symlink(outside, helperHost)
+        await symlink(outside, helperHost, 'junction')
       } else {
         await mkdir(helperHost)
         await chmod(helperHost, 0o777)

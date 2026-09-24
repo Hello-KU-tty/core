@@ -1,5 +1,5 @@
 import { copyFile, cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { dirname, join, relative, resolve } from 'node:path'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { build } from 'esbuild'
@@ -9,7 +9,7 @@ const packageRoot = join(workspaceRoot, 'dist', 'crew-package')
 
 if (
   resolve(packageRoot) === resolve(workspaceRoot) ||
-  !resolve(packageRoot).startsWith(`${resolve(workspaceRoot)}/dist/`)
+  !resolve(packageRoot).startsWith(`${resolve(workspaceRoot, 'dist')}${sep}`)
 ) {
   throw new TypeError('Crew package output must stay inside the workspace dist directory')
 }

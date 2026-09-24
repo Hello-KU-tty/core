@@ -67,7 +67,7 @@ describe('Builder Agent adapter', () => {
       expect.objectContaining<Partial<BuilderAgentAdapterError>>({ code: 'INVALID_PROMPT' }),
     )
     expect(() =>
-      createBuilderAgentDefinition('# Builder\n\n> Prompt version: `1.3.6`', {
+      createBuilderAgentDefinition('# Builder\n\n> Prompt version: `1.3.8`', {
         guardCommand: ' ',
       }),
     ).toThrowError(
@@ -269,7 +269,7 @@ describe('Builder native tool guard and transient stream', () => {
     const workspace = await mkdtemp(join(tmpdir(), 'vibe-helper-builder-guard-'))
     const outside = await mkdtemp(join(tmpdir(), 'vibe-helper-builder-outside-'))
     await mkdir(join(workspace, 'src'))
-    await symlink(outside, join(workspace, 'escape'))
+    await symlink(outside, join(workspace, 'escape'), 'junction')
 
     await expect(
       guardBuilderToolInput(

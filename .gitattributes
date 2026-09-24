@@ -1,0 +1,4 @@
+# Keep source, canonical prompts and formatter inputs identical on Windows/macOS.
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf

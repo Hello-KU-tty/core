@@ -196,6 +196,12 @@ function latestByRevision<T extends { readonly revision: number }>(items: readon
   )
 }
 
+function evidenceEmptySummary(reason: string): string {
+  // The complete Analyst reason remains in analysis[].resultSummary.
+  // UI emptyReason is a 240-code-unit preview; do not split a surrogate pair.
+  return reason.length <= 240 ? reason : reason.slice(0, 239).replace(/[\uD800-\uDBFF]$/, '') + '…'
+}
+
 function unique<T>(items: readonly T[]): T[] {
   return [...new Set(items)]
 }
@@ -4266,9 +4272,10 @@ export class ApplicationService {
         ...(concepts.length > 0
           ? {}
           : {
-              emptyReason:
+              emptyReason: evidenceEmptySummary(
                 noEvidenceReason ??
-                '아직 검증된 사용자 Evidence가 없습니다. 작업과 대화가 분석되면 여기에 표시됩니다.',
+                  '아직 검증된 사용자 Evidence가 없습니다. 작업과 대화가 분석되면 여기에 표시됩니다.',
+              ),
             }),
         redactionStatus: 'VERIFIED_REDACTED',
       })

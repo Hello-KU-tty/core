@@ -138,7 +138,9 @@ window.addEventListener('message', ({ data: message }) => {
       ? '생성 workspace 전환이 이 Kiro 창에서 확인되지 않아 Agent 작업을 받지 못했습니다. 같은 폴더를 연 다른 창과 실행 창을 확인해 주세요.'
       : message.status === 'WORKSPACE_SWITCH_FAILED'
         ? '생성 workspace 전환이 실패했습니다. 실행 창과 workspace 상태를 확인해 주세요.'
-        : ''
+        : message.status === 'HELPER_WINDOW_OPENING'
+          ? 'Helper 전용 Kiro 창을 여는 중입니다. 해당 창에 Restricted Mode 안내가 있으면 Workspace Trust를 승인해 주세요.'
+          : ''
   }
   if (message.kind === 'resultLaunch') {
     if (!snapshot || message.projectId !== snapshot.project.id ||
@@ -278,6 +280,16 @@ window.addEventListener('message', ({ data: message }) => {
       host.append(details)
     }
     if (data.analysis.length) host.append(element('p', `분석 Job: ${data.analysis.map(item => `${shortId(item.jobId)} ${item.status} (Episode ${shortId(item.episodeId)})`).join(' · ')}`))
+  }
+  if (message.kind === 'lifecycleStatus') {
+    const labels = { IDLE: '준비 전', PREPARING_RUNTIME: '실행 환경 준비 중', CONNECTING_CORE: 'Core 연결 중',
+      RECOVERING_CORE: 'Core 복구 중', CORE_CONNECTED: 'Core 연결됨', FAILED: '준비 실패', STOPPED: '종료됨' }
+    const native = message.data.native === 'WORKER_READY' ? 'Agent 실행 준비됨 · 실제 결과는 실행 후 저장됩니다.' : 'Agent 준비 대기'
+    byId('lifecycleStatus').textContent = `${labels[message.data.phase] ?? '상태 확인 중'} · ${native}` +
+      (message.data.helperMode === 'SEPARATE_WINDOW' ? ' · Helper는 전용 보조 창에서 실행됩니다.' : '') +
+      (message.data.errorCode ? ` · ${message.data.errorCode}` : '')
+    byId('retryCore').hidden = message.data.phase !== 'FAILED' && message.data.native !== 'UNAVAILABLE'
+    byId('retryCore').onclick = () => send('retryCore')
   }
   if (message.kind === 'userInputs') {
     if (!snapshot || message.projectId !== snapshot.project.id) return

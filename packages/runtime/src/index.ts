@@ -1,2 +1,6 @@
-export * from './workflow-runtime.js'
+export * from './portable-core.js'
+export * from './private-directory.js'
+export * from './project-toolchain.js'
 export * from './result-runtime.js'
+export * from './workflow-runtime.js'
+export * from './process-owner.js'

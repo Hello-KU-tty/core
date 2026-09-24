@@ -74,10 +74,10 @@ async function verifiedFile(root, asset) {
   return { path: canonical, content }
 }
 
-async function verifyNodeRuntime(path, run = execFile) {
+async function verifyNodeRuntime(path, run = execFile, checkAccess = access) {
   if (path !== NODE_EXECUTABLE || !isAbsolute(path))
     throw gate('NATIVE_NODE_SOURCE_UNSUPPORTED')
-  await access(path, constants.X_OK).catch(() => { throw gate('NATIVE_NODE_UNAVAILABLE') })
+  await checkAccess(path, constants.X_OK).catch(() => { throw gate('NATIVE_NODE_UNAVAILABLE') })
   let result
   try { result = await run(path, ['--version'], { timeout: 5_000, windowsHide: true }) }
   catch (error) { throw gate('NATIVE_NODE_VERSION_UNCONFIRMED', error) }
@@ -109,7 +109,7 @@ async function resolvePackagedNativeRuntime(options) {
   catch (error) { throw gate('NATIVE_RUNTIME_AGENT_SOURCE_UNSUPPORTED', error) }
   if (installedSource.agentExtensionVersion !== manifest.agentExtensionVersion)
     throw gate('NATIVE_RUNTIME_AGENT_SOURCE_UNSUPPORTED')
-  await verifyNodeRuntime(manifest.nodeExecutable, options.execFile ?? execFile)
+  await verifyNodeRuntime(manifest.nodeExecutable, options.execFile ?? execFile, options.access ?? access)
   const runtimeRoot = await realpath(join(extensionRoot, 'runtime'))
   if (!inside(extensionRoot, runtimeRoot)) throw gate('NATIVE_RUNTIME_ROOT_ESCAPED')
   const bridge = await verifiedFile(runtimeRoot, manifest.assets.bridge)
@@ -176,6 +176,16 @@ async function materializePackagedRoleRuntime(runtime, job, binding) {
   try { config = JSON.parse(await readFile(canonicalConfig, 'utf8')) }
   catch { throw gate('NATIVE_PACKAGED_ROLE_CONFIG_INVALID') }
   const server = config?.mcpServers?.['vibe-native-core']
+  if (runtime.windowsProduct) {
+    const descriptor = runtime.runtimeDescriptor
+    if (config.name !== job.roleName || config.prompt !== runtime.prompts[job.role].text ||
+        Object.keys(config.mcpServers ?? {}).join(',') !== 'vibe-native-core' ||
+        server?.command !== descriptor.executable ||
+        JSON.stringify(server?.args) !== JSON.stringify([...descriptor.args, runtime.bridgeScriptPath, bindingFile, workspace]) ||
+        JSON.stringify(server?.env ?? {}) !== JSON.stringify(descriptor.env))
+      throw gate('NATIVE_PACKAGED_ROLE_CONFIG_INVALID')
+    return // Core already wrote the verified portable command; never mutate an active role file.
+  }
   if (config.name !== job.roleName || config.prompt !== runtime.prompts[job.role].text ||
       Object.keys(config.mcpServers ?? {}).join(',') !== 'vibe-native-core' ||
       typeof server?.command !== 'string' ||

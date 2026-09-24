@@ -8,7 +8,7 @@
 - Kiro/Crew 세부 연결은 capability spike 결과에 따라 이 문서를 갱신한다.
 - 2026-09-07 T19 범위는 자체 IDE 패널의 Discovery·Spec·Builder·Helper·History 실제 연결과 frontend 로컬 실행 인계로 갱신됐다. [상세 구현 계획](T19_IMPLEMENTATION_PLAN.md)의 구현·검증은 승인됐고 진행 중이다. frontend 대상은 Windows native 실행이며 push는 별도 승인 대상이다. 아래 새 transport 설계의 실제 capability는 아직 검증 중이다.
 - 2026-09-15 사용자는 [4시간 IDE-only 전환 판단](spikes/T19_NATIVE_IDE_ONLY_4H_CUTOVER_PLAN_20260915.md)을 승인했다. 이는 pin한 macOS Kiro의 native adapter를 IDE frontend의 우선 개발 seam으로 쓸지 판단하는 범위이며, deterministic Core와 기존 CLI adapter를 삭제하거나 Windows/장기 안정성을 소급 승인하지 않는다.
-- 2026-09-23 Windows 우선·확장 단독 설치 경험을 승인했다. T19-W에서 native recovery 구현을 바탕으로 런타임 재사용과 extension-managed Core lifecycle을 검증한다. 아래 11.4절은 목표 설계이며 현재 Windows 실행 성공을 뜻하지 않는다.
+- 2026-09-23 Windows 우선·확장 단독 설치 경험을 승인했다. 2026-09-24 W2/W3에서 portable runtime과 extension-managed Core lifecycle, Windows 실제 Discovery·별도 창 Helper를 검증했다. W4는 기존/미설치 도구 환경의 native Builder와 결과 HTTP를 검증했다. 아래 11.4절의 clean 설치 전체 흐름과 출하 안정성은 W5 gate로 남는다.
 
 ## 2. 선택한 기술 스택과 선택 이유
 
@@ -677,17 +677,20 @@ T18 package는 app manifest, phase별 Discovery Agent, Builder·Helper, hidden n
 - Agent adapter 실패 시 Core data는 보존한다.
 - 실제 원격 배포가 추가되면 별도 deploy/rollback 계약을 작성한다.
 
-### 11.4 Windows 제품 확장과 런타임 선택 — 승인된 목표, 미구현
+### 11.4 Windows 제품 확장과 런타임 선택 — W2/W3/W4 검증, clean 출하는 W5
+
+- 2026-09-24 W2는 win32-x64 portable Core/bridge와 runtime 선택·획득을, W3는 자동 lifecycle·native worker·통합 패널을, W4는 생성 앱 도구 선택·획득과 실제 native shell/result HTTP를 검증했다. [W2 package 계약](T19_W2_PORTABLE_CORE_HANDOFF.md), [W3 lifecycle 인계](T19_W3_LIFECYCLE_HANDOFF.md), [W4 toolchain 인계](T19_W4_TOOLCHAIN_HANDOFF.md)를 따른다. 검증된 Node 24.18.0/24.19.0 및 NAPI 10/SQLite probe만 허용하며 개발 pin은 유지한다. clean 전체 흐름은 W5 목표다.
 
 - reference 구현은 [Windows 인계](WINDOWS_EXTENSION_HANDOFF_20260923.md)의 ESLint·Microsoft .NET·Java extension 사례를 따른다. 별도 Core process와 현재 loopback HTTP/SSE SDK 계약을 유지하며 실행 주체를 extension host의 lifecycle manager로 옮긴다. 언어 서버 구현 패턴을 참고하되 Core API를 LSP로 바꾸지는 않는다.
 - backend/bridge의 runtime descriptor는 executable, 고정된 bootstrap args/env, version, architecture, capability 결과와 소유권을 함께 표현한다. Kiro host runtime → 기존 호환 Node → 확장 관리 Node 순서로 검증·선택한다. 사용자 입력을 범용 shell command로 받지 않는다. Electron `runAsNode`가 지원되지 않으면 설정/fuse를 수정하지 않고 다음 후보로 이동한다.
 - Kiro runtime으로 별도 Core를 띄우려면 Node API/Node-API와 SQLite load·transaction을 확인한다. `better-sqlite3` 13.0.3은 Node-API 10을 요청하므로 단순 `Node >=22` 판정으로 대체하지 않는다. Kiro native Agent의 version/source/mode/권한 gate는 별개로 유지한다.
 - native worker는 extension host에, deterministic Core/SQLite는 별도 local process에 둔다. stdio MCP bridge에도 검증된 runtime descriptor를 전달한다. HTTP MCP로 바꾸면 그 transport의 실제 role binding을 별도로 검증하며 stdio와 동등하다고 가정하지 않는다.
-- 생성 앱 실행은 별도 project runtime descriptor를 사용한다. 현재 `ResultRuntimeSupervisor`의 `process.execPath`·축소 env 가정을 수정하고, Kiro executable이나 `ELECTRON_RUN_AS_NODE`를 일반 Node로 잘못 전달하지 않는다. native Agent shell의 Node/pnpm 전달 방식도 실제 Windows shell에서 검증한다.
+- 생성 앱 실행은 W4의 별도 project runtime descriptor를 사용한다. `ResultRuntimeSupervisor`는 선택된 일반 Node와 제한 환경으로 실행한다. Kiro executable이나 `ELECTRON_RUN_AS_NODE`를 일반 Node로 전달하지 않는다. native Agent shell은 Core 발급 `.kiro/vibe-tools.cmd`와 packaged runner로 같은 Node/pnpm을 사용하며 worker의 protected file 검증·기존 명령 guard·one-time permission을 통과해야 한다. 기존/미설치 두 도구 환경의 native shell과 deterministic 실행은 검증됐으며 관측 복구와 남은 경계는 [W4 결과](spikes/T19_W4_TOOLCHAIN_RESULTS_20260924.md)를 따른다.
 - VSIX는 UI/host/SDK, Core JS와 필요한 runtime JS dependencies, worker/bridge/guard, canonical prompts, migration SQL·journal, 해당 OS/architecture SQLite binary, manifest·checksum·license를 포함한다. source checkout, devDependencies, 다른 플랫폼 binary, DB/token은 제외한다. 새 packaging 도구 선택은 spike/결정 기록을 거친다.
 - extension package는 읽기 전용 asset root로 취급하고 mutable data는 host가 제공한 사용자별 storage 위치 아래의 전용 root로 분리한다. portable runtime/cache, private connection, DB/backup과 generated workspaces를 구분하며 Windows ACL·경로/junction을 검증한다.
 - runtime acquisition은 기존 검증된 cache를 재사용하고 필요한 경우에만 검증 가능한 출처의 배포물을 내려받아 중단 복구 가능한 방식으로 전용 root에 배치한다. global install/PATH/security 설정은 변경하지 않는다. 첫 다운로드가 필요한 offline 환경은 명시적 unavailable/retry 상태다.
-- 여러 창은 같은 data root에 backend를 중복 기동하지 않도록 owner/lock·client 수명 정책을 정의한다. 종료는 소유한 process tree에 한정하고, crash/rotation은 durable snapshot 복원과 명시적 재시도를 사용한다. migration은 검증된 backup과 schema compatibility를 확인하며 blind downgrade하지 않는다.
+- 여러 창은 같은 private data root의 단일 owner lock과 인증된 host lease로 Core를 공유한다. managed Core는 창의 process group과 분리하며, 2초 갱신과 마지막 lease 소멸 후 30초 유예로 수명을 제한한다. 살아 있는 다른 창의 Core를 임의 종료하지 않는다. crash/rotation은 새 credential·durable snapshot 복원과 bounded 재기동을 사용하며 mutation/stream은 자동 재생하지 않는다. package가 다른 살아 있는 owner에는 update 대기를 표시한다. migration은 owner lock 안에서 검증된 backup과 schema compatibility를 확인하며 blind downgrade하지 않는다.
+- Windows pinned Kiro 1.1.14/Agent 1.1.28에서 Helper/Analyst는 Core 발급 전용 workspace의 별도 창을 필요 시 자동으로 연다. source·Trust·endpoint·mode·permission·catalog 검증 뒤 모델을 요청한다. 같은 host에서 두 custom role을 동시에 claim하지 않으며 Helper/Analyst의 read-only 경계를 유지한다.
 - `NATIVE_READY`/HTTP health/SDK live는 Core 접속 성공일 뿐이다. runtime 준비, backend 연결, native worker 준비와 실제 Agent 결과 저장을 분리해서 표시한다. 기존 CLI 또는 Mock을 native 실패의 자동 대체 성공으로 사용하지 않는다.
 
 ## 12. 알려진 위험과 대안

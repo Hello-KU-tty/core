@@ -26,6 +26,7 @@ import {
   isJsonEnvelopeTool,
 } from './native-json-envelope.mjs'
 import { allowedNativeReceipt } from './native-receipt-scope.mjs'
+import nativePrivatePaths from '../examples/kiro-native-host/native-private-directory.cjs'
 
 const ROLE_TOOLS = {
   DISCOVERY: [
@@ -81,7 +82,14 @@ async function loadBinding() {
   if (!descriptorPath || !expectedWorkspace) throw new Error('BRIDGE_SCOPE_REQUIRED')
   const file = resolve(descriptorPath)
   const fileInfo = await lstat(file)
-  if (!fileInfo.isFile() || fileInfo.isSymbolicLink() || (fileInfo.mode & 0o077) !== 0)
+  if (
+    !fileInfo.isFile() ||
+    fileInfo.isSymbolicLink() ||
+    fileInfo.nlink !== 1 ||
+    (process.platform === 'win32'
+      ? !nativePrivatePaths.privateNativeFile(file)
+      : (fileInfo.mode & 0o077) !== 0)
+  )
     throw new Error('BRIDGE_DESCRIPTOR_UNSAFE')
   const binding = JSON.parse(await readFile(file, 'utf8'))
   if (

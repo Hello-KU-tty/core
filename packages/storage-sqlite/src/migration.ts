@@ -41,8 +41,12 @@ export const hasPendingMigrations = async (
       await readFile(join(migrationsDirectory, 'meta', '_journal.json'), 'utf8'),
     ) as MigrationJournal
     const latestAvailable = Math.max(0, ...journal.entries.map((entry) => entry.when))
-    return appliedMigrationTimestamp(sqlite) < latestAvailable
-  } catch {
+    const applied = appliedMigrationTimestamp(sqlite)
+    if (applied > latestAvailable)
+      throw new PersistenceError('DATABASE_NEWER_THAN_PACKAGE', 'Database requires a newer package')
+    return applied < latestAvailable
+  } catch (error) {
+    if (error instanceof PersistenceError) throw error
     throw new PersistenceError('MIGRATION_FAILED', 'Migration metadata could not be read')
   }
 }

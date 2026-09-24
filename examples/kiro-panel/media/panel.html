@@ -16,6 +16,7 @@ section { border-top:1px solid var(--vscode-panel-border); margin-top:16px; padd
 @media (max-width:700px) { .agent-panes { grid-template-columns:minmax(0,1fr); } .agent-pane { height:min(60vh,560px); } }
 </style></head><body>
 <h1>Vibe Helper · Local</h1><p class="muted">최소 연동 예제 · 실제 Kiro 호출 · 저장 상태는 Core가 원본입니다.</p>
+<div id="lifecycleStatus" role="status" aria-live="polite"></div><button id="retryCore" hidden>Core 연결 다시 준비</button>
 <button id="refresh">History / 상태 새로고침</button><div id="errors" role="alert"></div><div id="connectionStatus" role="status"></div><div id="workerStatus" role="status"></div><div id="history"></div>
 <section id="discoverySection"><h2>Discovery</h2><input id="goal" placeholder="Learning Goal"><input id="need" placeholder="Personal Need (선택)"><button id="start">새 Discovery</button>
 <div id="archiveNotice" hidden role="status"><p>이전 후보를 그대로 보고 있습니다. 돌아오기만 해서는 Agent가 다시 실행되지 않습니다.</p><button id="backToSpec">Spec으로 돌아가기</button><button id="restartDiscovery">입력을 확인하고 새 후보 받기</button></div>

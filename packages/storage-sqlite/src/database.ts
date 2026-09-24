@@ -18,6 +18,7 @@ const DEFAULT_MIGRATIONS_DIRECTORY = fileURLToPath(new URL('../drizzle', import.
 
 export interface SqliteStorageOptions {
   readonly dataDirectory: string
+  readonly migrationsDirectory?: string
   readonly now?: () => Date
 }
 
@@ -200,7 +201,7 @@ export const openSqliteStorage = async (options: SqliteStorageOptions): Promise<
     return await initialize(
       sqlite,
       databasePath,
-      DEFAULT_MIGRATIONS_DIRECTORY,
+      options.migrationsDirectory ?? DEFAULT_MIGRATIONS_DIRECTORY,
       existedWithContent,
       options.now ?? (() => new Date()),
     )

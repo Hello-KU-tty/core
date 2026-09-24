@@ -1297,10 +1297,36 @@ async function startFromKeyboard(
   await page.keyboard.press('Enter')
 }
 
+// Functional flows wait for the fixture's real Core writes before asserting UI state.
+// The default 5s UI assertion budget still starts after the corresponding response.
+function waitForDiscoveryTurn(
+  page: Page,
+  phase: 'preview' | 'enrich-first' | 'enrich-second' | 'round' | 'merge' | 'spec',
+  matchingResponses = 1,
+): Promise<void> {
+  let responses = 0
+  return page
+    .waitForResponse((response) => {
+      if (!response.url().endsWith('/api/chat') || response.request().method() !== 'POST')
+        return false
+      const dispatch = response.request().postDataJSON()
+      const matches = phase.startsWith('enrich-')
+        ? dispatch.agent === 'vibe-helper-discovery-enrichment' &&
+          String(dispatch.slot).includes(`-${phase}-`)
+        : dispatch.agent === `vibe-helper-discovery-${phase}`
+      return matches && ++responses === matchingResponses
+    })
+    .then((response) => {
+      expect(response.ok()).toBe(true)
+    })
+}
+
 test('runs the Campus Drop Golden Path through Discovery, Decision, Evidence, Final Upgrade, and completion', async ({
   page,
   request,
 }) => {
+  // This is a complete multi-stage flow, not a per-response latency assertion.
+  test.setTimeout(120_000)
   expect(campusDropFixture).toMatchObject({
     decision: { acceptedOption: 'CONSUME_AFTER_FIRST_DOWNLOAD' },
     allowedEvidence: {
@@ -1401,12 +1427,16 @@ test('runs the Campus Drop Golden Path through Discovery, Decision, Evidence, Fi
   await page.goto('/#/discovery')
   await expect(page.getByRole('heading', { name: /배우고 싶은 것을/ })).toBeVisible()
   await expect(page.getByRole('button', { name: '프로젝트 후보 만나기' })).toBeDisabled()
+  const initialDetails = waitForDiscoveryTurn(page, 'enrich-second')
+  const preview = waitForDiscoveryTurn(page, 'preview')
   await startFromKeyboard(page, campusDropFixture.discoveryInput)
+  await preview
 
   const firstCandidate = page.getByRole('listitem').filter({
     has: page.getByRole('heading', { name: 'Campus Drop', exact: true }),
   })
   await expect(firstCandidate).toBeVisible()
+  await initialDetails
   await expect(page.getByText('10개 후보')).toBeVisible()
   const composerBox = await page.locator('.refinement-dock').boundingBox()
   const candidateListBox = await page.locator('.candidate-list').boundingBox()
@@ -1493,7 +1523,9 @@ test('runs the Campus Drop Golden Path through Discovery, Decision, Evidence, Fi
   })
   await page.setViewportSize({ width: 1280, height: 720 })
 
+  const moreCandidates = waitForDiscoveryTurn(page, 'round')
   await page.getByRole('button', { name: '다른 후보 4개 더 보기' }).click()
+  await moreCandidates
   await expect(page.getByText('14개 후보')).toBeVisible()
   await interestCheckbox.focus()
   await page.keyboard.press('Space')
@@ -1506,16 +1538,20 @@ test('runs the Campus Drop Golden Path through Discovery, Decision, Evidence, Fi
   await page
     .getByLabel('Agent에게 원하는 방향 말하기')
     .fill('핵심은 유지하고 하루 안에 만들 수 있도록 범위를 줄여 주세요.')
+  const mergedCandidates = waitForDiscoveryTurn(page, 'merge')
   await page.getByRole('button', { name: '선택한 주제로 합치기' }).focus()
   await page.keyboard.press('Enter')
+  await mergedCandidates
   const revisedCandidate = page.getByRole('listitem').filter({
     has: page.getByRole('heading', { name: 'Campus Drop · 작은 MVP', exact: true }),
   })
   await expect(revisedCandidate).toBeVisible()
   await expect(page.locator('.candidate-list > .candidate-card')).toHaveCount(1)
   await expect(page.getByRole('heading', { name: 'QR Note Relay', exact: true })).toHaveCount(0)
+  const initialSpec = waitForDiscoveryTurn(page, 'spec')
   await revisedCandidate.getByRole('button', { name: '이 방향 선택' }).focus()
   await page.keyboard.press('Enter')
+  await initialSpec
 
   await expect(
     page.getByRole('heading', { name: '이 범위라면 바로 시작할 수 있어요.' }),
@@ -1525,7 +1561,9 @@ test('runs the Campus Drop Golden Path through Discovery, Decision, Evidence, Fi
   await page
     .getByLabel('바꾸고 싶은 점을 Agent에게 말하기')
     .fill('로그인은 빼고 한 화면에서 완성하도록 다시 정리해 주세요.')
+  const revisedSpec = waitForDiscoveryTurn(page, 'spec')
   await page.getByRole('button', { name: 'Agent에게 다시 정리해달라고 하기' }).click()
+  await revisedSpec
   await expect(page.getByText('권장 Learning Spec · revision 2')).toBeVisible()
   await expect(
     page.getByText('로그인 없이 작은 파일을 만료·일회용 링크로 옮기는 local 도구를 만든다.'),
@@ -1797,6 +1835,17 @@ test('runs the Campus Drop Golden Path through Discovery, Decision, Evidence, Fi
   expect(finalEvidence.concepts.every((concept) => concept.state !== 'TRANSFERRED')).toBe(true)
   expect(builderDispatches).toBe(3)
   expect(helperDispatches).toBe(3)
+  // The backend is shared across specs. Finish this fixture's automatic jobs
+  // before the next page installs a Discovery-only Agent route.
+  await expect
+    .poll(
+      async () => {
+        const trace = await readEvidenceTrace(request, projectId)
+        return trace.analysis.every((job) => job.status === 'SUCCEEDED')
+      },
+      { timeout: 15_000 },
+    )
+    .toBe(true)
   expect(pageErrors).toEqual([])
 })
 
@@ -1804,6 +1853,15 @@ test('shows durable previews and keeps the basket usable while fixed Candidate d
   page,
   request,
 }) => {
+  test.setTimeout(60_000)
+  let releaseFirst!: () => void
+  let releaseSecond!: () => void
+  const firstGate = new Promise<void>((resolve) => {
+    releaseFirst = resolve
+  })
+  const secondGate = new Promise<void>((resolve) => {
+    releaseSecond = resolve
+  })
   await page.route('**/api/chat', async (route) => {
     const dispatch = route.request().postDataJSON()
     const projectId = projectIdFromRoute(route)
@@ -1811,9 +1869,9 @@ test('shows durable previews and keeps the basket usable while fixed Candidate d
       await fulfillAgentTurn(route, request, projectId)
       return
     }
-    await new Promise<void>((resolve) => setTimeout(resolve, 1_200))
-    const snapshot = await restoreProject(request, projectId)
     const slot = String(dispatch.slot)
+    await (slot.includes('-enrich-first-') ? firstGate : secondGate)
+    const snapshot = await restoreProject(request, projectId)
     await submitCandidateEnrichment(
       request,
       snapshot,
@@ -1826,38 +1884,57 @@ test('shows durable previews and keeps the basket usable while fixed Candidate d
     })
   })
 
-  await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto('/#/discovery')
-  await startFromKeyboard(page)
-  await expect(page.getByText('10개 미리보기')).toBeVisible()
-  await expect(page.getByRole('heading', { name: '상세 0/10 준비됨' })).toBeVisible()
-  const previewCheckbox = page.getByRole('checkbox', {
-    name: 'Safe Config Lab 관심 목록에 담기',
-  })
-  await previewCheckbox.click()
-  await expect(previewCheckbox).toBeChecked()
-  await expect(page.getByText('1개 담음')).toBeVisible()
-  await expect(page.getByLabel('Agent에게 원하는 방향 말하기')).toBeEnabled()
-  await expect(page.getByRole('button', { name: '이 방향 선택' }).first()).toBeEnabled()
+  try {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/#/discovery')
+    const preview = waitForDiscoveryTurn(page, 'preview')
+    await startFromKeyboard(page)
+    await preview
+    await expect(page.getByText('10개 미리보기')).toBeVisible()
+    await expect(page.getByRole('heading', { name: '상세 0/10 준비됨' })).toBeVisible()
+    const previewCheckbox = page.getByRole('checkbox', {
+      name: 'Safe Config Lab 관심 목록에 담기',
+    })
+    await previewCheckbox.click()
+    await expect(previewCheckbox).toBeChecked()
+    await expect(page.getByText('1개 담음')).toBeVisible()
+    await expect(page.getByLabel('Agent에게 원하는 방향 말하기')).toBeEnabled()
+    await expect(page.getByRole('button', { name: '이 방향 선택' }).first()).toBeEnabled()
 
-  await expect(page.getByRole('heading', { name: '상세 5/10 준비됨' })).toBeVisible()
-  const firstCandidate = page
-    .getByRole('listitem')
-    .filter({ has: page.getByRole('heading', { name: 'Safe Config Lab', exact: true }) })
-  await firstCandidate.getByText('세부 범위 미리 보기', { exact: true }).click()
-  await expect(firstCandidate.locator('details')).toHaveAttribute('open', '')
+    const firstDetails = waitForDiscoveryTurn(page, 'enrich-first')
+    releaseFirst()
+    await firstDetails
+    await expect(page.getByRole('heading', { name: '상세 5/10 준비됨' })).toBeVisible()
+    const firstCandidate = page
+      .getByRole('listitem')
+      .filter({ has: page.getByRole('heading', { name: 'Safe Config Lab', exact: true }) })
+    await firstCandidate.getByText('세부 범위 미리 보기', { exact: true }).click()
+    await expect(firstCandidate.locator('details')).toHaveAttribute('open', '')
 
-  await expect(page.getByText('10개 후보')).toBeVisible()
-  await expect(previewCheckbox).toBeChecked()
-  await expect(firstCandidate.getByText('세부 범위와 변경 이력', { exact: true })).toBeVisible()
-  await expect(firstCandidate.locator('details')).toHaveAttribute('open', '')
-  await expect(page.getByRole('button', { name: '이 방향 선택' }).first()).toBeEnabled()
+    const secondDetails = waitForDiscoveryTurn(page, 'enrich-second')
+    releaseSecond()
+    await secondDetails
+    await expect(page.getByText('10개 후보')).toBeVisible()
+    await expect(previewCheckbox).toBeChecked()
+    await expect(firstCandidate.getByText('세부 범위와 변경 이력', { exact: true })).toBeVisible()
+    await expect(firstCandidate.locator('details')).toHaveAttribute('open', '')
+    await expect(page.getByRole('button', { name: '이 방향 선택' }).first()).toBeEnabled()
+  } finally {
+    releaseFirst()
+    releaseSecond()
+  }
 })
 
 test('selects a preview immediately by enriching only that direction', async ({
   page,
   request,
 }) => {
+  test.setTimeout(60_000) // Preview, selected enrichment and Spec are separate Core transactions.
+  let backgroundStarted = false
+  let releaseBackground!: () => void
+  const backgroundPending = new Promise<void>((resolve) => {
+    releaseBackground = resolve
+  })
   await page.route('**/api/chat', async (route) => {
     const dispatch = route.request().postDataJSON()
     const projectId = projectIdFromRoute(route)
@@ -1872,18 +1949,10 @@ test('selects a preview immediately by enriching only that direction', async ({
       if (selectedCandidateId === undefined) throw new TypeError('Selected preview is missing')
       await submitCandidateEnrichment(request, snapshot, 'SELECTED', [selectedCandidateId])
     } else {
-      await new Promise<void>((resolve) => setTimeout(resolve, 1_200))
-      const snapshot = await restoreProject(request, projectId)
-      if (
-        snapshot.discoverySession?.status === 'ACTIVE' &&
-        (snapshot.discoveryContext?.rounds.length ?? 0) === 0
-      ) {
-        await submitCandidateEnrichment(
-          request,
-          snapshot,
-          slot.includes('-enrich-first-') ? 'FIRST' : 'SECOND',
-        )
-      }
+      // Keep the unrelated Agent turn pending until selection is proven. A wall-clock
+      // delay raced the selected turn's state transition and submitted stale fixture data.
+      backgroundStarted = true
+      await backgroundPending
     }
     await route.fulfill({
       status: 200,
@@ -1892,23 +1961,32 @@ test('selects a preview immediately by enriching only that direction', async ({
     })
   })
 
-  await page.goto('/#/discovery')
-  await startFromKeyboard(page)
-  await expect(page.getByRole('heading', { name: '상세 0/10 준비됨' })).toBeVisible()
-  const firstPreview = page.getByRole('listitem').filter({
-    has: page.getByRole('heading', { name: 'Safe Config Lab', exact: true }),
-  })
-  await firstPreview.getByRole('button', { name: '이 방향 선택' }).click()
-  await expect(
-    page.getByRole('heading', { name: '이 범위라면 바로 시작할 수 있어요.' }),
-  ).toBeVisible()
+  try {
+    await page.goto('/#/discovery')
+    const preview = waitForDiscoveryTurn(page, 'preview')
+    await startFromKeyboard(page)
+    await preview
+    await expect.poll(() => backgroundStarted).toBe(true)
+    await expect(page.getByRole('heading', { name: '상세 0/10 준비됨' })).toBeVisible()
+    const firstPreview = page.getByRole('listitem').filter({
+      has: page.getByRole('heading', { name: 'Safe Config Lab', exact: true }),
+    })
+    const initialSpec = waitForDiscoveryTurn(page, 'spec')
+    await firstPreview.getByRole('button', { name: '이 방향 선택' }).click()
+    await initialSpec
+    await expect(
+      page.getByRole('heading', { name: '이 범위라면 바로 시작할 수 있어요.' }),
+    ).toBeVisible()
 
-  const projectId = projectIdFromUrl(page.url())
-  const selected = await restoreProject(request, projectId)
-  expect(selected.discoverySession?.status).toBe('SELECTED')
-  expect(selected.discoveryContext?.candidateEnrichments.length ?? 10).toBeLessThan(10)
-  expect(selected.discoveryContext?.rounds[0]?.candidates).toHaveLength(1)
-  expect(selected.selectedCandidate?.title).toBe('Safe Config Lab')
+    const projectId = projectIdFromUrl(page.url())
+    const selected = await restoreProject(request, projectId)
+    expect(selected.discoverySession?.status).toBe('SELECTED')
+    expect(selected.discoveryContext?.candidateEnrichments.length ?? 10).toBeLessThan(10)
+    expect(selected.discoveryContext?.rounds[0]?.candidates).toHaveLength(1)
+    expect(selected.selectedCandidate?.title).toBe('Safe Config Lab')
+  } finally {
+    releaseBackground()
+  }
 })
 
 test('distinguishes a Crew host disconnect from saved Core state and retries safely', async ({
@@ -1938,34 +2016,42 @@ test('starts a new Discovery only after the user edits or confirms the restored 
   page,
   request,
 }) => {
-  let agentDispatches = 0
+  test.setTimeout(60_000) // Two Discovery sessions plus selection and Spec.
+  let previewDispatches = 0
   await page.route('**/api/chat', async (route) => {
-    agentDispatches += 1
+    if (route.request().postDataJSON().agent === 'vibe-helper-discovery-preview')
+      previewDispatches += 1
     await fulfillAgentTurn(route, request, projectIdFromRoute(route))
   })
 
   await page.goto('/#/discovery')
+  const preview = waitForDiscoveryTurn(page, 'preview')
   await startFromKeyboard(page)
+  await preview
+  const initialSpec = waitForDiscoveryTurn(page, 'spec')
   await page
     .getByRole('listitem')
     .filter({ has: page.getByRole('heading', { name: 'Safe Config Lab', exact: true }) })
     .getByRole('button', { name: '이 방향 선택' })
     .click()
+  await initialSpec
   await expect(
     page.getByRole('heading', { name: '이 범위라면 바로 시작할 수 있어요.' }),
   ).toBeVisible()
-  expect(agentDispatches).toBe(3)
+  expect(previewDispatches).toBe(1)
 
   await page.getByRole('button', { name: /다른 주제로 돌아가기/ }).click()
   await expect(page.getByText('이전 후보를 그대로 보고 있어요.')).toBeVisible()
-  expect(agentDispatches).toBe(3)
+  expect(previewDispatches).toBe(1)
 
   const nextGoal = 'TypeScript runtime validation으로 로컬 CSV 검사기 만들기'
   await page.getByLabel(/무엇을 배우고 싶나요/).fill(nextGoal)
+  const newDetails = waitForDiscoveryTurn(page, 'enrich-second')
   await page.getByRole('button', { name: '새 후보 받기' }).click()
   await expect(page.getByRole('heading', { name: nextGoal, exact: true })).toBeVisible()
+  await newDetails
   await expect(page.getByText('10개 후보')).toBeVisible()
-  expect(agentDispatches).toBe(6)
+  expect(previewDispatches).toBe(2)
 
   const projectMatch = page.url().match(/project=(project_[0-9a-f-]{36})/)
   expect(projectMatch?.[1]).toBeDefined()
@@ -2027,7 +2113,9 @@ test('surfaces a terminal tool validation error before the polling timeout', asy
   })
 
   await page.goto('/#/discovery')
+  const terminalResponse = waitForDiscoveryTurn(page, 'preview')
   await startFromKeyboard(page)
+  await terminalResponse
   await expect(page.getByText('새 결과를 저장하지 못했어요.')).toBeVisible()
   await expect(page.getByText(/제출 형식을 거절/)).toBeVisible()
   await expect(page.getByRole('button', { name: '상태 확인 후 다시 시도' })).toBeVisible()
@@ -2043,7 +2131,9 @@ test('surfaces an Agent response that ends without a durable Core result', async
   })
 
   await page.goto('/#/discovery')
+  const terminalResponse = waitForDiscoveryTurn(page, 'preview')
   await startFromKeyboard(page)
+  await terminalResponse
   await expect(page.getByText('새 결과를 저장하지 못했어요.')).toBeVisible()
   await expect(page.getByText(/응답은 끝났지만 Core에 새 결과가 저장되지/)).toBeVisible()
   await expect(page.getByRole('button', { name: '상태 확인 후 다시 시도' })).toBeVisible()
@@ -2098,10 +2188,12 @@ test('retries one Spec refinement when the first response skips its submit tool'
   page,
   request,
 }) => {
-  let agentDispatches = 0
+  test.setTimeout(60_000) // Initial Spec and two refinement responses, including recovery.
+  let specDispatches = 0
   await page.route('**/api/chat', async (route) => {
-    agentDispatches += 1
-    if (agentDispatches !== 4) {
+    const spec = route.request().postDataJSON().agent === 'vibe-helper-discovery-spec'
+    if (spec) specDispatches += 1
+    if (!spec || specDispatches !== 2) {
       await fulfillAgentTurn(route, request, projectIdFromRoute(route))
       return
     }
@@ -2113,21 +2205,27 @@ test('retries one Spec refinement when the first response skips its submit tool'
   })
 
   await page.goto('/#/discovery')
+  const preview = waitForDiscoveryTurn(page, 'preview')
   await startFromKeyboard(page)
+  await preview
+  const initialSpec = waitForDiscoveryTurn(page, 'spec')
   await page
     .getByRole('listitem')
     .filter({ has: page.getByRole('heading', { name: 'Safe Config Lab', exact: true }) })
     .getByRole('button', { name: '이 방향 선택' })
     .click()
+  await initialSpec
   await expect(page.getByText('권장 Learning Spec · revision 1')).toBeVisible()
 
   await page
     .getByLabel('바꾸고 싶은 점을 Agent에게 말하기')
     .fill('로그인 기능은 제외하고 한 화면 흐름으로 바꿔 주세요.')
+  const recoveredSpec = waitForDiscoveryTurn(page, 'spec', 2)
   await page.getByRole('button', { name: 'Agent에게 다시 정리해달라고 하기' }).click()
+  await recoveredSpec
 
   await expect(page.getByText('권장 Learning Spec · revision 2')).toBeVisible()
-  expect(agentDispatches).toBe(5)
+  expect(specDispatches).toBe(3)
 })
 
 test('shows a refresh instruction when the backend rejects a stale UI protocol', async ({

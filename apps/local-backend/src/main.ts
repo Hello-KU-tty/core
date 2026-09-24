@@ -1,21 +1,38 @@
 import { execFile } from 'node:child_process'
-import { randomBytes, randomUUID } from 'node:crypto'
-import { lstat, mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
+import { lstat, mkdir, open, readdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
+import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { ApplicationService, WorkspacePathPolicy } from '@vibe-helper/application'
 import { LOCAL_PROTOCOL_VERSION, projectSessionSnapshotSchema } from '@vibe-helper/contracts'
 import { KiroAcpSession } from '@vibe-helper/kiro-adapter/acp-node'
-import { ResultRuntimeSupervisor, WorkflowError, WorkflowRuntime } from '@vibe-helper/runtime'
+import {
+  type CoreResources,
+  currentCoreRuntime,
+  loadCoreResources,
+  ownedPrivateDirectory,
+  type ProjectToolchain,
+  prepareProjectTools,
+  isLockOwnerAlive,
+  ResultRuntimeSupervisor,
+  selectProjectToolchain,
+  verifyProjectTools,
+  WorkflowError,
+  WorkflowRuntime,
+} from '@vibe-helper/runtime'
 import { openSqliteStorage } from '@vibe-helper/storage-sqlite'
 import { LocalAgentHost } from './agent-host.js'
+import { HostLeases } from './host-leases.js'
 import { NativeAgentRelay } from './native-agent-relay.js'
 import { createNativeCoreBinding } from './native-core-binding.js'
 import { privateDirectory } from './private-files.js'
 import { createLocalServer } from './server.js'
 
 const execute = promisify(execFile)
+declare const __VIBE_PACKAGED_CORE__: boolean
+const packaged = typeof __VIBE_PACKAGED_CORE__ !== 'undefined' && __VIBE_PACKAGED_CORE__
+let resources: CoreResources | undefined
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const args = process.argv.slice(2).filter((value) => value !== '--')
 const command = args.shift() ?? 'start'
@@ -77,7 +94,10 @@ async function init(): Promise<void> {
     flag: 'wx',
   })
   for (const name of ['data', 'workspaces', 'agents']) await privateDirectory(join(root, name))
-  const storage = await openSqliteStorage({ dataDirectory: join(root, 'data') })
+  const storage = await openSqliteStorage({
+    dataDirectory: join(root, 'data'),
+    ...(resources ? { migrationsDirectory: resources.migrationsDirectory } : {}),
+  })
   try {
     print({ status: 'INITIALIZED', root, storage: storage.checkIntegrity() })
   } finally {
@@ -145,24 +165,39 @@ async function doctor(): Promise<void> {
   }
 }
 async function recover(): Promise<void> {
-  await initialized()
-  const lock = JSON.parse(await readFile(join(lockPath, 'owner.json'), 'utf8')) as { pid?: unknown }
-  if (!Number.isSafeInteger(lock.pid) || Number(lock.pid) <= 0)
-    throw new Error('LOCK_OWNER_INVALID_MANUAL_REVIEW_REQUIRED')
-  try {
-    process.kill(Number(lock.pid), 0)
-    throw new Error('BACKEND_PROCESS_STILL_EXISTS')
-  } catch (error) {
-    if (!(error instanceof Error && 'code' in error && error.code === 'ESRCH')) throw error
+  // Managed initialization may have been interrupted before its marker was published.
+  if (!packaged) await initialized()
+  const ownerText = await readFile(join(lockPath, 'owner.json'), 'utf8')
+  const lock = JSON.parse(ownerText) as { pid?: unknown }
+  const assertDead = async (): Promise<void> => {
+    if (!Number.isSafeInteger(lock.pid) || Number(lock.pid) <= 0)
+      throw new Error('LOCK_OWNER_INVALID_MANUAL_REVIEW_REQUIRED')
+    if (await isLockOwnerAlive(Number(lock.pid), join(lockPath, 'owner.json')))
+      throw new Error('BACKEND_PROCESS_STILL_EXISTS')
   }
-  await rename(lockPath, join(root, `backend.abandoned-${randomUUID()}`))
-  print({
-    status: 'STALE_LOCK_ARCHIVED',
-    next: 'Start Core, restore Project, then explicitly retry. Old runs are not replayed.',
-  })
+  await assertDead()
+  const recoveryPath = join(lockPath, 'recovering')
+  const recovery = await open(recoveryPath, 'wx', 0o600)
+  const recoveryStat = await recovery.stat()
+  await recovery.close()
+  try {
+    if ((await readFile(join(lockPath, 'owner.json'), 'utf8')) !== ownerText)
+      throw new Error('LOCK_OWNER_CHANGED')
+    await assertDead()
+    await rename(lockPath, join(root, `backend.abandoned-${randomUUID()}`))
+    print({
+      status: 'STALE_LOCK_ARCHIVED',
+      next: 'Start Core, restore Project, then explicitly retry. Old runs are not replayed.',
+    })
+  } catch (error) {
+    const current = await lstat(recoveryPath).catch(() => null)
+    if (current?.ino === recoveryStat.ino && current?.dev === recoveryStat.dev)
+      await unlink(recoveryPath)
+    throw error
+  }
 }
-async function start(coreOnly = false, nativeMode = false): Promise<void> {
-  await initialized()
+async function start(coreOnly = false, nativeMode = false, managed = false): Promise<void> {
+  if (!managed) await initialized()
   if (!coreOnly && !nativeMode) await kiroVersion()
   const port = Number(option('--port', '47831'))
   if (!Number.isInteger(port) || port < 0 || port > 65_535) throw new Error('PORT_INVALID')
@@ -170,10 +205,24 @@ async function start(coreOnly = false, nativeMode = false): Promise<void> {
     throw new Error('BACKEND_LOCKED_USE_RECOVER_AFTER_PROCESS_EXIT')
   })
   const instanceId = randomUUID()
-  await writeFile(join(lockPath, 'owner.json'), JSON.stringify({ pid: process.pid, instanceId }), {
-    mode: 0o600,
-    flag: 'wx',
-  })
+  await writeFile(
+    join(lockPath, 'owner.json'),
+    JSON.stringify({
+      pid: process.pid,
+      instanceId,
+      ...(resources
+        ? {
+            packageHash: createHash('sha256')
+              .update(JSON.stringify(resources.manifest))
+              .digest('hex'),
+          }
+        : {}),
+    }),
+    {
+      mode: 0o600,
+      flag: 'wx',
+    },
+  )
   let storage: Awaited<ReturnType<typeof openSqliteStorage>> | undefined
   let nativeBinding: ReturnType<typeof createNativeCoreBinding> | undefined
   let nativeWorkspace: string | undefined
@@ -184,9 +233,12 @@ async function start(coreOnly = false, nativeMode = false): Promise<void> {
   let result: ResultRuntimeSupervisor | undefined
   let server: ReturnType<typeof createLocalServer> | undefined
   let closing = false
+  const hostLeases = managed ? new HostLeases() : undefined
+  let leaseTimer: ReturnType<typeof setInterval> | undefined
   const close = async (): Promise<void> => {
     if (closing) return
     closing = true
+    clearInterval(leaseTimer)
     // Revoke Agent authority and stop owned children before closing persistence.
     await runtime?.close()
     await nativeRelay?.close()
@@ -201,11 +253,29 @@ async function start(coreOnly = false, nativeMode = false): Promise<void> {
     }
     storage?.close()
     await rename(lockPath, join(root, `backend.stopped-${instanceId}`))
-    print({ status: 'STOPPED', backendInstanceId: instanceId })
+    if (!managed || process.connected) print({ status: 'STOPPED', backendInstanceId: instanceId })
+    if (packaged && process.connected) process.disconnect()
   }
   try {
-    storage = await openSqliteStorage({ dataDirectory: join(root, 'data') })
-    const policy = await WorkspacePathPolicy.create(join(root, 'workspaces'))
+    if (managed) {
+      for (const name of ['data', 'workspaces', 'agents'])
+        await ownedPrivateDirectory(join(root, name))
+      const marker = await lstat(markerPath).catch(() => null)
+      if (marker) await initialized()
+      else
+        await writeFile(markerPath, JSON.stringify({ format: 'vibe-helper-local-v1' }), {
+          mode: 0o600,
+          flag: 'wx',
+        })
+    }
+    storage = await openSqliteStorage({
+      dataDirectory: join(root, 'data'),
+      ...(resources ? { migrationsDirectory: resources.migrationsDirectory } : {}),
+    })
+    const policy = await WorkspacePathPolicy.create(
+      join(root, 'workspaces'),
+      packaged ? { prepareNewWorkspace: privateDirectory } : {},
+    )
     const application = new ApplicationService({ storage, workspacePolicy: policy })
     const nativeRole = option('--native-role', '')
     if (
@@ -249,7 +319,30 @@ async function start(coreOnly = false, nativeMode = false): Promise<void> {
           : {}),
       })
     }
-    result = await ResultRuntimeSupervisor.create(join(root, 'workspaces'))
+    let projectTools: Promise<ProjectToolchain> | undefined
+    const prepareTools = resources
+      ? async (workspace: string, signal?: AbortSignal): Promise<ProjectToolchain> => {
+          const assets = resources as CoreResources
+          if (!projectTools) {
+            projectTools = selectProjectToolchain({
+              resources: assets,
+              privateRoot: join(root, 'project-tools'),
+              ...(signal ? { signal } : {}),
+            })
+            void projectTools.catch(() => {
+              projectTools = undefined
+            })
+          }
+          const selected = await projectTools
+          signal?.throwIfAborted()
+          await prepareProjectTools(workspace, selected, assets)
+          return (await verifyProjectTools(workspace, assets)).toolchain
+        }
+      : undefined
+    result = await ResultRuntimeSupervisor.create(
+      join(root, 'workspaces'),
+      prepareTools ? { projectToolchain: prepareTools } : {},
+    )
     const localAgents =
       coreOnly || nativeMode
         ? undefined
@@ -268,7 +361,29 @@ async function start(coreOnly = false, nativeMode = false): Promise<void> {
           policy,
           root,
           repository,
-          singleWindowBuiltinH: process.env.VIBE_NATIVE_SINGLE_WINDOW_BUILTIN_H === '1',
+          ...(resources
+            ? {
+                portable: {
+                  promptDirectory: resources.promptDirectory,
+                  bridgeScriptPath: resources.bridge,
+                  runtime: currentCoreRuntime(),
+                },
+                prepareBuilderTools: async (workspace: string, signal: AbortSignal) => {
+                  try {
+                    await prepareTools?.(workspace, signal)
+                  } catch (error) {
+                    throw new WorkflowError(
+                      error instanceof Error &&
+                        /^(PROJECT|PNPM|RUNTIME|PRIVATE)_[A-Z_]{1,80}$/.test(error.message)
+                        ? error.message
+                        : 'PROJECT_TOOLCHAIN_PREPARATION_FAILED',
+                    )
+                  }
+                },
+              }
+            : {}),
+          singleWindowBuiltinH:
+            !packaged && process.env.VIBE_NATIVE_SINGLE_WINDOW_BUILTIN_H === '1',
         })
       : undefined
     const agents = localAgents ??
@@ -289,6 +404,7 @@ async function start(coreOnly = false, nativeMode = false): Promise<void> {
       token,
       instanceId,
       mcpHandlers,
+      ...(hostLeases ? { hostLease: (input: unknown) => hostLeases.update(input) } : {}),
       ...(nativeRelay ? { nativeRelay } : {}),
       ...(coreOnly ? { runStartDisabledCode: 'NATIVE_RUNTIME_NOT_ATTACHED' as const } : {}),
       isClosing: () => closing,
@@ -303,8 +419,9 @@ async function start(coreOnly = false, nativeMode = false): Promise<void> {
     const baseUrl = `http://127.0.0.1:${address.port}`
     localAgents?.setBaseUrl(baseUrl)
     nativeRelay?.setBaseUrl(baseUrl)
+    const nextDescriptorPath = `${descriptorPath}.${instanceId}.tmp`
     await writeFile(
-      descriptorPath,
+      nextDescriptorPath,
       JSON.stringify({
         protocolVersion: LOCAL_PROTOCOL_VERSION,
         backendInstanceId: instanceId,
@@ -313,6 +430,7 @@ async function start(coreOnly = false, nativeMode = false): Promise<void> {
       }),
       { mode: 0o600 },
     )
+    await rename(nextDescriptorPath, descriptorPath)
     if (nativeBinding) {
       await writeFile(
         nativeBindingFile,
@@ -337,6 +455,18 @@ async function start(coreOnly = false, nativeMode = false): Promise<void> {
           process.exitCode = 1
         })
       })
+    if (hostLeases)
+      leaseTimer = setInterval(() => {
+        if (hostLeases.expired()) void close()
+      }, 1000)
+    if (packaged && process.connected) {
+      process.once('disconnect', () => {
+        if (!managed) void close()
+      })
+      process.on('message', (message) => {
+        if (message === 'VIBE_CORE_SHUTDOWN' && !managed) void close()
+      })
+    }
     print({
       status: coreOnly ? 'CORE_ONLY_READY' : nativeMode ? 'NATIVE_READY' : 'READY',
       baseUrl,
@@ -356,22 +486,44 @@ async function start(coreOnly = false, nativeMode = false): Promise<void> {
   }
 }
 try {
-  if (process.versions.node !== '24.19.0') throw new Error('NODE_24_19_0_REQUIRED')
+  if (packaged) {
+    currentCoreRuntime()
+    resources = await loadCoreResources(resolve(dirname(fileURLToPath(import.meta.url)), '..'))
+    if (!args.includes('--root')) throw new Error('PACKAGED_PRIVATE_ROOT_REQUIRED')
+    if (!['init', 'native', 'managed', 'core-only', 'recover'].includes(command))
+      throw new Error('PACKAGED_COMMAND_UNSUPPORTED')
+    const assetPath = resources.root.toLowerCase()
+    const dataPath = root.toLowerCase()
+    if (
+      assetPath === dataPath ||
+      assetPath.startsWith(`${dataPath}${sep}`) ||
+      dataPath.startsWith(`${assetPath}${sep}`)
+    )
+      throw new Error('PACKAGED_DATA_RESOURCE_OVERLAP')
+    await ownedPrivateDirectory(root)
+  } else if (process.versions.node !== '24.19.0') throw new Error('NODE_24_19_0_REQUIRED')
   if (command === 'init') await init()
   else if (command === 'doctor') await doctor()
   else if (command === 'recover') await recover()
   else if (command === 'start') await start()
   else if (command === 'core-only') await start(true)
   else if (command === 'native') await start(false, true)
+  else if (command === 'managed' && packaged) await start(false, true, true)
   else throw new Error('UNKNOWN_COMMAND')
 } catch (error) {
   // Diagnostics do not print provider stderr, absolute credential paths or raw payloads.
   const code =
-    error instanceof Error && /^[A-Z0-9_]{1,100}$/.test(error.message)
-      ? error.message
-      : error instanceof Error && 'code' in error && error.code === 'ENOENT'
-        ? 'FILE_OR_KIRO_EXECUTABLE_NOT_FOUND'
-        : 'LOCAL_STARTUP_FAILED'
+    error instanceof Error &&
+    'code' in error &&
+    typeof error.code === 'string' &&
+    /^[A-Z][A-Z0-9_]{1,99}$/.test(error.code) &&
+    error.code !== 'ENOENT'
+      ? error.code
+      : error instanceof Error && /^[A-Z0-9_]{1,100}$/.test(error.message)
+        ? error.message
+        : error instanceof Error && 'code' in error && error.code === 'ENOENT'
+          ? 'FILE_OR_KIRO_EXECUTABLE_NOT_FOUND'
+          : 'LOCAL_STARTUP_FAILED'
   print({ status: 'FAILED', code })
   process.exitCode = 1
 }

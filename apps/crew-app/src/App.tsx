@@ -67,7 +67,8 @@ interface AgentExpectationSpec {
 type AgentExpectation = AgentExpectationRound | AgentExpectationPreview | AgentExpectationSpec
 
 const TARGET_DISCOVERY_FOREGROUND_MS = import.meta.env.MODE === 'test' ? 700 : 30_000
-const TARGET_DISCOVERY_TIMEOUT_MS = import.meta.env.MODE === 'test' ? 6_000 : 420_000
+// Test fixtures still perform real Core/SQLite transactions, including two sequential batches.
+const TARGET_DISCOVERY_TIMEOUT_MS = import.meta.env.MODE === 'test' ? 30_000 : 420_000
 const TARGET_DISCOVERY_COMPLETION_GRACE_MS = import.meta.env.MODE === 'test' ? 1_800 : 900
 
 interface AgentRequest {

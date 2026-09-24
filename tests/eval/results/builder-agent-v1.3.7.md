@@ -1,0 +1,6 @@
+# Builder prompt v1.3.7 regression
+
+- Windows product commands use the Core-issued `.\.kiro\vibe-tools.cmd` entry. The finite command vocabulary, generated cwd, one-time permission, lock preparation, frozen install and foreground smoke requirements are unchanged. Legacy Mac/CLI commands retain their existing form.
+- The launcher is not a learner Evidence source. Missing tools, rejected commands and failed compilation cannot establish Task completion.
+- `t19-builder-validation.json`, the Windows prompt regression, native permission fixtures and actual packaged TypeScript tool tests verify these boundaries. Final `pnpm check` passed (93 unit, 280 integration plus one platform skip, 35 eval, 3 Campus Drop, 6 smoke, 12 E2E). Existing and managed tools each passed five commands and HTTP smoke in a real native Builder turn. The managed case needed read-only observation recovery after one driver connection error; no Agent request was replayed. See [W4 results](../../../docs/spikes/T19_W4_TOOLCHAIN_RESULTS_20260924.md).
+- Synthetic source, seeded Task and deterministic HTTP results are explicitly separate from native Agent execution and from W5's complete product flow. No human learning outcome is inferred.

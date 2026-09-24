@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-09-24",
+  "target": "win32-x64",
+  "scope": "T19_W3",
+  "artifact": {
+    "version": "0.2.0",
+    "files": 69,
+    "vsixBytes": 2133254,
+    "installedBytes": 6581155,
+    "sha256": "b343af4156bcc91df970f4bb628d0bf4c35c712eff477a1bf5113fbf57d78e11"
+  },
+  "host": {
+    "kiro": "1.1.14",
+    "agent": "1.1.28",
+    "api": "1.131.0",
+    "runtime": "24.18.0",
+    "profile": "ISOLATED_SYNTHETIC",
+    "windowKind": "ORDINARY_INSTALLED_VSIX",
+    "trust": "USER_APPROVED"
+  },
+  "packagedLifecycle": {
+    "simultaneous_initialization_one_core": "PASS",
+    "owner_reload_keeps_shared_core": "PASS",
+    "crash_rotation_history_preserved": "PASS",
+    "update_does_not_kill_active_owner": "PASS",
+    "update_migration_backup_history": "PASS",
+    "downgrade_refused_without_data_loss": "PASS",
+    "status_has_no_paths_or_credentials": "PASS"
+  },
+  "liveDiscovery": {
+    "buildStage": "W3_BEFORE_FINAL_HELPER_LIFECYCLE_FIXES",
+    "status": "SUCCEEDED",
+    "previewCount": 10,
+    "projectStored": true
+  },
+  "finalLiveHelper": {
+    "nativeRequests": 1,
+    "setup": "SYNTHETIC_TASK_FIXTURE",
+    "status": "SUCCEEDED",
+    "outcome": "HELPER_RECORDED",
+    "stored": true,
+    "automaticDistinctWindow": true,
+    "coreInstanceUnchanged": true,
+    "ownerCloseKeptSharedCoreSeconds": 35,
+    "lastWindowClosedCore": true,
+    "coreProcessExited": true,
+    "overallStatus": "PASS"
+  },
+  "priorFailures": [
+    "WINDOWS_WORKSPACE_DRIVE_CASE",
+    "COLD_HELPER_ENDPOINT_NOT_READY",
+    "OWNER_WINDOW_CLOSE_TERMINATED_CORE"
+  ],
+  "requestCounterNote": "nativeRequests counts explicit run requests, not provider-internal model calls; earlier Helper modelCalls=0 metadata was incorrect",
+  "checks": {
+    "pnpmCheck": "PASS",
+    "unit": 92,
+    "integrationPassed": 274,
+    "integrationSkipped": 1,
+    "eval": 34,
+    "campusDrop": 3,
+    "smoke": 6,
+    "e2e": 12,
+    "panelCjs": 22,
+    "nativeClientFocused": 43
+  },
+  "remaining": ["W4_GENERATED_APP_TOOLS", "W5_CLEAN_FULL_VERTICAL_FLOW", "T19_T19N_EXISTING_LIMITATIONS"]
+}

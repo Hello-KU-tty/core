@@ -20,6 +20,7 @@ test-results/
 
 # Generated Crew Agent configs (source: docs/agent-prompts)
 /agents/*.json
+/examples/kiro-panel/runtime/
 
 # Logs and local runtime data
 *.log

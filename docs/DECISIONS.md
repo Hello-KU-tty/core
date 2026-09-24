@@ -1,5 +1,95 @@
 # 결정 기록
 
+## 2026-09-24: 다른 기기 재개를 위한 개발 checkpoint
+
+- **사용자 요청:** 현재 W1~W5 작업의 commit/push와 다른 기기 재개 준비. push 대상은 collaborator 권한이 있는 기존 조직 remote `https://github.com/Hello-KU-tty/core.git`의 `codex/windows-extension-runtime-20260923`으로 확인했다. 과거 작업별 local-only 또는 commit/push 제외 범위는 당시 기록으로 보존한다.
+- **인계:** 필요한 source·검증 script·tests·canonical prompts와 sanitized 결과를 함께 commit한다. [재개 문서](CROSS_DEVICE_HANDOFF_20260924.md)에 도구 pin·빌드·실패 근거·남은 gate를 기록하고 새 기기에서는 새 합성 환경을 사용한다. private DB/profile/credential/원본 로그와 생성 설치물은 Git에 포함하지 않는다. PR/merge/release나 사용자 데이터 동기화는 수행하지 않는다.
+- **상태:** 소스 인계가 W5 출하 완료를 뜻하지 않는다. W5와 T19/T19-N의 기존 미완료 상태를 유지한다.
+
+## 2026-09-24 W5 packaged 검증기 준비 한도 정합
+
+0.3.7 portable 검증에서 Kiro runtime 경로는 통과했지만 기존 Node 경로가 NATIVE_READY stdout 없이 기동에 실패했다. 이전 검증기는 30초 한도 초과와 process 조기 종료를 같은 오류로 처리해 정확한 원인을 구분하지 못했다. 설치 lifecycle은 이미 45초까지 준비를 관측하므로 검증기 한도만 같은 45초로 맞추고 runtime별 준비 시간/종료 원인 metadata를 기록한다. 제품 Core/Agent 한도나 권한 검증은 변경하지 않는다. 최초 실패 로그를 보존하고 실제 패키지 재검증으로 판정한다.
+
+## 2026-09-24: W5 긴 no-Evidence 사유의 UI projection
+
+- **실측:** native 분석 job은 SUCCEEDED 2개였으나 UI_READ_EVIDENCE_TRACE가 TRANSACTION_FAILED를 반환했다. 합성 DB의 read-only 재현에서 noEvidenceReason 길이 440/370자가 UI emptyReason의 240자 한도를 초과한 Zod 오류임을 확인했다. 분석 실패나 SQLite 손상으로 확정하지 않는다.
+- **선택:** 기존 UI 계약 240자를 유지하며 긴 사유를 surrogate pair를 자르지 않는 말줄임 preview로 투영한다. 원문(최대 4,000자)은 저장된 분석 결과와 응답 analysis[].resultSummary에 그대로 유지한다. Evidence 채택·Concept State·provenance 계산은 바꾸지 않는다.
+- **검증:** 짧은 값·긴 값·4,000자·Unicode 경계의 실제 storage/application 조회를 포함한 integration 35 tests PASS. 최신 전체 check와 설치물 검증은 W5 기록에 별도로 남긴다.
+
+## 2026-09-24: W5 Windows의 승인 설정과 lockfile 복구
+
+- **실측:** 0.3.5의 실제 Builder/Helper/Decision 적용은 저장됐으나 frozen install은 ERR_PNPM_OUTDATED_LOCKFILE로 실패했다. 승인된 allowBuilds.esbuild만 있는 설정에서도 lockfile 갱신을 거절하여 Task 완료가 기록되지 않았다. Agent는 완료를 거짓 보고하지 않았고 검증기는 실패를 보존했다.
+- **선택:** Windows 보호 launcher를 검증한 경우에만 packages의 현재 점 경로, esbuild/better-sqlite3의 allowBuilds boolean 또는 onlyBuiltDependencies로 제한된 일반 파일(8 KiB 이하, 단일 link)을 유지한 채 정확한 --lockfile-only --ignore-scripts --ignore-pnpmfile 명령을 허용한다. Host runner가 설정을 다시 검사한다. 다른 config key·package·외부 workspace·npmrc·pnpmfile 및 root install lifecycle은 계속 거절한다. 기존 비-Windows native 경로는 설정 부재 조건을 유지한다. 새 dependency/lifecycle 허용은 없다.
+- **Agent:** Builder prompt 1.3.8과 fixture에 Windows 복구 예외, 실제 frozen install 후 검증 및 실패 시 완료 금지를 기록한다. 특정 프로젝트/문구에 대한 예외는 추가하지 않는다.
+- **후속 검증:** 종료 응답이 SUCCEEDED/TURN_ENDED이나 Task가 ACTIVE이고 완료 보고가 없는 경우만 원본을 보존한 별도 receipt에서 Build 적용을 한 번 이어 요청한다. 같은 Task revision·저장된 Decision 적용·Helper 응답·active run 부재를 확인한다. 알려지지 않은 mutation을 재전송하거나 기존 선택/응답을 다시 저장하지 않는다.
+
+## 2026-09-24: W5 Windows의 Core PID 재사용 판별
+
+- **실측:** 합성 0.3.3 Core 종료 후 owner.json에 남은 PID를 0.3.4의 새 Kiro utility process가 재사용했다. PID 생존만 검사하던 lifecycle은 오래된 packageHash를 살아 있는 구버전 Core로 간주해 CORE_UPDATE_WAITING_FOR_OWNER_EXIT를 반환했다. 새 Agent 요청은 0개였다.
+- **선택:** Windows에서는 private owner 파일 mtime과 OS process StartTime을 읽기 전용으로 비교한다. process가 lock 기록보다 1초 초과 늦게 태어났다면 재사용된 PID로 구분한다. 순서가 불명확하거나 inspector 오류/출력 오류/검사 중 lock 변경이면 fail closed한다. 원래 Core나 재사용된 PID의 process를 종료하지 않는다. 다른 OS의 PID 생존 경계는 유지한다.
+- **복구:** lifecycle과 recover 명령이 같은 검사 함수를 사용한다. recover는 기존 전용 잠금과 owner 원문 재확인을 유지하고 오래된 lock을 archive한다. 두 OS 검사와 복구를 수용하도록 lifecycle의 recovery child 대기는 10초에서 45초로 조정한다. Agent RPC/응답 예산과 모델 재전송 정책은 바꾸지 않는다.
+- **검증:** PID 재사용·원래 소유자·불명확 timestamp·검사 오류·lock 변경 regression, 실제 OS를 사용하는 packaged stale-lock 복구를 수행한다. 과거 receipt와 사용자 일반 Kiro process는 보존한다.
+
+## 2026-09-24: W5 업데이트 후 생성 앱 도구 실행기 경로 갱신
+
+- **실측:** 기존 0.3.2 Project를 0.3.3에서 재개하자 설치 버전 directory를 담은 host-owned descriptor/launcher가 달라 PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED로 실패했다. 새 Agent prompt 전에 거절됐으며 원본 receipt를 보존했다.
+- **선택:** 동일 extension parent의 vibe-helper.vibe-helper-portable-core-<semver>/portable에서 더 높은 버전으로 옮기는 경우만 Core가 자동 갱신한다. workspace·Node/pnpm·private root와 descriptor의 나머지 직렬화 내용이 모두 같고 launcher도 이전 또는 이번 Core가 만드는 정확한 내용이어야 한다. 다른 도구 선택·publisher·설치 parent·downgrade·변조는 계속 거절한다. 이전 설치물 코드는 읽거나 실행하지 않는다.
+- **중단 복구:** owner Core 안의 준비 요청을 직렬화하고 launcher를 먼저 atomic 교체한 뒤 descriptor를 교체한다. 중간 상태는 실행 검증이 거절하며 다음 준비에서 같은 이전 descriptor와 정확한 새 launcher를 확인해 마친다. 사용자 생성 source·데이터는 수정하지 않는다.
+- **검증:** 실제 파일 기반 업데이트·변조·중단·중복 준비·downgrade/다른 설치 거절 test와 기존 명령/환경 경계를 검증한다. 설치물 재개와 packaged 회귀는 별도 기록한다.
+
+## 2026-09-24: W5 알려진 Builder 초기화 실패의 진단과 검증 재시도
+
+- **관측:** 0.3.2 단독 설치 실행에서 실제 Discovery/Spec 생성·수정과 workspace 전환은 성공했다. Builder는 AGENT_RUNNING 전 NATIVE_RPC_TIMEOUT으로 실패했으나 기존 로그만으로 정확한 RPC를 구분할 수 없었다.
+- **선택:** native-client는 timeout된 RPC의 고정 allowlist operation만 전달하고 worker는 role/operation만 기록한다. params·credential·session ID·Agent 본문은 제외하며 제품 연결/RPC 한도를 바꾸지 않는다.
+- **검증기:** 원본 receipt와 실패 run을 보존한 채 새 receipt로 알려진 terminal Builder 실패만 재시도한다. 원본 hash·이전 run·요청 수를 연결하고 같은 Core면 FAILED/outcome NONE을 다시 조회한다. Core 재시작으로 transient run ID가 사라진 경우에는 private receipt의 terminal 응답을 원본 근거로 보존하고, 현재 복원된 동일 Project/Task·확정 Spec revision과 active run/Decision/completion 부재를 확인한다. 재시작된 Core에서 이전 run을 직접 조회했다고 표시하지 않는다. 응답 불명확 STARTED, 진행 중 run, 이미 Decision/적용으로 진전된 상태는 거절한다. 검증기 재시도는 최대 2회이며 제품 자동 재전송 정책을 추가하지 않는다.
+- **검증:** timeout 진단 포함 native-client 46 tests, retry 거절/계보·재시작 경계와 기존 무재전송 driver 8 tests PASS. 실제 실행 결과는 W5 실측 기록에 남긴다.
+
+## 2026-09-24: W5 Windows ACL 검사 지연과 판정 구분
+
+- **실측:** 격리 profile의 Core data/tools/workspaces는 owner 일치·보호된 DACL·외부 Allow 0개였으나 기존 runtime 검사는 3회 모두 5.3~5.8초에 false를 반환했다. 단순 Windows PowerShell 시작도 4.964초가 걸렸다. 재개 native 실행은 모델 요청 전에 `PRIVATE_DIRECTORY_UNSAFE`, 전체 회귀는 실제 ACL 검증 test의 15초 한도에서 중단됐다.
+- **선택:** 동일한 읽기 전용 ACL 검사 조건을 유지하고 Core/native 검사 process의 한도를 30초로 둔다. inspector 시작/시간 초과/비정상 출력은 `PRIVATE_DIRECTORY_CHECK_UNAVAILABLE` 또는 `NATIVE_PRIVATE_PATH_CHECK_UNAVAILABLE`로 구분하여 계속 fail closed한다. 실제 UNSAFE, junction/hardlink·owner·DACL 거절은 그대로다. 자동 ACL 복구나 사용자 경로 권한 변경은 하지 않는다.
+- **검증 경계:** 실제 Windows ACL test는 여러 OS 검사 process를 순차 실행하므로 해당 test만 최대 150초로 둔다. 제품 Agent 응답 시간 기준과 나머지 test 기본값을 늘리지 않는다. 새 regression·실제 검사·VSIX 0.3.2·전체 check를 검증한 뒤 결과를 W5 기록에 남긴다. clean Windows gate와 기존 native SPEC 실패의 해결 여부는 별도다.
+
+## 2026-09-24: W5 Windows E2E 서버 시작 대기
+
+- **관측:** 전체 check와 E2E 단독 실행이 각각 `config.webServer`의 30초 기동 한도에서 중단됐다. 진단 실행에서는 backend 23.858초, frontend 14.552초 후 health/HTTP 준비를 확인했다. 변동이 있는 환경의 기동 문제와 앱 테스트 실패를 구분한다.
+- **선택:** Windows에서만 E2E webServer 준비 한도를 120초로 둔다. 나머지 OS는 30초를 유지한다. 개별 E2E timeout, 제품 Agent/응답 제한, 재시도 정책은 바꾸지 않는다.
+- **환경:** 기존 W1 검증용 Playwright browser cache를 명시해 실행한다. cache 환경 변수 누락으로 발생한 browser launch 실패는 제품 회귀나 통과로 해석하지 않고 원본 로그를 보존한다.
+
+## 2026-09-24: W5 Discovery E2E의 fixture 완료와 UI 확인 분리
+
+- **관측:** 올바른 browser cache를 지정한 단독 전체 check에서도 E2E 8 PASS / 4 FAIL이었다. Golden Path는 실제 두 번째 상세 batch 저장 중 `10개 후보` 표시의 5초 기대 한도를 소진했고, 선택/새 Discovery/Spec 재시도 세 흐름도 Spec 저장 응답을 기다리는 동안 같은 5초 기대 한도를 소진했다. 다른 단계의 unit/integration/eval/build/smoke는 통과했다.
+- **선택:** 기능 흐름 테스트에서 해당 Discovery fixture의 실제 Core mutation 후 chat response를 먼저 기다리고 UI를 검증한다. 초기 상세 두 batch, round/merge, Spec과 명시적 복구 응답을 구분한다. 고정 sleep이나 임의 성공 응답을 추가하지 않는다. UI assertion 기본 5초와 응답 대기 한도는 유지하고 네 다단계 test의 전체 실행 한도만 60초로 둔다. Golden Path의 기존 전체 120초 한도와 제품 응답/Agent 예산은 그대로다.
+- **추가 원인 확인:** 응답 동기화 후에도 Golden Path가 상세 5/10과 timeout UI에 머물렀다. `App.tsx`의 test 모드 전용 6초 deadline이 실제 Core/SQLite 두 batch 저장 도중 만료되는 것을 source/화면으로 확인했다. test 모드 deadline만 30초로 조정하며 제품 모드 420초 deadline·30초 foreground 기준은 유지한다. 이후 Golden Path 실제 E2E는 통과했다. 별도 preview/basket test의 고정 1.2초 지연은 FIRST/SECOND 명시적 gate로 바꾸어 사용자 조작을 마친 뒤 각 batch를 완료한다.
+- **History 전체 한도:** 반복 reload/권한/형식/연결 복구를 한 test에서 확인하는 History flow는 단독 성공 18.7~28초와 마지막 assertion 직전 30초 전체 한도 소진을 반복 관측했다. 이 test의 전체 한도만 60초로 두며 각 UI assertion은 기존 5초다.
+- **경계:** E2E fixture 통과는 native Agent 또는 사용자 의미 품질 통과가 아니다. 수정 후 실제 E2E와 최종 `pnpm check` 결과를 별도로 기록한다.
+
+## 2026-09-24: W4 생성 앱 전용 도구와 Windows native 명령 진입점
+
+- **범위:** 사용자 `T19 W4`와 승인된 설치 요구를 구현한다. 기존 일반 Node(검증 범위 24.18.0/24.19.0)와 pnpm 11.12.0을 우선하며 없으면 W2 Node 획득과 공식 pnpm 배포물을 private cache에 준비한다. Core용 Kiro executable은 생성 앱 runtime 후보가 아니다.
+- **source spike:** pin한 Agent 1.1.28 SHA의 Windows native `DefaultTerminal`은 `process.env`에서 직접 PowerShell child를 만들며 VS Code terminal 환경 collection을 사용하지 않는다. 전역 환경이나 Agent private source를 수정하지 않는다. Core가 생성 workspace의 보호된 `.kiro/vibe-tools.cmd`를 발급하고 native shell은 이 고정 진입점으로 기존 허용 명령만 실행한다. worker는 파일·scope를 검증한 뒤 기존 one-time permission/command guard를 적용한다. 일반 workspace와 기존 Mac/CLI 경로는 유지한다.
+- **획득:** 공식 npm `pnpm/11.12.0` metadata를 2026-09-24 조회했다. tarball은 `https://registry.npmjs.org/pnpm/-/pnpm-11.12.0.tgz`, integrity는 `sha512-ggpvvQ2fBMImY4ACrq0eRTQKkTndXcB3wdg+9EqiSByOtmN7TJqmlqPH41uoGOSc8nIT5fK5ETjQm3o+JuiYug==`다. 고정 URL·hash·크기·timeout 후 일반 파일만 private staging으로 추출하고 cache를 다시 검증한다. dependency/install script 추가 없이 Node 기본 API를 쓴다.
+- **권한:** launcher는 Core 환경을 상속하지 않고 선택한 Node/pnpm과 private pnpm config/cache/store만 제공한다. package script는 기존 생성 앱 실행 권한 안에서 동작하며 승인된 esbuild/better-sqlite3 이외 dependency lifecycle은 거절한다. 이는 임의 생성 코드에 대한 OS sandbox 완성을 주장하지 않는다.
+- **검증:** [W4 계획](T19_W4_TOOLCHAIN_PLAN.md), [실측 결과](spikes/T19_W4_TOOLCHAIN_RESULTS_20260924.md). 두 도구 환경에서 native shell·실제 HTTP, 실패·복구와 최종 `pnpm check`를 통과했다. 중간 조회 실패는 같은 run의 read-only 재관측으로 확인했으며 최초 실패를 보존했다. clean machine·workspace 전환 host crash·조회 안정성과 전체 수직 흐름의 출하 판정은 W5에 남긴다.
+
+## 2026-09-24: W3 Core 소유권과 Windows Helper 보조 창
+
+- **승인:** 사용자 `T19 W3` 착수 요청 및 “필요할 때 Helper 전용 창 자동 열기” 선택. W1의 두 창 capability를 제품 adapter에 통합한다. 한 창 protected built-in gate를 완화하지 않는다.
+- **선택:** global storage의 단일 Core lock/instance를 여러 확장 창이 공유한다. 각 host는 인증된 짧은 lease를 갱신하며, 한 창 종료나 workspace 전환 중에도 다른 창의 Core를 종료하지 않는다. 마지막 lease가 사라진 뒤 30초 유예를 지나면 Core가 SQLite를 닫고 credential을 폐기한다. crash 후 새 instance에는 durable state만 복원하며 응답 불명확 mutation과 진행 중 stream은 자동 재생하지 않는다. 정상 연결된 구버전 owner의 임의 종료 없이 업데이트 대기 상태를 표시한다.
+- **데이터:** 초기화와 migration은 owner lock 안에서 수행하며 기존 SQLite backup/quick_check를 재사용한다. 새 schema를 구버전 코드로 여는 것은 거절한다. DB/backup과 runtime cache/quarantine은 자동 삭제하지 않는다.
+- **native/UI:** Windows pinned source custom Agent와 기존 worker·SDK·제품 패널을 재사용한다. Helper/Analyst의 Core 발급 전용 workspace를 보조 창으로 열며 두 창 모두 같은 extension global storage를 사용한다. 준비/연결/native 가능 상태와 실제 Core 저장 완료를 구분한다.
+- **검증:** [W3 계획](T19_W3_LIFECYCLE_PLAN.md). 결과 확인 전 W3/W5 PASS를 주장하지 않는다. 새 dependency·Agent prompt 정책·전역 IDE 설정 변경은 없다.
+- **결과:** [W3 실측](spikes/T19_W3_LIFECYCLE_RESULTS_20260924.md)에서 통합 VSIX 일반 창 설치, native Discovery·Helper 저장, 자동 보조 창과 실제 owner/마지막 창 종료를 확인했다. 실제 owner 종료에서 발견한 Core 중단은 managed child의 process group 분리로 보정하고 lease 종료까지 검증했다. crash/rotation·update/backup·downgrade와 전체 회귀도 통과했다. W3 완료만 판정하며 W4/W5·T19/T19-N 한계는 유지한다.
+
+## 2026-09-24: W2 portable Core와 검증된 private runtime
+
+- **상태:** 사용자 `T19 w2` 착수 요청과 기존 Windows 설치 요구에 따른 구현 선택. [계획](T19_W2_PORTABLE_CORE_PLAN.md)의 실제 결과로 완료 여부를 판정한다.
+- **결정:** 기존 esbuild로 Core/bridge/host adapter를 bundle하고 runtime resource manifest에 파일별 SHA-256·platform·prompt version을 기록한다. SQLite 13.0.3의 win32-x64 prebuild와 JS wrapper, migration SQL/journal 및 실행 dependency license만 포함한다. 런타임 탐색은 Kiro child → 기존 Node → 검증된 cache → 공식 Node 조건부 획득 순서를 따른다.
+- **획득:** 공식 `https://nodejs.org/dist/v24.19.0/SHASUMS256.txt`를 2026-09-24 재조회했다. `win-x64/node.exe`의 SHA-256은 `3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237`이다. HTTPS 고정 URL·redirect 금지·크기 제한·hash pin 후 private staging에서만 실행하며 완료 cache도 재검증한다. archive 대신 executable을 받아 임의 archive extraction을 피한다. Node license는 검증된 공식 ZIP의 LICENSE를 패키지에 동봉한다. 이 선택은 download bytes가 ZIP보다 커지는 tradeoff가 있어 실제 크기를 기록한다.
+- **도구:** 새 npm dependency나 lifecycle script는 추가하지 않는다. Windows VSIX writer/reader는 기본 PowerShell/.NET System.IO.Compression을 사용한다. 경로는 환경 변수 data로 전달하며 shell 문자열에 삽입하지 않는다. 기존 macOS packaging은 유지한다.
+- **경계:** 제품 지원 version은 capability가 확인된 Node 24.18.0/24.19.0으로 시작하고 Node-API 10, API, platform, SQLite transaction/reopen probe를 모두 요구한다. 개발 24.19.0/11.12.0 pin은 불변이다. Node fallback으로 Kiro private Agent source/permission gate를 해제하지 않는다. W3 자동 lifecycle·frontend, W4 생성 앱 도구와 W5 clean install gate는 별도다.
+- **검증:** [W2 결과](spikes/T19_W2_PORTABLE_CORE_RESULTS_20260924.md). Kiro/기존/managed 세 후보에서 checkout 없는 Core·migration·SDK·stdio MCP·scope/권한/revoke·재시작 PASS. 공식 다운로드와 cache 재사용/손상/취소/offline/lock 복구를 검증했다. VSIX 1,875,725 bytes, 설치 파일 5,482,884 bytes, 조건부 Node 92,825,416 bytes다. 전체 `pnpm check`와 관련 native 회귀 PASS. W2 완료는 W3의 자동 실행/Windows native 제품 source gate 완료를 뜻하지 않는다.
+
 이 문서는 현재 제품·기술 판단의 근거와 상태를 보존한다. `승인`은 사용자가 직접 합의했거나 `PROJECT_BRIEF.md`에 확정된 사항, `제안`은 구현 전 승인이 필요한 선택, `spike 후 결정`은 외부 기능을 실제로 검증해야 하는 사항이다. 상태가 바뀌면 기존 맥락과 tradeoff를 지우지 않고 같은 항목을 갱신한다.
 
 ## 2026-08-24: Build-first 제품 철학
@@ -643,3 +733,12 @@
 - **결정:** `codex/kiro-native-recovery-20260913`의 `21674e8`에서 `codex/windows-extension-runtime-20260923`을 만든다. native 구현 baseline은 `445497b`이고 그 뒤 세 commit은 frontend 방향 문서다. 확인 당시 `main`은 `c8b3425`로 native baseline을 포함하지 않으므로 Windows 작업의 출발점으로 쓰지 않는다.
 - **이유:** recovery branch의 macOS 검증 근거를 보존하면서 Windows runtime·설치 변경을 독립적으로 검토·회귀할 수 있다. Core/frontend 계약을 보존하고 Windows 결과가 나온 뒤 통합 여부를 판단한다.
 - **Git 범위:** 이번 사용자 요청은 새 branch와 문서 commit까지다. 기존 untracked 실험 파일·생성 runtime·개인 설정은 보존하되 commit하지 않는다. remote 변경·push·PR·merge는 이번 작업에 포함하지 않는다. Windows에서 remote branch를 받으려면 별도 허용된 push/전달이 먼저 필요하다.
+
+## 2026-09-24: W1 Windows runtime 재사용과 native capability 판정
+
+- **상태:** 사용자 승인 [W1 계획](T19_W1_WINDOWS_CAPABILITY_PLAN.md)의 8개 native turn과 회귀/종료 감사를 완료했다. [결과와 한계](spikes/T19_W1_WINDOWS_CAPABILITY_RESULTS_20260924.md), [sanitized receipt](spikes/T19_W1_WINDOWS_RECEIPTS_20260924.json)를 근거로 W1만 완료하고 W2를 다음 작업으로 둔다.
+- **runtime:** 설치된 Kiro IDE 1.1.14 / Agent 1.1.28 / API 1.131.0 / Windows x64에서 extension-host의 Node 24.18.0·Electron 42.7.0·NAPI 10을 `process.execPath` + `ELECTRON_RUN_AS_NODE=1` child로 재사용할 수 있었다. 실제 win32-x64 SQLite transaction/reopen, Core/SDK와 stdio bridge가 통과했다. 개발 pin 24.19.0/11.12.0은 별도로 충족했으며 바꾸지 않는다. 다른 product runtime 후보나 ARM64를 검증했다고 확대하지 않는다.
+- **Windows 경계:** private directory/descriptor의 owner·DACL 검증을 추가하고 unsafe ACL/junction/hardlink를 거절한다. cloud session hash는 설치 source에 맞게 drive 경로의 slash/lowercase를 정규화한다. CRLF·separator·fixture portability를 고쳤고 canonical prompt 정책, dependency/lifecycle 허용 범위는 유지한다.
+- **native 동시성:** 한 창의 custom Builder/Helper queue는 여전히 직렬이었다. 이 Agent 버전은 `agentArtifacts`를 항상 켜는 승격 목록에 포함하여 과거 stable-empty-experiments 가정이 성립하지 않는다. 기존 protected built-in Helper를 Windows에 그대로 허용하지 않는다. 합성 profile에서 별도 Development Host를 만든 뒤 Helper의 empty catalog/all-deny, 별도 windowId와 실제 응답 중첩을 확인했다. 이는 **두 창 capability 관측**이며 제품 UX 채택 승인이 아니다. W3의 source gate와 lifecycle/UX 설계에 이 제한을 명시한다.
+- **판정 경계:** Discovery는 10 preview 제출, Builder는 별도 seeded Task에서 두 파일·검증 exit 0·Context v2, Helper는 실제 Core context/저장, 취소 후 새 실행·binding 401을 검증했다. 최종 harness의 기본 test reporter 오판은 원본 FAIL을 보존하고 같은 hash 파일의 TAP 9 tests 및 DB/ACL 감사를 별도 PASS로 남겼다. `pnpm check`, panel build 및 CJS 18 tests는 통과했다. 실제 사용자 Evidence, Analyst 의미 품질, clean Windows 설치·자동 Core lifecycle·전체 수직 흐름과 기존 T19/T19-N의 완료는 별도다.
+- **진행 경계:** W1용 진단만 새 Windows source SHA에 pin한다. 기존 제품의 Mac exact source gate는 보존하며 W2에서 검증된 portable descriptor/package를 구현한다. 추가 모델 turn, IDE 변경, commit/push는 이번 승인에 포함하지 않는다.

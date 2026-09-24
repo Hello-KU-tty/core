@@ -46,6 +46,7 @@ function startNativeWorker(context, connectionFile, runtime) {
   // waiting for the whole job would deadlock with builderOpening.
   const activeProtectedPrompts = new Set()
   let lastStatus = ''
+  let openedHelper = null
   let statusWrite = Promise.resolve()
   const record = (file, status) => {
     if (!file || status === lastStatus) return
@@ -290,6 +291,8 @@ function startNativeWorker(context, connectionFile, runtime) {
         ...(job.role === 'BUILDER' ?
           { builderLeaseDeadlineAt: job.leaseDeadlineAt } : {}),
         bridgeScriptPath: runtime.bridgeScriptPath,
+        ...(runtime.windowsProduct ? { windowsProduct: true,
+          runtimeDescriptor: runtime.runtimeDescriptor } : {}),
         redactText: redactSensitiveText,
         onPermissionTelemetry: (phase, toolName) => {
           const kind = ['read', 'search', 'write', 'shell'].includes(toolName) ?
@@ -298,6 +301,20 @@ function startNativeWorker(context, connectionFile, runtime) {
             record(file, `PERMISSION_${phase}_${job.role}_${kind}`)
         },
         onProtocolTelemetry: (summary) => {
+          if (summary?.kind === 'RPC_TIMEOUT') {
+            const operation = ['INITIALIZE', 'SESSION_NEW', 'SESSION_CONFIG', 'PERMISSION_EXPLAIN',
+              'PERMISSION_LIST', 'POLICY_CHECK', 'PROMPT', 'CANCEL'].includes(summary.operation)
+              ? summary.operation : 'OTHER'
+            record(file, `RPC_TIMEOUT_${job.role}_${operation}`)
+            return
+          }
+          if (summary?.kind === 'TOOLS_DID_CHANGE') {
+            const count = value => Number.isInteger(value) && value >= 0 && value <= 1024 ? value : 'INVALID'
+            const builtins = ['Read', 'Write', 'Shell', 'Web', 'Subagent', 'Spec', 'Context']
+              .filter(name => summary[`builtin${name}`]).map(name => name.toUpperCase()).join('_') || 'NONE'
+            record(file, `CATALOG_${job.role}_${summary.valid ? 'VALID' : 'INVALID'}_TOTAL_${count(summary.tagCount)}_MCP_${count(summary.mcpTagCount)}_BUILTIN_${builtins}`)
+            return
+          }
           if (summary?.kind === 'USER_INPUT_ACKED') {
             userInput.acknowledge(job.id, summary.sessionId, summary.toolCallId)
             record(file, `USER_INPUT_ACKED_${job.role}`)
@@ -338,7 +355,13 @@ function startNativeWorker(context, connectionFile, runtime) {
             reason => {
               if (detail.toolName === 'shell') record(file, `PERMISSION_GUARD_BUILDER_SHELL_${reason}`)
               if (detail.toolName === 'write') record(file, `PERMISSION_GUARD_BUILDER_WRITE_${reason}`)
-            })
+            }, runtime.windowsProduct ? async command => {
+              const tools = runtime.projectTools
+              if (!tools || !command.startsWith(tools.api.PROJECT_TOOL_COMMAND)) return null
+              await tools.api.verifyProjectTools(job.workspace, tools.resources)
+              const logical = command.slice(tools.api.PROJECT_TOOL_COMMAND.length)
+              return tools.api.projectCommandArgs(logical) ? logical : null
+            } : undefined)
           if (!optionId) {
             event({ kind: 'PERMISSION_DENIED' }); return null
           }
@@ -413,7 +436,7 @@ function startNativeWorker(context, connectionFile, runtime) {
         finishBuilderOpening = null
       }
       const code = typeof error?.code === 'string' && /^[A-Z0-9_]{1,100}$/.test(error.code) ?
-        error.code : 'NATIVE_IDE_TURN_FAILED'
+        error.code : /^NATIVE_[A-Z0-9_]{1,90}$/.test(error?.message ?? '') ? error.message : 'NATIVE_IDE_TURN_FAILED'
       if (protectedPair && job.protectedBuiltin) {
         const disposition = protectedFailureDisposition(code)
         if (disposition === 'REUSE_PAIR') {
@@ -472,8 +495,8 @@ function startNativeWorker(context, connectionFile, runtime) {
       if (health.agent !== 'KIRO_IDE_BUILTIN_AGENT') return
       if (!connectedRecorded) { record(file, 'WORKER_CONNECTED'); connectedRecorded = true }
       const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
-      if (!folder || vscode.workspace.workspaceFolders.length !== 1) return
-      const workspace = await realpath(folder)
+      if ((!folder || vscode.workspace.workspaceFolders.length !== 1) && !runtime.windowsProduct) return
+      const workspace = folder && vscode.workspace.workspaceFolders.length === 1 ? await realpath(folder) : dirname(file)
       const generatedRoot = await realpath(join(dirname(file), 'workspaces'))
       const helperHost = dirname(workspace) === generatedRoot &&
         basename(workspace).startsWith('__vibe-native-helper-')
@@ -481,9 +504,31 @@ function startNativeWorker(context, connectionFile, runtime) {
       // next custom Agent against this host's single MCP pool.
       if (helperHost && active.size > 0) return
       if (active.size >= 4) return
+      // Keep routing a pending Helper while Builder occupies this host. Block
+      // new claims on this host, not the read needed to open its separate host.
+      const blockedRoles = runtime.windowsProduct && active.size > 0
+        ? ['DISCOVERY', 'BUILDER', 'HELPER', 'EVIDENCE_ANALYST'] : [...active.keys()]
       const next = await get(connection,
         `/api/native/next?workspace=${encodeURIComponent(workspace)}` +
-        `&activeRoles=${encodeURIComponent([...active.keys()].join(','))}`)
+        `&activeRoles=${encodeURIComponent(blockedRoles.join(','))}`)
+      if (runtime.windowsProduct && !helperHost && next.pendingHelperWorkspace) {
+        const target = await realpath(next.pendingHelperWorkspace)
+        if (dirname(target) !== generatedRoot || !basename(target).startsWith('__vibe-native-helper-'))
+          throw gate('NATIVE_HELPER_WORKSPACE_INVALID')
+        if (openedHelper !== target) {
+          const endpoints = await vscode.commands.executeCommand('kiro.agentRegistry.getAgentEndpoints')
+          let existing = false
+          for (const endpoint of endpoints ?? []) {
+            if (endpoint.folders?.length === 1 && await realpath(endpoint.folders[0].path).catch(() => null) === target)
+              existing = true
+          }
+          openedHelper = target
+          if (!existing) {
+            record(file, 'HELPER_WINDOW_OPENING')
+            await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(target), { forceNewWindow: true })
+          }
+        }
+      } else if (!next.pendingHelperWorkspace) openedHelper = null
       // A later retry is a new routing opportunity after the old pending Job
       // has expired. Suppress only repeats of the same still-pending switch.
       if (!next.pendingWorkspace) unconfirmedSwitchTarget = null

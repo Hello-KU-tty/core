@@ -22,6 +22,7 @@ import {
   preparedBuilderTaskDescriptorSchema,
   projectCandidateRevisionSchema,
   projectSchema,
+  projectEvidenceTraceSchema,
 } from '@vibe-helper/contracts'
 import { describe, expect, it } from 'vitest'
 
@@ -1085,7 +1086,7 @@ describe('ApplicationService boundary', () => {
     const projectWorkspace = join(workspaceRoot, 'generated', 'webhook-lens')
     const outside = await mkdtemp(join(tmpdir(), 'vibe-helper-outside-workspace-'))
     await mkdir(projectWorkspace, { recursive: true })
-    await symlink(outside, join(projectWorkspace, 'escape'))
+    await symlink(outside, join(projectWorkspace, 'escape'), 'junction')
 
     await expect(
       workspacePolicy.validateReferences(
@@ -1108,7 +1109,7 @@ describe('ApplicationService boundary', () => {
     const projectWorkspace = join(workspaceRoot, 'generated', 'webhook-lens')
     const outside = await mkdtemp(join(tmpdir(), 'vibe-helper-builder-escape-'))
     await mkdir(projectWorkspace, { recursive: true })
-    await symlink(outside, join(projectWorkspace, 'escape'))
+    await symlink(outside, join(projectWorkspace, 'escape'), 'junction')
 
     const result = await service.executeAgent('BUILDER', {
       schemaVersion: 1,
@@ -3289,131 +3290,161 @@ describe('T11 Decision gate and Builder resume application flow', () => {
     ).toMatchObject({ success: true, data: { resourceRevision: 3 } })
   })
 
-  it('normalizes a Helper exchange, queues one job and accepts an empty analysis result', async () => {
-    const { service, storage } = await createHarness()
-    seedBuilderGraph(storage)
+  it.each([
+    ['short', 'The user asked a question but did not explain or apply the concept.'],
+    ['long', 'No independent explanation was given. '.repeat(12).trim()],
+    ['maximum', 'x'.repeat(4000)],
+    ['surrogate boundary', 'a'.repeat(238) + '🚦' + ' No user explanation.'.repeat(15)],
+  ])(
+    'normalizes a Helper exchange and safely displays empty analysis: %s',
+    async (_label, reason) => {
+      const { service, storage } = await createHarness()
+      seedBuilderGraph(storage)
 
-    const recorded = await service.executeUi({
-      schemaVersion: 1,
-      kind: 'UI_RECORD_HELPER_EXCHANGE',
-      correlationId: ids.correlation,
-      actor: { kind: 'UI' },
-      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000301',
-      projectId: ids.project,
-      taskId: ids.task,
-      userMessage: 'Why is runtime validation needed here?',
-      helperResponseSummary: 'It checks unknown input before typed code uses it.',
-      closeConversation: true,
-    })
-    expect(recorded).toMatchObject({
-      success: true,
-      data: { episodeRevision: 3, status: 'PENDING_ANALYSIS' },
-    })
-    if (!recorded.success || !('episodeId' in recorded.data)) throw new Error('missing episode')
+      const recorded = await service.executeUi({
+        schemaVersion: 1,
+        kind: 'UI_RECORD_HELPER_EXCHANGE',
+        correlationId: ids.correlation,
+        actor: { kind: 'UI' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000301',
+        projectId: ids.project,
+        taskId: ids.task,
+        userMessage: 'Why is runtime validation needed here?',
+        helperResponseSummary: 'It checks unknown input before typed code uses it.',
+        closeConversation: true,
+      })
+      expect(recorded).toMatchObject({
+        success: true,
+        data: { episodeRevision: 3, status: 'PENDING_ANALYSIS' },
+      })
+      if (!recorded.success || !('episodeId' in recorded.data)) throw new Error('missing episode')
 
-    const pendingResult = await service.executeAnalysis({
-      schemaVersion: 1,
-      kind: 'ANALYSIS_LIST_PENDING',
-      correlationId: ids.correlation,
-      actor: { kind: 'KIRO_ADAPTER' },
-      limit: 10,
-    })
-    if (!pendingResult.success) throw new Error('pending job query failed')
-    const pending = analysisJobSchema.array().parse(pendingResult.data)
-    expect(pending).toHaveLength(1)
-    const pendingJob = pending[0]
-    if (pendingJob === undefined) throw new Error('pending job missing')
-    expect(pendingJob).toMatchObject({
-      episodeId: recorded.data.episodeId,
-      episodeRevision: 3,
-      status: 'PENDING',
-      attempt: 0,
-    })
+      const pendingResult = await service.executeAnalysis({
+        schemaVersion: 1,
+        kind: 'ANALYSIS_LIST_PENDING',
+        correlationId: ids.correlation,
+        actor: { kind: 'KIRO_ADAPTER' },
+        limit: 10,
+      })
+      if (!pendingResult.success) throw new Error('pending job query failed')
+      const pending = analysisJobSchema.array().parse(pendingResult.data)
+      expect(pending).toHaveLength(1)
+      const pendingJob = pending[0]
+      if (pendingJob === undefined) throw new Error('pending job missing')
+      expect(pendingJob).toMatchObject({
+        episodeId: recorded.data.episodeId,
+        episodeRevision: 3,
+        status: 'PENDING',
+        attempt: 0,
+      })
 
-    const claimedResult = await service.executeAnalysis({
-      schemaVersion: 1,
-      kind: 'ANALYSIS_CLAIM_JOB',
-      correlationId: ids.correlation,
-      actor: { kind: 'KIRO_ADAPTER' },
-      projectId: ids.project,
-      analysisJobId: pendingJob.id,
-      expectedJobRevision: pendingJob.revision,
-      runtimeHandle: 'kiro-session-helper-empty',
-    })
-    if (!claimedResult.success) throw new Error('job claim failed')
-    const claimed = analysisJobSchema.parse(claimedResult.data)
-    expect(claimed).toMatchObject({ status: 'RUNNING', attempt: 1, revision: 2 })
+      const claimedResult = await service.executeAnalysis({
+        schemaVersion: 1,
+        kind: 'ANALYSIS_CLAIM_JOB',
+        correlationId: ids.correlation,
+        actor: { kind: 'KIRO_ADAPTER' },
+        projectId: ids.project,
+        analysisJobId: pendingJob.id,
+        expectedJobRevision: pendingJob.revision,
+        runtimeHandle: 'kiro-session-helper-empty',
+      })
+      if (!claimedResult.success) throw new Error('job claim failed')
+      const claimed = analysisJobSchema.parse(claimedResult.data)
+      expect(claimed).toMatchObject({ status: 'RUNNING', attempt: 1, revision: 2 })
 
-    const context = await service.executeAgent('EVIDENCE_ANALYST', {
-      schemaVersion: 1,
-      kind: 'ANALYST_GET_EPISODE_CONTEXT',
-      correlationId: ids.correlation,
-      actor: { kind: 'AGENT', role: 'EVIDENCE_ANALYST' },
-      projectId: ids.project,
-      episodeId: claimed.episodeId,
-      expectedEpisodeRevision: claimed.episodeRevision,
-    })
-    expect(context).toMatchObject({
-      success: true,
-      data: {
-        episode: { type: 'HELPER_CONVERSATION', status: 'PENDING_ANALYSIS' },
-        events: [
-          { actor: { kind: 'USER' }, payload: { type: 'USER_MESSAGE' } },
-          { actor: { kind: 'AGENT', role: 'HELPER' }, payload: { type: 'HELPER_RESPONSE' } },
-        ],
-        analysisJob: { id: claimed.id, status: 'RUNNING', attempt: 1 },
-      },
-    })
+      const context = await service.executeAgent('EVIDENCE_ANALYST', {
+        schemaVersion: 1,
+        kind: 'ANALYST_GET_EPISODE_CONTEXT',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'EVIDENCE_ANALYST' },
+        projectId: ids.project,
+        episodeId: claimed.episodeId,
+        expectedEpisodeRevision: claimed.episodeRevision,
+      })
+      expect(context).toMatchObject({
+        success: true,
+        data: {
+          episode: { type: 'HELPER_CONVERSATION', status: 'PENDING_ANALYSIS' },
+          events: [
+            { actor: { kind: 'USER' }, payload: { type: 'USER_MESSAGE' } },
+            { actor: { kind: 'AGENT', role: 'HELPER' }, payload: { type: 'HELPER_RESPONSE' } },
+          ],
+          analysisJob: { id: claimed.id, status: 'RUNNING', attempt: 1 },
+        },
+      })
 
-    const emptyResult = {
-      schemaVersion: 1,
-      episodeId: claimed.episodeId,
-      episodeRevision: claimed.episodeRevision,
-      correlationId: claimed.correlationId,
-      proposals: [],
-      noEvidenceReason: 'The user asked a question but did not explain or apply the concept.',
-    } as const
-    const submitted = await service.executeAnalysis({
-      schemaVersion: 1,
-      kind: 'ANALYSIS_SUBMIT_RESULT',
-      correlationId: ids.correlation,
-      actor: { kind: 'KIRO_ADAPTER' },
-      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000302',
-      projectId: ids.project,
-      analysisJobId: claimed.id,
-      expectedJobRevision: claimed.revision,
-      attempt: claimed.attempt,
-      result: emptyResult,
-    })
-    expect(submitted).toMatchObject({ success: true, data: { outcomes: [] } })
-    expect(storage.repository.readAnalysisJob(ids.project, claimed.id)).toMatchObject({
-      status: 'SUCCEEDED',
-      revision: 3,
-      resultSummary: {
-        proposalCount: 0,
-        acceptedCount: 0,
-        rejectedCount: 0,
-        noEvidenceReason: emptyResult.noEvidenceReason,
-      },
-    })
-    expect(
-      storage.repository.readEpisodeAggregate(ids.project, claimed.episodeId)?.episode,
-    ).toMatchObject({ status: 'ANALYZED', revision: 4 })
+      const emptyResult = {
+        schemaVersion: 1,
+        episodeId: claimed.episodeId,
+        episodeRevision: claimed.episodeRevision,
+        correlationId: claimed.correlationId,
+        proposals: [],
+        noEvidenceReason: reason,
+      } as const
+      const submitted = await service.executeAnalysis({
+        schemaVersion: 1,
+        kind: 'ANALYSIS_SUBMIT_RESULT',
+        correlationId: ids.correlation,
+        actor: { kind: 'KIRO_ADAPTER' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000302',
+        projectId: ids.project,
+        analysisJobId: claimed.id,
+        expectedJobRevision: claimed.revision,
+        attempt: claimed.attempt,
+        result: emptyResult,
+      })
+      expect(submitted).toMatchObject({ success: true, data: { outcomes: [] } })
+      expect(storage.repository.readAnalysisJob(ids.project, claimed.id)).toMatchObject({
+        status: 'SUCCEEDED',
+        revision: 3,
+        resultSummary: {
+          proposalCount: 0,
+          acceptedCount: 0,
+          rejectedCount: 0,
+          noEvidenceReason: emptyResult.noEvidenceReason,
+        },
+      })
+      expect(
+        storage.repository.readEpisodeAggregate(ids.project, claimed.episodeId)?.episode,
+      ).toMatchObject({ status: 'ANALYZED', revision: 4 })
 
-    const late = await service.executeAnalysis({
-      schemaVersion: 1,
-      kind: 'ANALYSIS_SUBMIT_RESULT',
-      correlationId: ids.correlation,
-      actor: { kind: 'KIRO_ADAPTER' },
-      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000303',
-      projectId: ids.project,
-      analysisJobId: claimed.id,
-      expectedJobRevision: claimed.revision,
-      attempt: claimed.attempt,
-      result: emptyResult,
-    })
-    expect(late).toMatchObject({ success: false, error: { code: 'ANALYSIS_JOB_STALE' } })
-  })
+      const viewResult = await service.executeUi({
+        schemaVersion: 1,
+        kind: 'UI_READ_EVIDENCE_TRACE',
+        correlationId: ids.correlation,
+        actor: { kind: 'UI' },
+        projectId: ids.project,
+      })
+      expect(viewResult.success).toBe(true)
+      if (!viewResult.success) throw new Error('evidence trace failed')
+      const view = projectEvidenceTraceSchema.parse(viewResult.data)
+      expect(view.concepts).toEqual([])
+      expect(view.emptyReason?.length).toBeLessThanOrEqual(240)
+      expect(Buffer.from(view.emptyReason ?? '').toString('utf8')).toBe(view.emptyReason)
+      expect(view.emptyReason).toBe(
+        reason.length <= 240
+          ? reason
+          : reason.startsWith('a'.repeat(238))
+            ? 'a'.repeat(238) + '…'
+            : reason.slice(0, 239) + '…',
+      )
+      expect(view.analysis[0]?.resultSummary?.noEvidenceReason).toBe(reason)
+
+      const late = await service.executeAnalysis({
+        schemaVersion: 1,
+        kind: 'ANALYSIS_SUBMIT_RESULT',
+        correlationId: ids.correlation,
+        actor: { kind: 'KIRO_ADAPTER' },
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000000303',
+        projectId: ids.project,
+        analysisJobId: claimed.id,
+        expectedJobRevision: claimed.revision,
+        attempt: claimed.attempt,
+        result: emptyResult,
+      })
+      expect(late).toMatchObject({ success: false, error: { code: 'ANALYSIS_JOB_STALE' } })
+    },
+  )
 
   it('keeps one Helper conversation Episode across request correlation boundaries', async () => {
     const { service, storage } = await createHarness()

@@ -1,5 +1,8 @@
 import { defineConfig, devices } from '@playwright/test'
 
+// Windows cold process/toolchain startup can exceed 30s; test timeouts stay unchanged.
+const serverStartupTimeout = process.platform === 'win32' ? 120_000 : 30_000
+
 export default defineConfig({
   testDir: './tests/e2e',
   // E2E specs share one temporary backend; their project histories must not interleave.
@@ -23,13 +26,13 @@ export default defineConfig({
       command: 'pnpm --filter @vibe-helper/crew-backend dev:test',
       url: 'http://127.0.0.1:4174/health',
       reuseExistingServer: false,
-      timeout: 30_000,
+      timeout: serverStartupTimeout,
     },
     {
       command: 'pnpm --filter @vibe-helper/crew-app dev',
       url: 'http://127.0.0.1:4173',
       reuseExistingServer: false,
-      timeout: 30_000,
+      timeout: serverStartupTimeout,
     },
   ],
 })

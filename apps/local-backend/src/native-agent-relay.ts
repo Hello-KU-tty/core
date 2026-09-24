@@ -8,14 +8,20 @@ import {
   helperContextSchema,
   projectSessionSnapshotSchema,
 } from '@vibe-helper/contracts'
-import { type AgentInvocation, type WorkflowAgentPort, WorkflowError } from '@vibe-helper/runtime'
+import {
+  type AgentInvocation,
+  type CoreRuntimeDescriptor,
+  type WorkflowAgentPort,
+  WorkflowError,
+} from '@vibe-helper/runtime'
 import type { LocalMcpHandler } from './agent-host.js'
-import { createNativeCoreBinding } from './native-core-binding.js'
 import { describeNativeAnalystResult } from './native-analyst-diagnostic.js'
+import { createNativeCoreBinding } from './native-core-binding.js'
 import {
   composeNativeProtectedAnalystPrompt,
   composeNativeProtectedHelperPrompt,
 } from './native-protected-prompt.js'
+import { isPrivateDirectory, privateDirectory } from './private-files.js'
 
 type NativeRole = 'DISCOVERY' | 'BUILDER' | 'HELPER' | 'EVIDENCE_ANALYST'
 interface NativeJob {
@@ -67,8 +73,11 @@ const coreActions = new Set([
   'HELPER_GET_CONTEXT',
   'HELPER_REQUEST_CONTEXT_REFRESH',
 ])
+declare const __VIBE_PACKAGED_CORE__: boolean
 const PERSISTENT_NATIVE_RUNTIME =
-  '/Users/hurdoo/Library/Application Support/VibeHelper/NativeExperiment-20260913/runtime'
+  typeof __VIBE_PACKAGED_CORE__ !== 'undefined' && __VIBE_PACKAGED_CORE__
+    ? ''
+    : '/Users/hurdoo/Library/Application Support/VibeHelper/NativeExperiment-20260913/runtime'
 const HELPER_HOST_PREFIX = '__vibe-native-helper-'
 function redactJobText(text: string, job: NativeJob): string {
   return redactSensitiveText(redactSensitiveText(text, job.workspace), job.projectWorkspace)
@@ -81,7 +90,13 @@ export class NativeAgentRelay implements WorkflowAgentPort {
   readonly #policy: WorkspacePathPolicy
   readonly #root: string
   readonly #repository: string
+  readonly #portable:
+    | { promptDirectory: string; bridgeScriptPath: string; runtime: CoreRuntimeDescriptor }
+    | undefined
   readonly #singleWindowBuiltinH: boolean
+  readonly #prepareBuilderTools:
+    | ((workspace: string, signal: AbortSignal) => Promise<void>)
+    | undefined
   #baseUrl: string | undefined
   #closed = false
   constructor(options: {
@@ -89,12 +104,16 @@ export class NativeAgentRelay implements WorkflowAgentPort {
     policy: WorkspacePathPolicy
     root: string
     repository: string
+    portable?: { promptDirectory: string; bridgeScriptPath: string; runtime: CoreRuntimeDescriptor }
     singleWindowBuiltinH?: boolean
+    prepareBuilderTools?: (workspace: string, signal: AbortSignal) => Promise<void>
   }) {
     this.#application = options.application
     this.#policy = options.policy
     this.#root = options.root
     this.#repository = options.repository
+    this.#portable = options.portable
+    this.#prepareBuilderTools = options.prepareBuilderTools
     this.#singleWindowBuiltinH = options.singleWindowBuiltinH === true
   }
   setBaseUrl(url: string): void {
@@ -170,6 +189,7 @@ export class NativeAgentRelay implements WorkflowAgentPort {
       ? join(await realpath(this.#root), `native-binding-${id}.json`)
       : undefined
     try {
+      if (role === 'BUILDER') await this.#prepareBuilderTools?.(workspace, request.signal)
       if (!protectedBuiltin)
         await this.#prepareConfig({
           workspace,
@@ -375,6 +395,13 @@ export class NativeAgentRelay implements WorkflowAgentPort {
       null
     )
   }
+  pendingHelperWorkspace(): string | null {
+    return (
+      [...this.#jobs.values()].find(
+        (job) => job.state === 'WAITING' && job.separateHost && !job.protectedBuiltin,
+      )?.workspace ?? null
+    )
+  }
   async #helperHostWorkspace(projectId: string, projectWorkspace: string): Promise<string> {
     const root = await realpath(this.#root)
     const generatedRoot = await realpath(this.#policy.generatedWorkspaceRoot)
@@ -385,6 +412,7 @@ export class NativeAgentRelay implements WorkflowAgentPort {
     if (host === projectWorkspace) throw new WorkflowError('NATIVE_HELPER_HOST_NOT_SEPARATE')
     try {
       await mkdir(host, { mode: 0o700 })
+      if (process.platform === 'win32') await privateDirectory(host)
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
     }
@@ -392,8 +420,7 @@ export class NativeAgentRelay implements WorkflowAgentPort {
     if (
       !info.isDirectory() ||
       info.isSymbolicLink() ||
-      (info.mode & 0o077) !== 0 ||
-      (typeof process.getuid === 'function' && info.uid !== process.getuid()) ||
+      !(await isPrivateDirectory(host)) ||
       (await realpath(host)) !== host
     )
       throw new WorkflowError('NATIVE_HELPER_HOST_PATH_INVALID')
@@ -409,7 +436,10 @@ export class NativeAgentRelay implements WorkflowAgentPort {
     helperWorkspace: string,
   ): Promise<string> {
     const rolePrompt = await readFile(
-      join(this.#repository, 'docs/agent-prompts', roleFiles[role]),
+      join(
+        this.#portable?.promptDirectory ?? join(this.#repository, 'docs/agent-prompts'),
+        roleFiles[role],
+      ),
       'utf8',
     )
     let composed: string
@@ -491,7 +521,7 @@ export class NativeAgentRelay implements WorkflowAgentPort {
       const bridgeErrorCode = update.bridgeErrorCode ?? null
       const nativeToolIdClass = update.nativeToolIdClass ?? null
       const commandPattern =
-        /^(?:node --test(?: [A-Za-z0-9._/:=-]+)*|pnpm test(?: [A-Za-z0-9._/:=,-]+)*|pnpm rebuild esbuild|pnpm run [a-zA-Z0-9:_-]+(?: -- [A-Za-z0-9._/:=,-]+)*|pnpm install --frozen-lockfile|npm test(?: -- [A-Za-z0-9._/:=,-]+)*|npm run [a-zA-Z0-9:_-]+(?: -- [A-Za-z0-9._/:=,-]+)*|npm install(?: --include=dev)?)$/
+        /^(?:\.\\\.kiro\\vibe-tools\.cmd )?(?:node --test(?: [A-Za-z0-9._/:=-]+)*|pnpm test(?: [A-Za-z0-9._/:=,-]+)*|pnpm rebuild esbuild|pnpm run [a-zA-Z0-9:_-]+(?: -- [A-Za-z0-9._/:=,-]+)*|pnpm install --frozen-lockfile|pnpm install --lockfile-only --ignore-scripts --ignore-pnpmfile|npm test(?: -- [A-Za-z0-9._/:=,-]+)*|npm run [a-zA-Z0-9:_-]+(?: -- [A-Za-z0-9._/:=,-]+)*|npm install(?: --include=dev)?)$/
       if (
         update.sessionUpdate !== 'tool_call_update' ||
         !['READ', 'WRITE', 'DECISION', 'OTHER'].includes(String(update.titleClass)) ||
@@ -708,7 +738,10 @@ export class NativeAgentRelay implements WorkflowAgentPort {
   }): Promise<void> {
     const { workspace, role, roleName, binding, descriptorFile } = options
     const prompt = await readFile(
-      join(this.#repository, 'docs/agent-prompts', roleFiles[role]),
+      join(
+        this.#portable?.promptDirectory ?? join(this.#repository, 'docs/agent-prompts'),
+        roleFiles[role],
+      ),
       'utf8',
     )
     const directory = join(workspace, '.kiro', 'agents')
@@ -749,7 +782,8 @@ export class NativeAgentRelay implements WorkflowAgentPort {
     const receiptRoot = await realpath(this.#root)
     const receiptFile =
       receiptRoot.startsWith('/private/tmp/') ||
-      (process.env.VIBE_NATIVE_PERSISTENT_DIAGNOSTICS === '1' &&
+      (!(typeof __VIBE_PACKAGED_CORE__ !== 'undefined' && __VIBE_PACKAGED_CORE__) &&
+        process.env.VIBE_NATIVE_PERSISTENT_DIAGNOSTICS === '1' &&
         receiptRoot === PERSISTENT_NATIVE_RUNTIME)
         ? join(receiptRoot, 'native-core-receipts.jsonl')
         : null
@@ -766,13 +800,22 @@ export class NativeAgentRelay implements WorkflowAgentPort {
           ? {}
           : {
               'vibe-native-core': {
-                command: '/opt/homebrew/opt/node@24/bin/node',
+                command: this.#portable?.runtime.executable ?? '/opt/homebrew/opt/node@24/bin/node',
                 args: [
-                  join(this.#repository, 'scripts/native-core-stdio-bridge.mjs'),
+                  ...(this.#portable?.runtime.args ?? []),
+                  this.#portable?.bridgeScriptPath ??
+                    join(this.#repository, 'scripts/native-core-stdio-bridge.mjs'),
                   descriptorFile,
                   workspace,
                 ],
-                ...(receiptFile ? { env: { VIBE_NATIVE_BRIDGE_RECEIPT_FILE: receiptFile } } : {}),
+                ...(receiptFile || this.#portable
+                  ? {
+                      env: {
+                        ...this.#portable?.runtime.env,
+                        ...(receiptFile ? { VIBE_NATIVE_BRIDGE_RECEIPT_FILE: receiptFile } : {}),
+                      },
+                    }
+                  : {}),
               },
             },
       permissions: {
@@ -802,6 +845,13 @@ export class NativeAgentRelay implements WorkflowAgentPort {
                 { capability: 'fs_write', effect: 'deny' },
                 { capability: 'shell', effect: 'deny' },
               ]),
+          ...(this.#portable
+            ? [
+                ...(role !== 'BUILDER' ? [{ capability: 'fs_read', effect: 'deny' }] : []),
+                { capability: 'web_search', effect: 'deny' },
+                ...(role === 'EVIDENCE_ANALYST' ? [{ capability: 'mcp', effect: 'deny' }] : []),
+              ]
+            : []),
         ],
       },
     }

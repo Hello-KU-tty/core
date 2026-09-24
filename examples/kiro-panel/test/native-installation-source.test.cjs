@@ -60,7 +60,7 @@ test('a product override fails closed even when both base manifests match', () =
 test('a symlinked app or Agent source cannot escape the running app root', () => {
   const root = stageKiroInstallation()
   const rootAlias = `${root}-alias`
-  symlinkSync(root, rootAlias)
+  symlinkSync(root, rootAlias, 'junction')
   assert.throws(() => attestPinnedKiroInstallation(vscode(rootAlias), undefined, root), error =>
     error.code === 'NATIVE_KIRO_INSTALLATION_SOURCE_UNVERIFIED')
 
@@ -71,7 +71,7 @@ test('a symlinked app or Agent source cannot escape the running app root', () =>
   const parent = realpathSync(mkdtempSync(join(tmpdir(), 'vibe-helper-pinned-kiro-parent-')))
   writeFileSync(join(parent, 'product.json'), JSON.stringify(PINNED_PRODUCT))
   mkdirSync(join(parent, 'extensions'))
-  symlinkSync(escapedRoot, join(parent, 'extensions', 'kiro.kiro-agent'))
+  symlinkSync(escapedRoot, join(parent, 'extensions', 'kiro.kiro-agent'), 'junction')
   assert.throws(() => attestPinnedKiroInstallation(vscode(parent), undefined, parent), error =>
     error.code === 'NATIVE_KIRO_INSTALLATION_SOURCE_UNVERIFIED')
 })

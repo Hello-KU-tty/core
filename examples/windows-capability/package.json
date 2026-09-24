@@ -1,0 +1,10 @@
+{
+  "name": "vibe-helper-windows-capability",
+  "displayName": "Vibe Helper Windows Capability Probe",
+  "publisher": "vibe-helper",
+  "version": "0.0.1",
+  "private": true,
+  "engines": { "vscode": "^1.90.0" },
+  "main": "./extension.cjs",
+  "activationEvents": ["onStartupFinished"]
+}

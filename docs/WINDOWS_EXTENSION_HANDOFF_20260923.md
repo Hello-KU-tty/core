@@ -1,5 +1,7 @@
 # Windows 확장 설치·런타임 후속 인계
 
+> **2026-09-24 갱신:** 아래는 W0 당시의 역사 기록이다. W1~W4 구현·검증 이후 현재 작업은 W5이며, 다른 기기에서의 checkout·환경 준비·남은 작업과 최신 commit/push 범위는 [새 재개 인계](CROSS_DEVICE_HANDOFF_20260924.md)를 따른다.
+
 > 작성: 2026-09-23 KST. 사용자와 합의한 요구와 구현 방향을 기록한다. 이번 인계는 문서 작업이며 Windows 실행·패키징·다운로드 기능은 아직 구현/검증되지 않았다.
 > 작업 브랜치: `codex/windows-extension-runtime-20260923`. 분기점: `codex/kiro-native-recovery-20260913`의 `21674e8`; native 구현 baseline: `445497b`.
 > 다음 작업은 [TASKS.md](TASKS.md)의 T19-W1이다. 상위 요구는 [PROJECT_BRIEF.md](../PROJECT_BRIEF.md) → [SPEC.md](SPEC.md) → [ARCHITECTURE.md](ARCHITECTURE.md) → [DECISIONS.md](DECISIONS.md) 순서로 읽는다.

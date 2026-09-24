@@ -5,13 +5,14 @@ import { createServer } from 'node:net'
 import { dirname, isAbsolute, resolve, sep } from 'node:path'
 
 import { redactSensitiveText } from '@vibe-helper/application/redaction'
-import { stopOwnedProcessTree } from './process-tree.js'
 import {
   GENERATED_RESULT_MANIFEST_PATH,
   type GeneratedResultDescriptor,
   generatedResultDescriptorSchema,
   generatedResultManifestSchema,
 } from '@vibe-helper/contracts'
+import { stopOwnedProcessTree } from './process-tree.js'
+import { type ProjectToolchain, projectEnvironment } from './project-toolchain.js'
 
 const MAX_MANIFEST_BYTES = 32_768
 const MAX_DIAGNOSTIC_CHARACTERS = 1_000
@@ -40,15 +41,24 @@ export class ResultRuntimeSupervisor {
   readonly #launching = new Map<string, Promise<GeneratedResultDescriptor>>()
   readonly #cleanups = new Set<Promise<void>>()
   #closed = false
+  readonly #projectToolchain: ((workspace: string) => Promise<ProjectToolchain>) | undefined
 
-  private constructor(workspaceRoot: string, startupTimeoutMs: number) {
+  private constructor(
+    workspaceRoot: string,
+    startupTimeoutMs: number,
+    projectToolchain?: (workspace: string) => Promise<ProjectToolchain>,
+  ) {
     this.#workspaceRoot = workspaceRoot
     this.#startupTimeoutMs = startupTimeoutMs
+    this.#projectToolchain = projectToolchain
   }
 
   static async create(
     workspaceRoot: string,
-    options: { readonly startupTimeoutMs?: number } = {},
+    options: {
+      readonly startupTimeoutMs?: number
+      readonly projectToolchain?: (workspace: string) => Promise<ProjectToolchain>
+    } = {},
   ): Promise<ResultRuntimeSupervisor> {
     if (!isAbsolute(workspaceRoot)) {
       throw new TypeError('Generated workspace root must be absolute.')
@@ -56,6 +66,7 @@ export class ResultRuntimeSupervisor {
     return new ResultRuntimeSupervisor(
       await realpath(workspaceRoot),
       options.startupTimeoutMs ?? 10_000,
+      options.projectToolchain,
     )
   }
 
@@ -134,12 +145,24 @@ export class ResultRuntimeSupervisor {
     const origin = `http://127.0.0.1:${String(port)}`
     const healthUrl = `${origin}${parsedManifest.data.healthPath}`
     const url = `${origin}${parsedManifest.data.openPath}`
-    const child = spawn(process.execPath, [canonicalEntry], {
+    const toolchain = await this.#projectToolchain?.(workspace).catch(() => {
+      throw new ResultRuntimeError(
+        'RESULT_PROJECT_RUNTIME_UNAVAILABLE',
+        'Generated app runtime could not be prepared. Restore its verified tools before retrying.',
+      )
+    })
+    if (!toolchain && process.versions.electron)
+      throw new ResultRuntimeError(
+        'RESULT_PROJECT_RUNTIME_REQUIRED',
+        'Generated app runtime has not been prepared.',
+      )
+    const executable = toolchain?.node.executable ?? process.execPath
+    const child = spawn(executable, [canonicalEntry], {
       cwd: workspace,
       env: {
+        ...(toolchain ? projectEnvironment(toolchain) : { PATH: dirname(executable) }),
         HOST: '127.0.0.1',
         NODE_ENV: 'production',
-        PATH: dirname(process.execPath),
         PORT: String(port),
       },
       shell: false,

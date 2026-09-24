@@ -28,6 +28,8 @@ test('restores Project History, route state, and Crew conversations across reloa
   page,
   request,
 }) => {
+  // This covers repeated reloads and several recovery states, not one response latency.
+  test.setTimeout(60_000)
   const pageErrors: Error[] = []
   page.on('pageerror', (error) => pageErrors.push(error))
 

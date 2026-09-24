@@ -930,11 +930,12 @@ describe('T19 Discovery v1.3.4 optional actual Decision forecast', () => {
     expect(learningSpecRevisionSchema.parse(realFork.learningSpec).expectedDecisions).toHaveLength(
       fixture.realForkExpectedDecisionCount,
     )
-    const previewStart = prompt.indexOf('\n## 빠른 PREVIEW turn\n')
-    const previewEnd = prompt.indexOf('\n## ENRICHMENT turn\n', previewStart)
+    const canonicalPrompt = prompt.replace(/\r\n/g, '\n')
+    const previewStart = canonicalPrompt.indexOf('\n## 빠른 PREVIEW turn\n')
+    const previewEnd = canonicalPrompt.indexOf('\n## ENRICHMENT turn\n', previewStart)
     expect(previewStart).toBeGreaterThan(0)
     expect(previewEnd).toBeGreaterThan(previewStart)
-    const currentPreview = prompt.slice(previewStart, previewEnd)
+    const currentPreview = canonicalPrompt.slice(previewStart, previewEnd)
     const { priorRule, revisedRule } = currentPreviewFixture.historicalRuleDelta
     expect(currentPreview.split(revisedRule)).toHaveLength(2)
     expect(currentPreview).not.toContain(priorRule)
@@ -1178,7 +1179,7 @@ describe('T11 Builder prompt regression', () => {
       readonly containsPersonalData: boolean
     }
 
-    expect(prompt).toContain('Prompt version: `1.3.6`')
+    expect(prompt).toContain('Prompt version: `1.3.8`')
     expect(prompt).toContain('.vibe-helper/result.json')
     expect(prompt).toContain('HOST=127.0.0.1')
     expect(prompt).toContain('동적 `PORT`')
@@ -1225,13 +1226,21 @@ describe('T11 Builder prompt regression', () => {
 })
 
 describe('T19 Builder validation regression', () => {
+  it('uses the prepared Windows tool entry without changing legacy commands or success criteria', async () => {
+    const prompt = await readFile(path.join(workspaceRoot, 'docs/agent-prompts/builder.md'), 'utf8')
+    expect(prompt).toContain('Prompt version: `1.3.8`')
+    expect(prompt).toContain('.\\.kiro\\vibe-tools.cmd pnpm run build')
+    expect(prompt).toContain('기존 macOS/CLI 경로에는 이 접두어를 붙이지 않는다')
+    expect(prompt).toContain('진입점이 없거나 도구 준비에 실패하면 실패 상태를 보고한다')
+    expect(prompt).toContain('esbuild/better-sqlite3에만 한정한다')
+  })
   it('distinguishes a blocked command from a real passing validation', async () => {
     const prompt = await readFile(path.join(workspaceRoot, 'docs/agent-prompts/builder.md'), 'utf8')
     const fixture = await loadInput(
       'tests/eval/fixtures/prompt-regressions/t19-builder-validation.json',
     )
     expect(fixture).toMatchObject({
-      promptVersion: '1.3.6',
+      promptVersion: '1.3.8',
       expected: {
         mayClaimPassed: false,
         mayComplete: false,
@@ -1248,6 +1257,8 @@ describe('T19 Builder validation regression', () => {
         mustNotPrependCoreWorkspacePath: true,
         nativeProjectRoot: '.',
         lockRefreshWithoutConfigAllowed: true,
+        windowsApprovedConfigRefreshAllowed: true,
+        unverifiedConfigRefreshAllowed: false,
         frozenInstallAfterRefreshRequired: true,
         smokeOwnsBoundedChild: true,
         smokeChecksLoopbackHttp: true,
@@ -1267,7 +1278,8 @@ describe('T19 Builder validation regression', () => {
     expect(prompt).toContain('잠금 파일을 처음 만들거나 갱신한다')
     expect(prompt).toContain('잠금 파일이 현재 `package.json`과 맞은 뒤')
     expect(prompt).toContain('`pnpm install --frozen-lockfile`로 실제 설치한다')
-    expect(prompt).toContain('설정 파일이 이미 있어 안전한 잠금 갱신이 거부되면')
+    expect(prompt).toContain('Windows 보호 실행기에서는 pnpm-workspace.yaml이')
+    expect(prompt).toContain('설정이나 명령이 거부되면 우회하지 말고')
     expect(prompt).toContain('별도의 foreground `pnpm run smoke`')
     expect(prompt).toContain('health path, 사용자 화면 path와 필요한 컴파일된 asset')
     expect(prompt).toContain('`finally`에서 자신이 띄운 child만 종료')

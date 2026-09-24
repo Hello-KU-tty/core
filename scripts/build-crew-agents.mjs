@@ -16,10 +16,13 @@ for (const model of [discoveryModel, specModel]) {
     throw new TypeError(`Unsupported Discovery model: ${model}`)
   }
 }
-const prompt = await readFile(sourcePath, 'utf8')
-const builderPrompt = await readFile(builderSourcePath, 'utf8')
-const helperPrompt = await readFile(helperSourcePath, 'utf8')
-const analystPrompt = await readFile(analystSourcePath, 'utf8')
+// Git may check canonical Markdown out with CRLF on Windows. Phase boundaries
+// and generated prompts must remain identical to the LF checkout.
+const readPrompt = async (path) => (await readFile(path, 'utf8')).replace(/\r\n/g, '\n')
+const prompt = await readPrompt(sourcePath)
+const builderPrompt = await readPrompt(builderSourcePath)
+const helperPrompt = await readPrompt(helperSourcePath)
+const analystPrompt = await readPrompt(analystSourcePath)
 const version = prompt.match(/^> Prompt version: `([^`]+)`$/m)?.[1]
 
 if (version !== expectedVersion) {
@@ -27,8 +30,8 @@ if (version !== expectedVersion) {
     `Discovery prompt version mismatch: expected ${expectedVersion}, received ${version ?? 'none'}`,
   )
 }
-if (builderPrompt.match(/^> Prompt version: `([^`]+)`$/m)?.[1] !== '1.3.6') {
-  throw new TypeError('Builder prompt version mismatch: expected 1.3.6')
+if (builderPrompt.match(/^> Prompt version: `([^`]+)`$/m)?.[1] !== '1.3.8') {
+  throw new TypeError('Builder prompt version mismatch: expected 1.3.8')
 }
 if (helperPrompt.match(/^> Prompt version: `([^`]+)`$/m)?.[1] !== '1.2.0') {
   throw new TypeError('Helper prompt version mismatch: expected 1.2.0')

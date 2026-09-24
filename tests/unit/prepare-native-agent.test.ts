@@ -1,11 +1,12 @@
 import { mkdtemp, mkdir, readFile, symlink, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { prepareNativeAgent } from '../../scripts/prepare-native-agent.mjs'
 
 const URL = 'http://127.0.0.1:47231/mcp/native-00000000-0000-4000-8000-000000000001'
 async function fixture(role = 'HELPER') {
-  const root = await mkdtemp('/private/tmp/vibe-native-preparer-unit-')
+  const root = await mkdtemp(join(tmpdir(), 'vibe-native-preparer-unit-'))
   const workspace = join(root, 'workspace')
   await mkdir(workspace)
   const bindingFile = join(root, 'binding.json')
@@ -44,7 +45,7 @@ describe('native role config preparation', () => {
       prepareNativeAgent({ workspace: f.root, bindingFile: f.bindingFile }),
     ).rejects.toThrow('NATIVE_WORKSPACE_BINDING_MISMATCH')
     await mkdir(join(f.root, 'outside'))
-    await symlink(join(f.root, 'outside'), join(f.workspace, '.kiro'))
+    await symlink(join(f.root, 'outside'), join(f.workspace, '.kiro'), 'junction')
     await expect(prepareNativeAgent(f)).rejects.toThrow('NATIVE_AGENT_CONFIG_SYMLINK_DENIED')
   })
 

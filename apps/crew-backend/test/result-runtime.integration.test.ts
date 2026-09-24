@@ -35,6 +35,31 @@ async function workspaceFixture(): Promise<{
 }
 
 describe('generated result runtime supervisor', () => {
+  it('reports tool preparation failure without launching or exposing private diagnostics', async () => {
+    const { root, workspace } = await workspaceFixture()
+    await writeFile(
+      join(workspace, '.vibe-helper', 'result.json'),
+      JSON.stringify({
+        schemaVersion: 1,
+        kind: 'WEB',
+        entry: 'dist/server.mjs',
+        healthPath: '/',
+      }),
+    )
+    await writeFile(join(workspace, 'dist', 'server.mjs'), "throw new Error('must not run')\n")
+    const supervisor = await ResultRuntimeSupervisor.create(root, {
+      projectToolchain: async () => {
+        throw new Error('private diagnostic must not escape')
+      },
+    })
+    supervisors.push(supervisor)
+    await expect(supervisor.launch(descriptor)).rejects.toMatchObject({
+      code: 'RESULT_PROJECT_RUNTIME_UNAVAILABLE',
+      message:
+        'Generated app runtime could not be prepared. Restore its verified tools before retrying.',
+    })
+  })
+
   it('runs one strict compiled web entry on loopback and reuses the healthy process', async () => {
     const { workspace, supervisor } = await workspaceFixture()
     await writeFile(
@@ -71,7 +96,7 @@ describe('generated result runtime supervisor', () => {
     const { workspace, supervisor } = await workspaceFixture()
     const outside = await mkdtemp(join(tmpdir(), 'vibe-helper-result-outside-'))
     await writeFile(join(outside, 'server.mjs'), "throw new Error('must not run')\n")
-    await symlink(outside, join(workspace, 'escape'))
+    await symlink(outside, join(workspace, 'escape'), 'junction')
     await writeFile(
       join(workspace, '.vibe-helper', 'result.json'),
       JSON.stringify({

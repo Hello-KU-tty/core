@@ -1,24 +1,42 @@
-const { lstat, realpath } = require('node:fs/promises')
+const { lstat, readFile, realpath } = require('node:fs/promises')
 const { join } = require('node:path')
 const { guardBuilderToolInput } = require('@vibe-helper/kiro-adapter/builder-tool-guard')
 
 const LOCKFILE_PREPARE_COMMAND =
   'pnpm install --lockfile-only --ignore-scripts --ignore-pnpmfile'
 
-async function lockfilePrepareReady(workspace) {
+async function lockfilePrepareReady(workspace, windowsLauncher = false) {
   const stat = async (name) => lstat(join(workspace, name)).catch((error) => {
     if (error?.code === 'ENOENT') return null
     throw error
   })
-  const [manifest, lockfile, config, npmrc, pnpmfile] = await Promise.all([
+  const [manifest, lockfile, config, npmrc, pnpmfile, pnpmfileMjs] = await Promise.all([
     stat('package.json'), stat('pnpm-lock.yaml'), stat('pnpm-workspace.yaml'),
-    stat('.npmrc'), stat('.pnpmfile.cjs'),
+    stat('.npmrc'), stat('.pnpmfile.cjs'), stat('.pnpmfile.mjs'),
   ])
   // The same script-free exact command can prepare or refresh a generated-app
   // lock after the Agent changes package.json. Never follow an aliased lock or
-  // run it with workspace-local config or an executable pnpmfile present.
+  // run it with unverified workspace config or an executable pnpmfile present.
   if (!manifest?.isFile() || manifest.isSymbolicLink() || manifest.nlink !== 1 ||
-      config != null || npmrc != null || pnpmfile != null) return null
+      npmrc != null || pnpmfile != null || pnpmfileMjs != null) return null
+  if (config != null) {
+    // The Windows host runner repeats this finite config check before spawning pnpm.
+    // Legacy native execution still requires no workspace-local config.
+    if (!windowsLauncher || !config.isFile() || config.isSymbolicLink() ||
+        config.nlink !== 1 || config.size > 8192) return null
+    const text = await readFile(join(workspace, 'pnpm-workspace.yaml'), 'utf8')
+    let section = ''
+    for (const line of text.split(/\r?\n/)) {
+      if (!line.trim() || /^\s*#/.test(line)) continue
+      if (/^(packages|allowBuilds|onlyBuiltDependencies):\s*$/.test(line)) {
+        section = line.split(':')[0]; continue
+      }
+      const valid = section === 'packages' ? /^\s+-\s+['"]?\.['"]?\s*$/ :
+        section === 'allowBuilds' ? /^\s+(esbuild|better-sqlite3):\s+(true|false)\s*$/ :
+        section === 'onlyBuiltDependencies' ? /^\s+-\s+(esbuild|better-sqlite3)\s*$/ : null
+      if (!valid?.test(line)) return null
+    }
+  }
   if (lockfile == null) return 'INITIAL'
   return lockfile.isFile() && !lockfile.isSymbolicLink() && lockfile.nlink === 1 ?
     'REFRESH' : null
@@ -52,7 +70,7 @@ function shellInputProblem(detail, workspace) {
 }
 
 /** Fail closed if the installed IDE changes a native permission request's tool shape. */
-async function chooseNativeBuilderPermission(detail, workspace, onDiagnostic) {
+async function chooseNativeBuilderPermission(detail, workspace, onDiagnostic, projectCommand) {
   let canonicalWorkspace = workspace
   if (detail?.toolName === 'shell') {
     const info = await lstat(workspace).catch(() => null)
@@ -62,6 +80,11 @@ async function chooseNativeBuilderPermission(detail, workspace, onDiagnostic) {
     }
     const problem = shellInputProblem(detail, workspace)
     if (problem) { onDiagnostic?.(problem); return null }
+    if (projectCommand) {
+      const command = await projectCommand(detail.rawInput.command).catch(() => null)
+      if (!command) { onDiagnostic?.('PROJECT_TOOLCHAIN_DENIED'); return null }
+      detail = { ...detail, rawInput: { ...detail.rawInput, command } }
+    }
   }
   if (!detail || !['read', 'search', 'write', 'shell'].includes(detail.toolName) ||
       !detail.rawInput || typeof detail.rawInput !== 'object' ||
@@ -138,7 +161,7 @@ async function chooseNativeBuilderPermission(detail, workspace, onDiagnostic) {
     return null
   }
   if (detail.toolName === 'shell' && input.command === LOCKFILE_PREPARE_COMMAND) {
-    const mode = await lockfilePrepareReady(canonicalWorkspace)
+    const mode = await lockfilePrepareReady(canonicalWorkspace, Boolean(projectCommand))
     onDiagnostic?.(mode === 'INITIAL' ? 'LOCKFILE_PREPARE_ALLOWED' :
       mode === 'REFRESH' ? 'LOCKFILE_REFRESH_ALLOWED' : 'LOCKFILE_PREPARE_DENIED')
     return mode ? option.optionId : null

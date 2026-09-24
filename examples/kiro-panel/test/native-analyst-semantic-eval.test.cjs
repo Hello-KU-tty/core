@@ -10,7 +10,7 @@ const { MAX_TURNS, derivePriorPrompt, rolePrompts, syntheticContext, evaluateTex
   require('../src/native-analyst-semantic-eval.cjs')
 
 const currentPrompt = readFileSync(join(__dirname, '..', '..', '..', 'docs',
-  'agent-prompts', 'evidence-analyst.md'), 'utf8')
+  'agent-prompts', 'evidence-analyst.md'), 'utf8').replaceAll('\r\n', '\n')
 // This command is a frozen v1.0.3/v1.0.4 comparison. Reconstruct the exact
 // v1.0.4 historical input from the known v1.0.7, v1.0.6 and v1.0.5 edits for tests only; the
 // production command must reject the current canonical prompt before a turn.

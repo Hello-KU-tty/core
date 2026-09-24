@@ -1,0 +1,67 @@
+{
+  "recordedAt": "2026-09-24",
+  "runtime": {
+    "schemaVersion": 1,
+    "target": "win32-x64",
+    "modelCalls": 0,
+    "resources": "PASS",
+    "cases": {
+      "kiroPreferredWithoutDownload": "PASS",
+      "existingFallback": "PASS",
+      "resourceTamperExtraTraversalHardlinkJunction": "PASS",
+      "unsafeAclRejected": "PASS",
+      "offlineCorruptionSizeCancellationRetryable": "PASS",
+      "acquisitionLockAndExitedOwnerRecovery": "PASS",
+      "officialAcquisitionAndOfflineCache": "PASS",
+      "corruptCacheQuarantineAndExplicitRetry": "PASS",
+      "packagedCoreMcpRestart_KIRO": "PASS",
+      "packagedCoreMcpRestart_EXISTING_NODE": "PASS",
+      "packagedCoreMcpRestart_MANAGED_NODE": "PASS"
+    },
+    "runtimes": {
+      "kiro": {
+        "source": "KIRO",
+        "node": "24.18.0",
+        "napi": 10,
+        "sqlite": "transaction/reopen PASS"
+      },
+      "existing": {
+        "source": "EXISTING_NODE",
+        "node": "24.19.0",
+        "napi": 10,
+        "sqlite": "transaction/reopen PASS"
+      },
+      "managed": {
+        "source": "MANAGED_NODE",
+        "node": "24.19.0",
+        "napi": 10,
+        "downloadedBytes": 92825416,
+        "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+      }
+    },
+    "status": "PASS",
+    "packageFiles": 60
+  },
+  "package": {
+    "status": "WINDOWS_VSIX_VERIFIED",
+    "target": "win32-x64",
+    "files": 67,
+    "vsixBytes": 1875725,
+    "installedBytes": 5482884,
+    "sha256": "c2f8daceff3e896038a06906b0d02e1f1a026331d845527f5dfe958a158bd82b",
+    "nativeWindowsLifecycle": "W3_PENDING",
+    "cleanInstallation": "W5_PENDING",
+    "file": "dist\\portable-win32-x64\\vibe-helper-portable-core-0.1.0-win32-x64.vsix"
+  },
+  "validation": {
+    "fullCheck": "PASS",
+    "unit": 91,
+    "integration": 272,
+    "integrationExistingSkip": 1,
+    "eval": 34,
+    "campusDrop": 3,
+    "smoke": 6,
+    "e2e": 12,
+    "panelAndReceipt": 19
+  }
+}

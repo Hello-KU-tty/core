@@ -13,13 +13,17 @@ const SESSION_ID = /^sess_[0-9a-f-]{36}$/
 const CLOUD_CONFIG_ROOT = join(homedir(), '.kiro', 'cloud-cache', 'user', 'config')
 
 function cloudStoreHash(workspace) {
-  if (typeof workspace !== 'string' || !workspace.startsWith('/'))
+  if (typeof workspace !== 'string' ||
+      !(process.platform === 'win32' ? /^[A-Za-z]:[\\/]/.test(workspace) : workspace.startsWith('/')))
     throw new Error('NATIVE_CLOUD_WORKSPACE_INVALID')
   // Installed Kiro Nu([cwd]): absolute path, slash normalization, trailing
   // slash removal, SHA-256 hex prefix. This route supplies one cwd only.
-  const normalized = posix.normalize(resolve(workspace).replace(/\\/g, '/'))
-  return createHash('sha256').update(normalized.length > 1 ?
-    normalized.replace(/\/+$/, '') : normalized).digest('hex').slice(0, 16)
+  let normalized = posix.normalize(resolve(workspace).replace(/\\/g, '/'))
+  if (normalized.length > 1 && !/^[A-Za-z]:\/$/.test(normalized))
+    normalized = normalized.replace(/\/+$/, '')
+  // Kiro 1.1.28 eI()/Hu(): Windows workspace identity is case insensitive.
+  if (process.platform === 'win32') normalized = normalized.toLowerCase()
+  return createHash('sha256').update(normalized).digest('hex').slice(0, 16)
 }
 
 async function ownedPath(path, kind, allowPending = false) {

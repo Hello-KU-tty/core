@@ -88,23 +88,35 @@ it('accepts only the pinned read-only process-introspection category after H den
     expect(protectedCatalogSourceBound({ ...finalCatalog, ...changed })).toBe(false)
 })
 
-it('binds a private built-in Helper cwd to its canonical Project workspace', () => {
-  const projectId = 'project_00000000-0000-4000-8000-000000000001'
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'vibe-h-scope-')))
-  const projects = join(root, 'projects')
-  mkdirSync(projects, { mode: 0o700 })
-  const workspace = join(projects, projectId)
-  mkdirSync(workspace, { mode: 0o700 })
-  const helper = join(
-    root,
-    `__vibe-native-helper-${createHash('sha256').update(projectId).digest('hex').slice(0, 24)}`,
-  )
-  mkdirSync(helper, { mode: 0o700 })
-  expect(productBuiltinHScope(projectId, workspace, helper)).toEqual({ workspace, helper })
-  expect(() => productBuiltinHScope(projectId, workspace, projects)).toThrow(
-    'NATIVE_BUILTIN_H_SCOPE_INVALID',
-  )
-})
+it(
+  'binds a private built-in Helper cwd to its canonical Project workspace',
+  async () => {
+    const projectId = 'project_00000000-0000-4000-8000-000000000001'
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'vibe-h-scope-')))
+    const projects = join(root, 'projects')
+    mkdirSync(projects, { mode: 0o700 })
+    const workspace = join(projects, projectId)
+    mkdirSync(workspace, { mode: 0o700 })
+    const helper = join(
+      root,
+      `__vibe-native-helper-${createHash('sha256').update(projectId).digest('hex').slice(0, 24)}`,
+    )
+    mkdirSync(helper, { mode: 0o700 })
+    if (process.platform === 'win32') {
+      expect(() => productBuiltinHScope(projectId, workspace, helper)).toThrow(
+        'NATIVE_BUILTIN_H_ROOT_UNSAFE',
+      )
+      const { privateDirectory } = await import('../../apps/local-backend/src/private-files.js')
+      await privateDirectory(workspace)
+      await privateDirectory(helper)
+    }
+    expect(productBuiltinHScope(projectId, workspace, helper)).toEqual({ workspace, helper })
+    expect(() => productBuiltinHScope(projectId, workspace, projects)).toThrow(
+      'NATIVE_BUILTIN_H_SCOPE_INVALID',
+    )
+  },
+  process.platform === 'win32' ? 30_000 : 10_000,
+)
 const {
   attestSessionMemoryDisabled,
 } = require('../../examples/kiro-native-host/native-memory-attestation.cjs')
@@ -293,6 +305,7 @@ function fakeVscode(root, overrides = {}) {
 
 class FakeWebSocket {
   static responses = 'complete'
+  static silentRpc: string | null = null
   static discoveryMode = false
   static editUpdateToolId = null
   static editPermissionToolId = 'str_replace'
@@ -322,6 +335,20 @@ class FakeWebSocket {
   send(raw) {
     const message = JSON.parse(raw)
     FakeWebSocket.sent.push(message)
+    if (message.method === FakeWebSocket.silentRpc) return
+    if (message.method === 'session/new' && FakeWebSocket.responses === 'earlyToolCatalog') {
+      for (const sessionId of ['session_foreign_0002', 'session_synthetic_0001'])
+        this.emit('message', {
+          data: JSON.stringify({
+            jsonrpc: '2.0',
+            method: '_kiro/tools/didChange',
+            params: {
+              sessionId,
+              tags: [{ source: 'mcp', tag: '@fixture/private', description: 'fixture-secret' }],
+            },
+          }),
+        })
+    }
     if (message.method === 'initialize') this.response(message.id, { protocolVersion: 1 })
     if (message.method === 'session/new')
       this.response(message.id, {
@@ -736,6 +763,7 @@ afterEach(() => {
   FakeWebSocket.created = 0
   FakeWebSocket.closed = 0
   FakeWebSocket.responses = 'complete'
+  FakeWebSocket.silentRpc = null
   FakeWebSocket.discoveryMode = false
   FakeWebSocket.editUpdateToolId = null
   FakeWebSocket.editPermissionToolId = 'str_replace'
@@ -745,6 +773,32 @@ afterEach(() => {
 })
 
 describe('private Kiro native connection gate', () => {
+  it.each([
+    ['initialize', 'INITIALIZE', 15_000],
+    ['session/new', 'SESSION_NEW', 30_000],
+  ] as const)(
+    'reports only the operation when %s times out before a prompt',
+    async (method, operation, timeout) => {
+      const root = workspace()
+      FakeWebSocket.silentRpc = method
+      vi.stubGlobal('WebSocket', FakeWebSocket)
+      vi.useFakeTimers()
+      const telemetry: unknown[] = []
+      const opening = openNativeRole(fakeVscode(root), {
+        workspace: root,
+        role,
+        requireMcp: false,
+        onProtocolTelemetry: (value: unknown) => telemetry.push(value),
+      })
+      const failed = expect(opening).rejects.toMatchObject({ code: 'NATIVE_RPC_TIMEOUT' })
+      await vi.advanceTimersByTimeAsync(timeout)
+      await failed
+      expect(telemetry).toEqual([{ kind: 'RPC_TIMEOUT', operation }])
+      expect(FakeWebSocket.sent.some((value) => value.method === 'session/prompt')).toBe(false)
+      expect(FakeWebSocket.closed).toBe(1)
+    },
+  )
+
   it('selects Discovery Haiku only after owned mode and model ACKs', async () => {
     const root = workspace()
     const discoveryRole = 'vibe-native-discovery-deadbeef'
@@ -859,6 +913,25 @@ describe('private Kiro native connection gate', () => {
     )
   })
 
+  it.skipIf(process.platform !== 'win32')(
+    'binds the same Windows folder when Kiro lowercases its drive letter',
+    async () => {
+      const root = workspace()
+      const lowerDrive = root[0]?.toLowerCase() + root.slice(1)
+      await expect(diagnose(fakeVscode(lowerDrive), root)).resolves.toMatchObject({ trusted: true })
+      const endpoint = {
+        port: 49731,
+        token: 'synthetic-endpoint-token',
+        windowId: 7,
+        folders: [{ path: lowerDrive }],
+      }
+      expect(uniqueWorkspaceEndpoint([endpoint], root).windowId).toBe(7)
+      expect(() =>
+        uniqueWorkspaceEndpoint([endpoint, { ...endpoint, folders: [{ path: root }] }], root),
+      ).toThrow('NATIVE_ENDPOINT_AMBIGUOUS')
+    },
+  )
+
   it('denies tool-bearing configs on the tool-less path', async () => {
     const root = workspace(['fs_write'])
     vi.stubGlobal('WebSocket', FakeWebSocket)
@@ -929,6 +1002,32 @@ describe('private Kiro native connection gate', () => {
     ])
     expect(JSON.stringify(events)).not.toContain('session_private_builder')
     expect(JSON.stringify(events)).not.toContain('session_foreign_0002')
+  })
+
+  it('retains an early catalog only after session/new establishes its ownership', async () => {
+    const root = workspace()
+    FakeWebSocket.responses = 'earlyToolCatalog'
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    const metadata = []
+    const session = await openNativeRole(fakeVscode(root), {
+      workspace: root,
+      role,
+      requireMcp: false,
+      onProtocolTelemetry: (value) => metadata.push(value),
+    })
+    expect(metadata).toHaveLength(1)
+    expect(metadata[0]).toMatchObject({
+      kind: 'TOOLS_DID_CHANGE',
+      sessionId: 'session_synthetic_0001',
+      valid: true,
+      tagCount: 1,
+      mcpTagCount: 1,
+    })
+    expect(JSON.stringify(metadata)).not.toContain('fixture-secret')
+    expect(JSON.stringify(metadata)).not.toContain('@fixture/private')
+    expect(JSON.stringify(metadata)).not.toContain('session_foreign_0002')
+    expect(FakeWebSocket.sent.some((value) => value.method === 'session/prompt')).toBe(false)
+    session.close()
   })
 
   it('reports only owned tool catalog categories without descriptions or MCP names', async () => {

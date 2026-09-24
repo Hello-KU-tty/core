@@ -58,6 +58,7 @@ const runtimeOptions = extensionPath => ({
   vscode: { version: '1.109.5', env: { appRoot: extensionPath },
     extensions: { getExtension: () => { throw new Error('CROSS_HOST_API_MUST_NOT_BE_USED') } } },
   execFile: async () => ({ stdout: 'v24.19.0\n', stderr: '' }),
+  access: async path => { assert.equal(path, NODE_EXECUTABLE) },
 })
 
 test('a relocated staged extension resolves only packaged runtime assets', async () => {
@@ -111,7 +112,7 @@ test('a symlinked Agent config parent cannot redirect the package rewrite outsid
   const outside = await mkdtemp(join(tmpdir(), 'vibe-helper-role-outside-'))
   const outsideAgents = join(outside, 'agents')
   await mkdir(outsideAgents)
-  await symlink(outside, join(canonicalWorkspace, '.kiro'))
+  await symlink(outside, join(canonicalWorkspace, '.kiro'), 'junction')
   const bindingFile = join(canonicalWorkspace, 'binding.json')
   const binding = { workspace: canonicalWorkspace }
   await writeFile(bindingFile, JSON.stringify(binding), { mode: 0o600 })
