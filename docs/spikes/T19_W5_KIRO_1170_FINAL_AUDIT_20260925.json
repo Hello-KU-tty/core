@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "version": "0.3.15",
+  "status": "PASS",
+  "recordedAt": "2026-09-25T14:17:49.193Z",
+  "databases": [
+    {
+      "personalNeed": true,
+      "quickCheck": "ok"
+    },
+    {
+      "personalNeed": false,
+      "quickCheck": "ok"
+    }
+  ],
+  "cleanup": {
+    "remainingOwnedProcesses": 0,
+    "ownedProcessesStopped": 6,
+    "status": "PASS",
+    "ordinaryProfileTouched": false,
+    "dataDeleted": false
+  },
+  "browser": {
+    "personalNeed": {
+      "fullValidSequence": true,
+      "reloadPersists": true,
+      "onlyValidNextTransitions": true,
+      "terminalHasNoAction": true
+    },
+    "noPersonalNeed": {
+      "pendingSuccessErrorRendered": true,
+      "reloadClearsHistory": true
+    }
+  },
+  "gui": {
+    "historyProjectSelected": true,
+    "storedSpecAndBuilderHelperRecordsVisible": true,
+    "allInputsManuallyDriven": false
+  }
+}

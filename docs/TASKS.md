@@ -768,7 +768,9 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - Node.js 24.19.0·pnpm 11.12.0에서 format/lint/typecheck/Drizzle check, unit 2개, integration 212개, eval 22개, Campus Drop 3개, build, smoke 6개와 Chromium E2E 12개가 통과했다.
 - target Kiro Crew 설치본을 data-preserving update endpoint로 app 0.4.1에 갱신했다. 설치 UI·backend·Builder·hidden no-tool Evidence Analyst hash가 source package와 일치하고 backend `/health`가 `ok`이며 실제 History UI가 기존 Project를 복원했다. 첫 target worker 검증에서 실제 Agent가 설명 뒤 single fenced JSON을 반환해 whole-message parser가 legacy 대기 Job 6개를 최대 재시도 뒤 거절하는 회귀를 발견했다. parser를 정확히 하나의 fenced JSON block만 허용하고 복수 block은 거절하도록 고친 versioned 0.4.1 UI에서 같은 no-evidence 형태의 실제 Job 2개가 13.8초·17.8초에 `SUCCEEDED`가 됐다. SQLite `quick_check=ok`이고 Project 61, Discovery Session 62, Learning Spec 27, Task 6, accepted Evidence 13, Concept Ledger 13, Completion Report 2가 유지됐으며, 실패·성공 Job revision도 provenance 때문에 삭제하지 않았다. 새 Campus Drop Agent run은 추가 durable fixture data를 만들지 않고 deterministic full E2E와 실제 result runtime integration으로 대체했다.
 
-### [-] T19. 자체 Kiro IDE 패널과 프론트 실제 연동
+### [>] T19. 자체 Kiro IDE 패널과 프론트 실제 연동
+
+**2026-09-26 다음 작업:** 사용자 요청으로 [프론트 인계 계획·요청서 답변](FRONTEND_HANDOFF_PLAN_20260926.md)을 작성했다. W5 완료로 과거 Windows 환경 대기 사유는 해소됐다. 다음 착수 범위는 기존 frontend 어댑터를 유지하는 host 연결부 분리·SDK/설치물 고정·외부 소비/최소 IDE 연결 검증이다. 성능·Analyst 의미 품질·개인화 효과 개선은 frontend 연결과 병행하되 상위 완료 조건은 유지한다. 이 표시는 문서 작성 후의 다음 작업 선정이며 host 분리·frontend 연결·전달 완료를 뜻하지 않는다. 아래 macOS-only 대기 기록은 과거 근거로 보존한다.
 
 **승인 기록**
 
@@ -949,7 +951,27 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - 기존 Node/pnpm 우선, 필요 시 private 도구 준비. native Agent shell과 result launcher가 선택한 runtime을 실제로 사용하게 하고 `process.execPath`·env 가정을 수정한다.
 - 도구 설치 유무 두 환경에서 frozen install/build/test/실제 result HTTP smoke를 수행한다. generated workspace·lifecycle allowlist를 지키고 전역 PATH/사용자 설치를 변경하지 않는다.
 
-### [~] T19-W5. clean Windows 확장 설치와 수직 흐름 출하 검증
+### [x] T19-W5. clean Windows 확장 설치와 수직 흐름 출하 검증
+
+**2026-09-25 완료:** 일반 설치 VSIX 0.3.15 / 정확한 Kiro 1.1.70 source에서 새 Personal Need 유무 프로젝트의 Discovery·Spec·실제 Decision·Builder/Helper·테스트·HTTP 결과·분석/다음 context·History를 검증했다. Need 없음은 9회 완주, Need 있음은 마지막 Helper catalog 사전 실패를 보존하고 보조 창 재개·새 read-only 요청 1회로 복구한 10회 완주다. 각각 실제 13/14 tests, 분석 4건 성공, USER_UNDERSTANDING 0, 명시적 취소 9ms, Core crash 후 약 5.1초 자동 복구·credential 회전·durable 상태 동일·새 run 0을 확인했다. 최종 전체 check(unit 113·integration 298+skip 1·eval 35·Campus 3·smoke 6·Edge E2E 12), CJS 106, driver 12, lifecycle 8, portable 11 PASS. [최종 일반 모드 결과·지원표·복구 한계](spikes/T19_W5_KIRO_1170_GENERAL_MODE_RESULTS_20260925.md), [정제 receipt](spikes/T19_W5_KIRO_1170_ADAPTATION_RECEIPTS_20260925.json). 현재 PC의 초기 clean 상태는 사용자 확인, 제품 PATH 격리·도구 자동 준비는 실제 receipt에 근거한다. 상위 T19/T19-N의 품질 gate는 유지한다. 아래 후보/승인 대기는 과거 기록이다.
+
+**2026-09-25 일반 설치 후보:** 0.3.14는 정확한 1.1.70 source pin, 내장 Agent manifest 의존성, pre-model Cloud 양성 증명과 복원되는 logging scope, 생성 Project만의 nonpersistent terminal 환경을 사용한다. 외부 진단 실행 옵션 없이 새 양쪽 흐름을 검증 중이다. 전체 check(unit 111·integration 298+skip 1·eval 35·Campus 3·smoke 6·Edge E2E 12), CJS 106개와 packaged lifecycle 8개 PASS. 개발/일반 확장 호스트 차이와 과거 startup 로그 혼입을 각각 재현해 보완했고 원본 실패를 보존했다. [일반 모드 기록](spikes/T19_W5_KIRO_1170_GENERAL_MODE_RESULTS_20260925.md)을 최신 판정으로 보며 아래 진단 전용·승인 대기는 당시 기록이다.
+
+**2026-09-25 원본 복구 PASS:** 프로세스 범위 RemoteSigned에서 실제 terminal 출력과 성공/실패 이벤트를 확인했다. 15번째 Builder가 원본 frozen install/build/typecheck/17 tests/HTTP smoke를 통과하고 Core Task를 완료했다. 16번째 후속 Helper·분석 3건·HTTP 200·History 무재실행도 PASS다. 영구 정책은 전후 불변이다. [실측](spikes/T19_W5_WINDOWS_PROCESS_SHELL_RESULTS_20260925.md)을 기록하고 새 Personal Need 흐름을 검증 중이다. 기존 도구 재사용 profile에 미설치 조건을 섞은 시도는 도구 변경 보호 검사에서 차단되어 보존하고, 새 profile에서 설치부터 검증한다.
+
+**2026-09-25 진행 재개:** 기존 W5 완료 요청과 사용자의 “왜 멈춤?”에 따라 불필요한 추가 승인 대기를 해제했다. 합성 Kiro 자식 프로세스에만 RemoteSigned를 전달하고 영구 정책 불변을 검증한다. 모델 0회 terminal 확인 뒤 새 한정 native 요청으로 진행한다. 아래 답변 대기는 이전 판단 기록이다.
+
+**2026-09-25 환경 정정:** 사용자가 현재 PC는 Kiro부터 새로 설치한 clean Windows라고 확인했다. 이전 기기의 환경 부재를 잘못 적용한 별도 PC/VM 요청과 gate 분리 질문은 철회한다. 초기 상태와 이후 임시 검증 도구 준비를 구분하며, 현재 환경에서 나머지 검증을 진행한다. 완료 기준 완화나 전체 흐름 PASS를 뜻하지 않는다. 실행 정책 변경 질문은 별개로 아직 답변 대기다.
+
+**2026-09-25 현재 버전 추가 실측·조건 대기:** 0.3.11 실제 업데이트 뒤 13번째 Builder가 원본 앱의 타입·test glob·종료 오류를 수정했다. 그 코드의 변경 없는 복사본은 frozen install/build/typecheck/17 tests/HTTP smoke·결과 감독기까지 PASS다. 실제 native 응답 후 취소, 최신 packaged lifecycle 8개·portable 11개도 PASS다. 하지만 기본 PowerShell과 합성 Command Prompt의 native 실행은 출력/종료값 누락으로 13·14번째 모두 원본 Task ACTIVE를 유지했다. 모델 0회 재현에서 Windows PowerShell `Restricted`가 Kiro의 `shellIntegration.ps1`을 `PSSecurityException/UnauthorizedAccess`로 차단함을 확인했다. `scripts/probe-windows-shell.mjs`로 재현 가능하다. 영구 정책은 변경하지 않았으며 검증 터미널 프로세스에만 RemoteSigned를 적용할지 사용자 응답을 기다린다. clean Windows 환경은 현재 PC로 확보되어 별도 환경 제공·gate 분리는 요구하지 않는다. 일반 1.1.70의 debug Cloud 증거 의존과 양쪽 fresh 완주 조건은 해결된 것으로 표시하지 않는다.
+
+**2026-09-25 현재 버전 완료 요청으로 재개:** 사용자 “지금 버전으로 w5 완료해”에 따라 Kiro 1.1.70과 VSIX 0.3.11부터 실제 완주·회귀·지원 경계 검증을 진행한다. 앞선 12회 시도의 기록은 보존하고 이번 명시적 요청에 따른 후속 실행을 별도 계보로 기록한다. 완료 조건을 통과한 결과만 완료로 처리한다.
+
+**2026-09-25 대기 해소·재개:** 사용자가 보안 알림을 닫고 검증 Kiro 창을 앞으로 가져왔다. 화면에서 승인 대상이 개발 도구에 포함된 `PSReadLine.format.ps1xml`임을 확인했다. 모델 0회 비교에서 상속된 PowerShell 7 모듈 경로는 실패하고, 자식 process의 `PSModulePath`를 제외한 Windows 기본 모듈은 정책 Restricted 그대로 import에 성공했다. 검증 host의 환경 격리를 보완하고, 원본 실패와 continuation 계보를 보존하는 별도 1회 복구를 준비한다. 정책·TrustedPublisher·방화벽·제품 adapter는 변경하지 않으며 누적 요청 12회와 W5 완료 gate를 유지한다.
+
+**2026-09-25 후속 판단 대기:** 누적 명시적 요청 12/12회가 끝났다. 검증기 옵션 실수로 11번째는 도구 변경 gate에서 모델 전 실패했고, 동일 도구를 복원한 12번째는 승인 입력 없이 실행기에 도달했지만 CP949의 한글 경로 해석 오류로 끝났다. 이를 고친 VSIX 0.3.11과 전체 check(unit 105, integration 298 + 기존 skip 1, eval 35, Campus Drop 3, smoke 6, Edge E2E 12), CJS 105개는 PASS다. 모델 없는 원본 생성 앱 복사본 검증은 설치 PASS 후 TS2345로 실패했다. 타입 guard와 test 파일 glob을 별도 복사본에서 보완하자 build/typecheck/test 17개와 제품 결과 감독기의 HTTP 200·종료는 통과했다. 생성 smoke 자체는 HTTP 확인 후 Node/libuv 종료 assertion으로 실패했다. 원본 Task는 ACTIVE이며 이 수동 보완을 native 완주로 집계하지 않는다. 일반 1.1.70 지원 전환은 보류를 권장하고, 새로운 한정 native 완주 검증 범위에 대한 사용자 판단을 기다린다. 검증 Kiro/Core는 종료됐고 원본 기록은 보존했다.
+
+**2026-09-25 새 기기 재개:** 사용자가 Kiro 설치·작업용 Workspace Trust 위임과 호환성 보완 후 진행을 승인했다. IDE 1.1.70 / Agent 1.1.158의 [호환성 spike](spikes/T19_W5_KIRO_1170_COMPATIBILITY_20260925.md)에서 기존 cloud receipt 생략을 확인하고, exact source·fresh 세션·debug 양성 증거를 요구하는 진단 전용 adapter를 추가했다. 실제 Helper 1회, Discovery 5단계와 확정 Spec, Builder Decision·별도 Helper 설명·선택 적용을 확인했다. Cloud 조회 경쟁과 Windows 절대 경로·shell 설명 필드 차이를 보완한 0.3.10은 실제 파일 작성까지 통과했다. 다만 terminal의 PowerShell 실행 승인 입력 때문에 생성 앱 install/build/test는 실행되지 않아 미완료다. 누적 명시적 요청 10/12회, 조회 실패 0회이며 원본 실패와 복구 계보를 보존한다. 최종 `pnpm check`는 unit 105, integration 296 + 기존 skip 1, eval 35, Campus Drop 3, smoke 6, 설치된 Edge E2E 12를 통과했고 CJS 104개와 0.3.9 packaged lifecycle 8개도 PASS다. 일반 제품 source gate와 W5/상위 완료 조건은 유지한다.
 
 **2026-09-24 기기 간 개발 인계:** 사용자가 commit/push 및 collaborator 권한이 있는 기존 `Hello-KU-tty/core` remote의 같은 branch를 확인했다. [재개 인계](CROSS_DEVICE_HANDOFF_20260924.md)에 개발 환경·검증 근거·남은 조사와 새 합성 환경 절차를 정리한다. W5 `[~]`, T19 `[-]`, T19-N `[~]` 상태와 clean Windows 미검증은 유지한다.
 

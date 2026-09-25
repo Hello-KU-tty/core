@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "kind": "W5_KIRO_1170_COMPATIBILITY",
+  "status": "FAIL",
+  "stage": "COMPLETE",
+  "modelCalls": 0,
+  "productSupportChanged": false,
+  "startedAt": "2026-09-25T07:38:42.686Z",
+  "host": {
+    "version": "1.1.70",
+    "vsCodeVersion": "1.131.0",
+    "commit": "8ce1870416c7dc7e51fffb01765d93ef7ad55102",
+    "agentVersion": "1.1.158",
+    "agentSha256": "cf6a5124f2fed75144b9d4236e0ffff85a5b22732d739807070783323c071b87",
+    "platform": "win32",
+    "arch": "x64",
+    "node": "24.18.0",
+    "electron": "42.7.0",
+    "napi": "10"
+  },
+  "originalProductGate": "NATIVE_KIRO_INSTALLATION_SOURCE_UNVERIFIED",
+  "runtime": {
+    "exitCode": 0,
+    "receipt": {
+      "platform": "win32",
+      "arch": "x64",
+      "node": "24.18.0",
+      "napi": "10",
+      "electron": "42.7.0",
+      "apis": {
+        "fetch": true,
+        "websocket": true
+      },
+      "sqlite": "PASS",
+      "coreStorage": "PASS",
+      "core": {
+        "sdk": "PASS",
+        "bridge": {
+          "DISCOVERY": {
+            "status": "PASS",
+            "toolCount": 6,
+            "scopeDenial": "AGENT_RUN_SCOPE_MISMATCH",
+            "revoked": true
+          },
+          "BUILDER": {
+            "status": "PASS",
+            "toolCount": 7,
+            "scopeDenial": "AGENT_RUN_SCOPE_MISMATCH",
+            "revoked": true
+          },
+          "HELPER": {
+            "status": "PASS",
+            "toolCount": 1,
+            "scopeDenial": "AGENT_RUN_SCOPE_MISMATCH",
+            "revoked": true
+          }
+        },
+        "shutdown": "PASS",
+        "unauthenticatedStatus": 401
+      }
+    }
+  },
+  "ownedEndpointCount": 1,
+  "native": {
+    "modelTurns": 0,
+    "stage": "HELPER_PREFLIGHT",
+    "status": "FAIL",
+    "windowId": 1,
+    "protocolVersion": 1,
+    "config": [
+      {
+        "id": "mode",
+        "currentValue": "vibe-w5-1170-metadata"
+      },
+      {
+        "id": "model",
+        "currentValue": "auto"
+      },
+      {
+        "id": "autopilot",
+        "currentValue": "on"
+      },
+      {
+        "id": "contentCollection",
+        "currentValue": "disabled"
+      }
+    ],
+    "policyErrorCount": null,
+    "customModeSelected": true,
+    "rules": [
+      {
+        "capability": "fs_write",
+        "effect": "deny"
+      },
+      {
+        "capability": "fs_write",
+        "effect": "ask"
+      },
+      {
+        "capability": "fs_write",
+        "effect": "ask"
+      },
+      {
+        "capability": "all",
+        "effect": "deny"
+      }
+    ],
+    "policy": [
+      {
+        "capability": "fs_read",
+        "effect": "deny"
+      },
+      {
+        "capability": "fs_write",
+        "effect": "deny"
+      },
+      {
+        "capability": "shell",
+        "effect": "deny"
+      },
+      {
+        "capability": "web_search",
+        "effect": "deny"
+      },
+      {
+        "capability": "mcp",
+        "effect": "deny"
+      }
+    ],
+    "catalog": [],
+    "liveEligibility": {
+      "cloudPull": "NATIVE_CLOUD_TIMEOUT",
+      "memoryDisabled": "PASS",
+      "commandHooksAbsent": "PASS"
+    },
+    "cloudStore": {
+      "bucket": true,
+      "session": true,
+      "metadata": true,
+      "messages": false
+    },
+    "permissionReceipts": [],
+    "error": {
+      "code": "PROBE_FAILED",
+      "rpcCode": null
+    }
+  },
+  "finishedAt": "2026-09-25T07:41:06.484Z"
+}

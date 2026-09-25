@@ -1,0 +1,2875 @@
+{
+  "schemaVersion": 1,
+  "kind": "W5_KIRO_1170_ADAPTATION",
+  "recordedAt": "2026-09-25T14:11:08.529Z",
+  "provenance": "SYNTHETIC_UI_INPUT_LIVE_NATIVE_AGENT",
+  "candidateVersion": "0.3.15",
+  "general1170Support": true,
+  "diagnosticOptInRequired": false,
+  "supportVerdict": "EXACT_PIN_WINDOWS_GENERAL_MODE_VERIFIED_WITH_DOCUMENTED_HELPER_RECOVERY",
+  "completedFlows": [
+    {
+      "version": "0.3.15",
+      "personalNeed": true,
+      "status": "PASS_WITH_ONE_READ_ONLY_HELPER_RECOVERY",
+      "explicitRequests": 10,
+      "requestLimit": 12,
+      "sourceStatus": "FAIL",
+      "sourceError": "NATIVE_ROLE_CATALOG_UNVERIFIED",
+      "sourceSha256": "06ce94584106ed1b42a366193a87b0d695aed4fce7c930f3c3689c81c00cffb6",
+      "verificationSha256": "201d7be3026fc701b05634af58147e1e4e75624e6bf68b583649d956d40c02ff",
+      "recovery": {
+        "kind": "DEDICATED_HELPER_WINDOW_REOPEN",
+        "newReadOnlyRequests": 1,
+        "helper": {
+          "status": "SUCCEEDED",
+          "outcome": "HELPER_RECORDED",
+          "errorCode": null
+        },
+        "automaticMutationReplay": false
+      },
+      "task": {
+        "status": "COMPLETED",
+        "completion": true,
+        "decisionsApplied": 1
+      },
+      "result": {
+        "status": "RUNNING",
+        "httpStatus": 200,
+        "bodyBytes": 1705
+      },
+      "analysis": [
+        {
+          "status": "SUCCEEDED",
+          "errorCode": null
+        },
+        {
+          "status": "SUCCEEDED",
+          "errorCode": null
+        },
+        {
+          "status": "SUCCEEDED",
+          "errorCode": null
+        },
+        {
+          "status": "SUCCEEDED",
+          "errorCode": null
+        }
+      ],
+      "evidence": {
+        "conceptStates": [
+          "OBSERVED",
+          "OBSERVED"
+        ],
+        "userUnderstandingCount": 0,
+        "personalization": [
+          {
+            "target": {
+              "kind": "HELPER_TURN",
+              "taskId": "task_c7248fc2-c353-4d41-bf78-1cd6a8046ce4"
+            },
+            "mode": "EVIDENCE_AWARE",
+            "basisCount": 2
+          },
+          {
+            "target": {
+              "kind": "HELPER_TURN",
+              "taskId": "task_c7248fc2-c353-4d41-bf78-1cd6a8046ce4",
+              "decisionId": "decision_22df9175-1912-4244-b51e-7038b96b0ef7"
+            },
+            "mode": "NO_RELEVANT_EVIDENCE",
+            "basisCount": 0
+          },
+          {
+            "target": {
+              "kind": "DISCOVERY_SESSION",
+              "discoverySessionId": "discovery_session_36ee1cda-3abe-452b-b4b7-1d74858ba9d7"
+            },
+            "mode": "NO_RELEVANT_EVIDENCE",
+            "basisCount": 0
+          }
+        ]
+      },
+      "historyReadStartsNoRun": true,
+      "activeRuns": 0,
+      "restart": {
+        "version": "0.3.15",
+        "status": "PASS",
+        "kind": "OWNED_CORE_CRASH_AND_AUTOMATIC_RECOVERY",
+        "startedAt": "2026-09-25T14:10:15.452Z",
+        "restoreMs": 5119,
+        "taskRestored": true,
+        "specRestored": true,
+        "decisionsRestored": true,
+        "helperHistoryRestored": true,
+        "credentialRotated": true,
+        "instanceChanged": true,
+        "newRuns": 0
+      }
+    },
+    {
+      "version": "0.3.15",
+      "personalNeed": false,
+      "status": "PASS",
+      "explicitRequests": 9,
+      "requestLimit": 12,
+      "sourceStatus": "PASS",
+      "sourceError": null,
+      "sourceSha256": "b9a845bdbd40f96baa4b6da1a79d2cdc99e5dc351b9e46bab01cae79da63fd01",
+      "verificationSha256": "f9c06e8f046de339a55bdee96ebfeab14ddaee82eb8aa9801bea531ddeb9426c",
+      "recovery": null,
+      "task": {
+        "status": "COMPLETED",
+        "completion": true,
+        "decisionsApplied": 1
+      },
+      "result": {
+        "status": "RUNNING",
+        "httpStatus": 200,
+        "bodyBytes": 1137
+      },
+      "analysis": [
+        {
+          "status": "SUCCEEDED",
+          "errorCode": null
+        },
+        {
+          "status": "SUCCEEDED",
+          "errorCode": null
+        },
+        {
+          "status": "SUCCEEDED",
+          "errorCode": null
+        },
+        {
+          "status": "SUCCEEDED",
+          "errorCode": null
+        }
+      ],
+      "evidence": {
+        "conceptStates": [
+          "OBSERVED",
+          "OBSERVED",
+          "OBSERVED",
+          "OBSERVED",
+          "OBSERVED",
+          "OBSERVED"
+        ],
+        "userUnderstandingCount": 0,
+        "personalization": [
+          {
+            "target": {
+              "kind": "HELPER_TURN",
+              "taskId": "task_d368d02a-8ba7-4693-9474-223f0c9ef228"
+            },
+            "mode": "EVIDENCE_AWARE",
+            "basisCount": 4
+          },
+          {
+            "target": {
+              "kind": "HELPER_TURN",
+              "taskId": "task_d368d02a-8ba7-4693-9474-223f0c9ef228",
+              "decisionId": "decision_45361c70-d77b-467c-940a-771ad17f7079"
+            },
+            "mode": "NO_RELEVANT_EVIDENCE",
+            "basisCount": 0
+          },
+          {
+            "target": {
+              "kind": "DISCOVERY_SESSION",
+              "discoverySessionId": "discovery_session_c2e7a2f9-696a-4c1b-a858-d138c790ce0c"
+            },
+            "mode": "NO_RELEVANT_EVIDENCE",
+            "basisCount": 0
+          }
+        ]
+      },
+      "historyReadStartsNoRun": true,
+      "activeRuns": 0,
+      "restart": {
+        "version": "0.3.15",
+        "status": "PASS",
+        "kind": "OWNED_CORE_CRASH_AND_AUTOMATIC_RECOVERY",
+        "startedAt": "2026-09-25T14:10:17.226Z",
+        "restoreMs": 5112,
+        "taskRestored": true,
+        "specRestored": true,
+        "decisionsRestored": true,
+        "helperHistoryRestored": true,
+        "credentialRotated": true,
+        "instanceChanged": true,
+        "newRuns": 0
+      }
+    }
+  ],
+  "debugLoggingRequired": true,
+  "debugLoggingScope": "PRE_MODEL_EXTENSION_HOST_ONLY",
+  "externalDebugEnvironmentRequired": false,
+  "cleanMachine": "USER_CONFIRMED_INITIAL_CLEAN_WINDOWS",
+  "environmentProvenance": {
+    "source": "USER_STATEMENT_20260925",
+    "kiroInstalledDuringTask": true,
+    "verificationToolsPreparedLater": true,
+    "externalMachineRequired": false,
+    "endToEndStatus": "PASS_WITH_DOCUMENTED_RECOVERY"
+  },
+  "helper": {
+    "status": "PASS_NATIVE_HELPER",
+    "startedAt": "2026-09-25T08:18:54.935Z",
+    "finishedAt": "2026-09-25T08:19:07.474Z",
+    "modelCalls": 1,
+    "host": {
+      "version": "1.1.70",
+      "vsCodeVersion": "1.131.0",
+      "commit": "8ce1870416c7dc7e51fffb01765d93ef7ad55102",
+      "agentVersion": "1.1.158",
+      "agentSha256": "cf6a5124f2fed75144b9d4236e0ffff85a5b22732d739807070783323c071b87",
+      "platform": "win32",
+      "arch": "x64",
+      "node": "24.18.0",
+      "electron": "42.7.0",
+      "napi": "10"
+    },
+    "originalProductGate": "NATIVE_KIRO_INSTALLATION_SOURCE_UNVERIFIED",
+    "candidateSourceGate": "PASS",
+    "runtime": {
+      "exitCode": 0,
+      "receipt": {
+        "platform": "win32",
+        "arch": "x64",
+        "node": "24.18.0",
+        "napi": "10",
+        "electron": "42.7.0",
+        "apis": {
+          "fetch": true,
+          "websocket": true
+        },
+        "sqlite": "PASS",
+        "coreStorage": "PASS",
+        "core": {
+          "sdk": "PASS",
+          "bridge": {
+            "DISCOVERY": {
+              "status": "PASS",
+              "toolCount": 6,
+              "scopeDenial": "AGENT_RUN_SCOPE_MISMATCH",
+              "revoked": true
+            },
+            "BUILDER": {
+              "status": "PASS",
+              "toolCount": 7,
+              "scopeDenial": "AGENT_RUN_SCOPE_MISMATCH",
+              "revoked": true
+            },
+            "HELPER": {
+              "status": "PASS",
+              "toolCount": 1,
+              "scopeDenial": "AGENT_RUN_SCOPE_MISMATCH",
+              "revoked": true
+            }
+          },
+          "shutdown": "PASS",
+          "unauthenticatedStatus": 401
+        }
+      }
+    },
+    "eligibility": {
+      "cloudPull": "PASS",
+      "memoryDisabled": "PASS",
+      "commandHooksAbsent": "PASS"
+    },
+    "policy": [
+      {
+        "capability": "fs_read",
+        "effect": "deny"
+      },
+      {
+        "capability": "fs_write",
+        "effect": "deny"
+      },
+      {
+        "capability": "shell",
+        "effect": "deny"
+      },
+      {
+        "capability": "web_search",
+        "effect": "deny"
+      },
+      {
+        "capability": "mcp",
+        "effect": "deny"
+      }
+    ],
+    "catalogCount": 0,
+    "turn": {
+      "stopReason": "end_turn",
+      "started": 1790324342733,
+      "finished": 1790324346970,
+      "elapsedMs": 4237,
+      "chunks": 32,
+      "firstChunkMs": 3498,
+      "lastChunkBeforeTerminalMs": 91,
+      "receipt": {
+        "stored": true,
+        "responseCharacters": 105,
+        "storedSummaryCharacters": 105
+      }
+    }
+  },
+  "vertical": [
+    {
+      "sourceSha256": "4ac481f6b8a449c74d9ad1b813753c81d59a721927a98f155ed7ac18b7ea8280",
+      "version": "0.3.8",
+      "status": "FAIL",
+      "stage": "BUILDER_INITIAL_WAITING",
+      "errorCode": "NATIVE_CLOUD_CYCLE_UNVERIFIED",
+      "startedAt": "2026-09-25T08:23:48.090Z",
+      "requestCount": 6,
+      "readFailures": 0,
+      "previewCount": 10,
+      "draftSpecRevision": 2,
+      "confirmedSpecRevision": null,
+      "recovered": false,
+      "retryVerification": null,
+      "continuationVerification": null,
+      "environmentRecovery": null,
+      "finalBuilderRecovery": null,
+      "currentVersionResume": null,
+      "initialEnvironment": "ISOLATED_DEVELOPMENT_PC",
+      "cleanMachine": "NOT_VERIFIED",
+      "processShellPolicy": null,
+      "runs": {
+        "PREVIEW": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "JIT_ENRICH": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "REFINE_ROUND": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 11
+        },
+        "SPEC": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 10
+        },
+        "SPEC_REVISE": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "BUILDER_INITIAL": {
+          "status": "FAILED",
+          "outcome": "NONE",
+          "errorCode": "NATIVE_CLOUD_CYCLE_UNVERIFIED",
+          "lastSequence": 4
+        }
+      },
+      "completedSteps": [
+        "START_DISCOVERY",
+        "PREVIEW",
+        "CHOOSE_SYNTHETIC_PREVIEW",
+        "JIT_ENRICH",
+        "REFINE_INPUT",
+        "REFINE_ROUND",
+        "SELECT",
+        "SPEC",
+        "SPEC_REVISE",
+        "CONFIRM_SPEC",
+        "PREPARE_TASK",
+        "BUILDER_INITIAL"
+      ],
+      "helperRecorded": false,
+      "task": null,
+      "result": null,
+      "analysis": null,
+      "evidence": null,
+      "historyReadStartsNoRun": null,
+      "maxObservedHostRssBytes": 268898304
+    },
+    {
+      "sourceSha256": "6ed326b0397bd40bbee5836f0c5579eb692565333fd47c65e49ea1f2a85ab75e",
+      "version": "0.3.11",
+      "status": "FAIL",
+      "stage": "BUILDER_APPLY",
+      "errorCode": "ERR_ASSERTION",
+      "startedAt": "2026-09-25T08:23:48.090Z",
+      "requestCount": 14,
+      "readFailures": 0,
+      "previewCount": 10,
+      "draftSpecRevision": 2,
+      "confirmedSpecRevision": null,
+      "recovered": true,
+      "retryVerification": null,
+      "continuationVerification": "RECORDED_INCOMPLETE_TURN_AND_RESTORED_TASK",
+      "environmentRecovery": {
+        "attempt": 1,
+        "sourceSha256": "3ef5960fcca48693c94bd7420e359725428cda64d68aa5dedc4474acf90dba05",
+        "previousContinuationSha256": "0783c2da68f71de94ea64b39f5bcb113349618819591102e4afa3fbbe41d4d9d",
+        "mode": "WINDOWS_DEFAULT_MODULES",
+        "moduleVersion": "2.0.0",
+        "moduleImport": "PASS",
+        "standardModule": true,
+        "executionPolicy": "Restricted",
+        "policyChanged": false
+      },
+      "finalBuilderRecovery": {
+        "sourceSha256": "88a276bc642d35fb9d6326dc18b7554c5f8b82bffed3fadfd5706c333abb1d4d",
+        "toolchainUnchanged": true,
+        "offlineToolchainProbe": "PASS",
+        "shellModule": "WINDOWS_DEFAULT_2.0.0",
+        "executionPolicy": "Restricted",
+        "policyChanged": false,
+        "explicitRequestLimit": 12,
+        "helperNextContext": "NOT_RUN_REQUEST_BUDGET",
+        "restoreVerified": true
+      },
+      "currentVersionResume": {
+        "sourceSha256": "b94cffe59bd08a119f18fc0f3c7da761794d02760193cc3a9baa0ce2e082dafd",
+        "authorization": "USER_COMPLETE_W5_CURRENT_VERSION_20260925",
+        "priorRequests": 13,
+        "newRequests": 1,
+        "requestLimit": 2,
+        "toolchainUnchanged": true,
+        "restoreVerified": true,
+        "policyChanged": false,
+        "policyScope": null,
+        "persistentPolicyChanged": null,
+        "client": "INSTALLED_SDK",
+        "shell": "ISOLATED_COMMAND_PROMPT"
+      },
+      "initialEnvironment": "ISOLATED_DEVELOPMENT_PC",
+      "cleanMachine": "NOT_VERIFIED",
+      "processShellPolicy": null,
+      "runs": {
+        "PREVIEW": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "JIT_ENRICH": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "REFINE_ROUND": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 11
+        },
+        "SPEC": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 10
+        },
+        "SPEC_REVISE": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "BUILDER_INITIAL": {
+          "status": "SUCCEEDED",
+          "outcome": "TURN_ENDED",
+          "errorCode": null,
+          "lastSequence": 50
+        },
+        "HELPER_DECISION": {
+          "status": "SUCCEEDED",
+          "outcome": "HELPER_RECORDED",
+          "errorCode": null,
+          "lastSequence": 29
+        },
+        "BUILDER_APPLY": {
+          "status": "SUCCEEDED",
+          "outcome": "TURN_ENDED",
+          "errorCode": null,
+          "lastSequence": 79
+        }
+      },
+      "completedSteps": [
+        "START_DISCOVERY",
+        "PREVIEW",
+        "CHOOSE_SYNTHETIC_PREVIEW",
+        "JIT_ENRICH",
+        "REFINE_INPUT",
+        "REFINE_ROUND",
+        "SELECT",
+        "SPEC",
+        "SPEC_REVISE",
+        "CONFIRM_SPEC",
+        "PREPARE_TASK",
+        "BUILDER_INITIAL",
+        "CHOOSE_DECISION",
+        "HELPER_DECISION",
+        "RESOLVE_DECISIONS",
+        "RESOLVE_DECISION",
+        "BUILDER_APPLY"
+      ],
+      "helperRecorded": true,
+      "task": {
+        "status": "ACTIVE",
+        "completion": false,
+        "decisionsApplied": 1
+      },
+      "result": null,
+      "analysis": null,
+      "evidence": null,
+      "historyReadStartsNoRun": null,
+      "maxObservedHostRssBytes": null
+    },
+    {
+      "sourceSha256": "5039fab7a855942ce81834e07fc3ddba9edad324dce498b682c2d143cdee0991",
+      "version": "0.3.9",
+      "status": "FAIL",
+      "stage": "WAITING_FOR_NATIVE_READY",
+      "errorCode": "ERR_ASSERTION",
+      "startedAt": "2026-09-25T08:23:48.090Z",
+      "requestCount": 6,
+      "readFailures": 0,
+      "previewCount": 10,
+      "draftSpecRevision": 2,
+      "confirmedSpecRevision": null,
+      "recovered": true,
+      "retryVerification": null,
+      "continuationVerification": null,
+      "environmentRecovery": null,
+      "finalBuilderRecovery": null,
+      "currentVersionResume": null,
+      "initialEnvironment": "ISOLATED_DEVELOPMENT_PC",
+      "cleanMachine": "NOT_VERIFIED",
+      "processShellPolicy": null,
+      "runs": {
+        "PREVIEW": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "JIT_ENRICH": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "REFINE_ROUND": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 11
+        },
+        "SPEC": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 10
+        },
+        "SPEC_REVISE": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        }
+      },
+      "completedSteps": [
+        "START_DISCOVERY",
+        "PREVIEW",
+        "CHOOSE_SYNTHETIC_PREVIEW",
+        "JIT_ENRICH",
+        "REFINE_INPUT",
+        "REFINE_ROUND",
+        "SELECT",
+        "SPEC",
+        "SPEC_REVISE",
+        "CONFIRM_SPEC",
+        "PREPARE_TASK"
+      ],
+      "helperRecorded": false,
+      "task": null,
+      "result": null,
+      "analysis": null,
+      "evidence": null,
+      "historyReadStartsNoRun": null,
+      "maxObservedHostRssBytes": 251043840
+    },
+    {
+      "sourceSha256": "3ef5960fcca48693c94bd7420e359725428cda64d68aa5dedc4474acf90dba05",
+      "version": "0.3.10",
+      "status": "FAIL",
+      "stage": "BUILDER_APPLY_WAITING",
+      "errorCode": "TASK_COMPLETION_NOT_RECORDED",
+      "startedAt": "2026-09-25T08:23:48.090Z",
+      "requestCount": 10,
+      "readFailures": 0,
+      "previewCount": 10,
+      "draftSpecRevision": 2,
+      "confirmedSpecRevision": null,
+      "recovered": true,
+      "retryVerification": null,
+      "continuationVerification": "RECORDED_INCOMPLETE_TURN_AND_RESTORED_TASK",
+      "environmentRecovery": null,
+      "finalBuilderRecovery": null,
+      "currentVersionResume": null,
+      "initialEnvironment": "ISOLATED_DEVELOPMENT_PC",
+      "cleanMachine": "NOT_VERIFIED",
+      "processShellPolicy": null,
+      "runs": {
+        "PREVIEW": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "JIT_ENRICH": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "REFINE_ROUND": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 11
+        },
+        "SPEC": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 10
+        },
+        "SPEC_REVISE": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "BUILDER_INITIAL": {
+          "status": "SUCCEEDED",
+          "outcome": "TURN_ENDED",
+          "errorCode": null,
+          "lastSequence": 50
+        },
+        "HELPER_DECISION": {
+          "status": "SUCCEEDED",
+          "outcome": "HELPER_RECORDED",
+          "errorCode": null,
+          "lastSequence": 29
+        },
+        "BUILDER_APPLY": {
+          "status": "SUCCEEDED",
+          "outcome": "TURN_ENDED",
+          "errorCode": null,
+          "lastSequence": 104
+        }
+      },
+      "completedSteps": [
+        "START_DISCOVERY",
+        "PREVIEW",
+        "CHOOSE_SYNTHETIC_PREVIEW",
+        "JIT_ENRICH",
+        "REFINE_INPUT",
+        "REFINE_ROUND",
+        "SELECT",
+        "SPEC",
+        "SPEC_REVISE",
+        "CONFIRM_SPEC",
+        "PREPARE_TASK",
+        "BUILDER_INITIAL",
+        "CHOOSE_DECISION",
+        "HELPER_DECISION",
+        "RESOLVE_DECISIONS",
+        "RESOLVE_DECISION",
+        "BUILDER_APPLY"
+      ],
+      "helperRecorded": true,
+      "task": {
+        "status": "ACTIVE",
+        "completion": false,
+        "decisionsApplied": 1
+      },
+      "result": null,
+      "analysis": null,
+      "evidence": null,
+      "historyReadStartsNoRun": null,
+      "maxObservedHostRssBytes": 274313216
+    },
+    {
+      "sourceSha256": "4756b3631e110ff63a98402384ad6206e9def79f45b72d8c500cdd8d277556ff",
+      "version": "0.3.11",
+      "status": "PASS",
+      "stage": "RECOVERED_VERTICAL_COMPLETE",
+      "errorCode": null,
+      "startedAt": "2026-09-25T08:23:48.090Z",
+      "requestCount": 16,
+      "readFailures": 0,
+      "previewCount": 10,
+      "draftSpecRevision": 2,
+      "confirmedSpecRevision": null,
+      "recovered": true,
+      "retryVerification": null,
+      "continuationVerification": "RECORDED_INCOMPLETE_TURN_AND_RESTORED_TASK",
+      "environmentRecovery": {
+        "attempt": 1,
+        "sourceSha256": "3ef5960fcca48693c94bd7420e359725428cda64d68aa5dedc4474acf90dba05",
+        "previousContinuationSha256": "0783c2da68f71de94ea64b39f5bcb113349618819591102e4afa3fbbe41d4d9d",
+        "mode": "WINDOWS_DEFAULT_MODULES",
+        "moduleVersion": "2.0.0",
+        "moduleImport": "PASS",
+        "standardModule": true,
+        "executionPolicy": "Restricted",
+        "policyChanged": false
+      },
+      "finalBuilderRecovery": {
+        "sourceSha256": "88a276bc642d35fb9d6326dc18b7554c5f8b82bffed3fadfd5706c333abb1d4d",
+        "toolchainUnchanged": true,
+        "offlineToolchainProbe": "PASS",
+        "shellModule": "WINDOWS_DEFAULT_2.0.0",
+        "executionPolicy": "Restricted",
+        "policyChanged": false,
+        "explicitRequestLimit": 12,
+        "helperNextContext": "NOT_RUN_REQUEST_BUDGET",
+        "restoreVerified": true
+      },
+      "currentVersionResume": {
+        "sourceSha256": "6ed326b0397bd40bbee5836f0c5579eb692565333fd47c65e49ea1f2a85ab75e",
+        "authorization": "USER_COMPLETE_W5_CURRENT_VERSION_20260925",
+        "priorRequests": 14,
+        "newRequests": 2,
+        "requestLimit": 2,
+        "toolchainUnchanged": true,
+        "restoreVerified": true,
+        "policyChanged": true,
+        "policyScope": "PROCESS_ONLY",
+        "persistentPolicyChanged": false,
+        "client": "INSTALLED_SDK",
+        "shell": "WINDOWS_POWERSHELL_PROCESS_REMOTESIGNED"
+      },
+      "initialEnvironment": "ISOLATED_DEVELOPMENT_PC",
+      "cleanMachine": "NOT_VERIFIED",
+      "processShellPolicy": null,
+      "runs": {
+        "PREVIEW": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "JIT_ENRICH": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "REFINE_ROUND": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 11
+        },
+        "SPEC": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 10
+        },
+        "SPEC_REVISE": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "BUILDER_INITIAL": {
+          "status": "SUCCEEDED",
+          "outcome": "TURN_ENDED",
+          "errorCode": null,
+          "lastSequence": 50
+        },
+        "HELPER_DECISION": {
+          "status": "SUCCEEDED",
+          "outcome": "HELPER_RECORDED",
+          "errorCode": null,
+          "lastSequence": 29
+        },
+        "BUILDER_APPLY": {
+          "status": "SUCCEEDED",
+          "outcome": "TURN_ENDED",
+          "errorCode": null,
+          "lastSequence": 95
+        },
+        "HELPER_NEXT_CONTEXT": {
+          "status": "SUCCEEDED",
+          "outcome": "HELPER_RECORDED",
+          "errorCode": null,
+          "lastSequence": 30
+        }
+      },
+      "completedSteps": [
+        "START_DISCOVERY",
+        "PREVIEW",
+        "CHOOSE_SYNTHETIC_PREVIEW",
+        "JIT_ENRICH",
+        "REFINE_INPUT",
+        "REFINE_ROUND",
+        "SELECT",
+        "SPEC",
+        "SPEC_REVISE",
+        "CONFIRM_SPEC",
+        "PREPARE_TASK",
+        "BUILDER_INITIAL",
+        "CHOOSE_DECISION",
+        "HELPER_DECISION",
+        "RESOLVE_DECISIONS",
+        "RESOLVE_DECISION",
+        "BUILDER_APPLY",
+        "LAUNCH_RESULT",
+        "HELPER_NEXT_CONTEXT"
+      ],
+      "helperRecorded": true,
+      "task": {
+        "status": "COMPLETED",
+        "completion": true,
+        "decisionsApplied": 1
+      },
+      "result": {
+        "status": "RUNNING",
+        "httpStatus": 200,
+        "bodyBytes": 1188
+      },
+      "analysis": [
+        {
+          "status": "SUCCEEDED",
+          "errorCode": null
+        },
+        {
+          "status": "SUCCEEDED",
+          "errorCode": null
+        },
+        {
+          "status": "SUCCEEDED",
+          "errorCode": null
+        }
+      ],
+      "evidence": {
+        "conceptStates": [
+          "OBSERVED",
+          "OBSERVED",
+          "OBSERVED",
+          "OBSERVED",
+          "OBSERVED"
+        ],
+        "userUnderstandingCount": 0,
+        "personalization": [
+          {
+            "target": {
+              "kind": "HELPER_TURN",
+              "taskId": "task_1adb832c-1ac4-4cc1-9041-0e9802281cbd"
+            },
+            "mode": "EVIDENCE_AWARE",
+            "basisCount": 3
+          },
+          {
+            "target": {
+              "kind": "HELPER_TURN",
+              "taskId": "task_1adb832c-1ac4-4cc1-9041-0e9802281cbd",
+              "decisionId": "decision_790296e6-61d3-4dff-98e8-c7b3574761a1"
+            },
+            "mode": "NO_RELEVANT_EVIDENCE",
+            "basisCount": 0
+          },
+          {
+            "target": {
+              "kind": "DISCOVERY_SESSION",
+              "discoverySessionId": "discovery_session_f3258a86-e3b4-4036-94f9-6621919c40fb"
+            },
+            "mode": "NO_RELEVANT_EVIDENCE",
+            "basisCount": 0
+          }
+        ]
+      },
+      "historyReadStartsNoRun": true,
+      "maxObservedHostRssBytes": null
+    },
+    {
+      "sourceSha256": "b94cffe59bd08a119f18fc0f3c7da761794d02760193cc3a9baa0ce2e082dafd",
+      "version": "0.3.11",
+      "status": "FAIL",
+      "stage": "BUILDER_APPLY",
+      "errorCode": "ERR_ASSERTION",
+      "startedAt": "2026-09-25T08:23:48.090Z",
+      "requestCount": 13,
+      "readFailures": 0,
+      "previewCount": 10,
+      "draftSpecRevision": 2,
+      "confirmedSpecRevision": null,
+      "recovered": true,
+      "retryVerification": null,
+      "continuationVerification": "RECORDED_INCOMPLETE_TURN_AND_RESTORED_TASK",
+      "environmentRecovery": {
+        "attempt": 1,
+        "sourceSha256": "3ef5960fcca48693c94bd7420e359725428cda64d68aa5dedc4474acf90dba05",
+        "previousContinuationSha256": "0783c2da68f71de94ea64b39f5bcb113349618819591102e4afa3fbbe41d4d9d",
+        "mode": "WINDOWS_DEFAULT_MODULES",
+        "moduleVersion": "2.0.0",
+        "moduleImport": "PASS",
+        "standardModule": true,
+        "executionPolicy": "Restricted",
+        "policyChanged": false
+      },
+      "finalBuilderRecovery": {
+        "sourceSha256": "88a276bc642d35fb9d6326dc18b7554c5f8b82bffed3fadfd5706c333abb1d4d",
+        "toolchainUnchanged": true,
+        "offlineToolchainProbe": "PASS",
+        "shellModule": "WINDOWS_DEFAULT_2.0.0",
+        "executionPolicy": "Restricted",
+        "policyChanged": false,
+        "explicitRequestLimit": 12,
+        "helperNextContext": "NOT_RUN_REQUEST_BUDGET",
+        "restoreVerified": true
+      },
+      "currentVersionResume": {
+        "sourceSha256": "ab83d43ef9147548dd0ea4bdd102cd0d15145ed3572a8601bc53f640f1b01e1e",
+        "authorization": "USER_COMPLETE_W5_CURRENT_VERSION_20260925",
+        "priorRequests": 12,
+        "newRequests": 1,
+        "requestLimit": 2,
+        "toolchainUnchanged": true,
+        "restoreVerified": true,
+        "policyChanged": false,
+        "policyScope": null,
+        "persistentPolicyChanged": null,
+        "client": "INSTALLED_SDK",
+        "shell": "WINDOWS_DEFAULT_POWERSHELL"
+      },
+      "initialEnvironment": "ISOLATED_DEVELOPMENT_PC",
+      "cleanMachine": "NOT_VERIFIED",
+      "processShellPolicy": null,
+      "runs": {
+        "PREVIEW": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "JIT_ENRICH": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "REFINE_ROUND": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 11
+        },
+        "SPEC": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 10
+        },
+        "SPEC_REVISE": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "BUILDER_INITIAL": {
+          "status": "SUCCEEDED",
+          "outcome": "TURN_ENDED",
+          "errorCode": null,
+          "lastSequence": 50
+        },
+        "HELPER_DECISION": {
+          "status": "SUCCEEDED",
+          "outcome": "HELPER_RECORDED",
+          "errorCode": null,
+          "lastSequence": 29
+        },
+        "BUILDER_APPLY": {
+          "status": "SUCCEEDED",
+          "outcome": "TURN_ENDED",
+          "errorCode": null,
+          "lastSequence": 153
+        }
+      },
+      "completedSteps": [
+        "START_DISCOVERY",
+        "PREVIEW",
+        "CHOOSE_SYNTHETIC_PREVIEW",
+        "JIT_ENRICH",
+        "REFINE_INPUT",
+        "REFINE_ROUND",
+        "SELECT",
+        "SPEC",
+        "SPEC_REVISE",
+        "CONFIRM_SPEC",
+        "PREPARE_TASK",
+        "BUILDER_INITIAL",
+        "CHOOSE_DECISION",
+        "HELPER_DECISION",
+        "RESOLVE_DECISIONS",
+        "RESOLVE_DECISION",
+        "BUILDER_APPLY"
+      ],
+      "helperRecorded": true,
+      "task": {
+        "status": "ACTIVE",
+        "completion": false,
+        "decisionsApplied": 1
+      },
+      "result": null,
+      "analysis": null,
+      "evidence": null,
+      "historyReadStartsNoRun": null,
+      "maxObservedHostRssBytes": null
+    },
+    {
+      "sourceSha256": "258c4687a71ab59c796efeee67858041ce2de625e1d13b6894aabfda6fab24a4",
+      "version": "0.3.14",
+      "status": "FAIL",
+      "stage": "BUILDER_INITIAL_WAITING",
+      "errorCode": "PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED",
+      "startedAt": "2026-09-25T13:29:24.932Z",
+      "requestCount": 6,
+      "readFailures": 0,
+      "previewCount": 10,
+      "draftSpecRevision": 2,
+      "confirmedSpecRevision": 3,
+      "recovered": false,
+      "retryVerification": null,
+      "continuationVerification": null,
+      "environmentRecovery": null,
+      "finalBuilderRecovery": null,
+      "currentVersionResume": null,
+      "initialEnvironment": "USER_CONFIRMED_INITIAL_CLEAN_WINDOWS",
+      "cleanMachine": "USER_CONFIRMED_INITIAL_CLEAN_WINDOWS",
+      "processShellPolicy": null,
+      "runs": {
+        "PREVIEW": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "JIT_ENRICH": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "REFINE_ROUND": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 10
+        },
+        "SPEC": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 16
+        },
+        "SPEC_REVISE": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "BUILDER_INITIAL": {
+          "status": "FAILED",
+          "outcome": "NONE",
+          "errorCode": "PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED",
+          "lastSequence": 4
+        }
+      },
+      "completedSteps": [
+        "START_DISCOVERY",
+        "PREVIEW",
+        "CHOOSE_SYNTHETIC_PREVIEW",
+        "JIT_ENRICH",
+        "REFINE_INPUT",
+        "REFINE_ROUND",
+        "SELECT",
+        "SPEC",
+        "SPEC_REVISE",
+        "CONFIRM_SPEC",
+        "PREPARE_TASK",
+        "BUILDER_INITIAL"
+      ],
+      "helperRecorded": false,
+      "task": null,
+      "result": null,
+      "analysis": null,
+      "evidence": null,
+      "historyReadStartsNoRun": null,
+      "maxObservedHostRssBytes": 470790144
+    },
+    {
+      "sourceSha256": "ab83d43ef9147548dd0ea4bdd102cd0d15145ed3572a8601bc53f640f1b01e1e",
+      "version": "0.3.10",
+      "status": "FAIL",
+      "stage": "FINAL_BUILDER_WAITING",
+      "errorCode": "ERR_ASSERTION",
+      "startedAt": "2026-09-25T08:23:48.090Z",
+      "requestCount": 12,
+      "readFailures": 0,
+      "previewCount": 10,
+      "draftSpecRevision": 2,
+      "confirmedSpecRevision": null,
+      "recovered": true,
+      "retryVerification": null,
+      "continuationVerification": "RECORDED_INCOMPLETE_TURN_AND_RESTORED_TASK",
+      "environmentRecovery": {
+        "attempt": 1,
+        "sourceSha256": "3ef5960fcca48693c94bd7420e359725428cda64d68aa5dedc4474acf90dba05",
+        "previousContinuationSha256": "0783c2da68f71de94ea64b39f5bcb113349618819591102e4afa3fbbe41d4d9d",
+        "mode": "WINDOWS_DEFAULT_MODULES",
+        "moduleVersion": "2.0.0",
+        "moduleImport": "PASS",
+        "standardModule": true,
+        "executionPolicy": "Restricted",
+        "policyChanged": false
+      },
+      "finalBuilderRecovery": {
+        "sourceSha256": "88a276bc642d35fb9d6326dc18b7554c5f8b82bffed3fadfd5706c333abb1d4d",
+        "toolchainUnchanged": true,
+        "offlineToolchainProbe": "PASS",
+        "shellModule": "WINDOWS_DEFAULT_2.0.0",
+        "executionPolicy": "Restricted",
+        "policyChanged": false,
+        "explicitRequestLimit": 12,
+        "helperNextContext": "NOT_RUN_REQUEST_BUDGET",
+        "restoreVerified": true
+      },
+      "currentVersionResume": null,
+      "initialEnvironment": "ISOLATED_DEVELOPMENT_PC",
+      "cleanMachine": "NOT_VERIFIED",
+      "processShellPolicy": null,
+      "runs": {
+        "PREVIEW": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "JIT_ENRICH": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "REFINE_ROUND": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 11
+        },
+        "SPEC": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 10
+        },
+        "SPEC_REVISE": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "BUILDER_INITIAL": {
+          "status": "SUCCEEDED",
+          "outcome": "TURN_ENDED",
+          "errorCode": null,
+          "lastSequence": 50
+        },
+        "HELPER_DECISION": {
+          "status": "SUCCEEDED",
+          "outcome": "HELPER_RECORDED",
+          "errorCode": null,
+          "lastSequence": 29
+        },
+        "BUILDER_APPLY": {
+          "status": "SUCCEEDED",
+          "outcome": "TURN_ENDED",
+          "errorCode": null,
+          "lastSequence": 125
+        }
+      },
+      "completedSteps": [
+        "START_DISCOVERY",
+        "PREVIEW",
+        "CHOOSE_SYNTHETIC_PREVIEW",
+        "JIT_ENRICH",
+        "REFINE_INPUT",
+        "REFINE_ROUND",
+        "SELECT",
+        "SPEC",
+        "SPEC_REVISE",
+        "CONFIRM_SPEC",
+        "PREPARE_TASK",
+        "BUILDER_INITIAL",
+        "CHOOSE_DECISION",
+        "HELPER_DECISION",
+        "RESOLVE_DECISIONS",
+        "RESOLVE_DECISION",
+        "BUILDER_APPLY"
+      ],
+      "helperRecorded": true,
+      "task": {
+        "status": "ACTIVE",
+        "completion": false,
+        "decisionsApplied": 1
+      },
+      "result": null,
+      "analysis": null,
+      "evidence": null,
+      "historyReadStartsNoRun": null,
+      "maxObservedHostRssBytes": null
+    },
+    {
+      "sourceSha256": "0783c2da68f71de94ea64b39f5bcb113349618819591102e4afa3fbbe41d4d9d",
+      "version": "0.3.9",
+      "status": "FAIL",
+      "stage": "BUILDER_APPLY_WAITING",
+      "errorCode": "TASK_COMPLETION_NOT_RECORDED",
+      "startedAt": "2026-09-25T08:23:48.090Z",
+      "requestCount": 9,
+      "readFailures": 0,
+      "previewCount": 10,
+      "draftSpecRevision": 2,
+      "confirmedSpecRevision": null,
+      "recovered": true,
+      "retryVerification": "RECORDED_TERMINAL_RESPONSE_AND_RESTORED_PROJECT",
+      "continuationVerification": null,
+      "environmentRecovery": null,
+      "finalBuilderRecovery": null,
+      "currentVersionResume": null,
+      "initialEnvironment": "ISOLATED_DEVELOPMENT_PC",
+      "cleanMachine": "NOT_VERIFIED",
+      "processShellPolicy": null,
+      "runs": {
+        "PREVIEW": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "JIT_ENRICH": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "REFINE_ROUND": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 11
+        },
+        "SPEC": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 10
+        },
+        "SPEC_REVISE": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "BUILDER_INITIAL": {
+          "status": "SUCCEEDED",
+          "outcome": "TURN_ENDED",
+          "errorCode": null,
+          "lastSequence": 50
+        },
+        "HELPER_DECISION": {
+          "status": "SUCCEEDED",
+          "outcome": "HELPER_RECORDED",
+          "errorCode": null,
+          "lastSequence": 29
+        },
+        "BUILDER_APPLY": {
+          "status": "SUCCEEDED",
+          "outcome": "TURN_ENDED",
+          "errorCode": null,
+          "lastSequence": 75
+        }
+      },
+      "completedSteps": [
+        "START_DISCOVERY",
+        "PREVIEW",
+        "CHOOSE_SYNTHETIC_PREVIEW",
+        "JIT_ENRICH",
+        "REFINE_INPUT",
+        "REFINE_ROUND",
+        "SELECT",
+        "SPEC",
+        "SPEC_REVISE",
+        "CONFIRM_SPEC",
+        "PREPARE_TASK",
+        "BUILDER_INITIAL",
+        "CHOOSE_DECISION",
+        "HELPER_DECISION",
+        "RESOLVE_DECISIONS",
+        "RESOLVE_DECISION",
+        "BUILDER_APPLY"
+      ],
+      "helperRecorded": true,
+      "task": {
+        "status": "ACTIVE",
+        "completion": false,
+        "decisionsApplied": 1
+      },
+      "result": null,
+      "analysis": null,
+      "evidence": null,
+      "historyReadStartsNoRun": null,
+      "maxObservedHostRssBytes": 253059072
+    },
+    {
+      "sourceSha256": "88a276bc642d35fb9d6326dc18b7554c5f8b82bffed3fadfd5706c333abb1d4d",
+      "version": "0.3.10",
+      "status": "FAIL",
+      "stage": "BUILDER_APPLY_WAITING",
+      "errorCode": "PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED",
+      "startedAt": "2026-09-25T08:23:48.090Z",
+      "requestCount": 11,
+      "readFailures": 0,
+      "previewCount": 10,
+      "draftSpecRevision": 2,
+      "confirmedSpecRevision": null,
+      "recovered": true,
+      "retryVerification": null,
+      "continuationVerification": "RECORDED_INCOMPLETE_TURN_AND_RESTORED_TASK",
+      "environmentRecovery": {
+        "attempt": 1,
+        "sourceSha256": "3ef5960fcca48693c94bd7420e359725428cda64d68aa5dedc4474acf90dba05",
+        "previousContinuationSha256": "0783c2da68f71de94ea64b39f5bcb113349618819591102e4afa3fbbe41d4d9d",
+        "mode": "WINDOWS_DEFAULT_MODULES",
+        "moduleVersion": "2.0.0",
+        "moduleImport": "PASS",
+        "standardModule": true,
+        "executionPolicy": "Restricted",
+        "policyChanged": false
+      },
+      "finalBuilderRecovery": null,
+      "currentVersionResume": null,
+      "initialEnvironment": "ISOLATED_DEVELOPMENT_PC",
+      "cleanMachine": "NOT_VERIFIED",
+      "processShellPolicy": null,
+      "runs": {
+        "PREVIEW": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "JIT_ENRICH": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "REFINE_ROUND": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 11
+        },
+        "SPEC": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 10
+        },
+        "SPEC_REVISE": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "BUILDER_INITIAL": {
+          "status": "SUCCEEDED",
+          "outcome": "TURN_ENDED",
+          "errorCode": null,
+          "lastSequence": 50
+        },
+        "HELPER_DECISION": {
+          "status": "SUCCEEDED",
+          "outcome": "HELPER_RECORDED",
+          "errorCode": null,
+          "lastSequence": 29
+        },
+        "BUILDER_APPLY": {
+          "status": "FAILED",
+          "outcome": "NONE",
+          "errorCode": "PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED",
+          "lastSequence": 4
+        }
+      },
+      "completedSteps": [
+        "START_DISCOVERY",
+        "PREVIEW",
+        "CHOOSE_SYNTHETIC_PREVIEW",
+        "JIT_ENRICH",
+        "REFINE_INPUT",
+        "REFINE_ROUND",
+        "SELECT",
+        "SPEC",
+        "SPEC_REVISE",
+        "CONFIRM_SPEC",
+        "PREPARE_TASK",
+        "BUILDER_INITIAL",
+        "CHOOSE_DECISION",
+        "HELPER_DECISION",
+        "RESOLVE_DECISIONS",
+        "RESOLVE_DECISION",
+        "BUILDER_APPLY"
+      ],
+      "helperRecorded": true,
+      "task": {
+        "status": "ACTIVE",
+        "completion": false,
+        "decisionsApplied": 1
+      },
+      "result": null,
+      "analysis": null,
+      "evidence": null,
+      "historyReadStartsNoRun": null,
+      "maxObservedHostRssBytes": 249823232
+    },
+    {
+      "sourceSha256": "687a04a4e83498d5590fbbfbb0c1a7491a97b33ec97ccb07aa9d0e7c72201586",
+      "version": "0.3.11",
+      "status": "FAIL",
+      "stage": "BUILDER_INITIAL_WAITING",
+      "errorCode": "PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED",
+      "startedAt": "2026-09-25T12:35:26.970Z",
+      "requestCount": 6,
+      "readFailures": 0,
+      "previewCount": 10,
+      "draftSpecRevision": 2,
+      "confirmedSpecRevision": 3,
+      "recovered": false,
+      "retryVerification": null,
+      "continuationVerification": null,
+      "environmentRecovery": null,
+      "finalBuilderRecovery": null,
+      "currentVersionResume": null,
+      "initialEnvironment": "USER_CONFIRMED_INITIAL_CLEAN_WINDOWS",
+      "cleanMachine": "USER_CONFIRMED_INITIAL_CLEAN_WINDOWS",
+      "processShellPolicy": {
+        "mode": "PROCESS_ONLY_REMOTESIGNED",
+        "before": {
+          "UserPolicy": "Undefined",
+          "LocalMachine": "Undefined",
+          "Process": "Undefined",
+          "MachinePolicy": "Undefined",
+          "CurrentUser": "Undefined",
+          "effective": "Restricted"
+        },
+        "scoped": {
+          "UserPolicy": "Undefined",
+          "LocalMachine": "Undefined",
+          "Process": "RemoteSigned",
+          "MachinePolicy": "Undefined",
+          "CurrentUser": "Undefined",
+          "effective": "RemoteSigned"
+        },
+        "persistentPolicyChanged": false
+      },
+      "runs": {
+        "PREVIEW": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "JIT_ENRICH": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "REFINE_ROUND": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 11
+        },
+        "SPEC": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 16
+        },
+        "SPEC_REVISE": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "BUILDER_INITIAL": {
+          "status": "FAILED",
+          "outcome": "NONE",
+          "errorCode": "PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED",
+          "lastSequence": 4
+        }
+      },
+      "completedSteps": [
+        "START_DISCOVERY",
+        "PREVIEW",
+        "CHOOSE_SYNTHETIC_PREVIEW",
+        "JIT_ENRICH",
+        "REFINE_INPUT",
+        "REFINE_ROUND",
+        "SELECT",
+        "SPEC",
+        "SPEC_REVISE",
+        "CONFIRM_SPEC",
+        "PREPARE_TASK",
+        "BUILDER_INITIAL"
+      ],
+      "helperRecorded": false,
+      "task": null,
+      "result": null,
+      "analysis": null,
+      "evidence": null,
+      "historyReadStartsNoRun": null,
+      "maxObservedHostRssBytes": 250433536
+    },
+    {
+      "sourceSha256": "75b3d35240311912187fbbed9ba390736066b5e96156f047786ce7ca164813ca",
+      "version": "0.3.13",
+      "status": "FAIL",
+      "stage": "PREVIEW_WAITING",
+      "errorCode": "NATIVE_CLOUD_DIAGNOSTIC_PROOF_UNAVAILABLE",
+      "startedAt": "2026-09-25T13:22:26.615Z",
+      "requestCount": 1,
+      "readFailures": 0,
+      "confirmedSpecRevision": null,
+      "recovered": false,
+      "retryVerification": null,
+      "continuationVerification": null,
+      "environmentRecovery": null,
+      "finalBuilderRecovery": null,
+      "currentVersionResume": null,
+      "initialEnvironment": "USER_CONFIRMED_INITIAL_CLEAN_WINDOWS",
+      "cleanMachine": "USER_CONFIRMED_INITIAL_CLEAN_WINDOWS",
+      "processShellPolicy": null,
+      "runs": {
+        "PREVIEW": {
+          "status": "FAILED",
+          "outcome": "NONE",
+          "errorCode": "NATIVE_CLOUD_DIAGNOSTIC_PROOF_UNAVAILABLE",
+          "lastSequence": 4
+        }
+      },
+      "completedSteps": [
+        "START_DISCOVERY",
+        "PREVIEW"
+      ],
+      "helperRecorded": false,
+      "task": null,
+      "result": null,
+      "analysis": null,
+      "evidence": null,
+      "historyReadStartsNoRun": null,
+      "maxObservedHostRssBytes": 385802240
+    },
+    {
+      "sourceSha256": "44efa85ee714fdca5b165984f6ac425ae30b4e3e713d41096b3234fceb4c835b",
+      "version": "0.3.11",
+      "status": "FAIL",
+      "stage": "BUILDER_APPLY_WAITING",
+      "errorCode": "TASK_COMPLETION_NOT_RECORDED",
+      "startedAt": "2026-09-25T12:43:41.809Z",
+      "requestCount": 8,
+      "readFailures": 0,
+      "previewCount": 10,
+      "draftSpecRevision": 2,
+      "confirmedSpecRevision": 3,
+      "recovered": false,
+      "retryVerification": null,
+      "continuationVerification": null,
+      "environmentRecovery": null,
+      "finalBuilderRecovery": null,
+      "currentVersionResume": null,
+      "initialEnvironment": "USER_CONFIRMED_INITIAL_CLEAN_WINDOWS",
+      "cleanMachine": "USER_CONFIRMED_INITIAL_CLEAN_WINDOWS",
+      "processShellPolicy": {
+        "mode": "PROCESS_ONLY_REMOTESIGNED",
+        "before": {
+          "UserPolicy": "Undefined",
+          "LocalMachine": "Undefined",
+          "Process": "Undefined",
+          "MachinePolicy": "Undefined",
+          "CurrentUser": "Undefined",
+          "effective": "Restricted"
+        },
+        "scoped": {
+          "UserPolicy": "Undefined",
+          "LocalMachine": "Undefined",
+          "Process": "RemoteSigned",
+          "MachinePolicy": "Undefined",
+          "CurrentUser": "Undefined",
+          "effective": "RemoteSigned"
+        },
+        "persistentPolicyChanged": false
+      },
+      "runs": {
+        "PREVIEW": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 12
+        },
+        "JIT_ENRICH": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 10
+        },
+        "REFINE_ROUND": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 13
+        },
+        "SPEC": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 16
+        },
+        "SPEC_REVISE": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "BUILDER_INITIAL": {
+          "status": "SUCCEEDED",
+          "outcome": "TURN_ENDED",
+          "errorCode": null,
+          "lastSequence": 138
+        },
+        "HELPER_DECISION": {
+          "status": "SUCCEEDED",
+          "outcome": "HELPER_RECORDED",
+          "errorCode": null,
+          "lastSequence": 23
+        },
+        "BUILDER_APPLY": {
+          "status": "SUCCEEDED",
+          "outcome": "TURN_ENDED",
+          "errorCode": null,
+          "lastSequence": 144
+        }
+      },
+      "completedSteps": [
+        "START_DISCOVERY",
+        "PREVIEW",
+        "CHOOSE_SYNTHETIC_PREVIEW",
+        "JIT_ENRICH",
+        "REFINE_INPUT",
+        "REFINE_ROUND",
+        "SELECT",
+        "SPEC",
+        "SPEC_REVISE",
+        "CONFIRM_SPEC",
+        "PREPARE_TASK",
+        "BUILDER_INITIAL",
+        "CHOOSE_DECISION",
+        "HELPER_DECISION",
+        "RESOLVE_DECISIONS",
+        "RESOLVE_DECISION",
+        "BUILDER_APPLY"
+      ],
+      "helperRecorded": true,
+      "task": {
+        "status": "ACTIVE",
+        "completion": false,
+        "decisionsApplied": 1
+      },
+      "result": null,
+      "analysis": null,
+      "evidence": null,
+      "historyReadStartsNoRun": null,
+      "maxObservedHostRssBytes": 269725696
+    },
+    {
+      "sourceSha256": "326479ffe5ea4ed762f06959c7dc211cad4e80986815c5be0ba39165ad1900ee",
+      "status": "FAIL",
+      "stage": "ACTIVATING",
+      "errorCode": "ERR_ASSERTION",
+      "requestCount": 0,
+      "readFailures": 0,
+      "confirmedSpecRevision": null,
+      "recovered": false,
+      "retryVerification": null,
+      "continuationVerification": null,
+      "environmentRecovery": null,
+      "finalBuilderRecovery": null,
+      "currentVersionResume": null,
+      "initialEnvironment": "USER_CONFIRMED_INITIAL_CLEAN_WINDOWS",
+      "cleanMachine": "USER_CONFIRMED_INITIAL_CLEAN_WINDOWS",
+      "processShellPolicy": null,
+      "runs": {},
+      "completedSteps": [],
+      "helperRecorded": false,
+      "task": null,
+      "result": null,
+      "analysis": null,
+      "evidence": null,
+      "historyReadStartsNoRun": null,
+      "maxObservedHostRssBytes": 183992320
+    },
+    {
+      "sourceSha256": "f21c544236a0cb793795c8c8c6fa3c92aceca2aaf13912df1a0d2a12dcd69a3b",
+      "version": "0.3.14",
+      "status": "FAIL",
+      "stage": "HELPER_DECISION_WAITING",
+      "errorCode": "NATIVE_CLOUD_CYCLE_UNVERIFIED",
+      "startedAt": "2026-09-25T13:27:07.189Z",
+      "requestCount": 7,
+      "readFailures": 0,
+      "previewCount": 10,
+      "draftSpecRevision": 2,
+      "confirmedSpecRevision": 3,
+      "recovered": false,
+      "retryVerification": null,
+      "continuationVerification": null,
+      "environmentRecovery": null,
+      "finalBuilderRecovery": null,
+      "currentVersionResume": null,
+      "initialEnvironment": "USER_CONFIRMED_INITIAL_CLEAN_WINDOWS",
+      "cleanMachine": "USER_CONFIRMED_INITIAL_CLEAN_WINDOWS",
+      "processShellPolicy": null,
+      "runs": {
+        "PREVIEW": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 11
+        },
+        "JIT_ENRICH": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 10
+        },
+        "REFINE_ROUND": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 17
+        },
+        "SPEC": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 10
+        },
+        "SPEC_REVISE": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 17
+        },
+        "BUILDER_INITIAL": {
+          "status": "SUCCEEDED",
+          "outcome": "TURN_ENDED",
+          "errorCode": null,
+          "lastSequence": 224
+        },
+        "HELPER_DECISION": {
+          "status": "FAILED",
+          "outcome": "NONE",
+          "errorCode": "NATIVE_CLOUD_CYCLE_UNVERIFIED",
+          "lastSequence": 4
+        }
+      },
+      "completedSteps": [
+        "START_DISCOVERY",
+        "PREVIEW",
+        "CHOOSE_SYNTHETIC_PREVIEW",
+        "JIT_ENRICH",
+        "REFINE_INPUT",
+        "REFINE_ROUND",
+        "SELECT",
+        "SPEC",
+        "SPEC_REVISE",
+        "CONFIRM_SPEC",
+        "PREPARE_TASK",
+        "BUILDER_INITIAL",
+        "CHOOSE_DECISION",
+        "HELPER_DECISION"
+      ],
+      "helperRecorded": false,
+      "task": null,
+      "result": null,
+      "analysis": null,
+      "evidence": null,
+      "historyReadStartsNoRun": null,
+      "maxObservedHostRssBytes": 460386304
+    },
+    {
+      "sourceSha256": "967681978697fdbc550cfe4ad1c1c15c11ead543f5cfbdfbe321c894af528381",
+      "version": "0.3.12",
+      "status": "FAIL",
+      "stage": "BUILDER_APPLY_WAITING",
+      "errorCode": "NATIVE_CLOUD_DIAGNOSTIC_PROOF_UNAVAILABLE",
+      "startedAt": "2026-09-25T12:43:41.809Z",
+      "requestCount": 9,
+      "readFailures": 0,
+      "previewCount": 10,
+      "draftSpecRevision": 2,
+      "confirmedSpecRevision": 3,
+      "recovered": true,
+      "retryVerification": null,
+      "continuationVerification": "RECORDED_INCOMPLETE_TURN_AND_RESTORED_TASK",
+      "environmentRecovery": null,
+      "finalBuilderRecovery": null,
+      "currentVersionResume": null,
+      "initialEnvironment": "USER_CONFIRMED_INITIAL_CLEAN_WINDOWS",
+      "cleanMachine": "USER_CONFIRMED_INITIAL_CLEAN_WINDOWS",
+      "processShellPolicy": {
+        "mode": "PROCESS_ONLY_REMOTESIGNED",
+        "before": {
+          "UserPolicy": "Undefined",
+          "LocalMachine": "Undefined",
+          "Process": "Undefined",
+          "MachinePolicy": "Undefined",
+          "CurrentUser": "Undefined",
+          "effective": "Restricted"
+        },
+        "scoped": {
+          "UserPolicy": "Undefined",
+          "LocalMachine": "Undefined",
+          "Process": "RemoteSigned",
+          "MachinePolicy": "Undefined",
+          "CurrentUser": "Undefined",
+          "effective": "RemoteSigned"
+        },
+        "persistentPolicyChanged": false
+      },
+      "runs": {
+        "PREVIEW": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 12
+        },
+        "JIT_ENRICH": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 10
+        },
+        "REFINE_ROUND": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 13
+        },
+        "SPEC": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 16
+        },
+        "SPEC_REVISE": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "BUILDER_INITIAL": {
+          "status": "SUCCEEDED",
+          "outcome": "TURN_ENDED",
+          "errorCode": null,
+          "lastSequence": 138
+        },
+        "HELPER_DECISION": {
+          "status": "SUCCEEDED",
+          "outcome": "HELPER_RECORDED",
+          "errorCode": null,
+          "lastSequence": 23
+        },
+        "BUILDER_APPLY": {
+          "status": "FAILED",
+          "outcome": "NONE",
+          "errorCode": "NATIVE_CLOUD_DIAGNOSTIC_PROOF_UNAVAILABLE",
+          "lastSequence": 4
+        }
+      },
+      "completedSteps": [
+        "START_DISCOVERY",
+        "PREVIEW",
+        "CHOOSE_SYNTHETIC_PREVIEW",
+        "JIT_ENRICH",
+        "REFINE_INPUT",
+        "REFINE_ROUND",
+        "SELECT",
+        "SPEC",
+        "SPEC_REVISE",
+        "CONFIRM_SPEC",
+        "PREPARE_TASK",
+        "BUILDER_INITIAL",
+        "CHOOSE_DECISION",
+        "HELPER_DECISION",
+        "RESOLVE_DECISIONS",
+        "RESOLVE_DECISION",
+        "BUILDER_APPLY"
+      ],
+      "helperRecorded": true,
+      "task": {
+        "status": "ACTIVE",
+        "completion": false,
+        "decisionsApplied": 1
+      },
+      "result": null,
+      "analysis": null,
+      "evidence": null,
+      "historyReadStartsNoRun": null,
+      "maxObservedHostRssBytes": 262848512
+    },
+    {
+      "sourceSha256": "06ce94584106ed1b42a366193a87b0d695aed4fce7c930f3c3689c81c00cffb6",
+      "version": "0.3.15",
+      "status": "FAIL",
+      "stage": "HELPER_NEXT_CONTEXT_WAITING",
+      "errorCode": "NATIVE_ROLE_CATALOG_UNVERIFIED",
+      "startedAt": "2026-09-25T13:47:46.462Z",
+      "requestCount": 9,
+      "readFailures": 0,
+      "previewCount": 10,
+      "draftSpecRevision": 2,
+      "confirmedSpecRevision": 3,
+      "recovered": false,
+      "retryVerification": null,
+      "continuationVerification": null,
+      "environmentRecovery": null,
+      "finalBuilderRecovery": null,
+      "currentVersionResume": null,
+      "initialEnvironment": "USER_CONFIRMED_INITIAL_CLEAN_WINDOWS",
+      "cleanMachine": "USER_CONFIRMED_INITIAL_CLEAN_WINDOWS",
+      "processShellPolicy": null,
+      "runs": {
+        "PREVIEW": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 14
+        },
+        "JIT_ENRICH": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 10
+        },
+        "REFINE_ROUND": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 11
+        },
+        "SPEC": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "SPEC_REVISE": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "BUILDER_INITIAL": {
+          "status": "SUCCEEDED",
+          "outcome": "TURN_ENDED",
+          "errorCode": null,
+          "lastSequence": 37
+        },
+        "HELPER_DECISION": {
+          "status": "SUCCEEDED",
+          "outcome": "HELPER_RECORDED",
+          "errorCode": null,
+          "lastSequence": 22
+        },
+        "BUILDER_APPLY": {
+          "status": "SUCCEEDED",
+          "outcome": "TURN_ENDED",
+          "errorCode": null,
+          "lastSequence": 174
+        },
+        "HELPER_NEXT_CONTEXT": {
+          "status": "FAILED",
+          "outcome": "NONE",
+          "errorCode": "NATIVE_ROLE_CATALOG_UNVERIFIED",
+          "lastSequence": 4
+        }
+      },
+      "completedSteps": [
+        "START_DISCOVERY",
+        "PREVIEW",
+        "CHOOSE_SYNTHETIC_PREVIEW",
+        "JIT_ENRICH",
+        "REFINE_INPUT",
+        "REFINE_ROUND",
+        "SELECT",
+        "SPEC",
+        "SPEC_REVISE",
+        "CONFIRM_SPEC",
+        "PREPARE_TASK",
+        "BUILDER_INITIAL",
+        "CHOOSE_DECISION",
+        "HELPER_DECISION",
+        "RESOLVE_DECISIONS",
+        "RESOLVE_DECISION",
+        "BUILDER_APPLY",
+        "LAUNCH_RESULT",
+        "HELPER_NEXT_CONTEXT"
+      ],
+      "helperRecorded": true,
+      "task": {
+        "status": "COMPLETED",
+        "completion": true,
+        "decisionsApplied": 1
+      },
+      "result": {
+        "status": "RUNNING",
+        "httpStatus": 200,
+        "bodyBytes": 1705
+      },
+      "analysis": [
+        {
+          "status": "SUCCEEDED",
+          "errorCode": null
+        },
+        {
+          "status": "SUCCEEDED",
+          "errorCode": null
+        },
+        {
+          "status": "SUCCEEDED",
+          "errorCode": null
+        }
+      ],
+      "evidence": null,
+      "historyReadStartsNoRun": null,
+      "maxObservedHostRssBytes": 478367744
+    },
+    {
+      "sourceSha256": "f80bea364d7051348c12da95e933fbb2ecbb0a7f21aa3b072e29239a86ace670",
+      "version": "0.3.14",
+      "status": "FAIL",
+      "stage": "BUILDER_INITIAL_WAITING",
+      "errorCode": "NATIVE_CLOUD_CYCLE_UNVERIFIED",
+      "startedAt": "2026-09-25T13:35:31.192Z",
+      "requestCount": 6,
+      "readFailures": 0,
+      "previewCount": 10,
+      "draftSpecRevision": 2,
+      "confirmedSpecRevision": 3,
+      "recovered": false,
+      "retryVerification": null,
+      "continuationVerification": null,
+      "environmentRecovery": null,
+      "finalBuilderRecovery": null,
+      "currentVersionResume": null,
+      "initialEnvironment": "USER_CONFIRMED_INITIAL_CLEAN_WINDOWS",
+      "cleanMachine": "USER_CONFIRMED_INITIAL_CLEAN_WINDOWS",
+      "processShellPolicy": null,
+      "runs": {
+        "PREVIEW": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 14
+        },
+        "JIT_ENRICH": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 14
+        },
+        "REFINE_ROUND": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 10
+        },
+        "SPEC": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 10
+        },
+        "SPEC_REVISE": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 11
+        },
+        "BUILDER_INITIAL": {
+          "status": "FAILED",
+          "outcome": "NONE",
+          "errorCode": "NATIVE_CLOUD_CYCLE_UNVERIFIED",
+          "lastSequence": 4
+        }
+      },
+      "completedSteps": [
+        "START_DISCOVERY",
+        "PREVIEW",
+        "CHOOSE_SYNTHETIC_PREVIEW",
+        "JIT_ENRICH",
+        "REFINE_INPUT",
+        "REFINE_ROUND",
+        "SELECT",
+        "SPEC",
+        "SPEC_REVISE",
+        "CONFIRM_SPEC",
+        "PREPARE_TASK",
+        "BUILDER_INITIAL"
+      ],
+      "helperRecorded": false,
+      "task": null,
+      "result": null,
+      "analysis": null,
+      "evidence": null,
+      "historyReadStartsNoRun": null,
+      "maxObservedHostRssBytes": 480518144
+    },
+    {
+      "sourceSha256": "b9a845bdbd40f96baa4b6da1a79d2cdc99e5dc351b9e46bab01cae79da63fd01",
+      "version": "0.3.15",
+      "status": "PASS",
+      "stage": "VERTICAL_COMPLETE",
+      "errorCode": null,
+      "startedAt": "2026-09-25T13:48:31.935Z",
+      "requestCount": 9,
+      "readFailures": 0,
+      "previewCount": 10,
+      "draftSpecRevision": 2,
+      "confirmedSpecRevision": 3,
+      "recovered": false,
+      "retryVerification": null,
+      "continuationVerification": null,
+      "environmentRecovery": null,
+      "finalBuilderRecovery": null,
+      "currentVersionResume": null,
+      "initialEnvironment": "USER_CONFIRMED_INITIAL_CLEAN_WINDOWS",
+      "cleanMachine": "USER_CONFIRMED_INITIAL_CLEAN_WINDOWS",
+      "processShellPolicy": null,
+      "runs": {
+        "PREVIEW": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 14
+        },
+        "JIT_ENRICH": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "REFINE_ROUND": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 11
+        },
+        "SPEC": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 13
+        },
+        "SPEC_REVISE": {
+          "status": "SUCCEEDED",
+          "outcome": "DURABLE_RESULT",
+          "errorCode": null,
+          "lastSequence": 8
+        },
+        "BUILDER_INITIAL": {
+          "status": "SUCCEEDED",
+          "outcome": "TURN_ENDED",
+          "errorCode": null,
+          "lastSequence": 41
+        },
+        "HELPER_DECISION": {
+          "status": "SUCCEEDED",
+          "outcome": "HELPER_RECORDED",
+          "errorCode": null,
+          "lastSequence": 26
+        },
+        "BUILDER_APPLY": {
+          "status": "SUCCEEDED",
+          "outcome": "TURN_ENDED",
+          "errorCode": null,
+          "lastSequence": 186
+        },
+        "HELPER_NEXT_CONTEXT": {
+          "status": "SUCCEEDED",
+          "outcome": "HELPER_RECORDED",
+          "errorCode": null,
+          "lastSequence": 33
+        }
+      },
+      "completedSteps": [
+        "START_DISCOVERY",
+        "PREVIEW",
+        "CHOOSE_SYNTHETIC_PREVIEW",
+        "JIT_ENRICH",
+        "REFINE_INPUT",
+        "REFINE_ROUND",
+        "SELECT",
+        "SPEC",
+        "SPEC_REVISE",
+        "CONFIRM_SPEC",
+        "PREPARE_TASK",
+        "BUILDER_INITIAL",
+        "CHOOSE_DECISION",
+        "HELPER_DECISION",
+        "RESOLVE_DECISIONS",
+        "RESOLVE_DECISION",
+        "BUILDER_APPLY",
+        "LAUNCH_RESULT",
+        "HELPER_NEXT_CONTEXT"
+      ],
+      "helperRecorded": true,
+      "task": {
+        "status": "COMPLETED",
+        "completion": true,
+        "decisionsApplied": 1
+      },
+      "result": {
+        "status": "RUNNING",
+        "httpStatus": 200,
+        "bodyBytes": 1137
+      },
+      "analysis": [
+        {
+          "status": "SUCCEEDED",
+          "errorCode": null
+        },
+        {
+          "status": "SUCCEEDED",
+          "errorCode": null
+        },
+        {
+          "status": "SUCCEEDED",
+          "errorCode": null
+        }
+      ],
+      "evidence": {
+        "conceptStates": [
+          "OBSERVED",
+          "OBSERVED",
+          "OBSERVED",
+          "OBSERVED",
+          "OBSERVED",
+          "OBSERVED"
+        ],
+        "userUnderstandingCount": 0,
+        "personalization": [
+          {
+            "target": {
+              "kind": "HELPER_TURN",
+              "taskId": "task_d368d02a-8ba7-4693-9474-223f0c9ef228"
+            },
+            "mode": "EVIDENCE_AWARE",
+            "basisCount": 4
+          },
+          {
+            "target": {
+              "kind": "HELPER_TURN",
+              "taskId": "task_d368d02a-8ba7-4693-9474-223f0c9ef228",
+              "decisionId": "decision_45361c70-d77b-467c-940a-771ad17f7079"
+            },
+            "mode": "NO_RELEVANT_EVIDENCE",
+            "basisCount": 0
+          },
+          {
+            "target": {
+              "kind": "DISCOVERY_SESSION",
+              "discoverySessionId": "discovery_session_c2e7a2f9-696a-4c1b-a858-d138c790ce0c"
+            },
+            "mode": "NO_RELEVANT_EVIDENCE",
+            "basisCount": 0
+          }
+        ]
+      },
+      "historyReadStartsNoRun": true,
+      "maxObservedHostRssBytes": 461352960
+    }
+  ],
+  "cp949": {
+    "reproduction": {
+      "codepage": 949,
+      "descriptorExistsFromNode": true,
+      "descriptorExistsFromUtf8Batch": false,
+      "directProtectedNodeRunnerReachedPnpm": true
+    },
+    "originalGeneratedApp": {
+      "schemaVersion": 1,
+      "kind": "W5_CP949_GENERATED_APP",
+      "version": "0.3.11",
+      "provenance": "DETERMINISTIC_VERIFICATION_OF_LIVE_AGENT_GENERATED_SOURCE_COPY",
+      "modelCalls": 0,
+      "sourceReceiptSha256": "ab83d43ef9147548dd0ea4bdd102cd0d15145ed3572a8601bc53f640f1b01e1e",
+      "sourceTaskCompletion": false,
+      "nativeVerticalComplete": false,
+      "status": "FAIL",
+      "startedAt": "2026-09-25T10:30:35.717Z",
+      "commands": [
+        {
+          "command": "pnpm install --lockfile-only --ignore-scripts --ignore-pnpmfile",
+          "exitCode": 0,
+          "restoredCodepage": 949
+        },
+        {
+          "command": "pnpm install --frozen-lockfile",
+          "exitCode": 0,
+          "restoredCodepage": 949
+        }
+      ],
+      "toolchainUnchanged": true,
+      "legacyShimMigration": "PASS",
+      "errorCode": "GENERATED_APP_COMMAND_FAILED",
+      "finishedAt": "2026-09-25T10:30:54.450Z"
+    },
+    "withTypeGuard": {
+      "schemaVersion": 1,
+      "kind": "W5_CP949_GENERATED_APP",
+      "version": "0.3.11",
+      "provenance": "DETERMINISTIC_VERIFICATION_OF_LIVE_AGENT_GENERATED_SOURCE_COPY",
+      "modelCalls": 0,
+      "sourceReceiptSha256": "ab83d43ef9147548dd0ea4bdd102cd0d15145ed3572a8601bc53f640f1b01e1e",
+      "sourceTaskCompletion": false,
+      "nativeVerticalComplete": false,
+      "status": "FAIL",
+      "startedAt": "2026-09-25T10:32:33.774Z",
+      "commands": [
+        {
+          "command": "pnpm install --lockfile-only --ignore-scripts --ignore-pnpmfile",
+          "exitCode": 0,
+          "restoredCodepage": 949
+        },
+        {
+          "command": "pnpm install --frozen-lockfile",
+          "exitCode": 0,
+          "restoredCodepage": 949
+        },
+        {
+          "command": "pnpm run build",
+          "exitCode": 0,
+          "restoredCodepage": 949
+        },
+        {
+          "command": "pnpm run typecheck",
+          "exitCode": 0,
+          "restoredCodepage": 949
+        }
+      ],
+      "generatedSourceRepair": {
+        "file": "src/mockFetch.ts",
+        "kind": "UNDEFINED_SAMPLE_GUARD",
+        "copyOnly": true,
+        "beforeSha256": "9b371e4e9dfaaf07f8bb031d1fbe520df84ccfcd4fc3ed36ba97f0e91afc8635",
+        "afterSha256": "b9b5517d8b09475f31041e4b2dfaccff60c148e95799e77e62060dfc758d0a2f"
+      },
+      "toolchainUnchanged": true,
+      "legacyShimMigration": "PASS",
+      "errorCode": "GENERATED_APP_COMMAND_FAILED",
+      "finishedAt": "2026-09-25T10:32:56.002Z"
+    },
+    "withTypeGuardAndTestGlob": {
+      "schemaVersion": 1,
+      "kind": "W5_CP949_GENERATED_APP",
+      "version": "0.3.11",
+      "provenance": "DETERMINISTIC_VERIFICATION_OF_LIVE_AGENT_GENERATED_SOURCE_COPY",
+      "modelCalls": 0,
+      "sourceReceiptSha256": "ab83d43ef9147548dd0ea4bdd102cd0d15145ed3572a8601bc53f640f1b01e1e",
+      "sourceTaskCompletion": false,
+      "nativeVerticalComplete": false,
+      "status": "FAIL",
+      "startedAt": "2026-09-25T10:33:49.647Z",
+      "commands": [
+        {
+          "command": "pnpm install --lockfile-only --ignore-scripts --ignore-pnpmfile",
+          "exitCode": 0,
+          "restoredCodepage": 949
+        },
+        {
+          "command": "pnpm install --frozen-lockfile",
+          "exitCode": 0,
+          "restoredCodepage": 949
+        },
+        {
+          "command": "pnpm run build",
+          "exitCode": 0,
+          "restoredCodepage": 949
+        },
+        {
+          "command": "pnpm run typecheck",
+          "exitCode": 0,
+          "restoredCodepage": 949
+        },
+        {
+          "command": "pnpm test",
+          "exitCode": 0,
+          "restoredCodepage": 949
+        }
+      ],
+      "generatedSourceRepair": {
+        "file": "src/mockFetch.ts",
+        "kind": "UNDEFINED_SAMPLE_GUARD",
+        "copyOnly": true,
+        "beforeSha256": "9b371e4e9dfaaf07f8bb031d1fbe520df84ccfcd4fc3ed36ba97f0e91afc8635",
+        "afterSha256": "b9b5517d8b09475f31041e4b2dfaccff60c148e95799e77e62060dfc758d0a2f"
+      },
+      "generatedTestCommandRepair": {
+        "file": "package.json",
+        "kind": "COMPILED_TEST_FILE_GLOB",
+        "copyOnly": true,
+        "beforeSha256": "98c603156fe0e5523f55703017de00c5ee2d3a6d744f04d8c02f5e9b8f99a96d",
+        "afterSha256": "b17a82714980b7cb4024ee8c5e558d04e4412eea617d90e793aae9a3687e41c0"
+      },
+      "toolchainUnchanged": true,
+      "legacyShimMigration": "PASS",
+      "errorCode": "GENERATED_APP_COMMAND_FAILED",
+      "finishedAt": "2026-09-25T10:34:13.577Z"
+    },
+    "resultSupervisor": {
+      "kind": "W5_CP949_RESULT_SUPERVISOR",
+      "version": "0.3.11",
+      "modelCalls": 0,
+      "sourceTaskCompletion": false,
+      "generatedSourceRepairs": 2,
+      "generatedSmokeProcessExit": "FAIL_UV_HANDLE_CLOSING",
+      "status": "PASS_HTTP",
+      "httpStatus": 200,
+      "bodyBytes": 1188,
+      "supervisorClosed": true
+    }
+  },
+  "nativeRepairedCopy": {
+    "schemaVersion": 1,
+    "kind": "W5_CP949_GENERATED_APP",
+    "version": "0.3.11",
+    "provenance": "DETERMINISTIC_VERIFICATION_OF_LIVE_AGENT_GENERATED_SOURCE_COPY",
+    "modelCalls": 0,
+    "sourceReceiptSha256": "b94cffe59bd08a119f18fc0f3c7da761794d02760193cc3a9baa0ce2e082dafd",
+    "sourceTaskCompletion": false,
+    "nativeVerticalComplete": false,
+    "status": "PASS",
+    "startedAt": "2026-09-25T11:34:39.359Z",
+    "commands": [
+      {
+        "command": "pnpm install --lockfile-only --ignore-scripts --ignore-pnpmfile",
+        "exitCode": 0,
+        "restoredCodepage": 949
+      },
+      {
+        "command": "pnpm install --frozen-lockfile",
+        "exitCode": 0,
+        "restoredCodepage": 949
+      },
+      {
+        "command": "pnpm run build",
+        "exitCode": 0,
+        "restoredCodepage": 949
+      },
+      {
+        "command": "pnpm run typecheck",
+        "exitCode": 0,
+        "restoredCodepage": 949
+      },
+      {
+        "command": "pnpm test",
+        "exitCode": 0,
+        "restoredCodepage": 949
+      },
+      {
+        "command": "pnpm run smoke",
+        "exitCode": 0,
+        "restoredCodepage": 949
+      }
+    ],
+    "toolchainUnchanged": true,
+    "legacyShimMigration": "PASS",
+    "result": {
+      "status": "RUNNING",
+      "httpStatus": 200,
+      "bodyBytes": 1188
+    },
+    "finishedAt": "2026-09-25T11:35:03.398Z"
+  },
+  "cancellation": {
+    "version": "0.3.15",
+    "status": "PASS",
+    "input": "SYNTHETIC",
+    "client": "INSTALLED_SDK",
+    "observedNativeEvent": "TEXT",
+    "cancelResponseMs": 9,
+    "terminalStatus": "CANCELLED",
+    "terminalOutcome": "NONE",
+    "historyReadStartsNoRun": true,
+    "taskCreated": false
+  },
+  "shellIntegration": {
+    "schemaVersion": 1,
+    "kind": "W5_WINDOWS_DEFAULT_POWERSHELL_SCRIPT_LOAD",
+    "observedAt": "2026-09-25T11:48:08.602Z",
+    "kiroVersion": "1.1.70",
+    "scriptSha256": "cc0e9dae2ef39261a53dd69477fd01600e2c2ef7a0bc619af72b2b35a020a081",
+    "modelCalls": 0,
+    "policyChanged": false,
+    "profileChanged": false,
+    "status": "SCRIPT_BLOCKED",
+    "interactiveTerminalVerified": false,
+    "policy": "Restricted",
+    "languageMode": "FullLanguage",
+    "errorType": "PSSecurityException",
+    "errorId": "UnauthorizedAccess"
+  },
+  "processShellIntegration": {
+    "schemaVersion": 1,
+    "kind": "W5_PROCESS_SCOPED_SHELL_INTEGRATION",
+    "observedAt": "2026-09-25T12:28:26.832Z",
+    "modelCalls": 0,
+    "status": "FAIL",
+    "before": {
+      "UserPolicy": "Undefined",
+      "LocalMachine": "Undefined",
+      "Process": "Undefined",
+      "MachinePolicy": "Undefined",
+      "CurrentUser": "Undefined",
+      "effective": "Restricted"
+    },
+    "scoped": {
+      "UserPolicy": "Undefined",
+      "LocalMachine": "Undefined",
+      "Process": "RemoteSigned",
+      "MachinePolicy": "Undefined",
+      "CurrentUser": "Undefined",
+      "effective": "RemoteSigned"
+    },
+    "after": {
+      "UserPolicy": "Undefined",
+      "LocalMachine": "Undefined",
+      "Process": "Undefined",
+      "MachinePolicy": "Undefined",
+      "CurrentUser": "Undefined",
+      "effective": "Restricted"
+    },
+    "persistentPolicyUnchanged": true,
+    "profileChanged": false,
+    "cases": [
+      {
+        "name": "POLICY",
+        "status": "OBSERVED",
+        "exitCodes": [
+          0
+        ],
+        "outputObserved": true
+      },
+      {
+        "name": "ASCII",
+        "status": "OBSERVED",
+        "exitCodes": [
+          0
+        ],
+        "outputObserved": true
+      },
+      {
+        "name": "CODEPAGE",
+        "status": "OBSERVED",
+        "exitCodes": [
+          0
+        ],
+        "outputObserved": true
+      },
+      {
+        "name": "AFTER_CODEPAGE",
+        "status": "OBSERVED",
+        "exitCodes": [
+          0
+        ],
+        "outputObserved": true
+      },
+      {
+        "name": "NONZERO",
+        "status": "OBSERVED",
+        "exitCodes": [
+          1
+        ],
+        "outputObserved": true
+      }
+    ],
+    "errorCode": null
+  },
+  "processShellAssessment": {
+    "schemaVersion": 1,
+    "kind": "W5_PROCESS_SHELL_SUCCESS_FAILURE_ASSESSMENT",
+    "observedAt": "2026-09-25T12:29:57.914Z",
+    "status": "PASS",
+    "modelCalls": 0,
+    "sourceSha256": "e8db1ee9286d6e3e0b084eb7e84efdd12fb595cd44ee625a86fd0573d4dc1175",
+    "shellScriptSha256": "cc0e9dae2ef39261a53dd69477fd01600e2c2ef7a0bc619af72b2b35a020a081",
+    "originalStrictExitCodeCheck": "FAIL_PRESERVED",
+    "exactNativeExitCodePreserved": false,
+    "shellReportsBooleanExitCode": true,
+    "successfulCommandReportsZero": true,
+    "failedCommandReportsNonzero": true,
+    "outputAfterCodepageChangeObserved": true,
+    "persistentPolicyUnchanged": true
+  },
+  "workspaceScopedTerminal": {
+    "schemaVersion": 1,
+    "kind": "W5_WORKSPACE_SCOPED_TERMINAL_ENVIRONMENT",
+    "status": "PASS",
+    "modelCalls": 0,
+    "startedAt": "2026-09-25T13:06:40.482Z",
+    "parentPolicy": null,
+    "cases": [
+      {
+        "name": "POLICY",
+        "exitCode": 0,
+        "expectedExitCode": 0,
+        "outputObserved": true
+      },
+      {
+        "name": "ASCII",
+        "exitCode": 0,
+        "expectedExitCode": 0,
+        "outputObserved": true
+      },
+      {
+        "name": "NONZERO",
+        "exitCode": 1,
+        "expectedExitCode": 1,
+        "outputObserved": true
+      },
+      {
+        "name": "AFTER_FAILURE",
+        "exitCode": 0,
+        "expectedExitCode": 0,
+        "outputObserved": true
+      }
+    ],
+    "persistent": false,
+    "collectionCleared": true,
+    "parentPolicyAfter": null,
+    "finishedAt": "2026-09-25T13:06:48.970Z",
+    "before": {
+      "UserPolicy": "Undefined",
+      "LocalMachine": "Undefined",
+      "Process": "Undefined",
+      "MachinePolicy": "Undefined",
+      "CurrentUser": "Undefined",
+      "effective": "Restricted"
+    },
+    "after": {
+      "UserPolicy": "Undefined",
+      "LocalMachine": "Undefined",
+      "Process": "Undefined",
+      "MachinePolicy": "Undefined",
+      "CurrentUser": "Undefined",
+      "effective": "Restricted"
+    },
+    "persistentPolicyUnchanged": true
+  },
+  "ordinaryCloudProof": {
+    "development": {
+      "status": "PASS",
+      "modelCalls": 0,
+      "initialLogLevel": null,
+      "restoredLogLevel": null,
+      "hostKind": "DEVELOPMENT_EXTENSION",
+      "extensionDependency": false,
+      "freshWorkspace": false,
+      "eligibility": {
+        "cloudPull": "PASS",
+        "memoryDisabled": "PASS",
+        "commandHooksAbsent": "PASS"
+      },
+      "startedAt": "2026-09-25T13:14:37.119Z",
+      "finishedAt": "2026-09-25T13:14:40.813Z"
+    },
+    "installedWithoutDependency": {
+      "status": "FAIL",
+      "modelCalls": 0,
+      "initialLogLevel": null,
+      "restoredLogLevel": null,
+      "hostKind": "INSTALLED_EXTENSION",
+      "extensionDependency": false,
+      "freshWorkspace": false,
+      "eligibility": {
+        "cloudPull": "NATIVE_CLOUD_DIAGNOSTIC_PROOF_UNAVAILABLE",
+        "memoryDisabled": "PASS",
+        "commandHooksAbsent": "PASS"
+      },
+      "startedAt": "2026-09-25T13:17:11.906Z",
+      "finishedAt": "2026-09-25T13:17:32.210Z"
+    },
+    "installedWithDependency": {
+      "status": "PASS",
+      "modelCalls": 0,
+      "initialLogLevel": null,
+      "restoredLogLevel": null,
+      "hostKind": "INSTALLED_EXTENSION",
+      "extensionDependency": true,
+      "freshWorkspace": false,
+      "eligibility": {
+        "cloudPull": "PASS",
+        "memoryDisabled": "PASS",
+        "commandHooksAbsent": "PASS"
+      },
+      "startedAt": "2026-09-25T13:19:29.087Z",
+      "finishedAt": "2026-09-25T13:19:32.820Z"
+    },
+    "freshWorkspace": {
+      "status": "PASS",
+      "modelCalls": 0,
+      "initialLogLevel": null,
+      "restoredLogLevel": null,
+      "hostKind": "INSTALLED_EXTENSION",
+      "extensionDependency": true,
+      "freshWorkspace": true,
+      "eligibility": {
+        "cloudPull": "PASS",
+        "memoryDisabled": "PASS",
+        "commandHooksAbsent": "PASS"
+      },
+      "startedAt": "2026-09-25T13:46:38.032Z",
+      "finishedAt": "2026-09-25T13:46:42.363Z"
+    },
+    "offlineAssessment": {
+      "schemaVersion": 1,
+      "kind": "OFFLINE_OWNED_CLOUD_PROOF_ASSESSMENT",
+      "status": "PASS",
+      "modelCalls": 0,
+      "sourceSha256": "75b3d35240311912187fbbed9ba390736066b5e96156f047786ce7ca164813ca",
+      "sourceFailurePreserved": true,
+      "checkedSessions": 1,
+      "observedAt": "2026-09-25T13:26:38.780Z"
+    }
+  },
+  "packagedRegression": {
+    "version": "0.3.15",
+    "lifecycle": {
+      "schemaVersion": 1,
+      "target": "win32-x64",
+      "modelCalls": 0,
+      "cases": {
+        "reused_pid_stale_lock_recovered_without_killing_process": "PASS",
+        "simultaneous_initialization_one_core": "PASS",
+        "owner_reload_keeps_shared_core": "PASS",
+        "crash_rotation_history_preserved": "PASS",
+        "update_does_not_kill_active_owner": "PASS",
+        "update_migration_backup_history": "PASS",
+        "downgrade_refused_without_data_loss": "PASS",
+        "status_has_no_paths_or_credentials": "PASS"
+      }
+    },
+    "portable": {
+      "schemaVersion": 1,
+      "target": "win32-x64",
+      "modelCalls": 0,
+      "resources": "PASS",
+      "cases": {
+        "kiroPreferredWithoutDownload": "PASS",
+        "existingFallback": "PASS",
+        "resourceTamperExtraTraversalHardlinkJunction": "PASS",
+        "unsafeAclRejected": "PASS",
+        "offlineCorruptionSizeCancellationRetryable": "PASS",
+        "acquisitionLockAndExitedOwnerRecovery": "PASS",
+        "officialAcquisitionAndOfflineCache": "PASS",
+        "corruptCacheQuarantineAndExplicitRetry": "PASS",
+        "packagedCoreMcpRestart_KIRO": "PASS",
+        "packagedCoreMcpRestart_EXISTING_NODE": "PASS",
+        "packagedCoreMcpRestart_MANAGED_NODE": "PASS"
+      },
+      "runtimes": {
+        "kiro": {
+          "source": "KIRO",
+          "node": "24.18.0",
+          "napi": 10,
+          "sqlite": "transaction/reopen PASS"
+        },
+        "existing": {
+          "source": "EXISTING_NODE",
+          "node": "24.19.0",
+          "napi": 10,
+          "sqlite": "transaction/reopen PASS"
+        },
+        "managed": {
+          "source": "MANAGED_NODE",
+          "node": "24.19.0",
+          "napi": 10,
+          "downloadedBytes": 92825416,
+          "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+        }
+      },
+      "startupObservations": [
+        {
+          "runtime": "KIRO",
+          "command": "native",
+          "elapsedMs": 902
+        },
+        {
+          "runtime": "KIRO",
+          "command": "native",
+          "elapsedMs": 902
+        },
+        {
+          "runtime": "EXISTING_NODE",
+          "command": "native",
+          "elapsedMs": 825
+        },
+        {
+          "runtime": "EXISTING_NODE",
+          "command": "native",
+          "elapsedMs": 835
+        },
+        {
+          "runtime": "MANAGED_NODE",
+          "command": "native",
+          "elapsedMs": 830
+        },
+        {
+          "runtime": "MANAGED_NODE",
+          "command": "native",
+          "elapsedMs": 848
+        }
+      ],
+      "status": "PASS",
+      "packageFiles": 63
+    }
+  }
+}

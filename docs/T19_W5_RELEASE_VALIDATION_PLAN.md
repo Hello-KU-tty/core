@@ -1,6 +1,8 @@
 # T19-W5 Windows 출하 검증 계획
 
-> 2026-09-24 사용자 `T19 W5` 착수 요청. 별도 clean Windows PC/VM/계정은 없으며 현재 개발 PC에서 가능한 검증부터 진행하도록 확인했다.
+> 2026-09-25 완료: VSIX 0.3.15 / Kiro 1.1.70에서 두 fresh 프로젝트와 명시적 Helper 복구, 결과 앱·History·취소·재시작 및 최종 회귀를 검증했다. [최종 결과와 한계](spikes/T19_W5_KIRO_1170_GENERAL_MODE_RESULTS_20260925.md)를 따른다. 아래 미완료·중단 문단은 당시 기록으로 보존한다.
+
+> 2026-09-25 환경 정정: 사용자가 현재 PC는 Kiro부터 새로 설치한 clean Windows라고 확인했다. 2026-09-24 이전 기기의 환경 부재 기록을 현재 PC에 적용하지 않는다. 별도 PC/VM 요청은 철회한다.
 
 ## 실행 경계
 
@@ -14,7 +16,7 @@
 
 ## 완료 판정
 
-현재 PC에서 PATH 도구 제외와 checkout 밖 설치는 격리 검증이다. OS에 개발 source/Node/pnpm이 없는 실제 일반 사용자 환경과 동등하지 않다. 해당 환경 부재, 실제 native 실패, frontend artifact/품질 미검증은 각각 별도 gate로 남긴다. 통과한 contract/fixture는 실제 IDE 또는 의미 품질 성공을 대신하지 않는다. 최종 `pnpm check`와 관련 packaged/IDE 결과를 기록하고 외부 gate가 남으면 W5를 완료 처리하지 않는다. 상위 T19/T19-N, commit/push·외부 배포는 이번 작업으로 자동 완료하거나 수행하지 않는다.
+현재 PC의 초기 clean Windows 상태와 Kiro 신규 설치는 사용자 확인을 근거로 기록한다. 이후 검증을 위해 준비한 임시 Node/pnpm·checkout·cache는 초기 환경과 구분하며, 제품의 도구 자동 준비·설치물 독립 실행은 해당 실행 receipt로 판정한다. 다른 PC/VM 확보는 남은 조건이 아니다. 현재 환경의 실제 native 실패와 frontend artifact/품질 미검증은 계속 검증한다. 통과한 contract/fixture는 실제 IDE 또는 의미 품질 성공을 대신하지 않는다. 최종 `pnpm check`와 관련 packaged/IDE 결과를 기록하고 미충족 조건이 남으면 W5를 완료 처리하지 않는다. 상위 T19/T19-N, commit/push·외부 배포는 이번 작업으로 자동 완료하거나 수행하지 않는다.
 
 ## 2026-09-24 중단 인계
 
