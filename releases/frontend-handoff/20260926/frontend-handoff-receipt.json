@@ -1,0 +1,11 @@
+{
+  "file": "frontend-handoff-20260926.zip",
+  "bytes": 5025853,
+  "sha256": "1e730fcf7485c32088ce65c4571fdc52233314324aa3b2e34b80536d35d18089",
+  "files": 126,
+  "directory": "frontend-handoff-20260926",
+  "backendHead": "88db173ece4426f433e19b8055a4880930e7f592",
+  "backendWorkingTreeDirty": false,
+  "frontendRevision": "73d0eb58e374357d6f28ea8db13e9b659cec5e5a",
+  "validationScope": "CURRENT_WINDOWS_MACHINE_ONLY"
+}
