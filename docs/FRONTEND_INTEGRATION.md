@@ -1,6 +1,6 @@
 # Kiro IDE 프론트 개발 안내
 
-> 2026-09-26 최신 Windows 연결 계획과 요청서 답변은 [프론트 인계 계획](FRONTEND_HANDOFF_PLAN_20260926.md)을 따른다. Windows 확장 자동 실행은 [W5](spikes/T19_W5_KIRO_1170_GENERAL_MODE_RESULTS_20260925.md)에서 검증됐고, 외부 frontend용 host 모듈·연결 예제는 준비할 항목이다. 아래 CLI/수동 connection/macOS 안내와 Windows 미검증 문장은 과거 개발 기록이다.
+> 2026-09-26 현재 시작점은 [Windows 프론트 연결 가이드](FRONTEND_WINDOWS_QUICKSTART.md)다. host·SDK·적용 패치·VSIX 조립 도구를 구현했고 현재 PC의 실제 프론트 설치물과 native 흐름을 검증했다. [결과와 범위](FRONTEND_HANDOFF_RESULTS_20260926.md). 아래 CLI/수동 connection/macOS 안내와 Windows 미검증 문장은 과거 기록이다.
 
 > 2026-09-23 이후 Windows 제품 개발의 시작점은 [Windows 확장 인계](WINDOWS_EXTENSION_HANDOFF_20260923.md)다. 확장 설치 후 Core 자동 기동과 런타임 재사용이 필수이며, 아래 수동 CLI/connection 설정은 과거 개발 경로다. Windows native가 미검증이라는 사실은 유지하며 CLI로 조용히 전환하지 않는다.
 

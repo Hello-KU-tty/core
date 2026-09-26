@@ -2,6 +2,11 @@ import { defineConfig, devices } from '@playwright/test'
 
 // Windows cold process/toolchain startup can exceed 30s; test timeouts stay unchanged.
 const serverStartupTimeout = process.platform === 'win32' ? 120_000 : 30_000
+// Optional installed Edge reuse avoids downloading a second browser on Windows.
+// Playwright still creates its own temporary profile; no personal profile is used.
+const browserChannel = process.env.VIBE_E2E_BROWSER_CHANNEL
+if (browserChannel !== undefined && browserChannel !== 'msedge')
+  throw new Error('E2E_BROWSER_CHANNEL_UNSUPPORTED')
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -18,7 +23,7 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: { ...devices['Desktop Chrome'], ...(browserChannel ? { channel: browserChannel } : {}) },
     },
   ],
   webServer: [

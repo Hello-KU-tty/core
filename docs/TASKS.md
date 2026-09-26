@@ -768,9 +768,13 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - Node.js 24.19.0·pnpm 11.12.0에서 format/lint/typecheck/Drizzle check, unit 2개, integration 212개, eval 22개, Campus Drop 3개, build, smoke 6개와 Chromium E2E 12개가 통과했다.
 - target Kiro Crew 설치본을 data-preserving update endpoint로 app 0.4.1에 갱신했다. 설치 UI·backend·Builder·hidden no-tool Evidence Analyst hash가 source package와 일치하고 backend `/health`가 `ok`이며 실제 History UI가 기존 Project를 복원했다. 첫 target worker 검증에서 실제 Agent가 설명 뒤 single fenced JSON을 반환해 whole-message parser가 legacy 대기 Job 6개를 최대 재시도 뒤 거절하는 회귀를 발견했다. parser를 정확히 하나의 fenced JSON block만 허용하고 복수 block은 거절하도록 고친 versioned 0.4.1 UI에서 같은 no-evidence 형태의 실제 Job 2개가 13.8초·17.8초에 `SUCCEEDED`가 됐다. SQLite `quick_check=ok`이고 Project 61, Discovery Session 62, Learning Spec 27, Task 6, accepted Evidence 13, Concept Ledger 13, Completion Report 2가 유지됐으며, 실패·성공 Job revision도 provenance 때문에 삭제하지 않았다. 새 Campus Drop Agent run은 추가 durable fixture data를 만들지 않고 deterministic full E2E와 실제 result runtime integration으로 대체했다.
 
-### [>] T19. 자체 Kiro IDE 패널과 프론트 실제 연동
+### [~] T19. 자체 Kiro IDE 패널과 프론트 실제 연동
 
-**2026-09-26 다음 작업:** 사용자 요청으로 [프론트 인계 계획·요청서 답변](FRONTEND_HANDOFF_PLAN_20260926.md)을 작성했다. W5 완료로 과거 Windows 환경 대기 사유는 해소됐다. 다음 착수 범위는 기존 frontend 어댑터를 유지하는 host 연결부 분리·SDK/설치물 고정·외부 소비/최소 IDE 연결 검증이다. 성능·Analyst 의미 품질·개인화 효과 개선은 frontend 연결과 병행하되 상위 완료 조건은 유지한다. 이 표시는 문서 작성 후의 다음 작업 선정이며 host 분리·frontend 연결·전달 완료를 뜻하지 않는다. 아래 macOS-only 대기 기록은 과거 근거로 보존한다.
+**2026-09-26 구현 착수:** 사용자 지시로 계획 이후 실제 인계 kit 구현에 착수한다. UI 독립 host·SDK·portable 자산과 검토된 `program` 적용 패치를 제공하고 현재 Windows 환경에서 소비·Core·확장 회귀를 검증한다. 다른 기기·외부 환경 검증은 이번 인계 범위에서 제외하며 전체 T19의 의미 품질 완료로 대체하지 않는다.
+
+**2026-09-26 현재 PC 연결 구현:** UI 독립 host와 program 11개 파일 패치를 구현했다. 실제 frontend TS/CJS build·228 tests, 실제 Core 소비 검사, 설치된 frontend VSIX의 native 4회(후보 10개→JIT/선택→Spec 1/수정 2→확정/Task READY→History 무재실행), host CJS 110개와 backend 회귀/Edge E2E 12개를 통과했다. [적용 가이드](FRONTEND_WINDOWS_QUICKSTART.md), [인계 결과](FRONTEND_HANDOFF_RESULTS_20260926.md). 사용자 요청에 따라 같은 Windows branch에 소스와 적용 ZIP·receipt를 전달하며 경로는 `releases/frontend-handoff/20260926/`다. 성능·Analyst 품질은 병행 backlog이며 Builder/Helper 등 후속 화면 연결과 T19/T19-N 전체 완료는 별도다.
+
+**2026-09-26 인계 계획 당시 기록:** 사용자 요청으로 [프론트 인계 계획·요청서 답변](FRONTEND_HANDOFF_PLAN_20260926.md)을 작성했다. W5 완료로 과거 Windows 환경 대기 사유는 해소됐다. 당시 다음 범위로 선정한 host 연결부 분리·SDK/설치물 고정·소비/최소 IDE 연결은 위 현재 PC 구현 결과로 갱신한다. 성능·Analyst 의미 품질·개인화 효과 개선은 frontend 연결과 병행하되 상위 완료 조건은 유지한다. 아래 macOS-only 대기 기록은 과거 근거로 보존한다.
 
 **승인 기록**
 

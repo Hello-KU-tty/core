@@ -71,6 +71,19 @@ await bundle('packages/runtime/dist/index.js', 'bin/runtime.cjs')
 await bundle('scripts/project-tools.mjs', 'bin/project-tools.mjs')
 await bundle('packages/frontend-client/dist/node.js', 'bin/client.cjs')
 await bundle('examples/kiro-panel/src/core-lifecycle.cjs', 'bin/lifecycle.cjs')
+await bundle('examples/kiro-panel/src/frontend-host.cjs', 'bin/frontend-host.cjs', {
+  alias: {
+    '@vibe-helper/frontend-client/node': join(repository, 'packages/frontend-client/dist/node.js'),
+    '@vibe-helper/application/redaction': join(
+      repository,
+      'packages/application/dist/redaction.js',
+    ),
+    '@vibe-helper/kiro-adapter/builder-tool-guard': join(
+      repository,
+      'packages/kiro-adapter/dist/builder-tool-guard.js',
+    ),
+  },
+})
 await bundle('examples/kiro-panel/src/portable-extension.cjs', 'bin/extension.cjs', {
   alias: {
     '@vibe-helper/frontend-client/node': join(repository, 'packages/frontend-client/dist/node.js'),
@@ -171,7 +184,19 @@ for (const name of ['discovery', 'builder', 'helper', 'evidence-analyst']) {
 // This build runs with the exact development Node distribution already verified in W1.
 if (sha256(await readFile(process.execPath)) !== MANAGED_NODE.sha256)
   throw new Error('NODE_DISTRIBUTION_UNVERIFIED')
-await copy(join(dirname(process.execPath), 'LICENSE'), 'licenses/node-LICENSE')
+// Some verified runtime caches contain node.exe without its distribution license.
+// Reuse that binary and accept only the exact official v24.19.0 license as a sidecar.
+const nodeLicense = process.env.VIBE_NODE_DISTRIBUTION_LICENSE
+if (
+  nodeLicense &&
+  sha256(await readFile(nodeLicense)) !==
+    '148eacf7863ef4329224a29398623077200a27194aa075569faf4a0a85566ca5'
+)
+  throw new Error('NODE_DISTRIBUTION_LICENSE_UNVERIFIED')
+await copy(
+  nodeLicense ? resolve(nodeLicense) : join(dirname(process.execPath), 'LICENSE'),
+  'licenses/node-LICENSE',
+)
 const licenses = new Map()
 for (const input of inputs) {
   if (!input.includes(`${sep}node_modules${sep}`)) continue

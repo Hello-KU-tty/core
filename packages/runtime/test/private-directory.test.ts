@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, realpath, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -21,7 +21,7 @@ afterEach(async () => {
 
 describe.skipIf(process.platform !== 'win32')('Windows private directory inspection', () => {
   const root = async () => {
-    const value = await mkdtemp(join(tmpdir(), 'vibe-w5-acl-test-'))
+    const value = await realpath(await mkdtemp(join(tmpdir(), 'vibe-w5-acl-test-')))
     roots.push(value)
     return value
   }

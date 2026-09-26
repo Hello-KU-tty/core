@@ -1,0 +1,52 @@
+{
+  "stage": "COMPLETE",
+  "status": "PASS",
+  "nativeRequests": 4,
+  "host": {
+    "phase": "CORE_CONNECTED",
+    "native": "WORKER_READY",
+    "runtimeSource": "KIRO",
+    "ownership": "OWNED",
+    "backendInstanceId": "fa12a2af-b4f2-4f84-b183-b91ef843b34e",
+    "restoreRequired": false,
+    "helperMode": "SEPARATE_WINDOW",
+    "nativeErrorCode": null,
+    "trusted": true
+  },
+  "projectId": "project_ca6db31a-636e-4fe6-ba53-183e6676f746",
+  "previewCount": 10,
+  "initialSpecRevision": 1,
+  "refinedSpecRevision": 2,
+  "taskReady": true,
+  "historyReadOnly": true,
+  "runs": [
+    {
+      "kind": "DISCOVERY",
+      "phase": "PREVIEW",
+      "status": "SUCCEEDED",
+      "outcome": "DURABLE_RESULT",
+      "errorCode": null
+    },
+    {
+      "kind": "DISCOVERY",
+      "phase": "ENRICH_SELECTED",
+      "status": "SUCCEEDED",
+      "outcome": "DURABLE_RESULT",
+      "errorCode": null
+    },
+    {
+      "kind": "DISCOVERY",
+      "phase": "SPEC",
+      "status": "SUCCEEDED",
+      "outcome": "DURABLE_RESULT",
+      "errorCode": null
+    },
+    {
+      "kind": "DISCOVERY",
+      "phase": "SPEC",
+      "status": "SUCCEEDED",
+      "outcome": "DURABLE_RESULT",
+      "errorCode": null
+    }
+  ]
+}

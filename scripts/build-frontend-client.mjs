@@ -78,6 +78,6 @@ await writeFile(
 )
 await writeFile(
   join(output, 'README.md'),
-  '# Vibe Helper frontend client\n\nExtension-host only. Read the private connection file with `connectLocalCore` from `@vibe-helper/frontend-client/node`. Never send credentials to a Webview. See the matching backend revision `docs/FRONTEND_INTEGRATION.md`.\n',
+  '# Vibe Helper frontend client\n\nExtension-host only. Windows products use the managed host from the matching frontend handoff kit; see `docs/FRONTEND_WINDOWS_QUICKSTART.md`. The low-level `connectLocalCore` API is for host integrations that already own the private descriptor and native worker lifecycle. Never send credentials to a Webview.\n',
 )
 console.log('Built dist/frontend-client (ESM + CJS, standalone contract declarations).')

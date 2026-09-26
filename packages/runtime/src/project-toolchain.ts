@@ -373,14 +373,17 @@ export async function selectProjectToolchain(options: {
   const pnpmPath = result.pnpm.executable
   if (/["%\r\n!&|<>^]/.test(pnpmPath) || /["%\r\n!&|<>^]/.test(node.executable))
     fail('PROJECT_LAUNCHER_PATH_UNSAFE')
-  const shim = `@echo off\r\n${result.pnpm.kind === 'JS' ? `"${node.executable}" "${pnpmPath}"` : result.pnpm.kind === 'CMD' ? `call "${pnpmPath}"` : `"${pnpmPath}"`} %*\r\nexit /b %errorlevel%\r\n`
+  const shimCommand = `${result.pnpm.kind === 'JS' ? `"${node.executable}" "${pnpmPath}"` : result.pnpm.kind === 'CMD' ? `call "${pnpmPath}"` : `"${pnpmPath}"`} %*`
+  const shim = utf8Batch([shimCommand])
+  const legacyShim = `@echo off\r\n${shimCommand}\r\nexit /b %errorlevel%\r\n`
   const shimPath = join(root, 'bin/pnpm.cmd')
   try {
     await writeFile(shimPath, shim, { flag: 'wx', mode: 0o600 })
   } catch (error) {
     if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) throw error
-    if ((await plainFile(shimPath, 32768)).toString() !== shim)
-      fail('PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED')
+    const previous = (await plainFile(shimPath, 32768)).toString()
+    if (previous === legacyShim) await replaceProjectFile(shimPath, shim)
+    else if (previous !== shim) fail('PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED')
   }
   return Object.freeze(result)
 }
@@ -402,12 +405,28 @@ export function projectCommandArgs(command: string): string[] | null {
   return command.split(' ')
 }
 
-function launcherText(node: string, runner: string, descriptor: string): string {
-  if ([node, runner, descriptor].some((path) => !isAbsolute(path) || /["%\r\n!&|<>^]/.test(path)))
-    fail('PROJECT_LAUNCHER_PATH_UNSAFE')
+function utf8Batch(commands: readonly string[]): string {
   return [
     '@echo off',
     'setlocal',
+    'set "_VIBE_CODEPAGE="',
+    'for /f "tokens=2 delims=:" %%c in (\'"%SystemRoot%\\System32\\chcp.com"\') do set "_VIBE_CODEPAGE=%%c"',
+    'if not defined _VIBE_CODEPAGE exit /b 1',
+    '"%SystemRoot%\\System32\\chcp.com" 65001 >nul',
+    'if errorlevel 1 exit /b 1',
+    ...commands,
+    'set "_VIBE_EXIT=%errorlevel%"',
+    '"%SystemRoot%\\System32\\chcp.com" %_VIBE_CODEPAGE% >nul',
+    'if errorlevel 1 exit /b 1',
+    'exit /b %_VIBE_EXIT%',
+    '',
+  ].join('\r\n')
+}
+
+function launcherText(node: string, runner: string, descriptor: string, legacy = false): string {
+  if ([node, runner, descriptor].some((path) => !isAbsolute(path) || /["%\r\n!&|<>^]/.test(path)))
+    fail('PROJECT_LAUNCHER_PATH_UNSAFE')
+  const commands = [
     ...[
       'NODE_OPTIONS',
       'NODE_PATH',
@@ -416,9 +435,10 @@ function launcherText(node: string, runner: string, descriptor: string): string 
       'ELECTRON_EXTRA_LAUNCH_ARGS',
     ].map((name) => `set "${name}="`),
     `"${node}" "${runner}" "${descriptor}" %*`,
-    'exit /b %errorlevel%',
-    '',
-  ].join('\r\n')
+  ]
+  return legacy
+    ? ['@echo off', 'setlocal', ...commands, 'exit /b %errorlevel%', ''].join('\r\n')
+    : utf8Batch(commands)
 }
 
 const projectPreparation = new Map<string, Promise<void>>()
@@ -536,7 +556,17 @@ async function prepareProjectToolsOnce(
     join(oldRoot, 'bin/project-tools.mjs'),
     descriptorFile,
   )
-  if (oldLauncher !== expectedOldLauncher && oldLauncher !== launcher)
+  const legacyOldLauncher = launcherText(
+    toolchain.node.executable,
+    join(oldRoot, 'bin/project-tools.mjs'),
+    descriptorFile,
+    true,
+  )
+  if (
+    oldLauncher !== expectedOldLauncher &&
+    oldLauncher !== legacyOldLauncher &&
+    oldLauncher !== launcher
+  )
     fail('PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED')
   // Launcher first: an interrupted pair fails verification and is recoverable using
   // the still-old descriptor. Never execute or trust assets from the old package.
@@ -552,8 +582,11 @@ export async function verifyProjectTools(
   if (canonical !== resolve(workspace) || !(await isPrivateDirectory(canonical)))
     fail('PROJECT_WORKSPACE_UNSAFE')
   const launcher = (await plainFile(join(canonical, '.kiro/vibe-tools.cmd'), 32768)).toString()
-  const line = launcher.split('\r\n').find((value) => value.startsWith('"'))
-  const match = line?.match(/^"([^"]+)" "([^"]+)" "([^"]+)" %\*$/)
+  const lines = launcher
+    .split('\r\n')
+    .map((line) => line.match(/^"([^"]+)" "([^"]+)" "([^"]+)" %\*$/))
+    .filter((line) => line !== null)
+  const match = lines.length === 1 ? lines[0] : null
   if (!match?.[3]) fail('PROJECT_LAUNCHER_INVALID')
   const descriptorFile = match[3]
   if (!(await isPrivateDirectory(dirname(descriptorFile)))) fail('PROJECT_DESCRIPTOR_UNSAFE')

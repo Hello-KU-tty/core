@@ -1,0 +1,23 @@
+{
+  "status": "PASS",
+  "boundary": "actual program controller/port + authenticated HTTP/SSE + SQLite",
+  "agent": "DELAYED_DETERMINISTIC_FIXTURE",
+  "checks": [
+    "two project/session mappings",
+    "wait for durable preview/JIT/spec",
+    "one SPEC run after SELECT",
+    "entity-specific revisions",
+    "stale spec conflict",
+    "confirm and prepare Task",
+    "new port History restore without model",
+    "original Agent failure",
+    "cancelled run is not success",
+    "controller uses Core project ID",
+    "selected candidate must match the requested revision"
+  ],
+  "counts": {
+    "PREVIEW": 5,
+    "ENRICH_SELECTED": 2,
+    "SPEC": 3
+  }
+}

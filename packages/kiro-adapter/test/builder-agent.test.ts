@@ -4,26 +4,25 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
-
-import {
-  BUILDER_AGENT_NAME,
-  type BuilderAgentAdapterError,
-  BuilderAgentToolAdapter,
-  BUILDER_CORE_TOOL_NAMES,
-  BUILDER_PROMPT_SOURCE,
-  BUILDER_PROMPT_VERSION,
-  createBuilderAgentDefinition,
-} from '../src/builder-agent.js'
-import { loadBuilderAgentDefinition } from '../src/builder-prompt-node.js'
-import { BuilderCrewSlotBinding } from '../src/builder-crew-slot.js'
-import { normalizeBuilderStreamLine, redactBuilderStreamText } from '../src/builder-stream.js'
-import { guardBuilderToolInput, resolveAppGeneratedWorkspace } from '../src/builder-tool-guard.js'
 import {
   builderTaskFixture,
   confirmedLearningSpecFixture,
   ids,
   projectFixture,
 } from '../../contracts/test/fixtures.js'
+import {
+  BUILDER_AGENT_NAME,
+  BUILDER_CORE_TOOL_NAMES,
+  BUILDER_PROMPT_SOURCE,
+  BUILDER_PROMPT_VERSION,
+  type BuilderAgentAdapterError,
+  BuilderAgentToolAdapter,
+  createBuilderAgentDefinition,
+} from '../src/builder-agent.js'
+import { BuilderCrewSlotBinding } from '../src/builder-crew-slot.js'
+import { loadBuilderAgentDefinition } from '../src/builder-prompt-node.js'
+import { normalizeBuilderStreamLine, redactBuilderStreamText } from '../src/builder-stream.js'
+import { guardBuilderToolInput, resolveAppGeneratedWorkspace } from '../src/builder-tool-guard.js'
 
 const repositoryRoot = fileURLToPath(new URL('../../..', import.meta.url))
 
@@ -270,6 +269,8 @@ describe('Builder native tool guard and transient stream', () => {
     const outside = await mkdtemp(join(tmpdir(), 'vibe-helper-builder-outside-'))
     await mkdir(join(workspace, 'src'))
     await symlink(outside, join(workspace, 'escape'), 'junction')
+    await mkdir(join(workspace, '.kiro'))
+    await symlink(join(workspace, '.kiro'), join(workspace, 'protected-alias'), 'junction')
 
     await expect(
       guardBuilderToolInput(
@@ -307,6 +308,16 @@ describe('Builder native tool guard and transient stream', () => {
         ),
       ).resolves.toMatchObject({ allowed: false, reasonCode: 'GUARD_PROTECTED_PATH' })
     }
+    await expect(
+      guardBuilderToolInput(
+        {
+          tool_name: 'fs_write',
+          tool_input: { path: 'protected-alias/agents/builder.json' },
+          cwd: workspace,
+        },
+        workspace,
+      ),
+    ).resolves.toMatchObject({ allowed: false, reasonCode: 'GUARD_PROTECTED_PATH' })
     await expect(
       guardBuilderToolInput(
         { tool_name: 'fs_write', tool_input: { path: 'escape/secret.ts' }, cwd: workspace },

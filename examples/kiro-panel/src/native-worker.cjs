@@ -292,6 +292,7 @@ function startNativeWorker(context, connectionFile, runtime) {
           { builderLeaseDeadlineAt: job.leaseDeadlineAt } : {}),
         bridgeScriptPath: runtime.bridgeScriptPath,
         ...(runtime.windowsProduct ? { windowsProduct: true,
+          windows1170Diagnostic: runtime.windows1170Diagnostic === true,
           runtimeDescriptor: runtime.runtimeDescriptor } : {}),
         redactText: redactSensitiveText,
         onPermissionTelemetry: (phase, toolName) => {
@@ -361,7 +362,7 @@ function startNativeWorker(context, connectionFile, runtime) {
               await tools.api.verifyProjectTools(job.workspace, tools.resources)
               const logical = command.slice(tools.api.PROJECT_TOOL_COMMAND.length)
               return tools.api.projectCommandArgs(logical) ? logical : null
-            } : undefined)
+            } : undefined, { windows1170Diagnostic: runtime.windows1170Diagnostic === true })
           if (!optionId) {
             event({ kind: 'PERMISSION_DENIED' }); return null
           }

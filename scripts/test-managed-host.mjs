@@ -14,6 +14,14 @@ const windowLifecycle = process.argv.includes('--window-lifecycle')
 const builderTools = process.argv.includes('--builder-tools')
 const withoutProjectTools = process.argv.includes('--without-project-tools')
 const vertical = process.argv.includes('--vertical')
+const kiro1170Diagnostic = process.argv.includes('--kiro-1170-diagnostic')
+const processShellIntegration = process.argv.includes('--process-shell-integration')
+const cleanWindowsUserConfirmed = process.argv.includes('--clean-windows-user-confirmed')
+if (processShellIntegration && (!kiro1170Diagnostic || !vertical))
+  throw new Error('ISOLATED_DIAGNOSTIC_SHELL_REQUIRED')
+const shellRecoveryIndex = process.argv.indexOf('--recover-shell-from')
+if (shellRecoveryIndex >= 0 && (!kiro1170Diagnostic || withoutProjectTools || !vertical))
+  throw new Error('ISOLATED_DIAGNOSTIC_SHELL_RECOVERY_REQUIRED')
 if (vertical && (builderTools || windowLifecycle || process.argv.includes('--helper')))
   throw new Error('VERTICAL_MUST_NOT_USE_SEEDED_TASK')
 if (windowLifecycle && !process.argv.includes('--helper')) throw new Error('HELPER_CHECK_REQUIRED')
@@ -31,11 +39,98 @@ if (
 )
   throw new Error('SYNTHETIC_HOST_ROOT_UNSAFE')
 const receiptFile = join(root, `receipt-${randomUUID()}.json`)
+const env = { ...process.env }
+if (kiro1170Diagnostic) {
+  env.VIBE_W5_KIRO_1170_DIAGNOSTIC = '1'
+  env.KIRO_LOG_LEVEL = 'debug'
+} else {
+  for (const key of Object.keys(env))
+    if (/^(VIBE_W5_KIRO_1170_DIAGNOSTIC|KIRO_LOG_LEVEL|PSExecutionPolicyPreference)$/i.test(key))
+      delete env[key]
+}
+delete env.ELECTRON_RUN_AS_NODE
+for (const name of Object.keys(env)) if (name.startsWith('VSCODE_')) delete env[name]
+if (shellRecoveryIndex >= 0)
+  for (const key of Object.keys(env)) if (/^psmodulepath$/i.test(key)) delete env[key]
+if (withoutProjectTools) {
+  // An intermediate Node/Kiro process otherwise passes PowerShell 7 modules to WinPS 5.1.
+  // Let WinPS construct its own defaults; no user/system setting or execution policy changes.
+  for (const key of Object.keys(env))
+    if (/^(path|node_options|node_path|pnpm_home|npm_config_.*|psmodulepath)$/i.test(key))
+      delete env[key]
+  env.PATH = join(process.env.SystemRoot, 'System32')
+}
+let shellEnvironment
+let processShellPolicy
+if (processShellIntegration) {
+  const baseEnv = { ...env }
+  for (const key of Object.keys(baseEnv))
+    if (/^(PSExecutionPolicyPreference|PSModulePath)$/i.test(key)) delete baseEnv[key]
+  const policies = async (environment) => {
+    const { stdout } = await promisify(execFile)(
+      join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe'),
+      [
+        '-NoLogo',
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        '$r=@{effective=[string](Get-ExecutionPolicy)}; Get-ExecutionPolicy -List | ForEach-Object { $r[[string]$_.Scope]=[string]$_.ExecutionPolicy }; $r | ConvertTo-Json -Compress',
+      ],
+      { env: environment, windowsHide: true, timeout: 30000, maxBuffer: 8192 },
+    )
+    return JSON.parse(stdout.trim())
+  }
+  const before = await policies(baseEnv)
+  env.PSExecutionPolicyPreference = 'RemoteSigned'
+  for (const key of Object.keys(env)) if (/^PSModulePath$/i.test(key)) delete env[key]
+  const scoped = await policies(env)
+  if (
+    scoped.effective !== 'RemoteSigned' ||
+    scoped.Process !== 'RemoteSigned' ||
+    ['MachinePolicy', 'UserPolicy', 'CurrentUser', 'LocalMachine'].some(
+      (key) => scoped[key] !== before[key],
+    )
+  )
+    throw new Error('PROCESS_SHELL_POLICY_UNAVAILABLE')
+  processShellPolicy = {
+    mode: 'PROCESS_ONLY_REMOTESIGNED',
+    before,
+    scoped,
+    persistentPolicyChanged: false,
+  }
+}
+if (shellRecoveryIndex >= 0) {
+  const { stdout } = await promisify(execFile)(
+    join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe'),
+    [
+      '-NoLogo',
+      '-NoProfile',
+      '-NonInteractive',
+      '-Command',
+      "$ErrorActionPreference = 'Stop'; Import-Module PSReadLine -ErrorAction Stop; $m = Get-Module PSReadLine; $standard = @((Join-Path $env:ProgramFiles 'WindowsPowerShell\\Modules'), (Join-Path $PSHOME 'Modules')); $origin = @($standard | Where-Object { $m.ModuleBase.StartsWith($_ + '\\', [StringComparison]::OrdinalIgnoreCase) }).Count -eq 1; @{ status = 'PASS'; standardModule = $origin; version = $m.Version.ToString(); executionPolicy = [string](Get-ExecutionPolicy) } | ConvertTo-Json -Compress",
+    ],
+    { env, windowsHide: true, timeout: 30000, maxBuffer: 8192 },
+  ).catch(() => {
+    throw new Error('WINDOWS_DEFAULT_MODULE_PREFLIGHT_FAILED')
+  })
+  const observed = JSON.parse(stdout.trim())
+  if (observed.status !== 'PASS' || observed.standardModule !== true)
+    throw new Error('WINDOWS_DEFAULT_MODULE_PREFLIGHT_FAILED')
+  shellEnvironment = {
+    ...observed,
+    mode: 'WINDOWS_DEFAULT_MODULES',
+    observedAt: new Date().toISOString(),
+    policyChanged: false,
+  }
+}
 const initializationRetryIndex = process.argv.indexOf('--retry-builder-from')
 const continuationIndex = process.argv.indexOf('--continue-build-from')
-if (initializationRetryIndex >= 0 && continuationIndex >= 0)
+if (
+  [initializationRetryIndex, continuationIndex, shellRecoveryIndex].filter((index) => index >= 0)
+    .length > 1
+)
   throw new Error('ONLY_ONE_CONTINUATION_ALLOWED')
-const retryIndex = Math.max(initializationRetryIndex, continuationIndex)
+const retryIndex = Math.max(initializationRetryIndex, continuationIndex, shellRecoveryIndex)
 let retryReport
 if (retryIndex >= 0) {
   const sourceName = process.argv[retryIndex + 1]
@@ -51,14 +146,19 @@ if (retryIndex >= 0) {
   )
     throw new Error('KNOWN_FAILED_BUILDER_RECEIPT_UNSAFE')
   const source = await readFile(sourceFile)
-  const { prepareBuilderRetry, prepareBuildContinuation } = createRequire(import.meta.url)(
-    '../examples/kiro-panel/test/windows-vertical.cjs',
-  )
-  const prepare = continuationIndex >= 0 ? prepareBuildContinuation : prepareBuilderRetry
+  const { prepareBuilderRetry, prepareBuildContinuation, prepareShellEnvironmentRecovery } =
+    createRequire(import.meta.url)('../examples/kiro-panel/test/windows-vertical.cjs')
+  const prepare =
+    shellRecoveryIndex >= 0
+      ? prepareShellEnvironmentRecovery
+      : continuationIndex >= 0
+        ? prepareBuildContinuation
+        : prepareBuilderRetry
   retryReport = prepare(
     JSON.parse(source.toString('utf8')),
     createHash('sha256').update(source).digest('hex'),
     sourceName,
+    shellEnvironment,
   )
   await writeFile(receiptFile, JSON.stringify(retryReport), { mode: 0o600 })
 }
@@ -95,6 +195,7 @@ await writeFile(
     version: '0.0.1',
     engines: { vscode: '^1.131.0' },
     main: './extension.cjs',
+    extensionDependencies: ['vibe-helper.vibe-helper-portable-core'],
     capabilities: { untrustedWorkspaces: { supported: true } },
     activationEvents: ['onStartupFinished'],
   }),
@@ -112,23 +213,18 @@ await writeFile(
     withoutProjectTools,
     vertical,
     personalNeed: process.argv.includes('--personal-need'),
+    processShellPolicy,
+    cleanWindowsUserConfirmed,
+    nativeRequestLimit: vertical ? 12 : null,
   }),
 )
-const env = { ...process.env }
-delete env.ELECTRON_RUN_AS_NODE
-for (const name of Object.keys(env)) if (name.startsWith('VSCODE_')) delete env[name]
-if (withoutProjectTools) {
-  for (const key of Object.keys(env))
-    if (/^(path|node_options|node_path|pnpm_home|npm_config_.*)$/i.test(key)) delete env[key]
-  env.PATH = join(process.env.SystemRoot, 'System32')
-}
 // Install only into this synthetic profile. Nothing is copied into the normal profile.
 const driverVsix = await (await import('./package-managed-host-driver.mjs')).packageHostDriver(
   root,
   driver,
 )
 for (const vsix of [
-  resolve('dist/portable-win32-x64/vibe-helper-portable-core-0.3.7-win32-x64.vsix'),
+  resolve('dist/portable-win32-x64/vibe-helper-portable-core-0.3.16-win32-x64.vsix'),
   driverVsix,
 ])
   await promisify(execFile)(

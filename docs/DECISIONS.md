@@ -835,3 +835,15 @@
 - **계약:** local protocol 1, Core 식별자·entity별 revision·idempotency·provenance와 권한 경계를 유지한다. frontend는 실제 지원 source 판정과 자동 연결을 사용하며 live 실패를 Mock 성공으로 바꾸지 않는다. 사용자 제품 설치에 수동 backend/connection 경로를 다시 요구하지 않는다.
 - **완료 구분:** W5 설치·실행은 기존 실측으로 완료됐다. 첫 frontend 연결 인계와 상위 T19/T19-N·MVP 완료는 별도 판정이다. 성능·Analyst 정확도·개인화 효과의 후속 개선은 병행하며 AC-MVP-012/015나 보안·데이터 경계를 완화하지 않는다. 새 제품 범위나 dependency 도입 결정은 아니다.
 - **이번 실행 범위:** 계획·인계 안내 링크·다음 작업 문서화다. host 구현, frontend 저장소 수정, 모델 호출, 외부 전달·commit/push는 이번 문서 작성으로 수행하거나 완료한 것으로 기록하지 않는다.
+
+## 2026-09-26: 현재 환경에서 실행 가능한 프론트 인계 kit 구현
+
+- **승인:** 사용자가 계획 이후 실제 실행부 작업을 지시했다. 다른 기기·외부 환경 검증은 제외하고 현재 Windows에서 프론트가 가이드대로 적용할 산출물을 준비한다.
+- **범위:** 기존 exact source·권한·provenance 계약을 유지한 UI 독립 host, SDK/portable 자산, 검토된 program revision용 적용 패치와 실제 소비 검증. 새 dependency나 제품 범위를 추가하지 않는다. 전체 T19의 의미 품질 gate는 유지한다.
+- **검증 구분:** 현재 PC의 실제 frontend 컴파일/실제 Core/확장 회귀를 이번 인계의 근거로 삼고 다른 PC 검증을 완료로 표시하지 않는다. 기존 W5 native 수직 흐름 근거는 재사용하되 변경 경계는 다시 검증한다.
+
+## 2026-09-26: 실행 가능한 프론트 인계본을 기존 저장소로 전달
+
+- **승인:** 사용자가 구현·현재 환경 검증 이후 commit과 push, 프론트 담당자에게 보낼 문구 작성을 요청했다. 대상은 기존 `Hello-KU-tty/core`의 `codex/windows-extension-runtime-20260923` branch다.
+- **전달 방식:** 소스 구현 commit을 먼저 만들고 그 HEAD와 clean 상태를 기록한 kit을 재생성한다. 약 5 MB의 ZIP 한 개와 SHA-256 receipt를 `releases/frontend-handoff/20260926/`에 별도 commit해 프론트가 백엔드 빌드 환경을 준비하지 않아도 받을 수 있게 한다. 전체 `dist/`나 로컬 DB·로그·credential은 포함하지 않는다.
+- **판정:** 현재 PC에서 검증한 Discovery·Spec·History 적용물과 Builder/Helper 등 후속 UI 연결 계약을 전달한다. 성능·Analyst 의미 품질 개선과 상위 T19/T19-N 완료는 별도로 유지한다. 프론트 저장소 직접 수정·push, 담당자에게 메시지 전송이나 hosted 배포는 수행하지 않는다.

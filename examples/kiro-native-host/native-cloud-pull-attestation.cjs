@@ -128,7 +128,7 @@ function parseCloudMessages(contents, notBefore) {
   return true
 }
 
-async function attestOwnedCloudPull(sessionId, workspace, notBefore,
+async function ownedCloudSessionDirectory(sessionId, workspace,
   sessionsRoot = join(homedir(), '.kiro', 'sessions'),
   configRoot = CLOUD_CONFIG_ROOT) {
   if (typeof sessionId !== 'string' || !SESSION_ID.test(sessionId))
@@ -156,6 +156,12 @@ async function attestOwnedCloudPull(sessionId, workspace, notBefore,
         (!Array.isArray(metadata.rootPaths) ||
          metadata.rootPaths.length !== 1 || metadata.rootPaths[0] !== workspace)))
     throw new Error('NATIVE_CLOUD_SESSION_SCOPE_MISMATCH')
+  return { directory, metadata }
+}
+
+async function attestOwnedCloudPull(sessionId, workspace, notBefore,
+  sessionsRoot = join(homedir(), '.kiro', 'sessions'), configRoot = CLOUD_CONFIG_ROOT) {
+  const { directory } = await ownedCloudSessionDirectory(sessionId, workspace, sessionsRoot, configRoot)
   const messagesPath = join(directory, 'messages.jsonl')
   const messagesInfo = await ownedPath(messagesPath, 'file', true)
   if (messagesInfo.size > MAX_MESSAGES_BYTES)
@@ -183,4 +189,4 @@ async function waitForOwnedCloudPull(sessionId, workspace, options = {}) {
 }
 
 module.exports = { cloudStoreHash, parseCloudMessages, assertCloudConfigAbsent,
-  attestOwnedCloudPull, waitForOwnedCloudPull }
+  attestOwnedCloudPull, waitForOwnedCloudPull, ownedCloudSessionDirectory, ownedPath }

@@ -1,0 +1,1111 @@
+diff --git a/package-lock.json b/package-lock.json
+index ac57d6f..2f4067a 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -20,7 +20,7 @@
+       },
+       "engines": {
+         "node": ">=18.0.0",
+-        "vscode": "^1.90.0"
++        "vscode": "^1.131.0"
+       }
+     },
+     "node_modules/@esbuild/aix-ppc64": {
+diff --git a/package.json b/package.json
+index 35ec2e5..21716d1 100644
+--- a/package.json
++++ b/package.json
+@@ -6,7 +6,7 @@
+   "private": true,
+   "publisher": "vibe-helper",
+   "engines": {
+-    "vscode": "^1.90.0",
++    "vscode": "^1.131.0",
+     "node": ">=18.0.0"
+   },
+   "categories": [
+@@ -38,15 +38,18 @@
+     },
+     "configuration": {
+       "title": "Vibe Helper",
+-      "properties": {
+-        "vibeHelper.connectionFile": {
+-          "type": "string",
+-          "default": "",
+-          "scope": "machine",
+-          "markdownDescription": "Absolute file path to the local Core backend `connection.json`. Host-only; never sent to the webview. Live flow is macOS/arm64 experimental — unsupported platforms fail closed to test data."
+-        }
++      "properties": {}
++    },
++    "commands": [
++      {
++        "command": "vibeHelper.retryCore",
++        "title": "Vibe Helper: Retry Core Connection"
++      },
++      {
++        "command": "vibeHelper.stopDiscovery",
++        "title": "Vibe Helper: Stop Active Discovery"
+       }
+-    }
++    ]
+   },
+   "scripts": {
+     "build": "node esbuild.mjs",
+@@ -68,5 +71,14 @@
+   },
+   "dependencies": {
+     "zod": "4.4.3"
++  },
++  "extensionDependencies": [
++    "kiro.kiroAgent"
++  ],
++  "capabilities": {
++    "untrustedWorkspaces": {
++      "supported": "limited",
++      "description": "History is available. Native Agent requires Workspace Trust."
++    }
+   }
+ }
+diff --git a/src/adapter/flow/flow-port-factory.ts b/src/adapter/flow/flow-port-factory.ts
+index 0f8bbc6..f904261 100644
+--- a/src/adapter/flow/flow-port-factory.ts
++++ b/src/adapter/flow/flow-port-factory.ts
+@@ -94,7 +94,7 @@ export interface CreateFlowPortsResult {
+   /** The Discovery/Spec port pair the controller consumes. */
+   ports: FlowPorts;
+   /** `"live"` when backed by the real SDK; `"mock"` otherwise. */
+-  mode: "live" | "mock";
++  mode: "live" | "mock" | "unavailable";
+   /**
+    * When `mode === "mock"` on a build that could have been live, an explicit
+    * machine-readable reason for the fallback (never silent). Absent only when
+@@ -175,3 +175,26 @@ function errorCodeOf(e: unknown): string {
+   if (e instanceof Error) return e.name || "ERROR";
+   return "UNKNOWN";
+ }
++
++// Managed Windows product entry. Legacy explicit Mock factory remains for development tests only.
++export function unavailableFlowPorts(reason = "CORE_PREPARING"): FlowPorts {
++  const unavailable = async () => ({ ok: false as const, error: { code: "unavailable" as const, message: reason } });
++  const port = { startDiscovery: unavailable, generatePreviewRound: unavailable, enrichCandidate: unavailable,
++    submitFeedback: unavailable, generateSpecDraft: unavailable, refineSpec: unavailable,
++    confirmSpec: unavailable, prepareBuilderTask: unavailable, listProjects: unavailable, restoreProject: unavailable };
++  return { discovery: port, spec: port, history: port };
++}
++export async function createManagedFlowPorts(hostPromise: Promise<import("../../../vendor/frontend-host").FrontendHost>): Promise<CreateFlowPortsResult> {
++  try {
++    const host = await hostPromise;
++    await host.prepare();
++    const port = new LocalCoreDiscoveryPort(host.client);
++    const status = host.getStatus();
++    return { ports: { discovery: port, spec: port, history: port },
++      mode: status.native === "WORKER_READY" ? "live" : "unavailable",
++      reason: status.nativeErrorCode ?? undefined };
++  } catch (error) {
++    const code = error instanceof Error && /^[A-Z][A-Z0-9_]{0,99}$/.test(error.message) ? error.message : "CORE_PREPARE_FAILED";
++    return { ports: unavailableFlowPorts(code), mode: "unavailable", reason: code };
++  }
++}
+diff --git a/src/adapter/flow/local-core-port.ts b/src/adapter/flow/local-core-port.ts
+index 9de090b..a610f04 100644
+--- a/src/adapter/flow/local-core-port.ts
++++ b/src/adapter/flow/local-core-port.ts
+@@ -29,9 +29,7 @@
+  * `err(PortError)`; it never throws. {@link LocalClientError} codes are mapped
+  * to the normalized {@link PortError} code set by {@link toPortError}.
+  *
+- * Because the real SDK needs a live backend + `connection.json` and is
+- * extension-host only (and there is no backend on Windows), this class is unit
+- * tested against a hand-written fake client, never a live connection.
++ * The Windows handoff uses the managed host and durable run completion.
+  */
+ 
+ import {
+@@ -45,7 +43,6 @@ import type {
+   CandidateRound,
+   CandidateScopeSuggestion,
+   DiscoveryFeedback,
+-  DiscoveryFeedbackIntent,
+   DiscoveryInput,
+   DiscoverySession,
+   ExpectedDecision,
+@@ -109,404 +106,148 @@ type ContractPreparedTask = Awaited<
+  * @param client A LocalCoreClient already connected via `connectLocalCore`
+  *   (host-only). The adapter never inspects the underlying connection.
+  */
++type CoreClient = Pick<LocalCoreClient, "health" | "execute" | "startDiscovery" | "startRun" | "cancelRun" | "getRun" | "listRuns" | "watchRun" | "listProjects" | "restoreProject">;
+ export class LocalCoreDiscoveryPort implements DiscoveryPort, SpecPort, HistoryPort {
+-  private readonly client: LocalCoreClient;
++  private readonly projects = new Map<string, string>();
++  private readonly previews = new Map<string, string>();
++  constructor(private readonly client: CoreClient) {}
+ 
+-  constructor(client: LocalCoreClient) {
+-    this.client = client;
++  private remember(snapshot: Snapshot): Snapshot {
++    if (snapshot.discoverySession) this.projects.set(snapshot.discoverySession.id, snapshot.project.id);
++    return snapshot;
+   }
+-
+-  // --- DiscoveryPort ---
+-
+-  /**
+-   * Open a Discovery Session (guide \u00a76 `start`).
+-   *
+-   * Maps to `startDiscovery(input, { enrichAfterPreview: true })`, then reads
+-   * the durable session back via `restoreProject`. NOTE: the SDK generates its
+-   * own `projectId`; `req.projectId` is not authoritative. The returned
+-   * DiscoverySession carries the SDK-owned projectId (documented mismatch with
+-   * the program's caller-supplied projectId contract).
+-   */
+-  async startDiscovery(
+-    req: { projectId: string; input: DiscoveryInput },
+-    _env: RequestEnvelope,
+-  ): Promise<PortResult<DiscoverySession>> {
+-    try {
+-      const { projectId } = await this.client.startDiscovery(req.input, {
+-        enrichAfterPreview: true,
+-      });
+-      const snapshot = await this.client.restoreProject(projectId);
+-      const session = snapshot.discoverySession;
+-      if (!session) {
+-        return err("unavailable", "discovery session missing from snapshot");
+-      }
+-      return ok(contractToProgramSession(session));
+-    } catch (e) {
+-      return err(...classify(e, "startDiscovery failed"));
+-    }
++  private async snapshot(projectId: string): Promise<Snapshot> {
++    return this.remember(await this.client.restoreProject(projectId));
+   }
+-
+-  /**
+-   * Read the current Preview Round (guide \u00a76: PREVIEW phase result).
+-   *
+-   * The preview round is produced by the discovery run's PREVIEW phase started
+-   * in {@link startDiscovery} (`enrichAfterPreview: true`). We read it from a
+-   * fresh `restoreProject` on `discoveryContext.previewRound`.
+-   *
+-   * SHAPE GAP: the port takes only `discoverySessionId`, but the SDK reads the
+-   * durable snapshot per-project. We call `listRuns`/`restoreProject` is not
+-   * possible without a projectId, so we resolve the projectId from the session
+-   * id by restoring via the session's owning project. Since the port contract
+-   * does not carry the projectId here, we look it up from the discovery run's
+-   * snapshot the session belongs to. In practice the controller restores the
+-   * project first; here we accept the sessionId and expect the SDK's snapshot
+-   * to expose the previewRound tied to that session. If unavailable, we return
+-   * `unavailable` with a clear reason rather than fabricating previews.
+-   */
+-  async generatePreviewRound(
+-    req: { discoverySessionId: string },
+-    _env: RequestEnvelope,
+-  ): Promise<PortResult<PreviewRound>> {
+-    try {
+-      const previewRound = await this.readPreviewRoundForSession(
+-        req.discoverySessionId,
+-      );
+-      if (!previewRound) {
+-        return err(
+-          "unavailable",
+-          "preview round not yet durable for this session",
+-        );
+-      }
+-      return ok(contractToProgramPreviewRound(previewRound));
+-    } catch (e) {
+-      return err(...classify(e, "generatePreviewRound failed"));
++  private async forSession(id: string): Promise<Snapshot> {
++    const projectId = this.projects.get(id);
++    if (!projectId) throw new Error("SESSION_RESTORE_REQUIRED");
++    const snapshot = await this.snapshot(projectId);
++    if (snapshot.discoverySession?.id !== id) throw new Error("STALE_DISCOVERY_SESSION");
++    return snapshot;
++  }
++  private async wait(id: string): Promise<void> {
++    const run = await this.client.watchRun(id, () => {}, { signal: AbortSignal.timeout(10 * 60_000) });
++    if (run.status !== "SUCCEEDED" || run.outcome !== "DURABLE_RESULT") {
++      throw new Error(run.errorCode ?? (run.status === "SUCCEEDED" ? "DURABLE_RESULT_REQUIRED" : run.status));
+     }
+   }
+-
+-  /**
+-   * Enrich one candidate (guide \u00a76 feedback path: `ENRICH_SELECTED`).
+-   *
+-   * Starts a DISCOVERY run with `phase: 'ENRICH_SELECTED'` and the single
+-   * target candidate id, then restores and maps the enriched candidate
+-   * revision from the snapshot.
+-   */
+-  async enrichCandidate(
+-    req: { discoverySessionId: string; target: CandidateRevisionReference },
+-    env: RequestEnvelope,
+-  ): Promise<PortResult<ProjectCandidateRevision>> {
++  private async run(snapshot: Snapshot, phase: "ENRICH_SELECTED" | "ENRICH_ALL" | "ROUND" | "MERGE" | "SPEC",
++    key: string, candidateIds: string[] = [], message?: string, expectedSpecRevision?: number): Promise<Snapshot> {
++    const session = snapshot.discoverySession;
++    if (!session) throw new Error("DISCOVERY_SESSION_REQUIRED");
++    const active = (await this.client.listRuns(snapshot.project.id)).some(r => r.kind === "DISCOVERY" && ["ACCEPTED", "RUNNING"].includes(r.status));
++    if (active) throw new Error("DISCOVERY_RUN_ACTIVE_STOP_OR_WAIT");
++    const accepted = await this.client.startRun({ kind: "DISCOVERY", projectId: snapshot.project.id,
++      discoverySessionId: session.id, expectedSessionRevision: session.revision,
++      idempotencyKey: key, phase, candidateIds, enrichAfterPreview: false,
++      ...(message ? { message, expectedSpecRevision } : {}) });
++    await this.wait(accepted.id);
++    return this.snapshot(snapshot.project.id);
++  }
++  async startDiscovery(req: { projectId: string; input: DiscoveryInput }, _env: RequestEnvelope): Promise<PortResult<DiscoverySession>> {
+     try {
+-      const projectId = await this.projectIdForSession(req.discoverySessionId);
+-      if (!projectId) {
+-        return err("unavailable", "project not found for session");
+-      }
+-      await this.client.startRun({
+-        kind: "DISCOVERY",
+-        projectId,
+-        idempotencyKey: env.idempotencyKey,
+-        discoverySessionId: req.discoverySessionId,
+-        expectedSessionRevision: env.expectedRevision,
+-        phase: "ENRICH_SELECTED",
+-        candidateIds: [req.target.candidateId],
+-        enrichAfterPreview: false,
+-      });
+-      const snapshot = await this.client.restoreProject(projectId);
+-      const enriched = findEnrichedCandidate(snapshot, req.target);
+-      if (!enriched) {
+-        return err("unavailable", "enriched candidate missing from snapshot");
+-      }
+-      return ok(contractToProgramCandidate(enriched));
+-    } catch (e) {
+-      return err(...classify(e, "enrichCandidate failed"));
+-    }
++      const { projectId, run } = await this.client.startDiscovery(req.input, { enrichAfterPreview: false });
++      const snapshot = await this.snapshot(projectId);
++      if (!snapshot.discoverySession) throw new Error("DISCOVERY_SESSION_REQUIRED");
++      this.previews.set(snapshot.discoverySession.id, run.id);
++      return ok(contractToProgramSession(snapshot.discoverySession));
++    } catch (e) { return err(...classify(e, "startDiscovery failed")); }
+   }
+-
+-  /**
+-   * Apply Discovery Feedback then regenerate (guide \u00a76 `feedback`).
+-   *
+-   * Records feedback via `execute(UI_RECORD_DISCOVERY_FEEDBACK)`, then starts
+-   * the DISCOVERY run whose phase matches the feedback intent
+-   * (`MERGE` -> MERGE, `SELECT` -> SPEC, everything else -> ROUND), then
+-   * restores and maps the resulting CandidateRound.
+-   *
+-   * The program {@link DiscoveryFeedback} is mapped into the contract
+-   * `discoveryFeedbackSchema` shape. The contract requires `discoverySessionId`,
+-   * `roundId`, `correlationId`, `createdAt`, `source`, `redactionStatus`; the
+-   * program type lacks `roundId`/`createdAt`/`source`, so we carry the current
+-   * round id from the snapshot, stamp `createdAt` now, and set
+-   * `source: { kind: 'USER' }` / `redactionStatus: 'NOT_REQUIRED'`.
+-   */
+-  async submitFeedback(
+-    req: { discoverySessionId: string; feedback: DiscoveryFeedback },
+-    env: RequestEnvelope,
+-  ): Promise<PortResult<CandidateRound>> {
++  async generatePreviewRound(req: { discoverySessionId: string }, _env: RequestEnvelope): Promise<PortResult<PreviewRound>> {
+     try {
+-      const projectId = await this.projectIdForSession(req.discoverySessionId);
+-      if (!projectId) {
+-        return err("unavailable", "project not found for session");
+-      }
+-      const before = await this.client.restoreProject(projectId);
+-      const roundId = currentRoundId(before, req.discoverySessionId);
+-
+-      await this.client.execute({
+-        ...uiMetadata(env.correlationId),
+-        kind: "UI_RECORD_DISCOVERY_FEEDBACK",
+-        idempotencyKey: env.idempotencyKey,
+-        expectedSessionRevision: env.expectedRevision,
+-        feedback: programToContractFeedback(
+-          req.feedback,
+-          req.discoverySessionId,
+-          roundId,
+-          env.correlationId,
+-        ),
+-      });
+-
+-      // The feedback mutation advances the session revision; use a fresh key
+-      // for the follow-on run and the bumped revision.
+-      await this.client.startRun({
+-        kind: "DISCOVERY",
+-        projectId,
+-        idempotencyKey: entityId("idem"),
+-        discoverySessionId: req.discoverySessionId,
+-        expectedSessionRevision: env.expectedRevision + 1,
+-        phase: phaseForIntent(req.feedback.intent),
+-        candidateIds: req.feedback.targets.map((t) => t.candidateId),
+-        message: req.feedback.message,
+-        enrichAfterPreview: false,
+-      });
+-
+-      const after = await this.client.restoreProject(projectId);
+-      const round = latestRound(after);
+-      if (!round) {
+-        return err("unavailable", "candidate round missing from snapshot");
+-      }
+-      return ok(contractToProgramRound(round));
+-    } catch (e) {
+-      return err(...classify(e, "submitFeedback failed"));
+-    }
++      const runId = this.previews.get(req.discoverySessionId);
++      if (runId) await this.wait(runId);
++      const snapshot = await this.forSession(req.discoverySessionId);
++      if (!snapshot.discoveryContext?.previewRound) throw new Error("PREVIEW_NOT_DURABLE");
++      return ok(contractToProgramPreviewRound(snapshot.discoveryContext.previewRound));
++    } catch (e) { return err(...classify(e, "generatePreviewRound failed")); }
+   }
+-
+-  // --- SpecPort ---
+-
+-  /**
+-   * Draft a Learning Spec (guide \u00a76: SPEC phase result).
+-   *
+-   * Starts a DISCOVERY run with `phase: 'SPEC'`, then restores and maps
+-   * `snapshot.learningSpec` into a program {@link LearningSpecRevision}.
+-   */
+-  async generateSpecDraft(
+-    req: { projectId: string; selectedCandidate: CandidateRevisionReference },
+-    env: RequestEnvelope,
+-  ): Promise<PortResult<LearningSpecRevision>> {
++  async enrichCandidate(req: { discoverySessionId: string; target: CandidateRevisionReference }, env: RequestEnvelope): Promise<PortResult<ProjectCandidateRevision>> {
+     try {
+-      const sessionId = await this.sessionIdForProject(req.projectId);
+-      if (!sessionId) {
+-        return err("unavailable", "discovery session not found for project");
+-      }
+-      await this.client.startRun({
+-        kind: "DISCOVERY",
+-        projectId: req.projectId,
+-        idempotencyKey: env.idempotencyKey,
+-        discoverySessionId: sessionId,
+-        expectedSessionRevision: env.expectedRevision,
+-        phase: "SPEC",
+-        candidateIds: [req.selectedCandidate.candidateId],
+-        enrichAfterPreview: false,
+-      });
+-      const snapshot = await this.client.restoreProject(req.projectId);
+-      if (!snapshot.learningSpec) {
+-        return err("unavailable", "learning spec missing from snapshot");
++      let snapshot = await this.forSession(req.discoverySessionId);
++      let candidate = findEnrichedCandidate(snapshot, req.target);
++      if (!candidate) {
++        snapshot = await this.run(snapshot, "ENRICH_SELECTED", env.idempotencyKey, [req.target.candidateId]);
++        candidate = findEnrichedCandidate(snapshot, req.target);
+       }
+-      return ok(contractToProgramSpec(snapshot.learningSpec));
+-    } catch (e) {
+-      return err(...classify(e, "generateSpecDraft failed"));
+-    }
++      if (!candidate) throw new Error("CANDIDATE_REVISION_NOT_FOUND");
++      return ok(contractToProgramCandidate(candidate));
++    } catch (e) { return err(...classify(e, "enrichCandidate failed")); }
+   }
+-
+-  /**
+-   * Refine the current draft (guide \u00a76 `refineSpec`).
+-   *
+-   * Starts a DISCOVERY run `phase: 'SPEC'` with the refinement `message` and
+-   * `expectedSpecRevision`, then restores and maps the higher-revision spec.
+-   */
+-  async refineSpec(
+-    req: { projectId: string; learningSpecId: string; message: string },
+-    env: RequestEnvelope,
+-  ): Promise<PortResult<LearningSpecRevision>> {
++  async submitFeedback(req: { discoverySessionId: string; feedback: DiscoveryFeedback }, env: RequestEnvelope): Promise<PortResult<CandidateRound>> {
+     try {
+-      const sessionId = await this.sessionIdForProject(req.projectId);
+-      if (!sessionId) {
+-        return err("unavailable", "discovery session not found for project");
++      let snapshot = await this.forSession(req.discoverySessionId);
++      if (!snapshot.discoveryContext) throw new Error("DISCOVERY_CONTEXT_REQUIRED");
++      if (!snapshot.discoveryContext.rounds.length) {
++        if (req.feedback.intent === "MORE") snapshot = await this.run(snapshot, "ENRICH_ALL", entityId("idem"));
++        const missing = req.feedback.targets.filter(t => !findEnrichedCandidate(snapshot, t));
++        if (missing.length) snapshot = await this.run(snapshot, "ENRICH_SELECTED", entityId("idem"), missing.map(t => t.candidateId));
+       }
+-      await this.client.startRun({
+-        kind: "DISCOVERY",
+-        projectId: req.projectId,
+-        idempotencyKey: env.idempotencyKey,
+-        discoverySessionId: sessionId,
+-        // A SPEC refine does not bump the session revision; the fresh snapshot
+-        // revision is the current session revision the caller observed.
+-        expectedSessionRevision: currentSessionRevisionOr(env.expectedRevision),
+-        phase: "SPEC",
+-        message: req.message,
+-        expectedSpecRevision: env.expectedRevision,
+-        enrichAfterPreview: false,
+-      });
+-      const snapshot = await this.client.restoreProject(req.projectId);
+-      if (!snapshot.learningSpec) {
+-        return err("unavailable", "refined learning spec missing from snapshot");
+-      }
+-      return ok(contractToProgramSpec(snapshot.learningSpec));
+-    } catch (e) {
+-      return err(...classify(e, "refineSpec failed"));
+-    }
++      const session = snapshot.discoverySession!;
++      const roundId = currentRoundId(snapshot, session.id);
++      await this.client.execute({ ...uiMetadata(session.correlationId), kind: "UI_RECORD_DISCOVERY_FEEDBACK",
++        idempotencyKey: env.idempotencyKey, expectedSessionRevision: session.revision,
++        feedback: programToContractFeedback(req.feedback, session.id, roundId, session.correlationId) });
++      snapshot = await this.snapshot(snapshot.project.id);
++      // SELECT is persisted here. The controller's next generateSpecDraft call owns the one SPEC run.
++      if (req.feedback.intent !== "SELECT") snapshot = await this.run(snapshot,
++        req.feedback.intent === "MERGE" ? "MERGE" : "ROUND", entityId("idem"));
++      const round = latestRound(snapshot);
++      if (round) return ok(contractToProgramRound(round));
++      const preview = snapshot.discoveryContext?.previewRound;
++      if (!preview || req.feedback.intent !== "SELECT") throw new Error("ROUND_NOT_DURABLE");
++      // The existing port requires a round-shaped acknowledgement for SELECT;
++      // its controller ignores it. This projection uses only persisted preview/enrichments.
++      return ok({ roundIndex: 1, candidates: snapshot.discoveryContext!.candidateEnrichments.map(e => ({ candidateId: e.candidate.id, revision: e.candidate.revision })),
++        generationRationale: preview.generationRationale, appliedFeedbackIds: [] });
++    } catch (e) { return err(...classify(e, "submitFeedback failed")); }
+   }
+-
+-  /**
+-   * Confirm the current revision (guide \u00a76 `confirm`).
+-   *
+-   * Executes `UI_CONFIRM_LEARNING_SPEC`, then restores and maps the CONFIRMED
+-   * spec.
+-   */
+-  async confirmSpec(
+-    req: { projectId: string; learningSpecId: string },
+-    env: RequestEnvelope,
+-  ): Promise<PortResult<LearningSpecRevision>> {
++  async generateSpecDraft(req: { projectId: string; selectedCandidate: CandidateRevisionReference }, env: RequestEnvelope): Promise<PortResult<LearningSpecRevision>> {
+     try {
+-      await this.client.execute({
+-        ...uiMetadata(env.correlationId),
+-        kind: "UI_CONFIRM_LEARNING_SPEC",
+-        idempotencyKey: env.idempotencyKey,
+-        projectId: req.projectId,
+-        learningSpecId: req.learningSpecId,
+-        expectedSpecRevision: env.expectedRevision,
+-      });
+-      const snapshot = await this.client.restoreProject(req.projectId);
+-      if (!snapshot.learningSpec) {
+-        return err("unavailable", "confirmed learning spec missing from snapshot");
+-      }
++      let snapshot = await this.snapshot(req.projectId);
++      if (!snapshot.selectedCandidate || snapshot.selectedCandidate.id !== req.selectedCandidate.candidateId || snapshot.selectedCandidate.revision !== req.selectedCandidate.revision)
++        throw new Error("SELECTED_CANDIDATE_REVISION_MISMATCH");
++      if (!snapshot.learningSpec) snapshot = await this.run(snapshot, "SPEC", env.idempotencyKey);
++      if (!snapshot.learningSpec) throw new Error("SPEC_NOT_DURABLE");
+       return ok(contractToProgramSpec(snapshot.learningSpec));
+-    } catch (e) {
+-      return err(...classify(e, "confirmSpec failed"));
+-    }
++    } catch (e) { return err(...classify(e, "generateSpecDraft failed")); }
+   }
+-
+-  /**
+-   * Prepare the Builder handoff task (guide \u00a76 `confirm` second step).
+-   *
+-   * Executes `UI_PREPARE_BUILDER_TASK` and maps the returned
+-   * `PreparedBuilderTaskDescriptor` into a program {@link PreparedBuilderTask}.
+-   */
+-  async prepareBuilderTask(
+-    req: { projectId: string; learningSpecId: string },
+-    env: RequestEnvelope,
+-  ): Promise<PortResult<PreparedBuilderTask>> {
++  async refineSpec(req: { projectId: string; learningSpecId: string; message: string }, env: RequestEnvelope): Promise<PortResult<LearningSpecRevision>> {
+     try {
+-      const response = await this.client.execute({
+-        ...uiMetadata(),
+-        kind: "UI_PREPARE_BUILDER_TASK",
+-        idempotencyKey: entityId("idem"),
+-        projectId: req.projectId,
+-        learningSpecId: req.learningSpecId,
+-        expectedSpecRevision: env.expectedRevision,
+-      });
+-      return ok(contractToProgramPreparedTask(response as ContractPreparedTask));
+-    } catch (e) {
+-      return err(...classify(e, "prepareBuilderTask failed"));
+-    }
++      let snapshot = await this.snapshot(req.projectId);
++      if (snapshot.learningSpec?.id !== req.learningSpecId || snapshot.learningSpec.revision !== env.expectedRevision)
++        throw new Error("STALE_SPEC_REVISION");
++      snapshot = await this.run(snapshot, "SPEC", env.idempotencyKey, [], req.message, env.expectedRevision);
++      if (!snapshot.learningSpec || snapshot.learningSpec.revision <= env.expectedRevision) throw new Error("SPEC_REVISION_NOT_ADVANCED");
++      return ok(contractToProgramSpec(snapshot.learningSpec));
++    } catch (e) { return err(...classify(e, "refineSpec failed")); }
+   }
+-
+-  // --- HistoryPort (read-only; guide §6/§10-2) ---
+-
+-  /**
+-   * List durable projects for the read-only History surface (guide §6:
+-   * `listProjects()` → ProjectHistory). Read-only: no run started, nothing
+-   * mutated, no model call. Maps each contract `ProjectHistoryItem` into the
+-   * SAFE {@link HistoryProjectView} (guide §9) — projecting only the safe
+-   * scalars and NEVER the workspace path, connection, or token.
+-   */
+-  async listProjects(
+-    limit: number,
+-    _env: RequestEnvelope,
+-  ): Promise<PortResult<ProjectHistoryView>> {
++  async confirmSpec(req: { projectId: string; learningSpecId: string }, env: RequestEnvelope): Promise<PortResult<LearningSpecRevision>> {
+     try {
+-      const history = await this.client.listProjects(limit);
+-      return ok(contractToProgramHistory(history));
+-    } catch (e) {
+-      return err(...classify(e, "listProjects failed"));
+-    }
++      const before = await this.snapshot(req.projectId);
++      await this.client.execute({ ...uiMetadata(before.discoverySession?.correlationId ?? before.project.correlationId), kind: "UI_CONFIRM_LEARNING_SPEC", ...req,
++        idempotencyKey: env.idempotencyKey, expectedSpecRevision: env.expectedRevision });
++      const snapshot = await this.snapshot(req.projectId);
++      if (!snapshot.learningSpec) throw new Error("SPEC_NOT_DURABLE");
++      return ok(contractToProgramSpec(snapshot.learningSpec));
++    } catch (e) { return err(...classify(e, "confirmSpec failed")); }
+   }
+-
+-  /**
+-   * Restore one project's durable snapshot as a SAFE summary (guide §6:
+-   * `restoreProject(projectId)` → ProjectSessionSnapshot). Read-only: no run
+-   * started, nothing mutated. Maps only safe scalars into
+-   * {@link RestoredProjectView} (guide §9) — NEVER the `generatedWorkspacePath`
+-   * / `workspaceDirectory`, connection, token, or raw transcripts.
+-   */
+-  async restoreProject(
+-    projectId: string,
+-    _env: RequestEnvelope,
+-  ): Promise<PortResult<RestoredProjectView>> {
++  async prepareBuilderTask(req: { projectId: string; learningSpecId: string }, env: RequestEnvelope): Promise<PortResult<PreparedBuilderTask>> {
+     try {
+-      const snapshot = await this.client.restoreProject(projectId);
+-      return ok(contractToProgramRestoredProject(snapshot));
+-    } catch (e) {
+-      return err(...classify(e, "restoreProject failed"));
+-    }
++      const before = await this.snapshot(req.projectId);
++      const response = await this.client.execute({ ...uiMetadata(before.discoverySession?.correlationId ?? before.project.correlationId), kind: "UI_PREPARE_BUILDER_TASK", ...req,
++        idempotencyKey: env.idempotencyKey, expectedSpecRevision: env.expectedRevision });
++      return ok(contractToProgramPreparedTask(response));
++    } catch (e) { return err(...classify(e, "prepareBuilderTask failed")); }
+   }
+-
+-  // --- snapshot lookups (durable truth) ---
+-
+-  private async projectIdForSession(
+-    discoverySessionId: string,
+-  ): Promise<string | undefined> {
+-    // The port contract does not carry the projectId for session-scoped ops.
+-    // A session id is `discovery_session_<uuid>`; the owning project is read
+-    // from a restore. We resolve it by restoring the project that the session
+-    // belongs to. Since restoreProject requires a projectId, callers in the
+-    // live flow have already selected one; here we accept that the session's
+-    // project equals the id embedded by the SDK. We look it up by restoring the
+-    // session via a project scan is not exposed, so we return the session's
+-    // projectId from a snapshot when the controller supplies it out-of-band.
+-    //
+-    // In this adapter we cannot list-by-session, so we return undefined only
+-    // when no snapshot is reachable. The fake-client tests exercise the happy
+-    // path where restoreProject(sessionId-derived projectId) is wired.
+-    return this.tryResolveProjectId(discoverySessionId);
++  async listProjects(limit: number, _env: RequestEnvelope): Promise<PortResult<ProjectHistoryView>> {
++    try { return ok(contractToProgramHistory(await this.client.listProjects(limit))); }
++    catch (e) { return err(...classify(e, "listProjects failed")); }
+   }
+-
+-  private async sessionIdForProject(
+-    projectId: string,
+-  ): Promise<string | undefined> {
+-    const snapshot = await this.client.restoreProject(projectId);
+-    return snapshot.discoverySession?.id;
+-  }
+-
+-  private async readPreviewRoundForSession(
+-    discoverySessionId: string,
+-  ): Promise<ContractPreviewRound | undefined> {
+-    const projectId = await this.tryResolveProjectId(discoverySessionId);
+-    if (!projectId) return undefined;
+-    const snapshot = await this.client.restoreProject(projectId);
+-    return snapshot.discoveryContext?.previewRound ?? undefined;
+-  }
+-
+-  /**
+-   * Resolve a projectId for a given session id. The SDK convention mirrors the
+-   * session/project 1:1 relationship: the caller-facing session id maps to a
+-   * single owning project. We derive it by restoring with the projectId the
+-   * SDK embeds; the fake client used in tests implements this mapping.
+-   */
+-  private async tryResolveProjectId(
+-    discoverySessionId: string,
+-  ): Promise<string | undefined> {
+-    // Restore by session id: the vendored client accepts a projectId, and the
+-    // owning project id is discoverable from any snapshot whose session matches.
+-    const snapshot = await this.client.restoreProject(discoverySessionId);
+-    if (snapshot.discoverySession?.id === discoverySessionId) {
+-      return snapshot.project.id;
+-    }
+-    // Fallback: the snapshot's project owns this session.
+-    return snapshot.project.id;
++  async restoreProject(projectId: string, _env: RequestEnvelope): Promise<PortResult<RestoredProjectView>> {
++    try { return ok(contractToProgramRestoredProject(await this.snapshot(projectId))); }
++    catch (e) { return err(...classify(e, "restoreProject failed")); }
+   }
+ }
+ 
+@@ -554,7 +295,7 @@ export function toPortError(e: unknown, fallbackMessage: string): PortError {
+     if (/timeout|timed out|abort/i.test(e.message) || e.name === "AbortError") {
+       return { code: "timeout", message: e.message };
+     }
+-    return { code: "unknown", message: e.message };
++    return { code: mapClientCode(e.message), message: /^[A-Z][A-Z0-9_]{0,99}$/.test(e.message) ? e.message : fallbackMessage };
+   }
+   return { code: "unknown", message: fallbackMessage };
+ }
+@@ -584,6 +325,9 @@ function mapClientCode(code: string, status?: number): PortError["code"] {
+     return "timeout";
+   }
+   if (
++    c.includes("REQUIRED") ||
++    c.includes("NOT_DURABLE") ||
++    c.includes("ACTIVE_STOP") ||
+     c.includes("CANCEL") ||
+     c.includes("CONNECTION") ||
+     c.includes("UNAVAILABLE") ||
+@@ -837,20 +581,6 @@ export function programToContractFeedback(
+   };
+ }
+ 
+-/** Map the program feedback intent -> the DISCOVERY run phase (guide \u00a76). */
+-function phaseForIntent(
+-  intent: DiscoveryFeedbackIntent,
+-): "ROUND" | "MERGE" | "SPEC" {
+-  switch (intent) {
+-    case "MERGE":
+-      return "MERGE";
+-    case "SELECT":
+-      return "SPEC";
+-    default:
+-      return "ROUND";
+-  }
+-}
+-
+ // --- small helpers ---
+ 
+ function mapRef(r: { candidateId: string; revision: number }): CandidateRevisionReference {
+@@ -878,7 +608,7 @@ function findEnrichedCandidate(
+   if (match) return match.candidate;
+   // Fallback: a freshly-enriched candidate may surface as selectedCandidate.
+   const selected = snapshot.selectedCandidate;
+-  if (selected && selected.id === target.candidateId) return selected;
++  if (selected && selected.id === target.candidateId && selected.revision === target.revision) return selected;
+   // Or in the discoveryContext candidate list.
+   return snapshot.discoveryContext?.candidates.find(
+     (c) => c.id === target.candidateId && c.revision === target.revision,
+@@ -890,7 +620,11 @@ function currentRoundId(snapshot: Snapshot, discoverySessionId: string): string
+   const rounds = (snapshot.discoveryContext?.rounds ?? []).filter(
+     (r) => r.discoverySessionId === discoverySessionId,
+   );
+-  if (rounds.length === 0) return "round_unknown";
++  if (rounds.length === 0) {
++    const id = snapshot.discoveryContext?.previewRound?.finalRoundId;
++    if (!id) throw new Error("ROUND_NOT_DURABLE");
++    return id;
++  }
+   const latest = rounds.reduce((a, b) => (b.roundIndex > a.roundIndex ? b : a));
+   return latest.id;
+ }
+@@ -902,12 +636,3 @@ function latestRound(snapshot: Snapshot): ContractRound | undefined {
+   return rounds.reduce((a, b) => (b.roundIndex > a.roundIndex ? b : a));
+ }
+ 
+-/**
+- * A conservative default for `expectedSessionRevision` on SPEC-only runs where
+- * the caller only supplied a spec revision. Uses the provided value directly;
+- * kept as a named helper so the intent (SPEC does not require a bumped session
+- * revision) is explicit at the call site.
+- */
+-function currentSessionRevisionOr(fallback: number): number {
+-  return fallback;
+-}
+diff --git a/src/agent-panel-view-provider.ts b/src/agent-panel-view-provider.ts
+index 2e4f563..e882f1c 100644
+--- a/src/agent-panel-view-provider.ts
++++ b/src/agent-panel-view-provider.ts
+@@ -47,6 +47,8 @@
+  */
+ 
+ import * as vscode from "vscode";
++import { randomUUID } from "node:crypto";
++import type { FrontendHost } from "../vendor/frontend-host";
+ 
+ import { PanelController } from "./core/panel-controller";
+ import { SystemClock } from "./core/clock";
+@@ -57,6 +59,8 @@ import { FlowController } from "./core/flow/flow-controller";
+ import { FlowDispatcher } from "./webview/flow/flow-dispatcher";
+ import {
+   createFlowPorts,
++  createManagedFlowPorts,
++  unavailableFlowPorts,
+   createFlowPortsAsync,
+   isNativeFlowSupported,
+ } from "./adapter/flow/flow-port-factory";
+@@ -119,7 +123,7 @@ export interface MessagingWebview {
+  */
+ export function wireWebviewMessaging(
+   webview: MessagingWebview,
+-  options: { connectionFile?: string } = {},
++  options: { connectionFile?: string; managedHost?: Promise<FrontendHost> } = {},
+ ): {
+   controller: PanelController;
+   dispatcher: WebviewDispatcher;
+@@ -153,7 +157,9 @@ export function wireWebviewMessaging(
+   // `onChange` triggers a full flow re-hydrate, so async/non-intent-driven
+   // mutations (e.g. a timer-driven mock round settling) push a fresh snapshot.
+   let flowDispatcher: FlowDispatcher;
+-  const flowController = new FlowController(createFlowPorts(), {
++  const flowController = new FlowController(options.managedHost ? unavailableFlowPorts() : createFlowPorts(), {
++    ...(options.managedHost ? { timeoutMs: 15 * 60_000,
++      ids: { correlationId: () => "corr_" + randomUUID(), idempotencyKey: () => "idem_" + randomUUID(), id: (prefix: string) => prefix + "_" + randomUUID() } } : {}),
+     clock: new SystemClock(),
+     onNotice: (n) => flowDispatcher.forwardNotice(n),
+     onChange: () => flowDispatcher.hydrateFlow(),
+@@ -162,44 +168,43 @@ export function wireWebviewMessaging(
+     webview.postMessage(message);
+   });
+ 
+-  // Async gated port construction / native-support verdict (guide §10-1, §9).
+-  //
+-  // The controller above is built synchronously with the sync Mock ports so
+-  // first paint and inbound routing work with zero delay and identical behavior
+-  // to before. The REAL gated factory is async, so we kick it off here and swap
+-  // the controller's ports + record the fail-closed native-support verdict once
+-  // it resolves. On Windows / unsupported pins this resolves near-instantly
+-  // WITHOUT attempting any connection (it fails closed to Mock), so the swap is
+-  // effectively immediate and non-networked in tests and on unsupported builds.
+-  //
+-  // SECURITY (guide §9): `options.connectionFile` is a HOST-ONLY absolute file
+-  // path. It is passed into the factory (which reads it inside the host-side
+-  // LocalCoreClient) but is NEVER forwarded to the controller snapshot or any
+-  // webview message — only the derived `{ mode, experimental, reason? }` verdict
+-  // crosses. `isNativeFlowSupported().experimental` supplies the experimental
+-  // flag for the `macOS exact pin · experimental` label.
+-  const experimental = isNativeFlowSupported().experimental;
+-  void createFlowPortsAsync({ connectionFile: options.connectionFile }).then(
+-    (result) => {
+-      // Swap to the chosen (real/live or fail-closed Mock) ports and record the
+-      // non-sensitive verdict. applyPortResult invokes the controller's onChange
+-      // (wired above to flowDispatcher.hydrateFlow), so the swap publishes the
+-      // fresh verdict snapshot to the webview automatically — no manual
+-      // hydrate needed here.
+-      flowController.applyPortResult(result, experimental);
+-      // Read-only Project History (guide §6/§10-2): load the History list ONCE
+-      // now that the real/mock HistoryPort is in place. This is read-only — it
+-      // never starts a run, mutates, or auto-triggers discovery. loadHistory's
+-      // notifyChange re-hydrates the flow snapshot so the list appears.
+-      void flowController.loadHistory();
+-    },
+-  );
+-
+-  const messageSubscription = webview.onDidReceiveMessage((raw) => {
++  let disposed = false;
++  let unsubscribeStatus: (() => void) | undefined;
++  let unsubscribeRotation: (() => void) | undefined;
++  const experimental = options.managedHost ? false : isNativeFlowSupported().experimental;
++  const refreshPorts = async () => {
++    const result = options.managedHost ? await createManagedFlowPorts(options.managedHost)
++      : await createFlowPortsAsync({ connectionFile: options.connectionFile });
++    if (disposed) return;
++    flowController.applyPortResult(result, experimental);
++    await flowController.loadHistory();
++  };
++  if (options.managedHost) {
++    flowController.setFlowSupport({ mode: "unavailable", experimental: false, reason: "CORE_PREPARING" });
++    void options.managedHost.then(host => {
++      if (disposed) return;
++      unsubscribeStatus = host.subscribeStatus(status => {
++        if (disposed) return;
++        flowController.setFlowSupport({ mode: status.phase === "CORE_CONNECTED" && status.native === "WORKER_READY" ? "live" : "unavailable",
++          experimental: false, reason: status.nativeErrorCode ?? status.errorCode ?? status.phase });
++      });
++      unsubscribeRotation = host.onDidRotate(() => {
++        // Restore durable History only. Never restart a command after rotation.
++        if (!disposed) void flowController.loadHistory();
++      });
++    }).catch(() => {});
++  }
++  void refreshPorts();
++
++  const inboundSubscription = webview.onDidReceiveMessage((raw) => {
+     // Route by discriminator. Build_Surface intents are handled exactly as
+     // before; anything else is tried against the additive flow union.
+     const intent = parseWebviewToHost(raw);
+     if (intent !== null) {
++      if (options.managedHost && intent.type === "submit") {
++        webview.postMessage({ type: "notice", tab: intent.tab, kind: "error", message: "Builder/Helper 화면 연결은 다음 단계입니다. 현재 Discovery·Spec·History는 실제 Core를 사용합니다." });
++        return;
++      }
+       // `handle` is async (submit awaits the adapter); chain the interim
+       // full-refresh so the conversation reflects any state the intent mutated.
+       void dispatcher.handle(intent).then(() => {
+@@ -218,6 +223,7 @@ export function wireWebviewMessaging(
+     // Untrusted/malformed payload from the webview: drop it defensively.
+   });
+ 
++  const messageSubscription = { dispose() { disposed = true; inboundSubscription.dispose(); unsubscribeStatus?.(); unsubscribeRotation?.(); } };
+   // Render immediately from host state (first paint / re-wire after disposal).
+   dispatcher.hydrateAll();
+   // Push the initial flow snapshot so the webview's flow store hydrates and
+@@ -1499,7 +1505,7 @@ export function buildWebviewHtml(
+  * {@link activate} against {@link AGENT_PANEL_VIEW_ID}.
+  */
+ export class AgentPanelViewProvider implements vscode.WebviewViewProvider {
+-  constructor(private readonly extensionUri: vscode.Uri) {}
++  constructor(private readonly extensionUri: vscode.Uri, private readonly managedHost?: Promise<FrontendHost>) {}
+ 
+   /**
+    * Called by VS Code when the view is first shown (and again after disposal).
+@@ -1541,7 +1547,7 @@ export class AgentPanelViewProvider implements vscode.WebviewViewProvider {
+     // instance. The initial hydrateAll() inside the helper performs first paint.
+     const { dispatcher, flowDispatcher, messageSubscription } = wireWebviewMessaging(
+       webviewView.webview,
+-      { connectionFile: connectionFile || undefined },
++      { connectionFile: this.managedHost ? undefined : connectionFile || undefined, managedHost: this.managedHost },
+     );
+     webviewView.onDidDispose(() => messageSubscription.dispose());
+ 
+diff --git a/src/core/flow/flow-controller.ts b/src/core/flow/flow-controller.ts
+index 912c0f7..8da32ff 100644
+--- a/src/core/flow/flow-controller.ts
++++ b/src/core/flow/flow-controller.ts
+@@ -120,6 +120,8 @@ export interface FlowControllerOptions {
+   onChange?: () => void;
+   /** Deterministic id source; defaults to {@link DefaultIdSource}. */
+   ids?: IdSource;
++  /** Live native turns have a longer bounded deadline than deterministic mocks. */
++  timeoutMs?: number;
+ }
+ 
+ /** A single in-flight port operation on a surface (single-flight lock). */
+@@ -175,6 +177,7 @@ export class FlowController {
+   private readonly onChange?: () => void;
+   private readonly onNotice?: (n: FlowNotice) => void;
+   private readonly ids: IdSource;
++  private readonly timeoutMs: number;
+ 
+   // --- authoritative state (single source of truth, Req 13.1) ---
+   private project: Project | null = null;
+@@ -218,6 +221,7 @@ export class FlowController {
+     this.onChange = options.onChange;
+     this.onNotice = options.onNotice;
+     this.ids = options.ids ?? new DefaultIdSource();
++    this.timeoutMs = options.timeoutMs ?? TIMEOUT_MS;
+   }
+ 
+   // --- startup port/verdict swap (async gated factory, guide §10-1) ---
+@@ -432,7 +436,7 @@ export class FlowController {
+       this.emitNotice(surface, "error", TIMEOUT_MESSAGE);
+       onErr({ code: "timeout", message: TIMEOUT_MESSAGE });
+       this.notifyChange();
+-    }, TIMEOUT_MS);
++    }, this.timeoutMs);
+ 
+     this.inFlight[surface] = { kind, timerId, token };
+     this.notifyChange();
+@@ -492,6 +496,8 @@ export class FlowController {
+       0,
+       async (session) => {
+         this.session = session;
++        // Core owns the project ID; every subsequent Spec operation must use it.
++        if (this.project) this.project.id = session.projectId;
+         // The discovery surface is free again here (runOp cleared the lock
+         // before invoking onOk), so chaining the preview op does not violate
+         // single-flight. See design.md note on legitimate chaining.
+diff --git a/src/core/flow/flow-snapshot.ts b/src/core/flow/flow-snapshot.ts
+index 12f6311..8bfd71e 100644
+--- a/src/core/flow/flow-snapshot.ts
++++ b/src/core/flow/flow-snapshot.ts
+@@ -54,7 +54,7 @@ export type FlowPhase = "discovery_start" | "discovery_workspace" | "spec_review
+  */
+ export interface FlowSupport {
+   /** `"live"` when backed by the real SDK; `"mock"` when running on test data. */
+-  mode: "live" | "mock";
++  mode: "live" | "mock" | "unavailable";
+   /** True only on the experimental macOS/arm64 live pin. */
+   experimental: boolean;
+   /** A machine-readable reason (e.g. why it failed closed). Never a secret. */
+diff --git a/src/extension.ts b/src/extension.ts
+index f2edf0e..08d7c73 100644
+--- a/src/extension.ts
++++ b/src/extension.ts
+@@ -8,6 +8,9 @@
+ // lazily when the view is first resolved.
+ 
+ import * as vscode from "vscode";
++import { join } from "node:path";
++import type { FrontendHost } from "../vendor/frontend-host";
++let managedHost: Promise<FrontendHost> | undefined;
+ 
+ import {
+   AgentPanelViewProvider,
+@@ -19,8 +22,24 @@ import {
+  * webview view provider for the Agent_Panel and tracks the disposable so it is
+  * cleaned up on deactivation (Req 1.1).
+  */
+-export function activate(context: vscode.ExtensionContext): void {
+-  const provider = new AgentPanelViewProvider(context.extensionUri);
++export function activate(context: vscode.ExtensionContext): { backend: Promise<FrontendHost> } {
++  // Dynamic absolute require keeps the native host outside the frontend bundle.
++  managedHost = (async () => {
++    const api: typeof import("../vendor/frontend-host") = require(join(context.extensionPath, "portable/bin/frontend-host.cjs"));
++    return api.createFrontendHost(context);
++  })();
++  void managedHost.catch(() => {});
++  const provider = new AgentPanelViewProvider(context.extensionUri, managedHost);
++  context.subscriptions.push(vscode.commands.registerCommand("vibeHelper.retryCore", async () => {
++    try { await (await managedHost!).retry(); await vscode.commands.executeCommand("workbench.action.reloadWindow"); }
++    catch { void vscode.window.showErrorMessage("Core 연결을 복구하지 못했습니다. 지원 버전과 Workspace Trust를 확인하세요."); }
++  }));
++  context.subscriptions.push(vscode.commands.registerCommand("vibeHelper.stopDiscovery", async () => {
++    const host = await managedHost!;
++    const history = await host.client.listProjects();
++    for (const item of history.projects) for (const run of await host.client.listRuns(item.project.id))
++      if (run.kind === "DISCOVERY" && ["ACCEPTED", "RUNNING"].includes(run.status)) await host.client.cancelRun(run.id);
++  }));
+   context.subscriptions.push(
+     vscode.window.registerWebviewViewProvider(AGENT_PANEL_VIEW_ID, provider),
+   );
+@@ -38,6 +57,7 @@ export function activate(context: vscode.ExtensionContext): void {
+   void revealAgentPanelOnRight().catch(() => {
+     // no-op: relocation is best-effort and never affects activation success.
+   });
++  return { backend: managedHost };
+ }
+ 
+ /**
+@@ -110,6 +130,8 @@ async function revealAgentPanelOnRight(): Promise<void> {
+  * Called by the host when the extension is deactivated. Cleanup is handled by
+  * the disposables pushed onto `context.subscriptions`, so this is a no-op.
+  */
+-export function deactivate(): void {
+-  // no-op: disposables handle cleanup
++export async function deactivate(): Promise<void> {
++  const host = await managedHost?.catch(() => undefined);
++  await host?.dispose();
++  managedHost = undefined;
+ }
+diff --git a/src/webview/flow/flow-render.ts b/src/webview/flow/flow-render.ts
+index d000cac..452924a 100644
+--- a/src/webview/flow/flow-render.ts
++++ b/src/webview/flow/flow-render.ts
+@@ -435,6 +435,11 @@ export class DiscoveryStartView {
+    */
+   private renderSupportBanner(snapshot: FlowSnapshot): void {
+     const support = snapshot.flowSupport;
++    if (support.mode === "unavailable") {
++      this.supportBanner.hidden = false;
++      this.supportBanner.textContent = "실제 연결 준비/오류: " + (support.reason ?? "CORE_PREPARING") + " · 명령 팔레트에서 Vibe Helper: Retry Core Connection";
++      return;
++    }
+     if (support.mode === "live") {
+       // Experimental live pin — always surface the guide §10-1 label.
+       this.supportBanner.hidden = false;
+diff --git a/test/integration.test.ts b/test/integration.test.ts
+index ef7f186..df2ec92 100644
+--- a/test/integration.test.ts
++++ b/test/integration.test.ts
+@@ -50,6 +50,7 @@ vi.mock("vscode", () => {
+   }
+   return {
+     Disposable,
++    commands: { registerCommand: vi.fn(() => new Disposable(() => {})) },
+     Uri: {
+       joinPath: (...parts: unknown[]) => ({ parts }),
+     },
+@@ -105,7 +106,7 @@ describe("extension activation contributes the Agent_Panel (Req 1.1 wiring)", ()
+     expect(register.mock.calls[0][0]).toBe(AGENT_PANEL_VIEW_ID);
+ 
+     // The registration disposable is tracked for cleanup (Req 1.1 lifecycle).
+-    expect(subscriptions).toHaveLength(1);
++    expect(subscriptions).toHaveLength(3);
+     expect(typeof subscriptions[0].dispose).toBe("function");
+ 
+     // deactivate is a no-op (disposables handle cleanup) and must not throw.
+diff --git a/test/local-core-port.test.ts b/test/local-core-port.test.ts
+index 6c9830e..f71beeb 100644
+--- a/test/local-core-port.test.ts
++++ b/test/local-core-port.test.ts
+@@ -234,12 +234,12 @@ function fakeClient(overrides: Partial<Record<string, unknown>> = {}): LocalCore
+   const base = {
+     startDiscovery: async () => ({ projectId: "project_1", run: {} }),
+     restoreProject: async () => contractSnapshot({}),
+-    startRun: async () => ({}),
++    startRun: async () => ({ id: "run_1" }),
+     execute: async () => ({ accepted: true, resourceRevision: 5 }),
+     getRun: async () => ({}),
+     listRuns: async () => [],
+     cancelRun: async () => ({}),
+-    watchRun: async () => ({}),
++    watchRun: async () => ({ status: "SUCCEEDED", outcome: "DURABLE_RESULT" }),
+     health: async () => ({ protocolVersion: 1, backendInstanceId: "b1" }),
+     listProjects: async () => ({ projects: [] }),
+     ...overrides,
+@@ -269,6 +269,7 @@ describe("LocalCoreDiscoveryPort success mapping (guide \u00a76)", () => {
+       restoreProject: async () => contractSnapshot({ previewRound: contractPreviewRound() }),
+     });
+     const port = new LocalCoreDiscoveryPort(client);
++    await port.restoreProject("project_1", ENV);
+     const res = await port.generatePreviewRound({ discoverySessionId: "discovery_session_1" }, ENV);
+     expect(res.ok).toBe(true);
+     if (!res.ok) return;
+@@ -297,6 +298,7 @@ describe("LocalCoreDiscoveryPort success mapping (guide \u00a76)", () => {
+         }),
+     });
+     const port = new LocalCoreDiscoveryPort(client);
++    await port.restoreProject("project_1", ENV);
+     const res = await port.enrichCandidate({ discoverySessionId: "discovery_session_1", target }, ENV);
+     expect(res.ok).toBe(true);
+     if (!res.ok) return;
+@@ -318,6 +320,7 @@ describe("LocalCoreDiscoveryPort success mapping (guide \u00a76)", () => {
+         contractSnapshot({ rounds: [contractRound(1, "round_1"), contractRound(2, "round_2")] }),
+     });
+     const port = new LocalCoreDiscoveryPort(client);
++    await port.restoreProject("project_1", ENV);
+     const res = await port.submitFeedback({ discoverySessionId: "discovery_session_1", feedback }, ENV);
+     expect(res.ok).toBe(true);
+     if (!res.ok) return;
+@@ -331,6 +334,7 @@ describe("LocalCoreDiscoveryPort success mapping (guide \u00a76)", () => {
+       restoreProject: async () =>
+         contractSnapshot({
+           discoverySession: contractSession(),
++          selectedCandidate: contractCandidate("cand_1", 2),
+           learningSpec: contractSpec(1, "DRAFT"),
+         }),
+     });
+@@ -348,17 +352,18 @@ describe("LocalCoreDiscoveryPort success mapping (guide \u00a76)", () => {
+   });
+ 
+   it("refineSpec -> ok(LearningSpecRevision) with higher revision", async () => {
++    let reads = 0;
+     const client = fakeClient({
+       restoreProject: async () =>
+         contractSnapshot({
+           discoverySession: contractSession(),
+-          learningSpec: contractSpec(2, "DRAFT", 1),
++          learningSpec: ++reads === 1 ? contractSpec(1, "DRAFT") : contractSpec(2, "DRAFT", 1),
+         }),
+     });
+     const port = new LocalCoreDiscoveryPort(client);
+     const res = await port.refineSpec(
+       { projectId: "project_1", learningSpecId: "learning_spec_1", message: "다듬어줘" },
+-      ENV,
++      { ...ENV, expectedRevision: 1 },
+     );
+     expect(res.ok).toBe(true);
+     if (!res.ok) return;
+@@ -426,7 +431,7 @@ describe("LocalCoreDiscoveryPort error mapping (never throws)", () => {
+       },
+     });
+     const port = new LocalCoreDiscoveryPort(client);
+-    const res = await port.generatePreviewRound({ discoverySessionId: "s" }, ENV);
++    const res = await port.restoreProject("project_1", ENV);
+     expect(res.ok).toBe(false);
+     if (res.ok) return;
+     expect(res.error.code).toBe("timeout");

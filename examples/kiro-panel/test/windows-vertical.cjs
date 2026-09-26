@@ -19,7 +19,8 @@ exports.prepareBuilderRetry = function (source, sourceDigest, sourceName) {
   const task = source?.steps?.PREPARE_TASK?.value?.taskId
   const attempt = (source?.retry?.attempt ?? 0) + 1
   if (source?.status !== 'FAIL' || source.stage !== 'BUILDER_INITIAL_WAITING' ||
-      !['NATIVE_RPC_TIMEOUT', 'PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED'].includes(source.errorCode) || builder?.status !== 'FAILED' ||
+      !['NATIVE_RPC_TIMEOUT', 'PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED',
+        'NATIVE_CLOUD_CYCLE_UNVERIFIED'].includes(source.errorCode) || builder?.status !== 'FAILED' ||
       builder.outcome !== 'NONE' || builder.errorCode !== source.errorCode ||
       step?.state !== 'DONE' || step.value !== builder.id ||
       !/^run_[0-9a-f-]{36}$/.test(builder.id) || !/^project_[0-9a-f-]{36}$/.test(project) ||
@@ -69,7 +70,7 @@ exports.verifyBuilderRetry = async function (client, report, instance, personalN
   assert.equal(existing.project.id, retry.projectId)
   assert.equal(existing.currentTask.id, retry.taskId)
   assert.equal(existing.learningSpec.status, 'CONFIRMED')
-  assert.equal(existing.learningSpec.revision, report.revisedSpecRevision)
+  assert.equal(existing.learningSpec.revision, report.confirmedSpecRevision ?? report.revisedSpecRevision + 1)
   assert.equal(Boolean(existing.discoverySession.input.personalNeed), Boolean(personalNeed))
   if (!report.steps.BUILDER_INITIAL && (existing.decisions.length || existing.completionReport))
     throw new Error('BUILDER_RETRY_REQUIRES_MANUAL_OBSERVATION')
@@ -140,7 +141,7 @@ exports.verifyBuildContinuation = async function (client, report, instance, pers
   assert.equal(current.currentTask.revision, prior.taskRevision)
   assert.equal(current.currentTask.status, 'ACTIVE')
   assert.equal(current.learningSpec.status, 'CONFIRMED')
-  assert.equal(current.learningSpec.revision, report.revisedSpecRevision)
+  assert.equal(current.learningSpec.revision, report.confirmedSpecRevision ?? report.revisedSpecRevision + 1)
   assert.equal(Boolean(current.discoverySession.input.personalNeed), Boolean(personalNeed))
   if (!report.steps.BUILDER_APPLY) {
     assert.equal(current.pendingDecisions.length, 0)
@@ -163,6 +164,29 @@ exports.verifyBuildContinuation = async function (client, report, instance, pers
   }
 }
 
+// One environment-repair observation, distinct from the already consumed build continuation.
+exports.prepareShellEnvironmentRecovery = function (source, sourceDigest, sourceName, environment) {
+  if (source?.environmentRecovery || source?.continuation?.attempt !== 1 ||
+      !/^[a-f0-9]{64}$/.test(source.continuation.sourceDigest ?? '') ||
+      !['CURRENT_CORE_INCOMPLETE_TURN', 'RECORDED_INCOMPLETE_TURN_AND_RESTORED_TASK']
+        .includes(source.continuation.verification) ||
+      source.productVersion !== '0.3.10' || source.apiVersion !== '1.131.0' ||
+      source.nativeRequests !== 10 || source.errorCode !== 'TASK_COMPLETION_NOT_RECORDED' ||
+      environment?.status !== 'PASS' || environment.mode !== 'WINDOWS_DEFAULT_MODULES' ||
+      environment.standardModule !== true || environment.policyChanged !== false ||
+      environment.executionPolicy !== 'Restricted' || environment.version !== '2.0.0' ||
+      !Number.isFinite(Date.parse(environment.observedAt)) ||
+      Date.now() - Date.parse(environment.observedAt) < 0 ||
+      Date.now() - Date.parse(environment.observedAt) > 60000)
+    throw new Error('VERIFIED_SHELL_ENVIRONMENT_RECOVERY_REQUIRED')
+  const input = JSON.parse(JSON.stringify(source))
+  delete input.continuation
+  const report = exports.prepareBuildContinuation(input, sourceDigest, sourceName)
+  report.environmentRecovery = { attempt: 1, sourceDigest, sourceName,
+    previousContinuation: source.continuation, environment }
+  return report
+}
+
 exports.activate = async function () {
   const vscode = require('vscode')
   const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? ''
@@ -170,8 +194,10 @@ exports.activate = async function () {
   const config = JSON.parse(await readFile(join(__dirname, 'config.json'), 'utf8'))
   const report = await readFile(config.report, 'utf8').then(JSON.parse).catch(error => {
     if (error.code !== 'ENOENT') throw error
-    return { target: 'win32-x64', environment: 'ISOLATED_DEVELOPMENT_PC',
-      provenance: 'SYNTHETIC_UI_INPUT_LIVE_NATIVE_AGENT', cleanMachine: 'NOT_VERIFIED',
+    return { target: 'win32-x64', environment: config.cleanWindowsUserConfirmed ? 'USER_CONFIRMED_INITIAL_CLEAN_WINDOWS' : 'ISOLATED_DEVELOPMENT_PC',
+      provenance: 'SYNTHETIC_UI_INPUT_LIVE_NATIVE_AGENT', cleanMachine: config.cleanWindowsUserConfirmed ? 'USER_CONFIRMED_INITIAL_CLEAN_WINDOWS' : 'NOT_VERIFIED',
+      verificationToolsPreparedLater: config.cleanWindowsUserConfirmed === true,
+      processShellPolicy: config.processShellPolicy ?? null,
       uiCoverage: 'PANEL_OPEN_AND_SDK_DRIVEN_HOST', stage: 'ACTIVATING', nativeRequests: 0,
       steps: {}, runs: {}, readFailures: 0, activatedHosts: 0 }
   })
@@ -276,6 +302,11 @@ exports.activate = async function () {
           completedStages.includes(key) &&
           report.steps[key]?.state === 'DONE' && report.runs[key]?.status === 'SUCCEEDED') return
       const runId = await step(key, async () => {
+        if (config.nativeRequestLimit !== null && config.nativeRequestLimit !== undefined) {
+          assert.ok(Number.isInteger(config.nativeRequestLimit) && config.nativeRequestLimit >= 1 &&
+            config.nativeRequestLimit <= 20 && report.nativeRequests < config.nativeRequestLimit,
+            'NATIVE_REQUEST_LIMIT_REACHED')
+        }
         report.nativeRequests += 1
         await save()
         const value = await client.startRun({ ...request, projectId, idempotencyKey: id('idem') })
@@ -337,6 +368,8 @@ exports.activate = async function () {
     })
     await step('PREPARE_TASK', async () => {
       const current = await snapshot()
+      assert.equal(current.learningSpec.status, 'CONFIRMED')
+      report.confirmedSpecRevision = current.learningSpec.revision
       const prepared = await client.execute({ ...meta(current.discoverySession.correlationId), kind: 'UI_PREPARE_BUILDER_TASK',
         projectId, learningSpecId: current.learningSpec.id, expectedSpecRevision: current.learningSpec.revision, idempotencyKey: id('idem') })
       return { taskId: prepared.task.id }
@@ -346,7 +379,7 @@ exports.activate = async function () {
       await run(key, { kind: 'BUILDER', taskId: current.currentTask.id,
         expectedTaskRevision: current.currentTask.revision, message })
     }
-    await builder('BUILDER_INITIAL', 'Implement the confirmed small MVP in this generated workspace. Before choosing whether user entries survive a page reload or server restart, explain the materially different retention options through a real Core Decision. I have not decided this behavior. Other reversible implementation details are yours. Follow the protected Windows tool launcher, verify the actual build/tests, and provide the local result manifest. Do not invent successful validation.')
+    await builder('BUILDER_INITIAL', 'Read and start the confirmed Task in this generated workspace. Before choosing whether user entries survive a page reload or server restart, explain the materially different retention options through a real Core Decision. I have not decided this behavior. After recording that Decision, end this turn so I can consult Helper and resolve it before you implement. Do not implement or claim completion yet. The next turn will implement and verify the actual build/tests and local result manifest with the protected Windows launcher.')
     s = await snapshot()
     if (!report.steps.CHOOSE_DECISION) assert.ok(s.pendingDecisions.length > 0)
     report.decisionCount ??= s.pendingDecisions.length

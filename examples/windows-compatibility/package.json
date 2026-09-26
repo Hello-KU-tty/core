@@ -1,0 +1,11 @@
+{
+  "name": "vibe-w5-windows-compatibility",
+  "displayName": "W5 Windows compatibility probe",
+  "publisher": "vibe-helper",
+  "version": "0.0.1",
+  "private": true,
+  "engines": { "vscode": "^1.131.0" },
+  "main": "./extension.cjs",
+  "activationEvents": ["onStartupFinished"],
+  "capabilities": { "untrustedWorkspaces": { "supported": true } }
+}

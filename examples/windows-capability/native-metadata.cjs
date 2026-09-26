@@ -157,8 +157,11 @@ exports.probe = async (vscode, workspace, helper = null) => {
     report.catalog = catalog.get(sessionId) ?? null
     report.liveEligibility = {}
     for (const [name, check] of [
-      ['cloudPull', () => require('../kiro-native-host/native-cloud-pull-attestation.cjs')
-        .waitForOwnedCloudPull(sessionId, sessionWorkspace, { notBefore: newStarted })],
+      ['cloudPull', () => helper?.cloudProofMode === 'WINDOWS_1170_DIAGNOSTIC'
+        ? require('../kiro-native-host/native-cloud-silent-attestation.cjs')
+          .waitForOwnedSilentCloudPull(sessionId, sessionWorkspace, { notBefore: newStarted })
+        : require('../kiro-native-host/native-cloud-pull-attestation.cjs')
+          .waitForOwnedCloudPull(sessionId, sessionWorkspace, { notBefore: newStarted })],
       ['memoryDisabled', () => require('../kiro-native-host/native-memory-attestation.cjs')
         .attestSessionMemoryDisabled(sessionId)],
       ['commandHooksAbsent', async () => {

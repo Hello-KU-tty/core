@@ -52,10 +52,12 @@ function createCoreConnectionManager(options) {
   let current = null
   let opening = null
   let generation = 0
+  let disposed = false
   const rotationListeners = new Set()
   const streamControllers = new Set()
 
   async function open(force = false, failed = null) {
+    if (disposed) throw codedError('CORE_CONNECTION_DISPOSED')
     if (!force && current) return current
     if (force && failed && current && current !== failed) return current
     if (opening) return opening
@@ -71,6 +73,7 @@ function createCoreConnectionManager(options) {
       if (!health || typeof health.backendInstanceId !== 'string')
         throw codedError('CORE_CONNECTION_HEALTH_INVALID')
       const previous = current
+      if (disposed) throw codedError('CORE_CONNECTION_DISPOSED')
       const next = { client, health, generation: ++generation }
       current = next
       if (previous) {
@@ -163,6 +166,11 @@ function createCoreConnectionManager(options) {
 
   return Object.freeze({
     client,
+    dispose() {
+      disposed = true
+      for (const controller of streamControllers) controller.abort()
+      streamControllers.clear(); rotationListeners.clear(); current = null
+    },
     onDidRotate(listener) {
       if (typeof listener !== 'function') throw new TypeError('CORE_ROTATION_LISTENER_INVALID')
       rotationListeners.add(listener)

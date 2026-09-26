@@ -11,6 +11,12 @@ const WINDOWS_SOURCE = Object.freeze({
   agentVersion: '1.1.28',
   agentSha256: 'af4e05df0677587e689883ccbbb19bb853517d8127c5caaec66511408e4ca5da',
 })
+const WINDOWS_1170_SOURCE = Object.freeze({
+  version: '1.1.70', vsCodeVersion: '1.131.0',
+  commit: '8ce1870416c7dc7e51fffb01765d93ef7ad55102', quality: 'stable',
+  agentVersion: '1.1.158',
+  agentSha256: 'cf6a5124f2fed75144b9d4236e0ffff85a5b22732d739807070783323c071b87',
+})
 
 const PINNED_PRODUCT = Object.freeze({
   nameShort: 'Kiro',
@@ -113,7 +119,8 @@ function attestPinnedKiroInstallation(vscode, filesystem = fs,
   }
 }
 
-function attestWindowsKiroInstallation(vscode, filesystem = fs, executable = process.execPath) {
+function attestWindowsKiroInstallation(vscode, filesystem = fs, executable = process.execPath,
+  options = {}) {
   const suppliedRoot = vscode?.env?.appRoot
   if (process.platform !== 'win32' || process.arch !== 'x64' ||
       vscode.version !== WINDOWS_SOURCE.vsCodeVersion || typeof suppliedRoot !== 'string') throw sourceError()
@@ -124,20 +131,24 @@ function attestWindowsKiroInstallation(vscode, filesystem = fs, executable = pro
       filesystem.realpathSync(expectedRoot).toLowerCase() !== root.toLowerCase()) throw sourceError()
   const product = readManifest(root, 'product.json', 128 * 1024, filesystem)
   const agent = readManifest(root, 'extensions/kiro.kiro-agent/package.json', 128 * 1024, filesystem)
+  // Both supported profiles require their exact metadata and source bytes.
+  const source = product.version === WINDOWS_1170_SOURCE.version
+    ? WINDOWS_1170_SOURCE : WINDOWS_SOURCE
   if (!exactMetadata(product, { nameShort: 'Kiro', applicationName: 'kiro',
-      version: WINDOWS_SOURCE.version, vsCodeVersion: WINDOWS_SOURCE.vsCodeVersion,
-      commit: WINDOWS_SOURCE.commit, quality: WINDOWS_SOURCE.quality }) ||
-      !exactMetadata(agent, { ...PINNED_AGENT, version: WINDOWS_SOURCE.agentVersion })) throw sourceError()
+      version: source.version, vsCodeVersion: source.vsCodeVersion,
+      commit: source.commit, quality: source.quality }) ||
+      !exactMetadata(agent, { ...PINNED_AGENT, version: source.agentVersion })) throw sourceError()
   try { filesystem.lstatSync(path.join(root, 'product.overrides.json')); throw sourceError() }
   catch (error) { if (error.code !== 'ENOENT') throw error }
   const entry = path.join(root, 'extensions/kiro.kiro-agent/dist/extension.js')
   const info = filesystem.lstatSync(entry)
   if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 ||
       info.size > 128 * 1024 * 1024 || filesystem.realpathSync(entry) !== entry ||
-      createHash('sha256').update(filesystem.readFileSync(entry)).digest('hex') !== WINDOWS_SOURCE.agentSha256)
+      createHash('sha256').update(filesystem.readFileSync(entry)).digest('hex') !== source.agentSha256)
     throw sourceError()
   return Object.freeze({ appVersion: product.version, vscodeVersion: product.vsCodeVersion,
-    commit: product.commit, agentExtensionVersion: agent.version })
+    commit: product.commit, agentExtensionVersion: agent.version,
+    cloudProofMode: source === WINDOWS_1170_SOURCE ? 'WINDOWS_1170_DIAGNOSTIC' : 'SESSION_RECEIPT' })
 }
 
 module.exports = {
@@ -147,4 +158,5 @@ module.exports = {
   attestPinnedKiroInstallation,
   attestWindowsKiroInstallation,
   WINDOWS_SOURCE,
+  WINDOWS_1170_SOURCE,
 }

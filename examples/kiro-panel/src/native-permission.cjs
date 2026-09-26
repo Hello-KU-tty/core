@@ -1,5 +1,5 @@
 const { lstat, readFile, realpath } = require('node:fs/promises')
-const { join } = require('node:path')
+const { join, win32 } = require('node:path')
 const { guardBuilderToolInput } = require('@vibe-helper/kiro-adapter/builder-tool-guard')
 
 const LOCKFILE_PREPARE_COMMAND =
@@ -49,13 +49,33 @@ function shellCwdMatches(cwd, workspace) {
   return cwd == null || cwd === workspace || cwd === '.' || cwd === './'
 }
 
-function shellInputProblem(detail, workspace) {
+async function sameWindowsShellDirectory(cwd, workspace) {
+  if (process.platform !== 'win32' || typeof cwd !== 'string' ||
+      !/^[a-zA-Z]:[\\/]/.test(cwd) || cwd.includes('\0') || cwd.slice(2).includes(':') ||
+      cwd.split(/[\\/]/).slice(1).some(part => part === '.' || part === '..' || /[. ]$/.test(part)) ||
+      win32.normalize(cwd).toLowerCase() !== win32.normalize(workspace).toLowerCase()) return false
+  try {
+    const [actual, expected, info, root] = await Promise.all([
+      realpath(cwd), realpath(workspace), lstat(cwd, { bigint: true }),
+      lstat(workspace, { bigint: true }),
+    ])
+    return info.isDirectory() && !info.isSymbolicLink() &&
+      root.isDirectory() && !root.isSymbolicLink() &&
+      actual.toLowerCase() === expected.toLowerCase() &&
+      info.ino !== 0n && info.ino === root.ino && info.dev === root.dev
+  } catch { return false }
+}
+
+function shellInputProblem(detail, workspace, diagnostic1170 = false) {
   const input = detail.rawInput
   if (!input || typeof input !== 'object' || Array.isArray(input)) return 'INPUT_INVALID'
   if (typeof input.command !== 'string' || !input.command.trim()) return 'COMMAND_INVALID'
   if (Object.keys(input).some(key => ![
     'command', 'cwd', 'ignoreWarning', 'timeout', 'warning', 'run_in_background',
+    ...(diagnostic1170 ? ['description'] : []),
   ].includes(key))) return 'UNKNOWN_FIELD'
+  if (diagnostic1170 && input.description != null &&
+      (typeof input.description !== 'string' || input.description.length > 240)) return 'DESCRIPTION_INVALID'
   if (!shellCwdMatches(input.cwd, workspace)) return 'CWD_MISMATCH'
   if (input.ignoreWarning != null && input.ignoreWarning !== false) return 'IGNORE_WARNING'
   if (Object.hasOwn(input, 'run_in_background') && input.run_in_background !== false)
@@ -70,7 +90,8 @@ function shellInputProblem(detail, workspace) {
 }
 
 /** Fail closed if the installed IDE changes a native permission request's tool shape. */
-async function chooseNativeBuilderPermission(detail, workspace, onDiagnostic, projectCommand) {
+async function chooseNativeBuilderPermission(detail, workspace, onDiagnostic, projectCommand, options = {}) {
+  const diagnostic1170 = options.windows1170Diagnostic === true
   let canonicalWorkspace = workspace
   if (detail?.toolName === 'shell') {
     const info = await lstat(workspace).catch(() => null)
@@ -78,7 +99,10 @@ async function chooseNativeBuilderPermission(detail, workspace, onDiagnostic, pr
     if (!info?.isDirectory() || info.isSymbolicLink() || !canonicalWorkspace) {
       onDiagnostic?.('WORKSPACE_NOT_CANONICAL'); return null
     }
-    const problem = shellInputProblem(detail, workspace)
+    if (diagnostic1170 && !shellCwdMatches(detail.rawInput?.cwd, workspace) &&
+        await sameWindowsShellDirectory(detail.rawInput?.cwd, workspace))
+      detail = { ...detail, rawInput: { ...detail.rawInput, cwd: workspace } }
+    const problem = shellInputProblem(detail, workspace, diagnostic1170)
     if (problem) { onDiagnostic?.(problem); return null }
     if (projectCommand) {
       const command = await projectCommand(detail.rawInput.command).catch(() => null)
@@ -93,10 +117,15 @@ async function chooseNativeBuilderPermission(detail, workspace, onDiagnostic, pr
   if (detail.toolName === 'shell') {
     if (typeof input.command !== 'string' || !input.command.trim()) return null
   } else if (typeof input.path !== 'string' || !input.path.trim()) return null
-  if (detail.toolName !== 'shell' &&
-      (input.path.startsWith('~') || input.path.includes('\\') ||
-       input.path.includes('\0') || /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(input.path)))
-    return null
+  if (detail.toolName !== 'shell') {
+    // Source-pinned 1.1.158 emits Windows absolute paths for native write/search.
+    // Core still canonicalizes the actual target and enforces workspace/.kiro boundaries.
+    const absoluteWindows = diagnostic1170 && process.platform === 'win32' &&
+      /^[a-zA-Z]:[\\/]/.test(input.path) && !input.path.slice(2).includes(':') &&
+      !input.path.split(/[\\/]/).slice(1).some(part => /[. ]$/.test(part) && part !== '.' && part !== '..')
+    if (input.path.startsWith('~') || input.path.includes('\0') ||
+        !absoluteWindows && (input.path.includes('\\') || /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(input.path))) return null
+  }
   // The permission surface is private to the pinned IDE build. If its shape
   // grows, review that new field before granting an automatic allow_once.
   const readingRange = 'start_line' in input || 'end_line' in input ||
@@ -109,7 +138,8 @@ async function chooseNativeBuilderPermission(detail, workspace, onDiagnostic, pr
     onDiagnostic?.('TOOL_ID_MISMATCH'); return null
   }
   const expectedKeys = detail.toolName === 'shell' ?
-    ['command', 'cwd', 'ignoreWarning', 'timeout', 'warning', 'run_in_background'] :
+    ['command', 'cwd', 'ignoreWarning', 'timeout', 'warning', 'run_in_background',
+      ...(diagnostic1170 ? ['description'] : [])] :
     detail.toolName === 'read' ? readingRange ?
       ['path', 'start_line', 'end_line', 'explanation'] : ['path', 'offset', 'limit'] :
       detail.toolName === 'search' ? ['path', 'explanation', 'depth'] :

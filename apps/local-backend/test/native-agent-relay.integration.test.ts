@@ -378,7 +378,10 @@ describe('native IDE Agent relay', { timeout: 60_000 }, () => {
       { kind: 'TOOL', update: envelopeUpdate },
       { kind: 'TEXT', text: 'Checking local concepts.' },
     ])
-    expect(JSON.parse(await readFile(job.bindingFile, 'utf8'))).toEqual({ status: 'REVOKED' })
+    // The in-memory grant is revoked synchronously; the descriptor is persisted asynchronously.
+    await expect
+      .poll(() => readFile(job.bindingFile, 'utf8'))
+      .toBe(JSON.stringify({ status: 'REVOKED' }))
     const selectedId = `candidate_${randomUUID()}`
     const selectedPending = relay.invoke({
       mode: 'ENRICH_SELECTED',

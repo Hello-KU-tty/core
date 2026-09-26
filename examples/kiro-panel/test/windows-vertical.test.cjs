@@ -137,6 +137,16 @@ test('unknown, active, inconsistent, or already advanced Builder attempts cannot
     assert.throws(() => prepareBuilderRetry(source, digest, receiptName), /KNOWN_FAILED_BUILDER_RETRY_REQUIRED/)
 })
 
+test('a known pre-model cloud rejection preserves the failed attempt before a new Builder run', () => {
+  const source = failedBuilderReceipt()
+  source.errorCode = source.runs.BUILDER_INITIAL.errorCode = 'NATIVE_CLOUD_CYCLE_UNVERIFIED'
+  const next = prepareBuilderRetry(source, digest, receiptName)
+  assert.equal(next.previousAttempts[0].failedRun.errorCode, source.errorCode)
+  assert.equal(next.nativeRequests, 6)
+  source.runs.BUILDER_INITIAL.outcome = 'DURABLE_RESULT'
+  assert.throws(() => prepareBuilderRetry(source, digest, receiptName), /KNOWN_FAILED_BUILDER_RETRY_REQUIRED/)
+})
+
 test('retry lineage is bounded and requires a digest and a local receipt basename', () => {
   const source = failedBuilderReceipt()
   source.retry = { attempt: 1 }
@@ -155,7 +165,7 @@ function retryClient(report, options = {}) {
     restoreProject: async () => ({
       project: { id: report.projectId },
       currentTask: { id: options.wrongTask ? 'changed-task' : report.retry.taskId },
-      learningSpec: { status: 'CONFIRMED', revision: 2 },
+      learningSpec: { status: 'CONFIRMED', revision: 3 },
       discoverySession: { input: { personalNeed: 'synthetic' } },
       decisions: options.decisions ?? [], completionReport: null,
     }),
@@ -234,7 +244,7 @@ test('a bounded build continuation preserves acknowledged Decision and Helper wo
 test('build continuation checks current task, decisions and no active run without replay', async () => {
   const report = prepareBuildContinuation(incompleteBuildReceipt(), digest, receiptName)
   const snapshot = { project: { id: report.projectId }, currentTask: { ...report.task },
-    learningSpec: { status: 'CONFIRMED', revision: 2 }, discoverySession: { input: { personalNeed: 'synthetic' } },
+    learningSpec: { status: 'CONFIRMED', revision: 3 }, discoverySession: { input: { personalNeed: 'synthetic' } },
     pendingDecisions: [], completionReport: null,
     decisions: [{ request: { id: report.steps.CHOOSE_DECISION.value }, application: {} }],
     helperConversations: [{ helperResponseSummaries: ['stored response'] }] }
@@ -250,4 +260,39 @@ test('build continuation checks current task, decisions and no active run withou
   active = false
   snapshot.currentTask.revision++
   await assert.rejects(verifyBuildContinuation(client, report, 'new-core', true))
+})
+
+test('shell environment recovery requires a fresh verified fix and keeps prior ancestry', () => {
+  const { prepareShellEnvironmentRecovery } = require('./windows-vertical.cjs')
+  const source = incompleteBuildReceipt()
+  source.productVersion = '0.3.10'
+  // Built-in Kiro Agent is not listed by vscode.extensions; native source gates verify it.
+  source.apiVersion = '1.131.0'
+  source.continuation = { attempt: 1, sourceDigest: digest,
+    verification: 'RECORDED_INCOMPLETE_TURN_AND_RESTORED_TASK' }
+  const environment = { status: 'PASS', mode: 'WINDOWS_DEFAULT_MODULES', standardModule: true,
+    policyChanged: false, executionPolicy: 'Restricted', version: '2.0.0', observedAt: new Date().toISOString() }
+  const original = JSON.stringify(source)
+  const next = prepareShellEnvironmentRecovery(source, digest, receiptName, environment)
+  assert.equal(JSON.stringify(source), original)
+  assert.deepEqual(next.environmentRecovery.previousContinuation, source.continuation)
+  assert.equal(next.nativeRequests, 10)
+  assert.equal(next.steps.BUILDER_APPLY, undefined)
+  assert.deepEqual(next.steps.RESOLVE_DECISIONS, source.steps.RESOLVE_DECISIONS)
+  for (const change of [
+    (s, e) => { e.standardModule = false },
+    (s, e) => { e.policyChanged = true },
+    (s, e) => { e.executionPolicy = 'Bypass' },
+    (s, e) => { e.observedAt = '2000-01-01T00:00:00.000Z' },
+    s => { s.environmentRecovery = { attempt: 1 } },
+    s => { s.nativeRequests = 11 },
+    s => { s.continuation.verification = 'UNKNOWN' },
+    s => { s.steps.BUILDER_APPLY.state = 'STARTED' },
+    s => { s.task.completion = true },
+    s => { s.runs.BUILDER_APPLY.status = 'RUNNING' },
+  ]) {
+    const s = JSON.parse(original), e = { ...environment }
+    change(s, e)
+    assert.throws(() => prepareShellEnvironmentRecovery(s, digest, receiptName, e))
+  }
 })

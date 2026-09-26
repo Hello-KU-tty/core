@@ -581,7 +581,9 @@ class FakeWebSocket {
     }
     if (
       message.method === 'session/prompt' &&
-      ['ownedShellOutput', 'ownedShellOutputTruncated'].includes(FakeWebSocket.responses)
+      ['ownedShellOutput', 'ownedShellOutputPadded', 'ownedShellOutputTruncated'].includes(
+        FakeWebSocket.responses,
+      )
     ) {
       queueMicrotask(() =>
         this.emit('message', {
@@ -600,7 +602,9 @@ class FakeWebSocket {
                   output:
                     FakeWebSocket.responses === 'ownedShellOutputTruncated'
                       ? 'first\n...[truncated 30000 chars]...\nlast'
-                      : 'token=fixture-secret\n10 tests passed',
+                      : (FakeWebSocket.responses === 'ownedShellOutputPadded'
+                          ? ' '.repeat(8192)
+                          : '') + 'token=fixture-secret\n10 tests passed',
                   message: 'fixture-private-duplicate-message',
                   exitCode: 0,
                 },
@@ -1566,29 +1570,32 @@ describe('private Kiro native connection gate', () => {
     ).toHaveLength(1)
   })
 
-  it('preserves only redacted known shell output and integer exit status', async () => {
-    const root = workspace()
-    FakeWebSocket.responses = 'ownedShellOutput'
-    vi.stubGlobal('WebSocket', FakeWebSocket)
-    const events = []
-    const session = await openNativeRole(fakeVscode(root), {
-      workspace: root,
-      role,
-      requireMcp: false,
-      redactText: (value) => value.replaceAll('fixture-secret', '[REDACTED]'),
-    })
-    await session.prompt('Synthetic prompt', (event) => events.push(event))
-    expect(events.find((event) => event.kind === 'tool_activity')).toMatchObject({
-      protocolKind: 'execute',
-      nativeStatus: 'completed',
-      toolName: 'shell',
-      shellExitCode: 0,
-      output: 'token=[REDACTED]\n10 tests passed',
-      rawOutputType: 'object',
-    })
-    expect(JSON.stringify(events)).not.toContain('fixture-secret')
-    expect(JSON.stringify(events)).not.toContain('fixture-private-duplicate-message')
-  })
+  it.each(['ownedShellOutput', 'ownedShellOutputPadded'])(
+    'preserves redacted shell output and exit status with %s',
+    async (response) => {
+      const root = workspace()
+      FakeWebSocket.responses = response
+      vi.stubGlobal('WebSocket', FakeWebSocket)
+      const events = []
+      const session = await openNativeRole(fakeVscode(root), {
+        workspace: root,
+        role,
+        requireMcp: false,
+        redactText: (value) => value.replaceAll('fixture-secret', '[REDACTED]'),
+      })
+      await session.prompt('Synthetic prompt', (event) => events.push(event))
+      expect(events.find((event) => event.kind === 'tool_activity')).toMatchObject({
+        protocolKind: 'execute',
+        nativeStatus: 'completed',
+        toolName: 'shell',
+        shellExitCode: 0,
+        output: 'token=[REDACTED]\n10 tests passed',
+        rawOutputType: 'object',
+      })
+      expect(JSON.stringify(events)).not.toContain('fixture-secret')
+      expect(JSON.stringify(events)).not.toContain('fixture-private-duplicate-message')
+    },
+  )
 
   it('reports Kiro and ACP output truncation without exposing offload paths', async () => {
     const root = workspace()

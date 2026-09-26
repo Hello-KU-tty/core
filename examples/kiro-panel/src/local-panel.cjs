@@ -24,8 +24,8 @@ function registerLocalPanel(context, options) {
     const ready = await options.prepare()
     if (!ready) return
     const { connectionFile: file, worker: nativeWorker } = ready
-    const connection = createCoreConnectionManager({ connectionFile: file, connect: connectLocalCore })
-    const client = connection.client
+    const connection = ready.connection ?? createCoreConnectionManager({ connectionFile: file, connect: connectLocalCore })
+    const client = ready.client ?? connection.client
     await client.health()
     const panel = vscode.window.createWebviewPanel('vibeHelper.local', 'Vibe Helper · Local', vscode.ViewColumn.Beside,
       { enableScripts: true, retainContextWhenHidden: false, localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, 'media')] })

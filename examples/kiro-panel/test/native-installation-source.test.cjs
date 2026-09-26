@@ -4,7 +4,8 @@ const { tmpdir } = require('node:os')
 const { join } = require('node:path')
 const { test } = require('node:test')
 
-const { PINNED_AGENT, PINNED_PRODUCT, attestPinnedKiroInstallation } =
+const { PINNED_AGENT, PINNED_PRODUCT, WINDOWS_1170_SOURCE, attestPinnedKiroInstallation,
+  attestWindowsKiroInstallation } =
   require('../../kiro-native-host/native-installation-source.cjs')
 
 function stageKiroInstallation(overrides = {}) {
@@ -75,3 +76,38 @@ test('a symlinked app or Agent source cannot escape the running app root', () =>
   assert.throws(() => attestPinnedKiroInstallation(vscode(parent), undefined, parent), error =>
     error.code === 'NATIVE_KIRO_INSTALLATION_SOURCE_UNVERIFIED')
 })
+
+test('Windows 1.1.70 requires exact metadata and pinned source bytes in ordinary and diagnostic mode',
+  { skip: process.platform !== 'win32' || process.arch !== 'x64' }, () => {
+    const fs = require('node:fs')
+    const parent = realpathSync(mkdtempSync(join(tmpdir(), 'vibe-windows-source-')))
+    const root = join(parent, 'resources', 'app')
+    const agent = join(root, 'extensions', 'kiro.kiro-agent')
+    mkdirSync(join(agent, 'dist'), { recursive: true })
+    const product = { nameShort: 'Kiro', applicationName: 'kiro',
+      version: WINDOWS_1170_SOURCE.version, vsCodeVersion: WINDOWS_1170_SOURCE.vsCodeVersion,
+      commit: WINDOWS_1170_SOURCE.commit, quality: 'stable' }
+    writeFileSync(join(root, 'product.json'), JSON.stringify(product))
+    writeFileSync(join(agent, 'package.json'), JSON.stringify({
+      ...PINNED_AGENT, version: WINDOWS_1170_SOURCE.agentVersion,
+    }))
+    const entry = join(agent, 'dist', 'extension.js')
+    writeFileSync(entry, '// synthetic untrusted Agent bytes')
+    let entryReads = 0
+    const filesystem = { ...fs, readFileSync(file, ...args) {
+      if (file === entry) entryReads++
+      return fs.readFileSync(file, ...args)
+    } }
+    const host = { version: '1.131.0', env: { appRoot: root } }
+    const executable = join(parent, 'Kiro.exe')
+    assert.throws(() => attestWindowsKiroInstallation(host, filesystem, executable),
+      /NATIVE_KIRO_INSTALLATION_SOURCE_UNVERIFIED/)
+    assert.equal(entryReads, 1)
+    assert.throws(() => attestWindowsKiroInstallation(host, filesystem, executable,
+      { diagnostic1170: true }), /NATIVE_KIRO_INSTALLATION_SOURCE_UNVERIFIED/)
+    assert.equal(entryReads, 2)
+    writeFileSync(join(root, 'product.json'), JSON.stringify({ ...product, commit: 'unknown' }))
+    assert.throws(() => attestWindowsKiroInstallation(host, filesystem, executable,
+      { diagnostic1170: true }), /NATIVE_KIRO_INSTALLATION_SOURCE_UNVERIFIED/)
+    assert.equal(entryReads, 2)
+  })

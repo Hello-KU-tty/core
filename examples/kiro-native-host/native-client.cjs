@@ -13,6 +13,8 @@ const { attestPinnedKiroInstallation, attestWindowsKiroInstallation } = require(
 const { privateNativeDirectory } = require('./native-private-directory.cjs')
 const { assertCloudConfigAbsent, waitForOwnedCloudPull } =
   require('./native-cloud-pull-attestation.cjs')
+const { waitForOwnedSilentCloudPull } = require('./native-cloud-silent-attestation.cjs')
+const { withScopedCloudDebug } = require('./native-cloud-debug-scope.cjs')
 
 const EXPECTED = Object.freeze({ vscode: '1.109.5', kiroExtensions: ['1.0.653', '1.0.794'] })
 const D_WORKSPACE_NAME = 'project_efc36445-7551-495f-bf4e-c66b82c871a8'
@@ -199,12 +201,16 @@ async function diagnose(vscode, expectedWorkspace, options = {}) {
       relative(realpathSync(folder), realpathSync(expectedWorkspace)) !== '')
     throw new NativeGateError('NATIVE_WORKSPACE_NOT_BOUND')
   let extensionVersion
+  let cloudProofMode = 'SESSION_RECEIPT'
   if (options.productSource === true) {
     try {
-      extensionVersion = (options.windowsProduct === true
-        ? attestWindowsKiroInstallation(vscode)
+      const installation = (options.windowsProduct === true
+        ? attestWindowsKiroInstallation(vscode, undefined, undefined,
+          { diagnostic1170: options.windows1170Diagnostic === true })
         : attestPinnedKiroInstallation(vscode, options.filesystem,
-          options.pinnedAppRoot)).agentExtensionVersion
+          options.pinnedAppRoot))
+      extensionVersion = installation.agentExtensionVersion
+      cloudProofMode = installation.cloudProofMode ?? cloudProofMode
     }
     catch { throw new NativeGateError('NATIVE_KIRO_VERSION_UNVERIFIED') }
   } else {
@@ -218,7 +224,8 @@ async function diagnose(vscode, expectedWorkspace, options = {}) {
       throw new NativeGateError('NATIVE_KIRO_VERSION_UNVERIFIED')
     await kiro.activate()
   }
-  if (!(options.windowsProduct === true && vscode.version === '1.131.0' && extensionVersion === '1.1.28') &&
+  if (!(options.windowsProduct === true && vscode.version === '1.131.0' &&
+      (extensionVersion === '1.1.28' || cloudProofMode === 'WINDOWS_1170_DIAGNOSTIC')) &&
       (vscode.version !== EXPECTED.vscode || !EXPECTED.kiroExtensions.includes(extensionVersion)))
     throw new NativeGateError('NATIVE_KIRO_VERSION_UNVERIFIED')
   // The old list command was removed in 1.0.794. That build proves the role
@@ -235,6 +242,7 @@ async function diagnose(vscode, expectedWorkspace, options = {}) {
   return {
     trusted: vscode.workspace.isTrusted,
     extensionVersion,
+    cloudProofMode,
     agentIds,
     mcpSetting,
     canEnableMcp: canEnableMcp === true,
@@ -1328,9 +1336,11 @@ async function openNativeRole(vscode, options) {
   const builderDeadline = options.productBuilder === true ?
     builderLeaseDeadline(options.builderLeaseDeadlineAt) : null
   const diagnostic = await diagnose(vscode, workspace,
-    { productSource: options.productMode === true, windowsProduct: options.windowsProduct === true })
+    { productSource: options.productMode === true, windowsProduct: options.windowsProduct === true,
+      windows1170Diagnostic: options.windows1170Diagnostic === true })
   if (options.windowsProduct && !options.productMode) throw new NativeGateError('NATIVE_PRODUCT_MODE_REQUIRED')
-  if (options.productMode && diagnostic.extensionVersion !== (options.windowsProduct ? '1.1.28' : '1.0.794'))
+  if (options.productMode && diagnostic.extensionVersion !== (options.windowsProduct
+    ? diagnostic.cloudProofMode === 'WINDOWS_1170_DIAGNOSTIC' ? '1.1.158' : '1.1.28' : '1.0.794'))
     throw new NativeGateError('NATIVE_PERMISSION_ROUTE_VERSION_UNVERIFIED')
   if (!diagnostic.trusted) throw new NativeGateError('NATIVE_WORKSPACE_UNTRUSTED')
   if (diagnostic.agentIds && !diagnostic.agentIds.includes(role))
@@ -1366,24 +1376,33 @@ async function openNativeRole(vscode, options) {
   let sessionId
   let modelId = null
   try {
-    const newStarted = Date.now()
+    let newStarted
     let metadata
     if (options.windowsProduct) {
       assertNoProtectedCommandHooks(workspace)
       const { name, ...config } = JSON.parse(readFileSync(join(workspace, '.kiro/agents', `${role}.json`), 'utf8'))
       metadata = { modeId: role, customAgents: [{ id: name, ...config }] }
     }
-    const session = await client.newSession(realpathSync(workspace), metadata)
-    if (typeof session?.sessionId !== 'string' || session.sessionId.length < 8)
-      throw new NativeGateError('NATIVE_SESSION_ID_INVALID')
-    sessionId = session.sessionId
-    if (options.productMode === true) {
-      try { await waitForOwnedCloudPull(sessionId, realpathSync(workspace),
-        { notBefore: newStarted }) }
-      catch (error) {
-        throw new NativeGateError(error?.message || 'NATIVE_CLOUD_UNCONFIRMED')
+    const createAndAttest = async () => {
+      if (options.productMode === true) await assertCloudConfigAbsent()
+      newStarted = Date.now()
+      const created = await client.newSession(realpathSync(workspace), metadata)
+      if (typeof created?.sessionId !== 'string' || created.sessionId.length < 8)
+        throw new NativeGateError('NATIVE_SESSION_ID_INVALID')
+      sessionId = created.sessionId
+      if (options.productMode === true) {
+        const attestCloud = diagnostic.cloudProofMode === 'WINDOWS_1170_DIAGNOSTIC'
+          ? waitForOwnedSilentCloudPull : waitForOwnedCloudPull
+        try { await attestCloud(sessionId, realpathSync(workspace),
+          { notBefore: newStarted }) }
+        catch (error) {
+          throw new NativeGateError(error?.message || 'NATIVE_CLOUD_UNCONFIRMED')
+        }
       }
+      return created
     }
+    const session = options.productMode === true && diagnostic.cloudProofMode === 'WINDOWS_1170_DIAGNOSTIC'
+      ? await withScopedCloudDebug(createAndAttest) : await createAndAttest()
     modelId = session.configOptions?.find((option) => option?.id === 'model')?.currentValue ?? null
     const modes = session.configOptions?.find((option) => option?.id === 'mode')?.options ?? []
     if (!Array.isArray(modes) || !modes.some((mode) => mode?.value === role))
@@ -1477,6 +1496,10 @@ async function openNativeRole(vscode, options) {
       }
       signal?.addEventListener('abort', abort, { once: true })
       try {
+        if (options.windowsProduct) {
+          await assertCloudConfigAbsent()
+          assertNoProtectedCommandHooks(workspace)
+        }
         if (builderSoftTimeoutMs !== null)
           budgetTimer = setTimeout(() => abort('BUILDER_BUDGET'), builderSoftTimeoutMs)
         const turn = client.prompt(sessionId, text, (update) => {
@@ -1559,8 +1582,11 @@ async function openNativeRole(vscode, options) {
               update?.status === 'failed' && !coreAction &&
               Object.hasOwn(rawInput, 'inputJson') ?
               bridgeEnvelopeErrorCode(outputObject) : null
-            const redactedOutput = visibleOutput && options.redactText ?
-              options.redactText(visibleOutput.slice(0, 4096), workspace) : null
+            // Kiro terminal redraw can prepend kilobytes of blank padding.
+            // Remove only that padding before the bounded redaction preview.
+            const outputPreview = visibleOutput?.trimStart() ?? null
+            const redactedOutput = outputPreview && options.redactText ?
+              options.redactText(outputPreview.slice(0, 4096), workspace) : null
             safeEvent({ kind: 'tool_activity', updateKeys: Object.keys(update ?? {}),
               rawInputKeys: Object.keys(rawInput), locationsCount: locations.length,
               protocolKind: ['read', 'edit', 'execute', 'search', 'think', 'fetch', 'other']
@@ -1626,7 +1652,7 @@ async function openNativeRole(vscode, options) {
               kiroOutputTransformation,
               acpTruncationMarkerPresent,
               output: redactedOutput?.slice(0, 2048) ?? null,
-              outputTruncated: visibleOutput !== null && visibleOutput.length > 2048,
+              outputTruncated: outputPreview !== null && outputPreview.length > 2048,
               rawOutputType: rawOutput !== null ? 'string' : update?.rawOutput == null ?
                 'none' : typeof update.rawOutput,
               validationFieldMentions, validationIssueKinds,

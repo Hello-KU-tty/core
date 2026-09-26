@@ -23,6 +23,7 @@
     "panel:pack": "pnpm panel:build && node scripts/package-kiro-panel.mjs",
     "core:portable": "pnpm typecheck && node scripts/build-portable-core.mjs win32-x64",
     "panel:pack:windows": "pnpm core:portable && node scripts/package-windows-core.mjs",
+    "frontend:handoff": "pnpm panel:pack:windows && pnpm client:build && node scripts/build-frontend-handoff.mjs",
     "test:portable": "pnpm core:portable && node scripts/test-portable-core.mjs",
     "test:managed": "pnpm core:portable && node scripts/test-managed-core.mjs",
     "test:managed-host": "pnpm panel:pack:windows && node scripts/test-managed-host.mjs",

@@ -27,11 +27,12 @@ const manifest = {
   name: 'vibe-helper-portable-core',
   displayName: 'Vibe Helper',
   description: 'Local Discovery, Builder, Helper and History with managed Windows Core runtime.',
-  version: '0.3.7',
+  version: '0.3.16',
   publisher: 'vibe-helper',
   private: true,
   engines: { vscode: '^1.131.0' },
   main: './dist/extension.cjs',
+  extensionDependencies: ['kiro.kiroAgent'],
   activationEvents: ['onStartupFinished', 'onCommand:vibeHelper.localPanel'],
   capabilities: {
     untrustedWorkspaces: {

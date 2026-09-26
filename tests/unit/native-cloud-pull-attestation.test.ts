@@ -1,4 +1,5 @@
-import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { realpath } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -91,7 +92,8 @@ it('rejects model turns, other actions, unsafe cloud results, and mismatched com
 })
 
 it('binds the terminal action to the exact owned session directory and absent cloud cache', async () => {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'vibe-cloud-attest-')))
+  // Match the async production canonicalizer, including Windows 8.3 aliases.
+  const root = await realpath(mkdtempSync(join(tmpdir(), 'vibe-cloud-attest-')))
   const workspace = join(root, 'workspace')
   const sessionsRoot = join(root, 'sessions')
   const sessionId = 'sess_00000000-0000-4000-8000-000000000001'

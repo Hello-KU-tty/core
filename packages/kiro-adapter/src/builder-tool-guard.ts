@@ -144,6 +144,9 @@ export async function guardBuilderToolInput(
   for (const path of paths) {
     if (protectedPath(path)) return { allowed: false, reasonCode: 'GUARD_PROTECTED_PATH' }
     const target = await canonicalizeExistingOrNearest(resolve(expected, path))
+    if (protectedPath(relative(expected, target))) {
+      return { allowed: false, reasonCode: 'GUARD_PROTECTED_PATH' }
+    }
     if (!isWithin(expected, target)) {
       return { allowed: false, reasonCode: 'GUARD_PATH_ESCAPE' }
     }

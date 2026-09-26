@@ -1,7 +1,7 @@
 import { linkSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { lstat, readFile, realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, win32 } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { guardBuilderToolInput } from '../../packages/kiro-adapter/src/builder-tool-guard.js'
 
@@ -22,12 +22,13 @@ const nativeModule = {
       workspace: string,
       onDiagnostic?: (reason: string) => void,
       projectCommand?: (command: string) => Promise<string | null>,
+      options?: { windows1170Diagnostic: boolean },
     ) => Promise<string | null>
   },
 }
 new Function('require', 'module', source)((name: string) => {
   if (name === 'node:fs/promises') return { lstat, readFile, realpath }
-  if (name === 'node:path') return { join }
+  if (name === 'node:path') return { join, win32 }
   if (name !== '@vibe-helper/kiro-adapter/builder-tool-guard') throw new Error('UNEXPECTED_REQUIRE')
   return { guardBuilderToolInput }
 }, nativeModule)
@@ -42,6 +43,131 @@ function workspace(): string {
 }
 
 describe('native Builder permission gate', () => {
+  it.skipIf(process.platform !== 'win32')(
+    'accepts Windows cwd spelling differences only for the same real directory and guarded command',
+    async () => {
+      const root = await realpath(workspace())
+      const outside = await realpath(workspace())
+      const alias = join(outside, 'alias')
+      symlinkSync(root, alias, 'junction')
+      const changedCase =
+        root[0] === root[0]?.toUpperCase()
+          ? root[0]?.toLowerCase() + root.slice(1)
+          : root[0]?.toUpperCase() + root.slice(1)
+      const request = (cwd: string, command = 'pnpm run build') => ({
+        toolName: 'shell',
+        rawInput: { command, cwd, run_in_background: false },
+        options: option,
+      })
+      for (const cwd of [changedCase, root.replaceAll('\\', '/')]) {
+        expect(
+          await chooseNativeBuilderPermission(request(cwd), root, undefined, undefined, {
+            windows1170Diagnostic: true,
+          }),
+        ).toBe('allow-1')
+        expect(
+          await chooseNativeBuilderPermission(request(cwd, 'whoami'), root, undefined, undefined, {
+            windows1170Diagnostic: true,
+          }),
+        ).toBeNull()
+      }
+      expect(await chooseNativeBuilderPermission(request(changedCase), root)).toBeNull()
+      for (const cwd of [
+        outside,
+        alias,
+        `${root}\\src\\..`,
+        `${root}.`,
+        `${root}:stream`,
+        `\\\\?\\${root}`,
+        '..',
+        '.\\',
+      ])
+        expect(
+          await chooseNativeBuilderPermission(request(cwd), root, undefined, undefined, {
+            windows1170Diagnostic: true,
+          }),
+        ).toBeNull()
+    },
+  )
+  it.skipIf(process.platform !== 'win32')(
+    'accepts source-pinned Windows absolute targets only within the unprotected workspace',
+    async () => {
+      const root = await realpath(workspace())
+      const outside = await realpath(workspace())
+      symlinkSync(join(root, '.kiro'), join(root, 'protected-alias'), 'junction')
+      symlinkSync(outside, join(root, 'outside-alias'), 'junction')
+      const allow = (path: string, diagnostic = true) =>
+        chooseNativeBuilderPermission(
+          {
+            toolName: 'write',
+            nativeToolId: 'fs_write',
+            rawInput: { path, text: 'synthetic' },
+            options: option,
+          },
+          root,
+          undefined,
+          undefined,
+          { windows1170Diagnostic: diagnostic },
+        )
+      expect(await allow(join(root, 'src', 'new.ts'))).toBe('allow-1')
+      expect(await allow(join(root, 'src', 'new.ts').replaceAll('\\', '/'))).toBe('allow-1')
+      expect(await allow(join(root, 'src', 'new.ts'), false)).toBeNull()
+      for (const path of [
+        join(outside, 'new.ts'),
+        join(root, '.kiro', 'agent.json'),
+        join(root, 'protected-alias', 'agent.json'),
+        join(root, 'outside-alias', 'new.ts'),
+        join(root, '.kiro.', 'agent.json'),
+        join(root, 'src', 'file.ts:stream'),
+        'C:relative.ts',
+        'file:///C:/temp/test.ts',
+        '\\\\server\\share\\test.ts',
+      ]) {
+        expect(await allow(path)).toBeNull()
+      }
+    },
+  )
+
+  it('accepts only the bounded display description in the 1.1.158 shell profile', async () => {
+    const root = workspace()
+    const request = (description: unknown) => ({
+      toolName: 'shell',
+      rawInput: { command: 'pnpm run build', description, run_in_background: false },
+      options: option,
+    })
+    const profile = { windows1170Diagnostic: true }
+    expect(await chooseNativeBuilderPermission(request('Build the local app'), root)).toBeNull()
+    expect(
+      await chooseNativeBuilderPermission(
+        request('Build the local app'),
+        root,
+        undefined,
+        undefined,
+        profile,
+      ),
+    ).toBe('allow-1')
+    for (const description of [42, {}, 'x'.repeat(241)])
+      expect(
+        await chooseNativeBuilderPermission(
+          request(description),
+          root,
+          undefined,
+          undefined,
+          profile,
+        ),
+      ).toBeNull()
+    const unsafe = request('Build the local app')
+    unsafe.rawInput.command = 'pnpm run build; whoami'
+    expect(
+      await chooseNativeBuilderPermission(unsafe, root, undefined, undefined, profile),
+    ).toBeNull()
+    unsafe.rawInput.command = 'pnpm run build'
+    unsafe.rawInput.run_in_background = true
+    expect(
+      await chooseNativeBuilderPermission(unsafe, root, undefined, undefined, profile),
+    ).toBeNull()
+  })
+
   it('refreshes a Windows lock with finite approved config while legacy and unsafe config remain denied', async () => {
     const root = workspace()
     writeFileSync(join(root, 'package.json'), '{}')

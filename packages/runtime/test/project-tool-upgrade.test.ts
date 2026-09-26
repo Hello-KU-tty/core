@@ -1,12 +1,14 @@
-import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises'
+import { execFile } from 'node:child_process'
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { promisify } from 'node:util'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CoreResources } from '../src/portable-core.js'
 import {
+  type ProjectToolchain,
   prepareProjectTools,
   verifyProjectTools,
-  type ProjectToolchain,
 } from '../src/project-toolchain.js'
 
 // ACL behavior has separate real-Windows integration tests. These tests exercise
@@ -25,12 +27,12 @@ const resources = (version: string) =>
   }) as CoreResources
 beforeEach(async () => {
   root = await realpath(await mkdtemp(join(tmpdir(), 'vibe-tool-upgrade-')))
-  workspace = join(root, 'generated project')
+  workspace = join(root, '한글 generated project')
   await mkdir(workspace)
-  await mkdir(join(root, 'private-tools'))
+  await mkdir(join(root, '한글 private-tools'))
   tools = {
     schemaVersion: 1,
-    privateRoot: join(root, 'private-tools'),
+    privateRoot: join(root, '한글 private-tools'),
     node: {
       schemaVersion: 1,
       source: 'MANAGED_NODE',
@@ -55,6 +57,78 @@ afterEach(async () => {
 })
 
 describe('Core-owned project launcher installation upgrade', () => {
+  it('migrates only the exact legacy launcher during a verified product upgrade', async () => {
+    await prepareProjectTools(workspace, tools, resources('0.3.10'))
+    const { descriptorFile } = await verifyProjectTools(workspace, resources('0.3.10'))
+    const legacy = [
+      '@echo off',
+      'setlocal',
+      'set "NODE_OPTIONS="',
+      'set "NODE_PATH="',
+      'set "NODE_REPL_EXTERNAL_MODULE="',
+      'set "ELECTRON_RUN_AS_NODE="',
+      'set "ELECTRON_EXTRA_LAUNCH_ARGS="',
+      `"${tools.node.executable}" "${join(resources('0.3.10').root, 'bin/project-tools.mjs')}" "${descriptorFile}" %*`,
+      'exit /b %errorlevel%',
+      '',
+    ].join('\r\n')
+    const launcher = join(workspace, '.kiro/vibe-tools.cmd')
+    await writeFile(launcher, legacy + 'echo altered\r\n')
+    await expect(prepareProjectTools(workspace, tools, resources('0.3.11'))).rejects.toThrow(
+      'PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED',
+    )
+    await writeFile(launcher, legacy)
+    await expect(prepareProjectTools(workspace, tools, resources('0.3.10'))).rejects.toThrow(
+      'PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED',
+    )
+    await prepareProjectTools(workspace, tools, resources('0.3.11'))
+    expect((await verifyProjectTools(workspace, resources('0.3.11'))).toolchain).toEqual(tools)
+  })
+
+  it.skipIf(process.platform !== 'win32')(
+    'executes Unicode paths from CP949 and restores codepage and failed exit status',
+    async () => {
+      tools = { ...tools, node: { ...tools.node, executable: await realpath(process.execPath) } }
+      const installed = resources('0.3.11')
+      await mkdir(join(installed.root, 'bin'), { recursive: true })
+      await writeFile(
+        join(installed.root, 'bin/project-tools.mjs'),
+        "import {readFileSync} from 'node:fs'; JSON.parse(readFileSync(process.argv[2], 'utf8')); console.log('UNICODE_LAUNCHER_PASS'); process.exit(7)",
+      )
+      await prepareProjectTools(workspace, tools, installed)
+      const harness = join(root, 'check.cmd')
+      await writeFile(
+        harness,
+        [
+          '@echo off',
+          'chcp 949 >nul',
+          'call "%VIBE_TEST_LAUNCHER%" pnpm run build',
+          'set "VIBE_TEST_EXIT=%errorlevel%"',
+          'chcp',
+          'exit /b %VIBE_TEST_EXIT%',
+          '',
+        ].join('\r\n'),
+      )
+      const result = await promisify(execFile)(
+        join(process.env.SystemRoot ?? 'C:\\Windows', 'System32/cmd.exe'),
+        ['/d', '/s', '/c', `""${harness}""`],
+        {
+          windowsHide: true,
+          windowsVerbatimArguments: true,
+          env: { ...process.env, VIBE_TEST_LAUNCHER: join(workspace, '.kiro/vibe-tools.cmd') },
+          timeout: 10000,
+          encoding: 'utf8',
+        },
+      ).then(
+        (value) => ({ ...value, code: 0 }),
+        (error) => ({ stdout: String(error.stdout), code: error.code }),
+      )
+      expect(result.code).toBe(7)
+      expect(result.stdout).toContain('UNICODE_LAUNCHER_PASS')
+      expect(result.stdout.trim()).toMatch(/949$/)
+    },
+  )
+
   it('updates only package paths while preserving generated source and tools', async () => {
     await writeFile(join(workspace, 'user.ts'), 'user-owned source')
     await prepareProjectTools(workspace, tools, resources('0.3.2'))

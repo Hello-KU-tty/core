@@ -1,6 +1,6 @@
 # IDE-only frontend 구현 가이드
 
-> 2026-09-26 현재 Windows 연결 작업은 [프론트 인계 계획·요청서 답변](FRONTEND_HANDOFF_PLAN_20260926.md)에서 시작한다. [W5 일반 설치 검증](spikes/T19_W5_KIRO_1170_GENERAL_MODE_RESULTS_20260925.md)은 완료됐으며, 외부 frontend용 host 모듈 분리와 실제 연결은 다음 작업이다. 아래 2026-09-16/23의 macOS 전용·Windows 미지원 설명은 당시 기록으로 보존하며 현재 Windows 지원 판정으로 사용하지 않는다.
+> 2026-09-26 현재 시작점은 [Windows 프론트 연결 가이드](FRONTEND_WINDOWS_QUICKSTART.md)다. UI 독립 host·실행 자산·`program` 적용 패치를 제공하며 현재 PC에서 실제 프론트 native 흐름을 검증했다. [결과와 범위](FRONTEND_HANDOFF_RESULTS_20260926.md). 아래 macOS 전용·Windows 미지원 설명은 당시 기록이다.
 
 최종 판정일: 2026-09-16 KST. 이 문서는 새 frontend 작업의 기술 front door다. 시간순 실측과 예외는 [historical handoff](FRONTEND_IDE_HANDOFF_20260915.md), 최종 판단은 [cutover verdict](spikes/T19_NATIVE_IDE_CUTOVER_VERDICT_20260916.md)를 따른다.
 
