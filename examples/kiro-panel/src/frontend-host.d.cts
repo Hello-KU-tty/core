@@ -27,6 +27,30 @@ export interface NativeQuestion {
 export type NativeAnswer = Pick<NativeQuestion, 'projectId' | 'nativeJobId' | 'requestId'> & (
   { action: 'dismissed' } | { action: 'answered'; answer: string } |
   { action: 'answered'; optionIndex: number; subOptionIndices: number[] })
+/**
+ * Diagnostic status code of the native worker, e.g. `WORKER_CONNECTED`,
+ * `AGENT_RUNNING_BUILDER`, `WORKSPACE_SWITCHING`. Classify it with the SDK's
+ * `classifyNativeWorkerStatus()`; never branch product state on raw suffixes.
+ * An empty string means the worker has not reported yet.
+ */
+export type NativeWorkerStatusCode = string
+export interface NativeWorker {
+  /** Latest diagnostic code or `undefined` before the worker is attached. */
+  getStatus(): NativeWorkerStatusCode | undefined
+  /** Pending questions that a native Agent asked in this Project. Poll-free; re-read on notify. */
+  listUserInputs(projectId: string): NativeQuestion[]
+  subscribeStatus(listener: (status: NativeWorkerStatusCode) => void): () => void
+  /** Notification only; call `listUserInputs(projectId)` again. */
+  subscribeUserInputs(listener: () => void): () => void
+  /**
+   * Submit exactly what the user chose. Rejects with `NATIVE_USER_INPUT_STALE` when the
+   * native job is no longer claimed, `NATIVE_USER_INPUT_RESPONSE_INVALID` for malformed
+   * values (including free text that would need redaction) and `NATIVE_NOT_READY` before a
+   * worker exists. Same answer repeated: `ALREADY_SUBMITTED` while Kiro is consuming it,
+   * `ALREADY_HANDLED` after Kiro acknowledged it. Never auto-answer.
+   */
+  submitUserInput(value: NativeAnswer): Promise<'SUBMITTED' | 'ALREADY_SUBMITTED' | 'ALREADY_HANDLED'>
+}
 export interface FrontendHost {
   client: CoreClient
   prepare(): Promise<{ client: CoreClient }>
@@ -35,13 +59,7 @@ export interface FrontendHost {
   getStatus(): HostStatus
   subscribeStatus(listener: (status: HostStatus) => void): () => void
   onDidRotate(listener: (event: { generation: number; backendInstanceId: string; previousBackendInstanceId: string }) => void): () => void
-  worker: {
-    getStatus(): unknown
-    listUserInputs(projectId: string): NativeQuestion[]
-    subscribeStatus(listener: (status: unknown) => void): () => void
-    subscribeUserInputs(listener: () => void): () => void
-    submitUserInput(value: NativeAnswer): Promise<'SUBMITTED' | 'ALREADY_SUBMITTED'>
-  }
+  worker: NativeWorker
   dispose(): Promise<void>
 }
 export function createFrontendHost(context: {

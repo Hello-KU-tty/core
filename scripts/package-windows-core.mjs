@@ -27,7 +27,7 @@ const manifest = {
   name: 'vibe-helper-portable-core',
   displayName: 'Vibe Helper',
   description: 'Local Discovery, Builder, Helper and History with managed Windows Core runtime.',
-  version: '0.3.16',
+  version: '0.3.17',
   publisher: 'vibe-helper',
   private: true,
   engines: { vscode: '^1.131.0' },

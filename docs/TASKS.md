@@ -770,6 +770,8 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 
 ### [~] T19. 자체 Kiro IDE 패널과 프론트 실제 연동
 
+**2026-09-27 프론트 후속 요청 반영:** 프론트의 적용 결과·요청서(`program` `main` `048bce3`)를 검토했다. 이전 기준 `73d0eb5`는 프론트 main의 merge commit이며 clean checkout gate는 READY였다. main clean clone은 typecheck·228 tests·build를 통과하지만 `portable/node_modules/` 28개 미추적과 CRLF 때문에 VSIX 조립이 실패함을 확인했다. Final Upgrade가 기록된 Helper 답변의 trace만 허용하도록 Core를 고치고, Builder/Helper/Decision/Evidence/Final Upgrade/worker 상태의 SDK helper와 host 타입을 추가했다. UI를 patch하지 않는 update kit `frontend-handoff-20260927`(추적 규칙 포함)을 만들고 새 clone 검증·VSIX 조립·consumer·HTTP 계약 test·`pnpm check`·CJS 110을 통과했다. [답변·계약](FRONTEND_HANDOFF_20260927.md), [검증 기록](spikes/T19_FRONTEND_HANDOFF_UPDATE_20260927.json). 이번 변경 뒤 모델 native 재실측과 다른 기기 검증은 하지 않았으며 Builder/Helper 제품 화면 연결과 T19/T19-N 전체 완료는 별도다.
+
 **2026-09-26 구현 착수:** 사용자 지시로 계획 이후 실제 인계 kit 구현에 착수한다. UI 독립 host·SDK·portable 자산과 검토된 `program` 적용 패치를 제공하고 현재 Windows 환경에서 소비·Core·확장 회귀를 검증한다. 다른 기기·외부 환경 검증은 이번 인계 범위에서 제외하며 전체 T19의 의미 품질 완료로 대체하지 않는다.
 
 **2026-09-26 현재 PC 연결 구현:** UI 독립 host와 program 11개 파일 패치를 구현했다. 실제 frontend TS/CJS build·228 tests, 실제 Core 소비 검사, 설치된 frontend VSIX의 native 4회(후보 10개→JIT/선택→Spec 1/수정 2→확정/Task READY→History 무재실행), host CJS 110개와 backend 회귀/Edge E2E 12개를 통과했다. [적용 가이드](FRONTEND_WINDOWS_QUICKSTART.md), [인계 결과](FRONTEND_HANDOFF_RESULTS_20260926.md). 사용자 요청에 따라 같은 Windows branch에 소스와 적용 ZIP·receipt를 전달하며 경로는 `releases/frontend-handoff/20260926/`다. 성능·Analyst 품질은 병행 backlog이며 Builder/Helper 등 후속 화면 연결과 T19/T19-N 전체 완료는 별도다.

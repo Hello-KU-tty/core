@@ -549,6 +549,7 @@ export class ApplicationService {
     return helperConversationSummarySchema.parse({
       conversationId: aggregate.episode.conversationId,
       episodeId: aggregate.episode.id,
+      correlationId: aggregate.episode.correlationId,
       taskId: aggregate.episode.taskId,
       ...(aggregate.episode.decisionId === undefined
         ? {}
@@ -1854,6 +1855,23 @@ export class ApplicationService {
           )
           if (personalization === null) {
             throw this.#notFound(request.correlationId, 'PERSONALIZATION_TRACE_NOT_FOUND')
+          }
+          // The trace is written when Helper reads its context, before it answers. A cancelled
+          // or failed turn therefore leaves a trace without any delivered Helper response.
+          if (
+            personalization.projectId !== request.projectId ||
+            personalization.target.kind !== 'HELPER_TURN' ||
+            !repository.hasHelperResponseForCorrelation(
+              request.projectId,
+              personalization.target.taskId,
+              personalization.correlationId,
+            )
+          ) {
+            throw this.#validationError(
+              request.correlationId,
+              'FINAL_UPGRADE_HELPER_TURN_NOT_RECORDED',
+              'Final Upgrade requires a trace from a Helper turn whose answer was recorded.',
+            )
           }
           const hasSucceededAnalysis = repository
             .readAnalysisJobsForProject(request.projectId, 'SUCCEEDED', 100)

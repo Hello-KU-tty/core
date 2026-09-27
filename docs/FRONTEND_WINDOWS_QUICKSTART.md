@@ -1,5 +1,7 @@
 # Windows 프론트 연결 시작
 
+> 2026-09-27: 이미 이 kit을 적용한 `program`(`main` `048bce3` 이후)은 [update kit 안내와 Builder/Helper 연결 계약](FRONTEND_HANDOFF_20260927.md)을 따른다. 아래는 최초 적용용 20260926 기록이다.
+
 2026-09-26. `Hello-KU-tty/program`의 `73d0eb58e374357d6f28ea8db13e9b659cec5e5a`에 적용할 실행 kit다. 이 PC에서 **실제 프론트 VSIX 설치 → Core 자동 기동 → Kiro Agent → Discovery·Spec·Task·History**를 검증했다. 다른 기기 검증은 사용자 지시에 따라 제외했다. 기존 계획서와 macOS/수동 connection 안내보다 이 문서를 먼저 따른다.
 
 ## 1. 받는 파일과 적용

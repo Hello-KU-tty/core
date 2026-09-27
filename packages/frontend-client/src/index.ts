@@ -20,6 +20,7 @@ import {
 
 export * from '@vibe-helper/contracts'
 export * from './program-adapter.js'
+export * from './workflow-view.js'
 export function entityId(prefix: string): string {
   return `${prefix}_${randomUUID()}`
 }

@@ -5,15 +5,19 @@ import { promisify } from 'node:util'
 import { archive, inventory, sha256 } from '../examples/frontend-handoff/archive.mjs'
 import { loadCoreResources } from '../packages/runtime/dist/portable-core.js'
 
+// Update kit for a program checkout that already consumed the 20260926 kit. It replaces only
+// kit-managed directories; frontend UI sources are wired by the frontend developer.
+const KIT = 'frontend-handoff-20260927'
+const REFERENCE_VSIX = 'vibe-helper-portable-core-0.3.17-win32-x64.vsix'
 const root = resolve('.')
 const output = join(root, 'dist')
 await mkdir(output, { recursive: true })
 if ((await realpath(output)) !== output) throw new Error('HANDOFF_OUTPUT_PARENT_UNSAFE')
 const stage = await mkdtemp(join(output, 'frontend-handoff-stage-'))
-const kit = join(stage, 'frontend-handoff-20260926')
+const kit = join(stage, KIT)
 await mkdir(kit)
 const assets = await loadCoreResources(join(output, 'portable-core-win32-x64'))
-for (const name of ['apply-program.mjs', 'archive.mjs', 'package-program.mjs', 'program.patch'])
+for (const name of ['update-program.mjs', 'archive.mjs', 'package-program.mjs'])
   await cp(join(root, 'examples/frontend-handoff', name), join(kit, name))
 await cp(join(output, 'portable-core-win32-x64'), join(kit, 'portable'), { recursive: true })
 await mkdir(join(kit, 'vendor/frontend-host'), { recursive: true })
@@ -25,23 +29,17 @@ await writeFile(
     "'../frontend-client'",
   ),
 )
-await cp('docs/FRONTEND_WINDOWS_QUICKSTART.md', join(kit, 'README.md'))
-await cp(
-  'docs/FRONTEND_HANDOFF_RESULTS_20260926.md',
-  join(kit, 'FRONTEND_HANDOFF_RESULTS_20260926.md'),
-)
+await cp('docs/FRONTEND_HANDOFF_20260927.md', join(kit, 'README.md'))
 await mkdir(join(kit, 'verification'))
-for (const name of ['NATIVE', 'CONSUMER'])
-  await cp(
-    `docs/spikes/T19_FRONTEND_HANDOFF_${name}_20260926.json`,
-    join(kit, 'verification', `${name.toLowerCase()}.json`),
-  )
-await mkdir(join(kit, 'reference'))
 await cp(
-  'dist/portable-win32-x64/vibe-helper-portable-core-0.3.16-win32-x64.vsix',
-  join(kit, 'reference/vibe-helper-portable-core-0.3.16-win32-x64.vsix'),
+  'docs/spikes/T19_FRONTEND_HANDOFF_UPDATE_20260927.json',
+  join(kit, 'verification/update.json'),
 )
-const base = JSON.parse(await readFile('examples/frontend-handoff/program-base.json', 'utf8'))
+await mkdir(join(kit, 'reference'))
+await cp(join('dist/portable-win32-x64', REFERENCE_VSIX), join(kit, 'reference', REFERENCE_VSIX))
+const previous = JSON.parse(
+  await readFile('examples/frontend-handoff/program-managed-20260926.json', 'utf8'),
+)
 const { stdout } = await promisify(execFile)('git', ['rev-parse', 'HEAD'], { windowsHide: true })
 const dirty = await promisify(execFile)('git', ['status', '--porcelain'], { windowsHide: true })
 const files = await inventory(kit)
@@ -53,14 +51,16 @@ for (const file of files) {
     throw new Error('HANDOFF_PRIVATE_PATH_DENIED')
 }
 const manifest = {
-  schemaVersion: 1,
-  kitVersion: '2026.09.26.1',
+  schemaVersion: 2,
+  kitVersion: '2026.09.27.1',
+  kind: 'UPDATE',
   target: 'win32-x64',
   backendHead: stdout.trim(),
   backendWorkingTreeDirty: Boolean(dirty.stdout.trim()),
-  frontendRevision: base.revision,
+  frontendRevision: previous.frontendRevision,
+  previousKitVersion: previous.kitVersion,
   sdkVersion: '0.1.0',
-  referenceVsixVersion: '0.3.16',
+  referenceVsixVersion: '0.3.17',
   portableManifestSha256: sha256(JSON.stringify(assets.manifest)),
   supported: {
     kiro: '1.1.70',
@@ -69,27 +69,22 @@ const manifest = {
     sourceGate: 'EXACT_INSTALLATION_ATTESTATION',
   },
   validationScope: 'CURRENT_WINDOWS_MACHINE_ONLY',
-  programBaseFiles: base.files,
-  programPatchedFiles: base.patchedFiles,
-  programSdkFiles: base.sdkFiles,
+  previousManagedFiles: previous.managedFiles,
   files: Object.fromEntries(files.map(({ name, ...value }) => [name, value])),
 }
 await writeFile(join(kit, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`)
-const zip = join(output, 'frontend-handoff-20260926.zip')
+const zip = join(output, `${KIT}.zip`)
 if (!zip.startsWith(`${output}${sep}`)) throw new Error('HANDOFF_OUTPUT_UNSAFE')
 // Replace only the named generated archive. Stage/source/user data are untouched.
 await rm(zip, { force: true })
 const receipt = await archive(stage, zip)
 const report = {
   ...receipt,
-  directory: `dist/${stage.split(sep).at(-1)}/frontend-handoff-20260926`,
+  directory: KIT,
   backendHead: manifest.backendHead,
   backendWorkingTreeDirty: manifest.backendWorkingTreeDirty,
-  frontendRevision: base.revision,
+  frontendRevision: manifest.frontendRevision,
   validationScope: manifest.validationScope,
 }
-await writeFile(
-  join(output, 'frontend-handoff-receipt.json'),
-  `${JSON.stringify(report, null, 2)}\n`,
-)
+await writeFile(join(output, `${KIT}-receipt.json`), `${JSON.stringify(report, null, 2)}\n`)
 console.log(JSON.stringify(report))

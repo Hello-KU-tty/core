@@ -38,7 +38,7 @@ for (const format of ['esm', 'cjs']) {
       source.replace(/from '(\.\/[^']+)\.js'/g, `from '$1${ext}'`),
     )
   }
-  for (const file of ['index', 'node', 'program-adapter']) {
+  for (const file of ['index', 'node', 'program-adapter', 'workflow-view']) {
     const source = await readFile(
       join(root, 'packages/frontend-client/dist', `${file}.d.ts`),
       'utf8',
@@ -48,7 +48,8 @@ for (const format of ['esm', 'cjs']) {
       source
         .replaceAll("'@vibe-helper/contracts'", `'./contracts/index${ext}'`)
         .replaceAll("'./index.js'", `'./index${ext}'`)
-        .replaceAll("'./program-adapter.js'", `'./program-adapter${ext}'`),
+        .replaceAll("'./program-adapter.js'", `'./program-adapter${ext}'`)
+        .replaceAll("'./workflow-view.js'", `'./workflow-view${ext}'`),
     )
   }
 }

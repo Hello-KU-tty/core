@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-09-27",
+  "scope": "CURRENT_WINDOWS_MACHINE_ONLY",
+  "kit": "frontend-handoff-20260927",
+  "kitKind": "UPDATE",
+  "frontendRepository": "Hello-KU-tty/program",
+  "frontendRevision": "048bce383a774f429f8868949d4ba2f95a63c66a",
+  "previousKit": {
+    "version": "2026.09.26.1",
+    "frontendRevision": "73d0eb58e374357d6f28ea8db13e9b659cec5e5a",
+    "revisionFinding": "73d0eb5 is the PR #3 merge commit on program main; tree identical to ed27132",
+    "applyCheckOnCleanEd27132": { "autocrlfTrue": "READY", "autocrlfFalse": "READY" }
+  },
+  "frontendMainCleanClone": {
+    "npmCi": "PASS",
+    "typecheck": "PASS",
+    "tests": { "files": 29, "tests": 228, "failed": 0 },
+    "build": "PASS",
+    "portableAgainstKit": { "kitFiles": 116, "missing": 28, "eolOnlyDifference": 80, "contentDifference": 0 },
+    "missingCause": "program .gitignore node_modules/ excluded portable/node_modules (better-sqlite3 native binary, drizzle-orm)",
+    "packageProgram": "FAIL PORTABLE_INVENTORY_MISMATCH"
+  },
+  "updateKit": {
+    "checkOnCleanMain": "READY",
+    "apply": "UPDATED",
+    "gitRulesAdded": [
+      ".gitattributes /portable/** -text",
+      ".gitattributes /vendor/frontend-client/** -text",
+      ".gitattributes /vendor/frontend-host/** -text",
+      ".gitignore !/portable/node_modules/"
+    ],
+    "newlyTrackedFiles": 31,
+    "freshCloneAutocrlfTrueVerify": { "status": "VERIFIED", "managedFiles": 118 },
+    "freshClone": {
+      "typecheck": "PASS",
+      "tests": { "files": 29, "tests": 228, "failed": 0 },
+      "build": "PASS",
+      "packageProgram": { "status": "PASS", "files": 71 }
+    },
+    "frontendTypeScriptProbe": { "typescript": "5.4.5", "status": "PASS", "note": "temporary file importing new SDK helpers and NativeWorker type; removed" },
+    "modifiedManagedFile": { "status": "REFUSED", "code": "PROGRAM_MANAGED_FILE_MODIFIED", "filesChanged": 0 }
+  },
+  "consumer": {
+    "command": "node scripts/test-program-consumer.mjs <updated program>",
+    "status": "PASS",
+    "checks": 11,
+    "agent": "DELAYED_DETERMINISTIC_FIXTURE"
+  },
+  "core": {
+    "finalUpgradeUnrecordedHelperTurn": { "status": "REJECTED", "code": "FINAL_UPGRADE_HELPER_TURN_NOT_RECORDED", "test": "packages/application/test/application-service.integration.test.ts" },
+    "builderHelperContract": {
+      "status": "PASS",
+      "test": "apps/local-backend/test/builder-helper-contract.integration.test.ts",
+      "sequence": ["BUILDER decision request", "HELPER recorded", "HELPER cancelled after context read", "USER resolution", "STALE_TASK_REVISION rejected", "BUILDER apply and complete"],
+      "agent": "DETERMINISTIC_CORE_COMMANDS"
+    },
+    "dbMigration": false
+  },
+  "regression": {
+    "pnpmCheck": { "status": "PASS", "browserChannel": "msedge", "unit": 113, "integration": 307, "integrationSkipped": 1, "eval": 35, "campusDrop": 3, "smoke": 6, "e2e": 12 },
+    "sdkWorkflowViewUnit": 8,
+    "extensionHostCjs": { "tests": 110, "failed": 0 }
+  },
+  "notPerformed": [
+    "model-backed native vertical run after this change",
+    "other-machine validation",
+    "support pin expansion"
+  ]
+}

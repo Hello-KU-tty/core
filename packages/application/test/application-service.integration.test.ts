@@ -2675,6 +2675,53 @@ describe('T18 evidence-aware Final Upgrade application flow', () => {
       repository.appendAnalysisJob(succeededAnalysis)
       repository.appendPersonalizationTrace(evidenceAwareTrace)
     })
+    const prepareRequest = {
+      schemaVersion: 1,
+      kind: 'UI_PREPARE_FINAL_UPGRADE_TASK',
+      correlationId: 'corr_00000000-0000-4000-8000-000000000402',
+      actor: { kind: 'UI' },
+      projectId: ids.project,
+      sourceTaskId: ids.task,
+      expectedSourceTaskRevision: 2,
+      personalizationTraceId: ids.personalization,
+      userGoal: 'Show expired and consumed links as different states.',
+    } as const
+
+    // Helper read its context (trace exists) but its answer was never recorded, e.g. cancelled.
+    const unrecorded = await service.executeUi({
+      ...prepareRequest,
+      idempotencyKey: 'idem_00000000-0000-4000-8000-000000000409',
+    })
+    expect(unrecorded).toMatchObject({
+      success: false,
+      error: { code: 'FINAL_UPGRADE_HELPER_TURN_NOT_RECORDED' },
+    })
+    expect(storage.repository.readLatestTaskForProject(ids.project)?.id).toBe(ids.task)
+
+    storage.transaction((repository) =>
+      repository.appendActivityEvent(
+        activityEventSchema.parse({
+          ...activityEventFixture,
+          id: 'event_00000000-0000-4000-8000-000000000410',
+          sequence: repository.nextActivitySequence(ids.project),
+          correlationId: evidenceAwareTrace.correlationId,
+          actor: { kind: 'AGENT', role: 'HELPER' },
+          payload: {
+            type: 'HELPER_RESPONSE',
+            conversationId: ids.conversation,
+            messageId: ids.helperMessage,
+            summary: 'Separate expired and consumed states before rendering.',
+          },
+          sourceReferences: [
+            {
+              kind: 'AGENT_MESSAGE',
+              conversationId: ids.conversation,
+              messageId: ids.helperMessage,
+            },
+          ],
+        }),
+      ),
+    )
 
     const prepared = await service.executeUi({
       schemaVersion: 1,

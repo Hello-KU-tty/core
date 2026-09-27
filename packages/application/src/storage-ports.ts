@@ -191,6 +191,8 @@ export interface PersistenceRepository {
       readonly conversationId?: string
     },
   ): Episode | null
+  /** True only after a Helper answer was durably recorded for this exact turn. */
+  hasHelperResponseForCorrelation(projectId: string, taskId: string, correlationId: string): boolean
   nextActivitySequence(projectId: string): number
   readRecentEpisodeAggregatesForProject(
     projectId: string,

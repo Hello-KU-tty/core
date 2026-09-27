@@ -224,7 +224,7 @@ const driverVsix = await (await import('./package-managed-host-driver.mjs')).pac
   driver,
 )
 for (const vsix of [
-  resolve('dist/portable-win32-x64/vibe-helper-portable-core-0.3.16-win32-x64.vsix'),
+  resolve('dist/portable-win32-x64/vibe-helper-portable-core-0.3.17-win32-x64.vsix'),
   driverVsix,
 ])
   await promisify(execFile)(

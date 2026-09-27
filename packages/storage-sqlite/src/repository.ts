@@ -1825,6 +1825,31 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
     })
   }
 
+  hasHelperResponseForCorrelation(
+    projectId: string,
+    taskId: string,
+    correlationId: string,
+  ): boolean {
+    if (
+      !projectSchema.shape.id.safeParse(projectId).success ||
+      !builderTaskSchema.shape.id.safeParse(taskId).success ||
+      !correlationIdSchema.safeParse(correlationId).success
+    ) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Helper response query is invalid')
+    }
+    return this.#read(
+      () =>
+        this.#sqlite
+          .prepare<[string, string, string], { readonly found: number }>(
+            `SELECT 1 AS found FROM activity_events
+             WHERE correlation_id = ? AND project_id = ? AND task_id = ?
+               AND event_type = 'HELPER_RESPONSE'
+             LIMIT 1`,
+          )
+          .get(correlationId, projectId, taskId) !== undefined,
+    )
+  }
+
   readOpenEpisode(
     projectId: string,
     type: Episode['type'],
