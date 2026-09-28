@@ -407,10 +407,56 @@ export async function selectProjectToolchain(options: {
   } catch (error) {
     if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) throw error
     const previous = (await plainFile(shimPath, 32768)).toString()
-    if (previous === legacyShim) await replaceProjectFile(shimPath, shim)
+    if (
+      previous === legacyShim ||
+      (previous !== shim &&
+        (await olderPinnedPnpmShims(root, node.executable, result.pnpm.version)).includes(previous))
+    )
+      await replaceProjectFile(shimPath, shim)
     else if (previous !== shim) fail('PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED')
   }
   return Object.freeze(result)
+}
+
+/**
+ * Exact shared-shim texts that an older product pin would have written: the
+ * same Node running a strictly older Core-managed pnpm from this private cache
+ * (current and legacy batch forms). Only these may be replaced after a pin
+ * change; any other shim content stays a toolchain change.
+ */
+export async function olderPinnedPnpmShims(
+  root: string,
+  nodeExecutable: string,
+  currentVersion: string,
+): Promise<string[]> {
+  const current = parseExactVersion(currentVersion)
+  if (!current) return []
+  const cache = join(root, 'pnpm-cache')
+  const names = await readdir(cache).catch(() => [] as string[])
+  const shims: string[] = []
+  for (const name of names) {
+    const version = parseExactVersion(name.startsWith('pnpm-') ? name.slice(5) : '')
+    if (!version || !isOlderVersion(version, current)) continue
+    const command = `"${nodeExecutable}" "${join(cache, name, 'bin/pnpm.cjs')}" %*`
+    shims.push(utf8Batch([command]), `@echo off\r\n${command}\r\nexit /b %errorlevel%\r\n`)
+  }
+  return shims
+}
+
+function parseExactVersion(value: unknown): number[] | undefined {
+  if (typeof value !== 'string') return undefined
+  const version = value
+    .match(/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/)
+    ?.slice(1)
+    .map(Number)
+  return version?.every(Number.isSafeInteger) ? version : undefined
+}
+
+function isOlderVersion(before: readonly number[], after: readonly number[]): boolean {
+  for (let i = 0; i < 3; i++) {
+    if (before[i] !== after[i]) return (before[i] ?? 0) < (after[i] ?? 0)
+  }
+  return false
 }
 
 /** Same finite vocabulary as native Builder, before its existing permission guard. */
@@ -478,24 +524,10 @@ function isOlderPinnedPnpm(previous: unknown, toolchain: ProjectToolchain): bool
   const old = previous as Record<string, unknown>
   const keys = Object.keys(old).sort().join(',')
   if (keys !== 'executable,kind,source,version') return false
-  const parse = (value: unknown) =>
-    typeof value === 'string'
-      ? value
-          .match(/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/)
-          ?.slice(1)
-          .map(Number)
-      : undefined
-  const before = parse(old.version),
-    after = parse(toolchain.pnpm.version)
+  const before = parseExactVersion(old.version),
+    after = parseExactVersion(toolchain.pnpm.version)
   if (!before || !after || typeof old.executable !== 'string') return false
-  let older = false
-  for (let i = 0; i < 3; i++) {
-    if (before[i] !== after[i]) {
-      older = (before[i] ?? 0) < (after[i] ?? 0)
-      break
-    }
-  }
-  if (!older) return false
+  if (!isOlderVersion(before, after)) return false
   if (old.source === 'MANAGED_PNPM')
     return (
       old.kind === 'JS' &&
