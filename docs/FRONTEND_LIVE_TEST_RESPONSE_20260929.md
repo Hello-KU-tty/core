@@ -1,7 +1,19 @@
 # 9월 29일 프론트 B6 후속 답변
 
 대상: [프론트 B6 추가 커밋](https://github.com/Hello-KU-tty/program/commit/031ae154b9172701caa1d3b79fdb404f0f5ae52c).
-기준 backend: `d02ef61` 이후 T19-F7. 아래는 소스 수정과 macOS 모델 없는 검증이며, Windows 새 kit/VSIX 설치·실제 두 창 검증 완료 기록이 아니다.
+수정 backend: [`a4a6632`](https://github.com/Hello-KU-tty/core/commit/a4a6632), 브랜치 `codex/windows-extension-runtime-20260923` (T19-F7).
+아래는 소스 수정과 macOS 모델 없는 검증이며, Windows 새 kit/VSIX 설치·실제 두 창 검증 완료 기록이 아니다.
+
+## 전달 요약과 프론트 적용 항목
+
+B6의 같은 폴더 다중 창 거절을 재현했고, 현재 worker의 창을 선택하도록 백엔드 소스를 수정했다. 기존 B1~B5의 반영/잔여 항목은 [9월 28일 답변](FRONTEND_LIVE_TEST_RESPONSE_20260928.md)과 [백엔드 변경 내역](BACKEND_CHANGES_20260928.md)을 참고한다. 이 문서는 새로 추가된 B6의 답변이다.
+
+1. **적용 대상:** 위 수정 커밋을 포함한 backend로 Windows kit/VSIX를 새로 생성·반영해야 한다. 이번 전달물은 수정 소스와 검증 결과이며 새 Windows 설치물은 아직 제공하지 않았다. 기존 `20260927` kit를 그대로 쓰면 B6 수정이 적용되지 않는다. 기존 [Windows 재개 안내](WINDOWS_RESUME_20260928.md)의 빌드·인계 절차를 따른다.
+2. **프론트 코드:** SDK/HTTP 메서드 변경은 필요 없다. 아래 표의 terminal `run.errorCode`에 안내 문구를 연결한다. 새 worker 진단 두 개는 진행/복구 안내이며 성공 판정에 사용하지 않는다.
+3. **실패 복구:** 같은 생성 폴더를 연 창 중 사용할 창 하나를 남기고, 기존 Project의 PREVIEW를 명시적으로 재시도한다. 다른 Project를 새로 만들거나 History 진입만으로 재실행할 필요는 없다. 자세한 재시도 계약은 [이전 답변의 B3](FRONTEND_LIVE_TEST_RESPONSE_20260928.md#b3-preview만-같은-project에서-명시적으로-다시-실행)를 따른다.
+4. **확인 회신:** 새 kit/VSIX의 버전·backend 커밋, 두 창 조건에서의 terminal run 상태/오류 코드, preview 저장 여부를 알려 주면 된다. 실패 시 worker 상태와 창 ID 일치 여부를 함께 남기되 token·개인 경로·대화 원문은 보내지 않는다.
+
+PR #8 적용과 B6 수정 kit 반영은 각각 필요 여부를 확인해야 한다. 저장된 후보 복원과 native 연결 실패는 다른 단계이며, 이번 소스 검증을 Windows 실제 성공으로 표시하지 않았다.
 
 ## 수정
 
