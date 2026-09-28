@@ -1,0 +1,45 @@
+{
+  "promptVersion": "1.3.7",
+  "kind": "FULL_CANONICAL_PRODUCT_INTERACTION_CANDIDATE",
+  "containsPersonalData": false,
+  "liveResult": "MIXED_NOT_ADOPTED",
+  "nativeObservation": {
+    "reports": ["native-v137-dedup-preview-1.json", "native-v137-dedup-preview-2.json", "native-v137-streaming-preview-1.json"],
+    "durationsMs": [28049, 31477, 26923],
+    "oversizeFieldsOf50": [12, 27, 3],
+    "review": "AI_REVIEW_NOT_HUMAN_REVIEW",
+    "summary": "Deduplication output contains more independent products, but length regressions, unbounded constant-time claims, and technique-only held-out suggestions remain."
+  },
+  "automatedQualityVerdict": "NOT_ASSERTED",
+  "baseline": {
+    "promptVersion": "1.3.5",
+    "fixture": "deduplication",
+    "report": "native-unseen-dedup-preview-1.json",
+    "previewCount": 10,
+    "latencyMs": 22930,
+    "review": "AI_REVIEW_NOT_HUMAN_REVIEW",
+    "observedIssue": "All ten directions stayed in the participant/roster domain; several split one product into search, grouping, merging, and history functions."
+  },
+  "requiredRules": [
+    "같은 제품의 기능을 나눈 목록인지 확인하라",
+    "Personal Need는 출발점이지 전체 목록의 주제 제한이 아니며",
+    "사용자가 화면에서 입력·조작해 얻는 결과로 쓴다",
+    "한 기술의 사용만으로 모든 오류가 사라지거나 항상 일정한 성능이 보장된다고 주장하지 마라"
+  ],
+  "preservedRules": [
+    "lightweight preview를 정확히 10개",
+    "title은 16자",
+    "사용자가 명시적으로 프로젝트를 확정할 때까지",
+    "명시된 과거 프로젝트의 accepted Evidence만",
+    "갈림길이 없으면 빈 배열 `[]`로 제출하라",
+    "직접 데이터베이스를 수정하지 마라"
+  ],
+  "reviewAxes": [
+    "Distinct user tasks and product interactions, not a fixed domain/category quota",
+    "Reachable inputs, meaningful output, and concrete technology role",
+    "Personal Need does not suppress independent exploration",
+    "No-Personal-Need usefulness and beginner-readable interactions",
+    "Bounded technical guarantees, output length, and transport retries"
+  ],
+  "heldOutNativeFixture": "streaming"
+}

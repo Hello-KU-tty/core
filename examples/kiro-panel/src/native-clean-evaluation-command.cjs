@@ -1,8 +1,11 @@
 const { mkdtemp, writeFile } = require('node:fs/promises')
 const { tmpdir } = require('node:os')
 const { join } = require('node:path')
+const { createHash } = require('node:crypto')
 
-const fixture = require('../../../tests/eval/fixtures/prompt-regressions/evidence-analyst-v1.0.7-claim-temporality.json')
+const fixture = require('../../../tests/eval/fixtures/prompt-regressions/evidence-analyst-v1.0.8-source-first.json')
+const heldOutFixture = require('../../../tests/eval/fixtures/prompt-regressions/evidence-analyst-v1.0.8-held-out.json')
+const pairedUnseenFixture = require('../../../tests/eval/fixtures/prompt-regressions/evidence-analyst-paired-unseen-20260928.json')
 const contracts = require('../../../packages/contracts/dist/index.js')
 const { composeNativeProtectedAnalystPrompt } =
   require('../../../apps/local-backend/src/native-protected-prompt.ts')
@@ -10,14 +13,25 @@ const { runNativeAnalystCleanSemantics } =
   require('./native-analyst-clean-semantics.cjs')
 
 const COMMAND_ID = 'vibeHelper.nativeCleanEvaluationRun'
-const RUN_LABEL = 'Run 7 synthetic Analyst cells'
+const CELL_COUNT = fixture.cases.length
+const RUN_LABEL = `Run ${CELL_COUNT} synthetic Analyst cells`
+const ARTIFACT_KIND = 'NATIVE_ANALYST_V1_0_8_SOURCE_FIRST_8_CELL'
+const ARCHIVED_BASELINE_SHA256 = '0d0c7f132f75f36246b87447d57ff5c6d0b7b9ed4d1eb368e792bdc25cea149c'
+const CORPORA = [
+  { corpusId: 'SOURCE_FIRST_REGRESSION', label: 'Source-first regression (8 cells)', fixture },
+  { corpusId: 'HELD_OUT_COLLECTIONS_REQUESTS', label: 'Held-out collections and requests (8 cells)',
+    fixture: heldOutFixture },
+  { corpusId: 'PAIRED_LIFETIMES_ORDER_NORMALIZATION', label: 'New paired lifetimes, order and normalization (8 cells)',
+    fixture: pairedUnseenFixture },
+]
 const EXPECTED_PROMPT_VERSIONS = {
-  EVIDENCE_ANALYST: '1.0.7',
+  EVIDENCE_ANALYST: '1.0.8',
 }
 const HUMAN_REVIEW_CRITERIA = [
   'A timeless definition must not become a separate future prediction',
   'A completed action and past observation must not become a separate future prediction',
   'A reasoned choice must rely on the user rationale rather than Agent-authored tradeoffs',
+  'A bare recommendation click without user-authored words must produce no Proposal',
   'A concrete independent not-yet-observed result may retain STRONG PREDICTION and ' +
     'DEMONSTRATED support',
   'Claim-profile matches are a fixture oracle, not general model accuracy or human learning',
@@ -67,6 +81,9 @@ function renderNativeCleanEvaluationHtml(result, redact) {
     `source: ${escapeHtml(metadata.model?.source ?? 'UNCONFIRMED')}; ` +
     `configuration: ${escapeHtml(metadata.model?.configuration ?? 'NOT_EXPOSED')}</p>` +
     `<p>Fixture SHA-256: <code>${escapeHtml(metadata.fixtureSha256 ?? '')}</code></p>` +
+    `<p>Corpus: <code>${escapeHtml(metadata.corpusId ?? 'HISTORICAL_FIXED_CORPUS')}</code></p>` +
+    `<p>Prompt version/source: <code>${escapeHtml(metadata.promptVersion ?? 'HISTORICAL')} / ` +
+    `${escapeHtml(metadata.promptSource ?? 'PACKAGED_CANONICAL')}</code></p>` +
     `<p>Analyst prompt SHA-256: <code>${escapeHtml(
       metadata.analystPromptSha256 ?? '')}</code></p>` +
     '<p>Inputs are synthetic and redacted. Core mutation count is zero. ' +
@@ -158,9 +175,40 @@ async function executeNativeCleanEvaluation(vscode, deps) {
   let assertIdle
   let finalIdleAttempted = false
   let finalIdleConfirmed = false
+  let corpus = null
+  let variant = null
   try {
+    const pickedCorpus = await vscode.window.showQuickPick(CORPORA.map(({ corpusId, label }) =>
+      ({ corpusId, label })), { placeHolder: 'Choose a fixed synthetic Analyst corpus',
+      ignoreFocusOut: true })
+    if (!pickedCorpus) return { status: 'CANCELLED_CORPUS_SELECTION' }
+    corpus = CORPORA.find(item => item.corpusId === pickedCorpus.corpusId)
+    if (!corpus || corpus.fixture.cases.length !== CELL_COUNT ||
+        corpus.fixture.promptVersion !== EXPECTED_PROMPT_VERSIONS.EVIDENCE_ANALYST)
+      throw fail('NATIVE_CLEAN_CORPUS_UNCONFIRMED')
     const runtime = await deps.packagedRuntime()
     validateRuntimePrompts(runtime)
+    variant = { variantId: 'PACKAGED', label: 'Current v1.0.8 (packaged; quality limitations remain)',
+      version: '1.0.8', source: 'PACKAGED_CANONICAL', text: runtime.prompts.EVIDENCE_ANALYST.text }
+    if (deps.archivedComparisonPrompt !== undefined) {
+      const archived = deps.archivedComparisonPrompt
+      if (typeof archived !== 'string' || promptVersion(archived) !== '1.0.7' ||
+          createHash('sha256').update(archived).digest('hex') !== ARCHIVED_BASELINE_SHA256)
+        throw fail('NATIVE_CLEAN_BASELINE_ARCHIVE_INVALID')
+      const variants = [variant, { variantId: 'ARCHIVED_BASELINE',
+        label: 'Baseline v1.0.7 (SHA-pinned archive; same 8 inputs)', version: '1.0.7',
+        source: 'SHA_PINNED_ARCHIVE', text: archived }]
+      const selected = await vscode.window.showQuickPick(variants.map(({ variantId, label }) =>
+        ({ variantId, label })), { placeHolder: 'Choose one prompt; input/oracle stay unchanged',
+        ignoreFocusOut: true })
+      if (!selected) return { status: 'CANCELLED_PROMPT_SELECTION' }
+      variant = variants.find(item => item.variantId === selected.variantId)
+      if (!variant) throw fail('NATIVE_CLEAN_PROMPT_SELECTION_UNCONFIRMED')
+    }
+    const selectedFixture = variant.variantId === 'ARCHIVED_BASELINE' ? {
+      ...corpus.fixture, promptVersion: variant.version,
+      comparisonProtocol: 'SAME_EIGHT_CASES_V1',
+    } : corpus.fixture
     const scope = deps.currentApprovedBuiltinHelperScope(vscode)
     const client = await deps.connectLocalCore(deps.configuredConnection)
     const snapshot = await client.restoreProject(scope.projectId)
@@ -182,7 +230,7 @@ async function executeNativeCleanEvaluation(vscode, deps) {
       const picked = await vscode.window.showQuickPick(models.map(id => ({
         label: id, description: id === 'claude-sonnet-4.5' ? 'Preferred if selected' : undefined,
         modelId: id,
-      })), { placeHolder: 'Choose one exact catalog-confirmed model for all 7 cells',
+      })), { placeHolder: `Choose one exact catalog-confirmed model for all ${CELL_COUNT} cells`,
         ignoreFocusOut: true })
       if (picked) {
         selectedModelId = picked.modelId
@@ -194,8 +242,8 @@ async function executeNativeCleanEvaluation(vscode, deps) {
     await assertIdle()
     if (selectedModelId === null) return { status: 'CANCELLED_MODEL_SELECTION' }
     const confirmation = await vscode.window.showWarningMessage(
-      'Run at most 7 synthetic, read-only native Analyst cells?',
-      { modal: true, detail: 'One exact model; fresh protected H per cell; retry 0; ' +
+      `Run at most ${CELL_COUNT} synthetic, read-only native Analyst cells?`,
+      { modal: true, detail: `${corpus.label}. ${variant.label}. One exact model; fresh protected H per cell; retry 0; ` +
         'Core mutation 0. Outputs require review and are not human Evidence.' }, RUN_LABEL)
     if (confirmation !== RUN_LABEL) return { status: 'CANCELLED_EXPLICIT_RUN' }
     artifact = await (deps.createArtifact ?? createPrivateMetadataArtifact)()
@@ -203,7 +251,7 @@ async function executeNativeCleanEvaluation(vscode, deps) {
       configuration: 'NOT_EXPOSED' }
     const result = await vscode.window.withProgress({
       location: vscode.ProgressLocation.Notification,
-      title: 'Vibe Helper: 7-cell native Analyst evaluation', cancellable: true,
+      title: `Vibe Helper: ${CELL_COUNT}-cell native Analyst evaluation`, cancellable: true,
     }, async (progress, token) => {
       const cancelled = new AbortController()
       const cancel = () => cancelled.abort()
@@ -220,8 +268,8 @@ async function executeNativeCleanEvaluation(vscode, deps) {
       }
       try {
         const analyst = await (deps.runAnalyst ?? runNativeAnalystCleanSemantics)({
-          ...common, fixture, contracts,
-          rolePrompt: runtime.prompts.EVIDENCE_ANALYST.text,
+          ...common, fixture: selectedFixture, contracts,
+          rolePrompt: variant.text,
           composeAnalystPrompt: composeNativeProtectedAnalystPrompt,
           onCell: cell => progress.report({ message: `Analyst ${cell.caseId} ${cell.status}` }),
         })
@@ -237,13 +285,17 @@ async function executeNativeCleanEvaluation(vscode, deps) {
     finalIdleConfirmed = true
     const analystMetadata = result.analyst.metadata
     const metadata = {
-      kind: 'NATIVE_ANALYST_V1_0_7_CLAIM_TEMPORALITY_7_CELL',
+      kind: variant.variantId === 'ARCHIVED_BASELINE' ? 'NATIVE_ANALYST_V1_0_7_PAIRED_8_CELL' : ARTIFACT_KIND,
+      corpusId: corpus.corpusId,
+      promptVersion: variant.version, promptSource: variant.source,
+      sourceCorpusSha256: createHash('sha256').update(JSON.stringify(corpus.fixture)).digest('hex'),
+      caseSetSha256: createHash('sha256').update(JSON.stringify(corpus.fixture.cases)).digest('hex'),
       status: analystMetadata.status,
       deterministicStatus: analystMetadata.deterministicStatus,
       humanReviewStatus: 'NEEDS_REVIEW',
       humanReviewCriteria: HUMAN_REVIEW_CRITERIA,
       provenance: 'SYNTHETIC_REDACTED_EVAL_INPUT', coreMutationCount: 0,
-      cellRetryCount: 0, maxTurns: 7,
+      cellRetryCount: 0, maxTurns: CELL_COUNT,
       turns: analystMetadata.turns, reloadRequired: true,
       model, windowId: analystMetadata.windowId,
       fixtureSha256: analystMetadata.fixtureSha256,
@@ -274,10 +326,12 @@ async function executeNativeCleanEvaluation(vscode, deps) {
         finalIdleErrorCode = safeCode(idleError)
       }
     }
-    const metadata = { kind: 'NATIVE_ANALYST_V1_0_7_CLAIM_TEMPORALITY_7_CELL',
+    const metadata = { kind: ARTIFACT_KIND,
+      corpusId: corpus?.corpusId ?? null,
+      promptVersion: variant?.version ?? null, promptSource: variant?.source ?? null,
       status: 'FAILED', deterministicStatus: 'FAILED',
       errorCode, provenance: 'SYNTHETIC_REDACTED_EVAL_INPUT',
-      coreMutationCount: 0, cellRetryCount: 0, maxTurns: 7,
+      coreMutationCount: 0, cellRetryCount: 0, maxTurns: CELL_COUNT,
       selectedModelId, humanReviewStatus: 'BLOCKED_BY_EXECUTION_FAILURE',
       reloadRequired: Boolean(lease), finalIdleConfirmed,
       ...(finalIdleErrorCode === null ? {} : { finalIdleErrorCode }),

@@ -12,8 +12,14 @@ const { MAX_TURNS, derivePriorPrompt, rolePrompts, syntheticContext, evaluateTex
 const currentPrompt = readFileSync(join(__dirname, '..', '..', '..', 'docs',
   'agent-prompts', 'evidence-analyst.md'), 'utf8').replaceAll('\r\n', '\n')
 // This command is a frozen v1.0.3/v1.0.4 comparison. Reconstruct the exact
-// v1.0.4 historical input from the known v1.0.7, v1.0.6 and v1.0.5 edits for tests only; the
+// v1.0.4 historical input from a pinned v1.0.7 archive and inverse edits for tests only; the
 // production command must reject the current canonical prompt before a turn.
+const archivedPrompt = readFileSync(join(__dirname, '..', '..', '..', 'tests', 'eval',
+  'fixtures', 'prompt-regressions', 'evidence-analyst-v1.0.7-canonical.md'), 'utf8')
+  .replaceAll('\r\n', '\n')
+assert.equal(createHash('sha256').update(archivedPrompt).digest('hex'),
+  '0d0c7f132f75f36246b87447d57ff5c6d0b7b9ed4d1eb368e792bdc25cea149c',
+  'historical v1.0.7 archive drifted')
 function historicalV104Prompt(current) {
   assert.match(current, /^> Prompt version: `1\.0\.7`$/m)
   let prior = current
@@ -53,7 +59,7 @@ function historicalV104Prompt(current) {
     'Episode 전체에서 사용자 Evidence가 없다면 가짜 `NONE` Proposal을 만들지 말고 빈 `proposals`와 구체적인 `noEvidenceReason`을 반환하라. Proposal이 하나 이상이면 `noEvidenceReason`은 반환하지 마라.')
   return prior
 }
-const historicalPrompt = historicalV104Prompt(currentPrompt)
+const historicalPrompt = historicalV104Prompt(archivedPrompt)
 assert.equal(createHash('sha256').update(historicalPrompt).digest('hex'),
   '157effa5142311acaf884b779a32f129c647212ed0420480d208d98e5b3dea8e',
   'historical v1.0.4 reconstruction drifted')
@@ -103,7 +109,7 @@ test('reconstructs and pins the prior canonical prompt without changing the comm
   assert.throws(() => rolePrompts(currentPrompt), /ANALYST_EVAL_PROMPT_VERSION_INVALID/)
 })
 
-test('the historical evaluator rejects current canonical v1.0.7 before a native model turn', async () => {
+test('the historical evaluator rejects the current canonical prompt before a native model turn', async () => {
   let opened = 0
   await assert.rejects(runNativeAnalystSemanticEval({
     scope: { projectId: 'project_scope', workspace: '/scope/W', helper: '/scope/H' },

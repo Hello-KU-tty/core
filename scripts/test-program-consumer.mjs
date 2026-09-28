@@ -19,6 +19,8 @@ for (const [entry, name] of [
   [join(program, 'src/adapter/flow/local-core-port.ts'), 'port'],
   [resolve('packages/contracts/test/fixtures.ts'), 'fixtures'],
   [join(program, 'src/core/flow/flow-controller.ts'), 'controller'],
+  [join(program, 'src/adapter/agent/managed-agent-port.ts'), 'agent-port'],
+  [join(program, 'src/core/agent/agent-controller.ts'), 'agent-controller'],
 ])
   await build({
     entryPoints: [entry],
@@ -29,8 +31,15 @@ for (const [entry, name] of [
     target: 'node24',
   })
 const { LocalCoreDiscoveryPort } = require(join(root, 'port.cjs'))
-const { candidateFixture, draftLearningSpecFixture } = require(join(root, 'fixtures.cjs'))
+const {
+  candidateFixture,
+  draftLearningSpecFixture,
+  canonicalConceptFixture,
+  conceptLedgerFixture,
+} = require(join(root, 'fixtures.cjs'))
 const { FlowController } = require(join(root, 'controller.cjs'))
+const { ManagedAgentPort } = require(join(root, 'agent-port.cjs'))
+const { AgentSurfaceController } = require(join(root, 'agent-controller.cjs'))
 await mkdir(join(root, 'workspaces'))
 const storage = await openSqliteStorage({ dataDirectory: join(root, 'db') })
 const application = new ApplicationService({
@@ -44,7 +53,7 @@ const metadata = () => ({
   redactionStatus: 'NOT_REQUIRED',
 })
 const counts = {}
-let failNext = false
+let failNext = null
 const instanceId = randomUUID()
 let client
 const runtime = new WorkflowRuntime({
@@ -65,8 +74,17 @@ const runtime = new WorkflowRuntime({
         )
       })
       if (failNext) {
-        failNext = false
-        throw Object.assign(new Error('FIXTURE_AGENT_FAILED'), { code: 'FIXTURE_AGENT_FAILED' })
+        const code = failNext
+        failNext = null
+        throw Object.assign(new Error(code), { code })
+      }
+      if (request.mode === 'BUILDER') {
+        assert.ok(request.message.includes('No additional user message was provided'))
+        assert.ok(!request.message.includes('Exact user message:'))
+        return {
+          text: 'Synthetic Builder resume transport checked; no code generated.',
+          stopReason: 'end_turn',
+        }
       }
       const snapshot = await client.restoreProject(request.projectId)
       const session = snapshot.discoverySession
@@ -253,6 +271,113 @@ try {
     ),
   )
   assert.equal(task.projectId, first.projectId)
+  // The real frontend resume button sends message="". A fake startRun would
+  // miss the SDK/HTTP validation mismatch observed in the live native run.
+  const inertWorker = {
+    getStatus: () => 'WORKER_CONNECTED',
+    listUserInputs: () => [],
+    subscribeStatus: () => () => {},
+    subscribeUserInputs: () => () => {},
+  }
+  const agentPort = new ManagedAgentPort(client, inertWorker)
+  const agentController = new AgentSurfaceController({
+    port: agentPort,
+    globalState: {
+      get: () => first.projectId,
+      update: async (_key, value) => assert.equal(value, first.projectId),
+    },
+    onChange: () => {},
+    openFolder: async () => {
+      throw new Error('UNEXPECTED_FOLDER_OPEN')
+    },
+    openExternal: async () => {
+      throw new Error('UNEXPECTED_EXTERNAL_OPEN')
+    },
+  })
+  await agentController.resumeAfterDecision()
+  assert.equal(counts.BUILDER, 1)
+  assert.equal(agentController.getViewModel().builder.phase, 'TURN_ENDED')
+  assert.equal((await client.restoreProject(first.projectId)).completionReport, null)
+  const countBeforeEvidence = JSON.stringify(counts)
+  const emptyEvidence = await agentController.readEvidence()
+  assert.equal(emptyEvidence.userUnderstandingTotal, 0)
+  assert.deepEqual(emptyEvidence.concepts, [])
+  const currentTask = (await client.restoreProject(first.projectId)).currentTask
+  const helper = await client.execute({
+    ...uiMetadata(),
+    kind: 'UI_RECORD_HELPER_EXCHANGE',
+    idempotencyKey: entityId('idem'),
+    projectId: first.projectId,
+    taskId: currentTask.id,
+    userMessage: 'Synthetic model-0 consumer question.',
+    helperResponseSummary: 'Synthetic fixture answer; not user understanding.',
+    closeConversation: false,
+  })
+  // Synthetic Core observations let the *actual* frontend projector exercise
+  // nonempty/full/filtered views without fabricating learner Evidence.
+  const observedConcepts = []
+  storage.transaction((r) => {
+    for (let n = 0; n < 2; n++) {
+      const at = new Date().toISOString()
+      const concept = {
+        ...canonicalConceptFixture,
+        id: entityId('concept'),
+        canonicalName: `Synthetic consumer observation ${n}`,
+        createdAt: at,
+        updatedAt: at,
+      }
+      const evidence = {
+        schemaVersion: 1,
+        id: entityId('evidence'),
+        kind: 'CONCEPT_OBSERVATION',
+        projectId: first.projectId,
+        taskId: currentTask.id,
+        episodeId: helper.episodeId,
+        conceptId: concept.id,
+        correlationId: helper.correlationId,
+        supportsState: 'OBSERVED',
+        contextSources: [{ kind: 'CODE', path: 'src/synthetic.ts' }],
+        acceptedAt: at,
+        source: { kind: 'CORE' },
+        redactionStatus: 'VERIFIED_REDACTED',
+      }
+      r.appendCanonicalConcept(concept)
+      r.appendAcceptedEvidence(evidence)
+      r.appendConceptLedger({
+        ...conceptLedgerFixture,
+        id: entityId('concept_ledger'),
+        concept,
+        acceptedAliases: [],
+        relatedProjectIds: [first.projectId],
+        relatedTaskIds: [currentTask.id],
+        state: {
+          ...conceptLedgerFixture.state,
+          conceptId: concept.id,
+          state: 'OBSERVED',
+          acceptedEvidenceIds: [evidence.id],
+          updatedAt: at,
+        },
+        updatedAt: at,
+      })
+      observedConcepts.push(concept.id)
+    }
+  })
+  const allEvidence = await agentController.readEvidence()
+  assert.equal(allEvidence.concepts.length, 2)
+  assert.equal(allEvidence.userUnderstandingTotal, 0)
+  assert.ok(
+    allEvidence.concepts.every(
+      (c) => c.displayState === 'OBSERVED_ONLY' && c.userUnderstandingCount === 0,
+    ),
+  )
+  const filteredEvidence = await agentController.readEvidence(observedConcepts[0])
+  assert.deepEqual(
+    filteredEvidence.concepts,
+    allEvidence.concepts.filter((c) => c.id === observedConcepts[0]),
+  )
+  assert.equal(await agentController.readEvidence(entityId('concept')), null)
+  assert.equal(JSON.stringify(counts), countBeforeEvidence)
+  agentController.dispose()
   const staleCandidate = await port.enrichCandidate(
     { discoverySessionId: first.id, target: { ...target, revision: 999 } },
     envelope(0),
@@ -263,7 +388,7 @@ try {
   unwrap(await restoredPort.restoreProject(second.projectId, envelope(0)))
   unwrap(await restoredPort.generatePreviewRound({ discoverySessionId: second.id }, envelope(0)))
   assert.equal(JSON.stringify(counts), countBeforeHistory)
-  failNext = true
+  failNext = 'FIXTURE_AGENT_FAILED'
   const failed = unwrap(
     await port.startDiscovery(
       { projectId: 'ignored', input: { learningGoal: 'Synthetic failure check' } },
@@ -273,6 +398,70 @@ try {
   const failure = await port.generatePreviewRound({ discoverySessionId: failed.id }, envelope(0))
   assert.equal(failure.ok, false)
   assert.equal(failure.error.message, 'FIXTURE_AGENT_FAILED')
+  // Frontend B1/B3: inspect the real port's failure projection and its existing
+  // cached-run behavior. These are injected Agent failures, not paid RPC calls.
+  for (const errorCode of [
+    'NATIVE_QUOTA_EXCEEDED',
+    'NATIVE_AUTH_REQUIRED',
+    'NATIVE_MODEL_UNAVAILABLE',
+    'NATIVE_RPC_REJECTED',
+  ]) {
+    failNext = errorCode
+    const failedSession = unwrap(
+      await port.startDiscovery(
+        { projectId: 'ignored', input: { learningGoal: 'Synthetic classified failure recovery' } },
+        envelope(0),
+      ),
+    )
+    const observed = await port.generatePreviewRound(
+      { discoverySessionId: failedSession.id },
+      envelope(0),
+    )
+    assert.equal(observed.ok, false)
+    assert.equal(observed.error.message, errorCode)
+    const countBeforeRetry = counts.PREVIEW
+    const cached = await port.generatePreviewRound(
+      { discoverySessionId: failedSession.id },
+      envelope(0),
+    )
+    assert.equal(cached.ok, false)
+    assert.equal(cached.error.message, errorCode)
+    assert.equal(counts.PREVIEW, countBeforeRetry, 're-reading a failed run is not a new attempt')
+    const snapshot = await client.restoreProject(failedSession.projectId)
+    const request = {
+      kind: 'DISCOVERY',
+      phase: 'PREVIEW',
+      projectId: failedSession.projectId,
+      discoverySessionId: snapshot.discoverySession.id,
+      expectedSessionRevision: snapshot.discoverySession.revision,
+      idempotencyKey: entityId('idem'),
+      enrichAfterPreview: false,
+    }
+    const retry = await client.startRun(request)
+    assert.equal((await client.startRun(request)).id, retry.id)
+    const terminal = await client.watchRun(retry.id, () => {})
+    assert.equal(terminal.status, 'SUCCEEDED')
+    assert.equal(terminal.outcome, 'DURABLE_RESULT')
+    assert.equal(counts.PREVIEW, countBeforeRetry + 1)
+    const restored = new LocalCoreDiscoveryPort(client)
+    unwrap(await restored.restoreProject(failedSession.projectId, envelope(0)))
+    const recovered = unwrap(
+      await restored.generatePreviewRound({ discoverySessionId: failedSession.id }, envelope(0)),
+    )
+    assert.equal(recovered.previews.length, 10)
+    assert.equal(counts.PREVIEW, countBeforeRetry + 1, 'durable restore must not invoke an Agent')
+    assert.equal(
+      (await client.restoreProject(failedSession.projectId)).discoverySession.id,
+      failedSession.id,
+    )
+    // Current frontend must replace/clear this cache when wiring a retry action.
+    const oldPort = await port.generatePreviewRound(
+      { discoverySessionId: failedSession.id },
+      envelope(0),
+    )
+    assert.equal(oldPort.ok, false)
+    assert.equal(oldPort.error.message, errorCode)
+  }
   const cancel = unwrap(
     await port.startDiscovery(
       { projectId: 'ignored', input: { learningGoal: 'Synthetic cancellation check' } },
@@ -317,9 +506,15 @@ try {
       'confirm and prepare Task',
       'new port History restore without model',
       'original Agent failure',
+      'classified native codes survive the actual port without automatic retry',
+      'explicit same-Project PREVIEW retry succeeds exactly once and restores without model',
+      'known frontend limitation: original port retains its old failed-run cache',
       'cancelled run is not success',
       'controller uses Core project ID',
       'selected candidate must match the requested revision',
+      'actual agent controller empty-message resume reaches Core exactly once',
+      'a successful Builder turn is not fabricated Task completion',
+      'actual agent controller projects empty/full/filtered Evidence without model calls or false user understanding',
     ],
     counts,
   }

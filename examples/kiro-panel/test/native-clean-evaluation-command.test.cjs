@@ -1,5 +1,8 @@
 const assert = require('node:assert/strict')
 const { test } = require('node:test')
+const { readFileSync } = require('node:fs')
+const { join } = require('node:path')
+const { createHash } = require('node:crypto')
 const {
   COMMAND_ID, RUN_LABEL, confirmedModels, executeNativeCleanEvaluation,
   renderNativeCleanEvaluationHtml,
@@ -28,18 +31,19 @@ function harness(overrides = {}) {
     commands: { registerCommand: (_id, callback) => ({ callback, dispose: () => undefined }) },
     window: {
       showQuickPick: async items => {
+        if (items[0].corpusId) return items[0]
         assert.equal(items[0].modelId, SONNET)
         return items[0]
       },
       showWarningMessage: async (message, options, label) => {
-        assert.match(message, /7 synthetic/)
+        assert.match(message, /8 synthetic/)
         assert.equal(options.modal, true)
         assert.match(options.detail, /retry 0/)
         assert.equal(label, RUN_LABEL)
         return label
       },
       withProgress: async (options, callback) => {
-        assert.match(options.title, /7-cell native Analyst/)
+        assert.match(options.title, /8-cell native Analyst/)
         return callback({ report: () => undefined }, {
         isCancellationRequested: false,
         onCancellationRequested: () => ({ dispose: () => undefined }),
@@ -58,7 +62,7 @@ function harness(overrides = {}) {
     setBusy: value => { busy = value },
     getNativeWorker: () => ({ acquireIsolatedEvaluation: async () => lease }),
     packagedRuntime: async () => ({ prompts: {
-      EVIDENCE_ANALYST: { text: prompt('Analyst', '1.0.7') },
+      EVIDENCE_ANALYST: { text: prompt('Analyst', '1.0.8') },
     } }),
     connectLocalCore: async () => ({ restoreProject: async () => ({
       currentTask: { id: 'task_runtime' },
@@ -83,9 +87,9 @@ function harness(overrides = {}) {
     runAnalyst: async input => {
       assert.equal(input.model.id, SONNET)
       assert.equal(input.expectedWindowId, WINDOW_ID)
-      assert.equal(input.fixture.promptVersion, '1.0.7')
+      assert.equal(input.fixture.promptVersion, '1.0.8')
       return { metadata: { status: 'PLAN_FINISHED', deterministicStatus: 'FAILED',
-        turns: 7, windowId: WINDOW_ID, promptSha256: 'a'.repeat(64),
+        turns: 8, windowId: WINDOW_ID, promptSha256: 'a'.repeat(64),
         fixtureSha256: 'f'.repeat(64) },
       display: { request_only: 'RAW_ANALYST_MODEL_ANSWER' } }
     },
@@ -105,12 +109,13 @@ test('orders Sonnet first but accepts only an exact catalog-confirmed selection'
     analystModels: ['valid', 'bad model'] }), /NATIVE_CLEAN_MODEL_CATALOG_UNCONFIRMED/)
 })
 
-test('runs seven Analyst cells and exposes execution separately from a failed quality verdict', async () => {
+test('runs eight Analyst cells and exposes execution separately from a failed quality verdict', async () => {
   const state = harness()
   const result = await executeNativeCleanEvaluation(state.vscode, state.deps)
   assert.equal(result.status, 'PLAN_FINISHED')
-  assert.equal(result.metadata.turns, 7)
-  assert.equal(result.metadata.maxTurns, 7)
+  assert.equal(result.metadata.turns, 8)
+  assert.equal(result.metadata.maxTurns, 8)
+  assert.equal(result.metadata.corpusId, 'SOURCE_FIRST_REGRESSION')
   assert.equal(result.metadata.deterministicStatus, 'FAILED')
   assert.equal(result.metadata.humanReviewStatus, 'NEEDS_REVIEW')
   assert.equal(result.metadata.model.id, SONNET)
@@ -199,4 +204,88 @@ test('escapes and redacts temporary model output in a scripts-disabled-compatibl
 
 test('exports the registration id for the P1-owned extension hook', () => {
   assert.equal(COMMAND_ID, 'vibeHelper.nativeCleanEvaluationRun')
+})
+
+test('selects only a fixed held-out corpus and includes its provenance in the result', async () => {
+  const state = harness({ runAnalyst: async input => {
+    assert.equal(input.fixture.fixtureId, 'source-first-held-out-collections-and-requests')
+    assert.ok(input.fixture.cases.every(item => item.conceptCandidateMode === 'NONE'))
+    return { metadata: { status: 'PLAN_FINISHED', deterministicStatus: 'PASSED', turns: 8,
+      windowId: WINDOW_ID, promptSha256: 'a'.repeat(64), fixtureSha256: 'b'.repeat(64) },
+    display: {} }
+  } })
+  state.vscode.window.showQuickPick = async items =>
+    items[0].corpusId ? items[1] : items[0]
+  const result = await executeNativeCleanEvaluation(state.vscode, state.deps)
+  assert.equal(result.metadata.corpusId, 'HELD_OUT_COLLECTIONS_REQUESTS')
+  assert.equal(result.metadata.fixtureSha256, 'b'.repeat(64))
+  assert.equal(result.metadata.maxTurns, 8)
+})
+
+test('unknown corpus and corpus cancellation never acquire a worker or call a model', async () => {
+  let workerRequests = 0
+  for (const selection of [undefined, { corpusId: 'UNREVIEWED_CORPUS' }]) {
+    const state = harness({ getNativeWorker: () => { workerRequests += 1 } })
+    state.vscode.window.showQuickPick = async () => selection
+    const result = await executeNativeCleanEvaluation(state.vscode, state.deps)
+    assert.equal(result.status, selection === undefined ? 'CANCELLED_CORPUS_SELECTION' :
+      'FAILED')
+    if (selection) assert.equal(result.errorCode, 'NATIVE_CLEAN_CORPUS_UNCONFIRMED')
+    assert.equal(state.busy, false)
+  }
+  assert.equal(workerRequests, 0)
+})
+
+test('selects the newly fixed paired corpus without changing the existing two', async () => {
+  const state = harness({ runAnalyst: async input => {
+    assert.equal(input.fixture.fixtureId, 'paired-held-out-lifetimes-order-and-normalization')
+    assert.equal(input.fixture.cases.length, 8)
+    return { metadata: { status: 'PLAN_FINISHED', deterministicStatus: 'PASSED', turns: 8,
+      windowId: WINDOW_ID, promptSha256: 'a'.repeat(64), fixtureSha256: 'b'.repeat(64) }, display: {} }
+  } })
+  state.vscode.window.showQuickPick = async items => items[0].corpusId ? items[2] : items[0]
+  const result = await executeNativeCleanEvaluation(state.vscode, state.deps)
+  assert.equal(result.metadata.corpusId, 'PAIRED_LIFETIMES_ORDER_NORMALIZATION')
+})
+
+test('compares the exact archived baseline with the same eight held-out inputs and oracles', async () => {
+  const archive = readFileSync(join(__dirname, '../../../tests/eval/fixtures/prompt-regressions/evidence-analyst-v1.0.7-canonical.md'), 'utf8')
+  const original = require('../../../tests/eval/fixtures/prompt-regressions/evidence-analyst-v1.0.8-held-out.json')
+  const state = harness({ archivedComparisonPrompt: archive, runAnalyst: async input => {
+    assert.equal(input.rolePrompt, archive)
+    assert.equal(input.fixture.promptVersion, '1.0.7')
+    assert.equal(input.fixture.comparisonProtocol, 'SAME_EIGHT_CASES_V1')
+    assert.deepEqual(input.fixture.cases, original.cases)
+    assert.equal(original.promptVersion, '1.0.8')
+    return { metadata: { status: 'PLAN_FINISHED', deterministicStatus: 'FAILED', turns: 8,
+      windowId: WINDOW_ID, promptSha256: createHash('sha256').update(archive).digest('hex'),
+      fixtureSha256: createHash('sha256').update(JSON.stringify(input.fixture)).digest('hex') }, display: {} }
+  } })
+  state.vscode.window.showQuickPick = async items => items[0].corpusId ? items[1] :
+    items[0].variantId ? items[1] : items[0]
+  const result = await executeNativeCleanEvaluation(state.vscode, state.deps)
+  assert.equal(result.metadata.promptVersion, '1.0.7')
+  assert.equal(result.metadata.promptSource, 'SHA_PINNED_ARCHIVE')
+  assert.equal(result.metadata.caseSetSha256, createHash('sha256').update(JSON.stringify(original.cases)).digest('hex'))
+  assert.equal(result.metadata.maxTurns, 8)
+  assert.equal(result.metadata.finalIdleConfirmed, true)
+  assert.equal(result.metadata.coreMutationCount, 0)
+  assert.match(result.metadata.kind, /V1_0_7/)
+  assert.deepEqual(state.released, { resume: false })
+})
+
+test('rejects archive drift and unknown prompt selection before leasing a worker', async () => {
+  const archive = readFileSync(join(__dirname, '../../../tests/eval/fixtures/prompt-regressions/evidence-analyst-v1.0.7-canonical.md'), 'utf8')
+  let workerRequests = 0
+  for (const mode of ['drift', 'unknown', 'cancel']) {
+    const state = harness({ archivedComparisonPrompt: mode === 'drift' ? archive + '\n' : archive,
+      getNativeWorker: () => { workerRequests++ } })
+    state.vscode.window.showQuickPick = async items => items[0].variantId ?
+      mode === 'cancel' ? undefined : { variantId: 'UNREVIEWED_PROMPT' } : items[0]
+    const result = await executeNativeCleanEvaluation(state.vscode, state.deps)
+    assert.equal(result.status, mode === 'cancel' ? 'CANCELLED_PROMPT_SELECTION' : 'FAILED')
+    if (mode === 'drift') assert.equal(result.errorCode, 'NATIVE_CLEAN_BASELINE_ARCHIVE_INVALID')
+    if (mode === 'unknown') assert.equal(result.errorCode, 'NATIVE_CLEAN_PROMPT_SELECTION_UNCONFIRMED')
+  }
+  assert.equal(workerRequests, 0)
 })

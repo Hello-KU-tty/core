@@ -4,6 +4,7 @@ import {
   advertiseJsonEnvelope,
   decodeJsonEnvelope,
   envelopeFailureReceipt,
+  jsonEnvelopeToolError,
 } from './native-json-envelope.mjs'
 
 const coreTool = {
@@ -216,4 +217,64 @@ test('classifies pre-Core envelope failures without recording the JSON payload',
       inputJsonBytes: null,
     },
   )
+})
+
+test('truncated JSON stays rejected with a safe actionable offset, not automatic repair', () => {
+  const inputJson = '{"report":{"limitations":["private-value"]}'
+  assert.throws(
+    () => decodeJsonEnvelope('BUILDER', 'complete_task', { inputJson }),
+    (error) => {
+      const result = jsonEnvelopeToolError(error)
+      assert.equal(result.isError, true)
+      const failure = JSON.parse(result.content[0].text)
+      assert.equal(failure.code, 'BRIDGE_ENVELOPE_JSON_INVALID')
+      assert.equal(failure.syntax.reason, 'INCOMPLETE_JSON')
+      assert.equal(failure.syntax.offset, inputJson.length)
+      assert(failure.syntax.instruction.includes('outer argument object closing brace'))
+      const receipt = envelopeFailureReceipt('BUILDER', 'complete_task', { inputJson }, error)
+      assert.deepEqual(receipt.syntax, failure.syntax)
+      assert(!JSON.stringify(result).includes('private-value'))
+      assert(!JSON.stringify(receipt).includes('private-value'))
+      return true
+    },
+  )
+  // A new valid submission, not bridge repair, is required for Core dispatch.
+  assert.deepEqual(
+    decodeJsonEnvelope('BUILDER', 'complete_task', { inputJson: `${inputJson}}` }).input,
+    { report: { limitations: ['private-value'] } },
+  )
+})
+
+test('JSON syntax diagnostics do not expose quoted parser text, names or forged detail', () => {
+  for (const inputJson of [
+    '{"private-name":private-value}',
+    '{"private-name":"private-value\n"}',
+    '{',
+    '',
+  ]) {
+    assert.throws(
+      () => decodeJsonEnvelope('BUILDER', 'complete_task', { inputJson }),
+      (error) => {
+        const result = jsonEnvelopeToolError(error)
+        assert.equal(result.isError, true)
+        assert(!JSON.stringify(result).includes('private-'))
+        assert(result.content[0].text.length < 512)
+        return true
+      },
+    )
+  }
+  for (const error of [
+    null,
+    undefined,
+    new Error('BRIDGE_ENVELOPE_PRIVATE_VALUE'),
+    {
+      message: 'BRIDGE_ENVELOPE_JSON_INVALID',
+      syntax: { reason: 'private-value' },
+    },
+  ]) {
+    const result = jsonEnvelopeToolError(error)
+    assert(!JSON.stringify(result).includes('PRIVATE_VALUE'))
+    assert(!JSON.stringify(result).includes('private-value'))
+    assert.equal(JSON.parse(result.content[0].text).syntax, undefined)
+  }
 })

@@ -770,6 +770,28 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 
 ### [~] T19. 자체 Kiro IDE 패널과 프론트 실제 연동
 
+**2026-09-28 08:50 사용자 연장:** 마감은 같은 날 **10:00 KST**로 변경했다. 최신 프론트 main0858811의 실측 인계 B2(Core 설치 경로 재사용)·B1(RPC 오류 사유) 등을 백엔드에서 수정·검증하는 데 우선 집중한다. [대조 기록](spikes/T19_FRONTEND_LATE_LIVE_TRIAGE_20260928.md). 계정누적900 상한과 프론트수정/commit/push/배포 금지, 공유Core/사용자창 보존은 유지한다. 아래08:43 종료는 1차 Mac 성능작업 기록이며 현재T19/Goal은 계속진행중이다.
+
+**09:20 후속:** B2는 설치/runtime identity 비교·불일치 lease 갱신 금지·45초 정상 owner 종료 대기·명시적 재시도 검증으로 수정했다. B1은 bounded structured 오류의 고정 코드 분류·worker/run 전파를 구현했다.09:08 시작 fullcheck unit128/integration325/eval41/E2E12 PASS이며 이후 lifecycle 재시도 guard3개·worker 오류7개·Trust1개와 실제 program 오류4종/같은 Project 명시적 retry 검증을 추가했다. B3 frontend의 옛 run 캐시 갱신 필요, durable 실패/abandon 미구현, B5 Windows 프로세스/정책 영향 미확정은 [항목별 인계](spikes/T19_FRONTEND_LATE_LIVE_TRIAGE_20260928.md)에 구분한다. Windows 신규 실측/새 kit/상위T19 완료는 아니다. 추가 모델0.
+
+**09:43 최종 수정 고정:** 느린lease중첩/종료경합2개FAIL재현 뒤 maintenance직렬화·종료전drain·stop뒤갱신금지를보강했다. lifecycle17회귀PASS, 최신fullcheckunit130+3skip/integration325+8skip/eval41/Campus3/smoke6/E2E12, 별도CJS161+2skip/panelbuild/actualprogramconsumer PASS. 메모리안portablehost/runtimebundle2회귀와실패즉시Coregrant회수도포함한다. 최종1,000Concept의restore/Evidence/lifecycle재측정은전체응답·상태동등/기존성능개선유지·모델0이었다. [프론트 답변](FRONTEND_LIVE_TEST_RESPONSE_20260928.md)에오류표시/Core업데이트대기/명시적retry/100runretention/Windows남은평가를정리했다.
+
+**09:50경 사용자 승인 종료:** Mac 개선·프론트 인계 수정과 최종 검증을 마쳐 예정10:00까지 추가보고를 기다리지 않고 마무리한다.09:50:11 종료감사는 소유Core정지·SQLite50테이블불변·무결성PASS였다. 연장구간모델0, 데이터/임시파일보존, commit/push/새VSIX없음. Windows 재평가 및 상위T19/T19-N은 미완료로 유지한다.
+
+**2026-09-28 08:43 Mac 개선 인계 완료:** 최종 `pnpm check` unit123+3SKIP/integration323+8SKIP/eval41/Campus3/smoke6/E2E12, panel123+2SKIP, 별도34검사, panel build와 actualprogram consumer PASS. 실제 Core15분·9,374조회는 전체 응답/50테이블 불변·새 run0·무결성 PASS. 최종 누적 계정815.91(08:33 관측),07:27 이후 모델0. 승인 실험 개발 창과 소유 Core만 유휴 정상 종료했고 DB/원본을 보존했다. [최종 인계](spikes/T19_MAC_PERFORMANCE_HANDOFF_20260928.md)·[정제 근거](spikes/T19_MAC_PERFORMANCE_RECEIPTS_20260928.json)에 한정 성능 개선, 기각 실험, 남은 의미 품질/생성 앱 결함, Windows 재평가 절차를 남겼다. 미커밋·push/프론트 수정/배포 없음. **이번 시간 제한 Mac 작업의 종료이며 T19/T19-N과 제출 전 Windows gate는 완료 처리하지 않는다.**
+
+**07:49 lifecycle 채택/인계 초안:** Analysis 상태전환5곳의 미사용 Ledger/proposal 읽기를 제거했다. 두 독립DB의 정상/실패/idempotent 응답과 전체테이블 매회동등성, 반복측정, 대상46검사·actualprogram소비·전체check(integration321+8SKIP/E2E12)·실제16Project/77view Core재시작전후동등성 PASS. 1000개이력의retry6.834→0.286ms 등 Core계산비용을 줄였고 Analystcontext/증거판정/FinalUpgrade정책은 그대로다. 실제 native취소직후재요청도07:27새runner PASS이며 원본FAIL기록을 보존한다. [Windows 제출 전 인계](spikes/T19_MAC_PERFORMANCE_HANDOFF_20260928.md)에 채택/기각·재현명령·남은품질/Windows gate를 정리했다. 미커밋이며 commit/push/새kit배포는 하지 않았다.09:00까지후속검토중,T19/T19-N미완료유지.
+
+**2026-09-28 성능 개선 착수:** 사용자가 현재 맥에서 Goal 기반 반복 개선을 09:00 KST까지 진행하도록 승인했다. 프론트 `main`의 실제 소비 흐름과 계약을 기준으로 baseline → 작은 변경 → 반복 측정/회귀 → Windows 재평가 인계를 수행한다. 진행 중 T19의 후속 범위이며 T20/T21/T27을 완료 또는 선행 조건 충족으로 바꾸지 않는다. 크레딧·마감·실험별 판정은 [실험 기록](spikes/T19_MAC_PERFORMANCE_20260928.md)에 남긴다.
+
+**07:15 Analyst 한정 판정:** source-first 동일8개에서원본3/8→후보1.0.8의6/8두회,별도두코퍼스는5/8·4/8동률이다. 출력schema준수개선만채택하고지연/일반의미품질/사용자학습향상으로표시하지않는다. 인용·DIRECTLY_LED상승은기존Core가거절하지만미래계획APPLICATION같은의미오류는수락될수있음을offline순수정책대조로확인했다. 원문·전체실패·동일inputSHA·최대8회평가기록을보존한다. 최종전체회귀·인계정리와Windows실측은별도이며T19/T19-N은계속진행중이다.
+
+**06:41 중간 검증:** Evidence 조회의 요청내중복·단일Concept전체이력읽기·미사용Ledger hydration을 제거했다. 독립SQLite 전체응답동등성/반복·대상22검사·actualprogram Evidence projector·전체check(integration319+8SKIP/E2E12) PASS. 실제16Project/77filtered view가 새Core 전후 동일했다. 1000이력 단일Concept128.435→1.514ms, 개념별Episode100개 전체116.076→16.012ms 관측으로 채택한다. actualnative 취소/즉시재요청도 owned terminal뒤실행을 확인하고 원본계측FAIL/후속감사를 구분했다. Analyst후보판정·최종인계·Windows실측은 아직남아 있으며 상위T19는진행중이다.
+
+**05:30 중간 검증:** Helper 대화 복원에서 사용하지 않는 Evidence/Ledger hydration을 제거했다. 실제 SQLite 응답 전체 동등성·반복 측정, 전체 `pnpm check`와 actual program HTTP/SSE 소비 검증 PASS. 1,000 Concept/20대화의 delivered 복원 중앙값148.543→9.683ms 관측이며 Windows/모델 응답속도 증명은 아니다. 프롬프트 퇴행 후보는 archive/복귀했고 Goal·상위 T19는 계속 진행 중이다.
+
+**05:58 중간 검증:** Helper context의 closed Episode 요약도 별도 history reader로 바꾸고 응답전체동등성·반복측정·전체check(integration316)/actualprogram소비 PASS로 유지한다. 1,000Concept/20Helper대화 계산146.714→7.548ms, 재구성반복134.061→7.342ms. Helper1.2.1 후보는 의미 품질 근거 부족으로 archive하고1.2.0복귀; 기본버전의 제한도 보존한다. 실제 Windows 평가·최종채택표·Analyst후보판정은 남아 있다.
+
 **2026-09-27 프론트 후속 요청 반영:** 프론트의 적용 결과·요청서(`program` `main` `048bce3`)를 검토했다. 이전 기준 `73d0eb5`는 프론트 main의 merge commit이며 clean checkout gate는 READY였다. main clean clone은 typecheck·228 tests·build를 통과하지만 `portable/node_modules/` 28개 미추적과 CRLF 때문에 VSIX 조립이 실패함을 확인했다. Final Upgrade가 기록된 Helper 답변의 trace만 허용하도록 Core를 고치고, Builder/Helper/Decision/Evidence/Final Upgrade/worker 상태의 SDK helper와 host 타입을 추가했다. UI를 patch하지 않는 update kit `frontend-handoff-20260927`(추적 규칙 포함)을 만들고 새 clone 검증·VSIX 조립·consumer·HTTP 계약 test·`pnpm check`·CJS 110을 통과했다. [답변·계약](FRONTEND_HANDOFF_20260927.md), [검증 기록](spikes/T19_FRONTEND_HANDOFF_UPDATE_20260927.json). 이번 변경 뒤 모델 native 재실측과 다른 기기 검증은 하지 않았으며 Builder/Helper 제품 화면 연결과 T19/T19-N 전체 완료는 별도다.
 
 **2026-09-26 구현 착수:** 사용자 지시로 계획 이후 실제 인계 kit 구현에 착수한다. UI 독립 host·SDK·portable 자산과 검토된 `program` 적용 패치를 제공하고 현재 Windows 환경에서 소비·Core·확장 회귀를 검증한다. 다른 기기·외부 환경 검증은 이번 인계 범위에서 제외하며 전체 T19의 의미 품질 완료로 대체하지 않는다.

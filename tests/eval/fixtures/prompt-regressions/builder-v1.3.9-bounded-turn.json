@@ -1,0 +1,36 @@
+{
+  "promptVersion": "1.3.9",
+  "kind": "MECHANICAL_PROMPT_REGRESSION",
+  "containsPersonalData": false,
+  "liveResult": "OBSERVED_WITH_LIMITATIONS",
+  "nativeObservation": {
+    "report": "native-unseen-dedup-builder-1.json",
+    "pendingDecisionReadsInOneTurn": 1,
+    "dependentImplementationBeforeResolution": false,
+    "firstPackageHasNodeTypesAndCompiledTestTarget": true,
+    "resumeReport": "native-unseen-dedup-resume-1.json",
+    "durableTaskCompleted": true,
+    "completionScopeErrorsBeforeSuccess": 1,
+    "independentBuildTypecheckAndTests": "PASS_16_TESTS",
+    "independentHttpProbes": "9_PASS_1_FAIL_NULL_JSON_CRASH",
+    "claimBoundary": "One synthetic fresh build supports bounded waiting and compiled-test behavior, not general output quality or a paired latency improvement."
+  },
+  "observedBaseline": {
+    "promptVersion": "1.3.8",
+    "pendingDecisionReadsInOneTurn": 4,
+    "twoGeneratedProjectsNeededCompiledTestPathRepair": true,
+    "invalidStateTransitionCompileTimeClaimOverstated": true
+  },
+  "requiredRules": [
+    "한 turn에서 같은 pending Decision은 한 번만 조회하라",
+    "짧은 반복 조회·sleep·다른 tool을 이용한 상태 polling을 하지 마라",
+    "독립 작업이 있으면 수행하고",
+    "이것은 Task 완료나 선택 취소가 아니다",
+    "다음 명시적 Builder 시작/재개 때",
+    "실제 선택이 있을 때만 의존 작업과 적용을 진행한다",
+    "기본 추천을 자동 수락하지 마라",
+    "실제 컴파일된 test 파일 또는 디렉터리를 명시적으로 지정하라",
+    "실패한 test를 제외해 통과시키지 말고",
+    "정적 타입이 막는 잘못된 표현과 런타임 입력·상태 전이 검증이 거절하는 행동을 구분한다"
+  ]
+}

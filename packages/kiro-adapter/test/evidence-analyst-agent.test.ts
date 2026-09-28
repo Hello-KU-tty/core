@@ -45,7 +45,7 @@ describe('Evidence Analyst adapter', () => {
       tools: [],
       allowedTools: [],
     })
-    expect(definition.prompt).toContain('빈 `proposals`')
+    expect(definition.prompt).toContain('proposals: []')
     expect(definition.prompt).toContain('strict JSON')
     expect(definition.prompt).toContain('미래 계획·조건부 해결책·Agent 지시는 수행이 아니다')
     expect(definition.prompt).toContain('구조화된 `USER_DECISION`')

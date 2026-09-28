@@ -26,10 +26,12 @@ async function stageRuntime(source = RUNTIME_SOURCE) {
   await writeFile(join(runtime, 'native-core-stdio-bridge.mjs'), bridge)
   assets.bridge = { path: 'native-core-stdio-bridge.mjs', sha256: sha256(bridge) }
   for (const [role, path] of Object.entries(PROMPTS)) {
-    const content = Buffer.from(`# ${role}\n\n> Prompt version: \`0.0.0\`\n`)
+    const content = role === 'DISCOVERY'
+      ? await readFile(join(__dirname, '../../../docs/agent-prompts/discovery.md'))
+      : Buffer.from(`# ${role}\n\n> Prompt version: \`0.0.0\`\n`)
     await writeFile(join(runtime, path), content)
     assets[role] = { path, sha256: sha256(content) }
-    promptVersions[role] = '0.0.0'
+    promptVersions[role] = content.toString().match(/^> Prompt version: `([^`]+)`$/m)[1]
   }
   await writeFile(join(runtime, 'manifest.json'), JSON.stringify({
     schemaVersion: 1,
@@ -102,6 +104,43 @@ test('an unrecognized private runtime source fails closed', async () => {
   const root = await stageRuntime('KIRO_IDE_UNSUPPORTED_SOURCE')
   await assert.rejects(resolvePackagedNativeRuntime(runtimeOptions(root)), error =>
     error.code === 'NATIVE_RUNTIME_SOURCE_UNSUPPORTED')
+})
+
+test('Discovery packaging verifies the full canonical prompt on Mac and Windows, rejecting shortened or foreign text', async () => {
+  const root = await stageRuntime()
+  const runtime = await resolvePackagedNativeRuntime(runtimeOptions(root))
+  const workspace = await realpath(await mkdtemp(join(tmpdir(), 'vibe-helper-phase-workspace-')))
+  const agents = join(workspace, '.kiro', 'agents')
+  await mkdir(agents, { recursive: true })
+  const bindingFile = join(workspace, 'binding.json')
+  const roleName = 'vibe-native-discovery-deadbeef'
+  const configPath = join(agents, `${roleName}.json`)
+  const job = { role: 'DISCOVERY', roleName, workspace, bindingFile, protectedBuiltin: false }
+  for (const mode of ['PREVIEW', 'ENRICH_FIRST', 'ENRICH_SECOND', 'ENRICH_SELECTED', 'ROUND', 'MERGE', 'SPEC', 'SPEC_RECOVERY']) {
+    const binding = { role: 'DISCOVERY', workspace, mode }
+    await writeFile(bindingFile, JSON.stringify(binding), { mode: 0o600 })
+    const config = {
+      name: roleName,
+      prompt: runtime.prompts.DISCOVERY.text,
+      mcpServers: { 'vibe-native-core': {
+        command: NODE_EXECUTABLE,
+        args: [runtime.bridgeScriptPath, bindingFile, workspace],
+      } },
+    }
+    await writeFile(configPath, JSON.stringify(config), { mode: 0o600 })
+    await materializePackagedRoleRuntime(runtime, job, binding)
+    const beforeWindows = await readFile(configPath, 'utf8')
+    const portable = { ...runtime, windowsProduct: true, runtimeDescriptor: {
+      executable: NODE_EXECUTABLE, args: [], env: {},
+    } }
+    await materializePackagedRoleRuntime(portable, job, binding)
+    assert.equal(await readFile(configPath, 'utf8'), beforeWindows)
+    for (const prompt of [config.prompt.slice(0, 1000), `${config.prompt}\nUntrusted addition`, '']) {
+      await writeFile(configPath, JSON.stringify({ ...config, prompt }), { mode: 0o600 })
+      for (const target of [runtime, portable])
+        await assert.rejects(materializePackagedRoleRuntime(target, job, binding), { code: 'NATIVE_PACKAGED_ROLE_CONFIG_INVALID' })
+    }
+  }
 })
 
 test('a symlinked Agent config parent cannot redirect the package rewrite outside workspace', async () => {

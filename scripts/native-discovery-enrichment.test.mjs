@@ -3,6 +3,8 @@ import { test } from 'node:test'
 import {
   advertiseNativeEnrichment,
   bindNativeEnrichment,
+  nativeEnrichmentFailure,
+  nativeEnrichmentToolError,
   nativeInputSchema,
 } from './native-discovery-enrichment.mjs'
 
@@ -230,4 +232,106 @@ test('SELECTED stays limited to unique currently staged Preview identities', asy
   await assert.rejects(selectedBind({ ...selected, batch: 'SECOND' }), {
     message: 'BRIDGE_ENRICHMENT_MODE_MISMATCH',
   })
+})
+
+test('nested transport metadata is rejected with bounded structural feedback, never repaired', async () => {
+  const input = {
+    ...second,
+    candidates: second.candidates.map((candidate, index) =>
+      index === 0 ? { ...candidate, __tool_use_purpose: 'private-purpose' } : candidate,
+    ),
+  }
+  const before = structuredClone(input)
+  let reads = 0
+  await assert.rejects(
+    bindNativeEnrichment(binding, 'submit_candidate_enrichments', envelope(input), async () => {
+      reads++
+      return context
+    }),
+    (error) => {
+      const failure = nativeEnrichmentFailure(error)
+      assert.deepEqual(failure, {
+        code: 'BRIDGE_ENRICHMENT_INPUT_INVALID',
+        shape: {
+          issueCount: 1,
+          issues: [
+            {
+              path: ['candidates', 0],
+              code: 'unrecognized_keys',
+              unknownKeyCount: 1,
+              transportMetadataNotAllowedHere: true,
+            },
+          ],
+        },
+      })
+      const result = nativeEnrichmentToolError(failure)
+      assert.equal(result.isError, true)
+      assert.deepEqual(JSON.parse(result.content[0].text), failure)
+      assert(!result.content[0].text.includes('private-purpose'))
+      return error.message === failure.code
+    },
+  )
+  assert.equal(reads, 0)
+  assert.deepEqual(input, before)
+})
+
+test('enrichment preserves safe JSON syntax feedback from the shared scalar decoder', async () => {
+  await assert.rejects(
+    bindNativeEnrichment(
+      binding,
+      'submit_candidate_enrichments',
+      {
+        inputJson: '{"candidates":[{"usageMoment":"private-value"}]',
+      },
+      async () => {
+        throw new Error('MUST_NOT_READ_CORE')
+      },
+    ),
+    (error) => {
+      const failure = nativeEnrichmentFailure(error)
+      assert.equal(failure.code, 'BRIDGE_ENVELOPE_JSON_INVALID')
+      assert.equal(failure.syntax.reason, 'INCOMPLETE_JSON')
+      assert(!JSON.stringify(failure).includes('private-value'))
+      return true
+    },
+  )
+})
+
+test('enrichment feedback never echoes values, unknown names, arbitrary errors or forged shape', async () => {
+  const input = {
+    ...second,
+    candidates: Array.from({ length: 10 }, (_, index) => ({
+      ...details(previews[index].candidateId),
+      targetUsers: 'private-value',
+      suggestedScope: { learnerFocus: null, agentSupport: 42, excluded: [] },
+      'private-field-name': 'private-value',
+    })),
+  }
+  await assert.rejects(bind(input), (error) => {
+    const failure = nativeEnrichmentFailure(error)
+    assert(failure.shape.issueCount > 8)
+    assert.equal(failure.shape.issues.length, 8)
+    assert(failure.shape.issues.some((issue) => issue.path.includes('targetUsers')))
+    const text = nativeEnrichmentToolError(failure).content[0].text
+    assert(text.length < 2_048)
+    assert(!text.includes('private-'))
+    assert(!text.includes(previews[0].candidateId))
+    return true
+  })
+  for (const error of [
+    null,
+    undefined,
+    'private-value',
+    new Error('private-value'),
+    new Error('BRIDGE_ENRICHMENT_PRIVATE_VALUE'),
+    {
+      message: 'BRIDGE_ENRICHMENT_INPUT_INVALID',
+      shape: { issues: ['private-value'] },
+    },
+  ]) {
+    const failure = nativeEnrichmentFailure(error)
+    assert.equal(failure.shape, undefined)
+    assert(!JSON.stringify(failure).includes('private-'))
+    assert(!JSON.stringify(failure).includes('PRIVATE_VALUE'))
+  }
 })

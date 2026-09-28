@@ -544,6 +544,7 @@ async function runNativePersonalizationMatrix(input) {
         configuration: model.configuration ?? 'NOT_EXPOSED' },
       expectedWindowId, helperPromptVersion: '1.2.0',
       helperPromptSha256: digest(helperRolePrompt), discoveryPromptVersion: '1.3.5',
+      discoveryPromptShape: 'FULL_CANONICAL_STANDALONE',
       discoveryPromptSha256: digest(discoveryRolePrompt),
       fixtureSha256: digest(JSON.stringify(fixture)),
       helperInvariantSha256: plan.helperInvariantSha256,

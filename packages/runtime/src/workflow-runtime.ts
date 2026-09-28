@@ -411,7 +411,9 @@ export class WorkflowRuntime {
             request.kind === 'BUILDER'
               ? 'Read get_builder_task first. Continue the current Task from durable Context/Decision state. If a user Decision was resolved, read and apply its result before continuing. Do not invent completion; use the canonical checkpoint, tests and result manifest contract.'
               : 'Read get_helper_context for this exact Project/Task and question. You are read-only; do not act as Builder or claim to change its state.',
-            `Exact user message:\n${request.message}`,
+            request.kind === 'BUILDER' && request.message === ''
+              ? 'No additional user message was provided for this explicit Builder start/resume.'
+              : `Exact user message:\n${request.message}`,
           ].join('\n'),
           turnCorrelationId,
         )

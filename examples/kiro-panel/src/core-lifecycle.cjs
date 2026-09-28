@@ -18,17 +18,22 @@ function createCoreLifecycle(options) {
   const connectionFile = join(dataRoot, 'connection.json')
   const listeners = new Set()
   let state = Object.freeze({ phase: 'IDLE' })
-  let selected, packageHash, owned, attempt, timer, stopped = false
+  let selected, packageHash, runtimeIdentity, owned, attempt, timer, stopped = false
   let lastInstance, recoveries = []
+  let leasedInstance, maintenance
   const controller = new AbortController()
   const leaseId = randomUUID()
-  async function lease(action) {
+  async function lease(action, expectedInstance) {
+    if (action === 'RENEW' && stopped) throw new Error('CORE_LIFECYCLE_STOPPED')
     const descriptor = await options.readConnection(connectionFile)
+    if (action === 'RENEW' && stopped) throw new Error('CORE_LIFECYCLE_STOPPED')
+    if (descriptor.backendInstanceId !== expectedInstance) throw new Error('CORE_DESCRIPTOR_STALE')
     const response = await fetch(`${descriptor.baseUrl}/api/host/lease`, {
       method: 'POST', headers: { authorization: `Bearer ${descriptor.token}`, 'content-type': 'application/json' },
       body: JSON.stringify({ action, id: leaseId, pid: process.pid }), signal: AbortSignal.timeout(5000),
     })
     if (!response.ok) throw new Error('CORE_HOST_LEASE_FAILED')
+    if (action === 'RENEW') leasedInstance = expectedInstance
   }
   const publish = value => {
     const next = Object.freeze(value)
@@ -41,7 +46,10 @@ function createCoreLifecycle(options) {
       const value = JSON.parse((await api.plainFile(join(dataRoot, 'backend.lock/owner.json'), 4096)).toString())
       if (!Number.isSafeInteger(value.pid) || value.pid <= 0 ||
           typeof value.instanceId !== 'string' || !/^[0-9a-f-]{36}$/.test(value.instanceId) ||
-          !/^[0-9a-f]{64}$/.test(value.packageHash)) throw new Error('CORE_OWNER_INVALID')
+          typeof value.packageHash !== 'string' || !/^[0-9a-f]{64}$/.test(value.packageHash) ||
+          (value.runtimeIdentity !== undefined && (typeof value.runtimeIdentity !== 'string' ||
+            !/^[0-9a-f]{64}$/.test(value.runtimeIdentity))))
+        throw new Error('CORE_OWNER_INVALID')
       return value
     } catch (error) { if (error.code === 'ENOENT') return null; throw error }
   }
@@ -83,13 +91,19 @@ function createCoreLifecycle(options) {
     if (stopped) throw new Error('CORE_LIFECYCLE_STOPPED')
     if (!selected) {
       publish({ phase: 'PREPARING_RUNTIME' })
-      selected = await selectRuntime(controller.signal)
-      packageHash = createHash('sha256').update(JSON.stringify(selected.resources.manifest)).digest('hex')
+      const candidate = await selectRuntime(controller.signal)
+      const candidateHash = createHash('sha256').update(JSON.stringify(candidate.resources.manifest)).digest('hex')
+      const candidateIdentity = api.coreInstallationIdentity(candidate.resources, candidate.runtime)
+      if (typeof candidateIdentity !== 'string' || !/^[0-9a-f]{64}$/.test(candidateIdentity))
+        throw new Error('CORE_RUNTIME_IDENTITY_INVALID')
       await api.ownedPrivateDirectory(dataRoot)
+      // A rejected preparation must not cache partially validated state that
+      // would skip the identity or private-directory guard on explicit retry.
+      selected = candidate; packageHash = candidateHash; runtimeIdentity = candidateIdentity
     }
-    publish({ phase: 'CONNECTING_CORE', runtimeSource: selected.runtime.source })
+    publish({ phase: 'CONNECTING_CORE', runtimeSource: selected.runtime.source, errorCode: null })
     const deadline = Date.now() + 45000
-    let launched = false, recovered = false
+    let launched = false, recovered = false, waitingForOwnerExit = false
     while (!stopped && Date.now() < deadline) {
       let lock, lockAlive
       try {
@@ -105,15 +119,22 @@ function createCoreLifecycle(options) {
         throw error
       }
       if (lockAlive) {
-        if (lock.packageHash !== packageHash) throw new Error('CORE_UPDATE_WAITING_FOR_OWNER_EXIT')
-        try {
+        if (lock.packageHash !== packageHash || lock.runtimeIdentity !== runtimeIdentity) {
+          // A reload must not renew the previous installation's lease. Its
+          // existing hosts decide when it can close; never kill a shared PID.
+          waitingForOwnerExit = true
+          publish({ phase: 'CONNECTING_CORE', runtimeSource: selected.runtime.source,
+            errorCode: 'CORE_UPDATE_WAITING_FOR_OWNER_EXIT' })
+        } else try {
+          waitingForOwnerExit = false
           const client = await connect(connectionFile)
           const health = await client.health()
           if (health.backendInstanceId !== lock.instanceId) throw new Error('CORE_DESCRIPTOR_STALE')
-          await lease('RENEW')
+          await lease('RENEW', lock.instanceId)
           const rotated = Boolean(lastInstance && lastInstance !== lock.instanceId)
           lastInstance = lock.instanceId
           publish({ phase: 'CORE_CONNECTED', runtimeSource: selected.runtime.source,
+            errorCode: null,
             ownership: owned?.child.pid === lock.pid ? 'OWNED' : 'SHARED',
             backendInstanceId: lock.instanceId, restoreRequired: rotated })
           return { connectionFile, ...selected, health }
@@ -121,6 +142,7 @@ function createCoreLifecycle(options) {
           if (safeCode(error) === 'CORE_UPDATE_WAITING_FOR_OWNER_EXIT') throw error
         }
       } else if (lock && !recovered) {
+        waitingForOwnerExit = false
         publish({ phase: 'RECOVERING_CORE' })
         const recovery = launch('recover')
         await Promise.race([recovery.done, delay(45000)])
@@ -128,6 +150,7 @@ function createCoreLifecycle(options) {
         // Another window may have recovered first. Re-read the owner before acting.
         recovered = true
       } else if (!lock && !launched) {
+        waitingForOwnerExit = false
         if (lastInstance) {
           recoveries = recoveries.filter(time => Date.now() - time < 60000)
           if (recoveries.length >= 2) throw new Error('CORE_CRASH_RETRY_REQUIRED')
@@ -140,7 +163,8 @@ function createCoreLifecycle(options) {
         throw new Error(owned.failure)
       await delay(200)
     }
-    throw new Error(stopped ? 'CORE_LIFECYCLE_STOPPED' : 'CORE_START_TIMEOUT')
+    throw new Error(stopped ? 'CORE_LIFECYCLE_STOPPED' : waitingForOwnerExit
+      ? 'CORE_UPDATE_WAITING_FOR_OWNER_EXIT' : 'CORE_START_TIMEOUT')
   }
   function start() {
     if (attempt) return attempt
@@ -148,15 +172,16 @@ function createCoreLifecycle(options) {
       publish({ phase: 'FAILED', errorCode: safeCode(error) }); throw error
     }).finally(() => { attempt = null })
     if (!timer) timer = setInterval(() => {
-      if (stopped || attempt || ['FAILED', 'IDLE'].includes(state.phase)) return
-      void (async () => {
+      if (stopped || attempt || maintenance || ['FAILED', 'IDLE'].includes(state.phase)) return
+      maintenance = (async () => {
         try {
           const client = await connect(connectionFile)
           const health = await client.health()
-          if (health.backendInstanceId === lastInstance) { await lease('RENEW'); return }
+          if (stopped) return
+          if (health.backendInstanceId === lastInstance) { await lease('RENEW', lastInstance); return }
         } catch {}
-        await start()
-      })().catch(() => {})
+        if (!stopped) await start()
+      })().catch(() => {}).finally(() => { maintenance = null })
     }, 2000)
     return attempt
   }
@@ -168,8 +193,12 @@ function createCoreLifecycle(options) {
     async dispose() {
       if (stopped) return
       stopped = true; controller.abort(); clearInterval(timer)
+      // Drain this host's bounded periodic request before RELEASE. Otherwise a
+      // delayed renewal could re-add the lease after disposal and delay updates.
+      await maintenance
       await attempt?.catch(() => {})
-      await lease('RELEASE').catch(() => {})
+      if (leasedInstance) await lease('RELEASE', leasedInstance).catch(() => {})
+      leasedInstance = undefined
       // Core outlives host reloads and other live windows. The final lease expiry
       // closes/revokes it; a shared process is never killed by a departing host.
       if (owned && !owned.exited) {

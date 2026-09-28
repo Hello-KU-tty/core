@@ -1,0 +1,1388 @@
+{
+  "schemaVersion": 1,
+  "kind": "T19_MAC_PERFORMANCE_HANDOFF_EVIDENCE",
+  "generatedAt": "2026-09-28T00:55:03.058Z",
+  "snapshotStatus": "MAC_WORK_COMPLETED_USER_APPROVED_EARLY_FINISH",
+  "validationScope": "MACOS_LOCAL_SYNTHETIC_ONLY",
+  "windowsValidation": "NOT_RUN_FOR_CURRENT_MAC_CHANGES",
+  "measurementHost": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "node": "v24.19.0",
+    "pnpm": "11.12.0",
+    "osRelease": "25.6.0",
+    "cpuModel": "Apple M4 Pro",
+    "logicalCpuCount": 14,
+    "totalMemoryGiB": 64
+  },
+  "source": {
+    "baselineHead": "04117c520c10e732af709b0d064c020d1d001e55",
+    "uncommittedChanges": true,
+    "commitPushOrDeploymentPerformed": false,
+    "inputHashCoverage": "SELECTED_PERFORMANCE_PACKAGING_FRONTEND_RELIABILITY_FILES_NOT_COMPLETE_WORKTREE",
+    "currentInputs": [
+      {
+        "path": "packages/application/src/application-service.ts",
+        "sha256": "96db4198264ae211480245708d35a2870df0fee4fee9241370e09596a0d1c08e"
+      },
+      {
+        "path": "packages/application/src/storage-ports.ts",
+        "sha256": "5bf4eaad89a6c76b194baafe395fff038dd8e794ed8f7364f68e0df53aa4bc35"
+      },
+      {
+        "path": "packages/storage-sqlite/src/repository.ts",
+        "sha256": "bdb8e1ffd6872eebc2b9391c9628a0dda8bff0f775f477bfa93e3639aea14b83"
+      },
+      {
+        "path": "scripts/build-portable-core.mjs",
+        "sha256": "40ad5a43bd2eebaf6fa410f0b34436f5bb2af6a50b48b0cbda02dd5f3aa699c0"
+      },
+      {
+        "path": "scripts/portable-build-preflight.mjs",
+        "sha256": "10c9f1361c29fc9843e22746cb861e4c88a04b0e9990c4891826ea8759bebce2"
+      },
+      {
+        "path": "apps/local-backend/src/main.ts",
+        "sha256": "773cd82cbef4b361a10aa653a2903a40a245c4d48cfa2f796fcb857dc9055c8e"
+      },
+      {
+        "path": "packages/runtime/src/portable-core.ts",
+        "sha256": "31aa20520282764496c3e4d36de7b445cea01fe8366ada5972126ed355858893"
+      },
+      {
+        "path": "examples/kiro-panel/src/core-lifecycle.cjs",
+        "sha256": "9f8325da3ac4d275a9e56839f98d037baa83780599db7d301bf38eb129ed8e28"
+      },
+      {
+        "path": "examples/kiro-native-host/native-client.cjs",
+        "sha256": "764ac47180b1188c4d6e9e5158232e19e723bbb5eb523890d86d5ff5302e6387"
+      },
+      {
+        "path": "examples/kiro-native-host/native-rpc-error.cjs",
+        "sha256": "eeccf0a57064d11e641ab51a10b61586e95c6145a4e134397dcd74b1fb7ff4d9"
+      },
+      {
+        "path": "apps/local-backend/test/native-failure-retry.integration.test.ts",
+        "sha256": "9f6ae55dcae1ef7d48afafc85e95f40fa13b77f4b9681a52067978c360fb5deb"
+      },
+      {
+        "path": "examples/kiro-panel/test/core-lifecycle.test.cjs",
+        "sha256": "5ab20ee10371764495c6f22c9e070c0e28364031355504b42eb804756697820d"
+      },
+      {
+        "path": "examples/kiro-panel/test/frontend-host.test.cjs",
+        "sha256": "53a9ee34e63b8ec84909f0cebfcf5f493d042cd63b4dd77ebdbc788869a01087"
+      },
+      {
+        "path": "examples/kiro-panel/test/native-worker-failure.test.cjs",
+        "sha256": "a20a4e43150a69b3d1a78a95c0a25cdee58abc9b99fe5e44bf5c1e0d20cfdd76"
+      },
+      {
+        "path": "examples/kiro-panel/test/native-rpc-error.test.cjs",
+        "sha256": "e4a1042e1670f7421b90008eca2703d392ca5ee3239f7e837bd7844ad4827e7e"
+      },
+      {
+        "path": "tests/unit/native-client.test.ts",
+        "sha256": "0988d24afbaa94e3d86d6659c8a029382c1ca3e52c269e7475284624f04712ec"
+      },
+      {
+        "path": "packages/runtime/test/portable-core.test.ts",
+        "sha256": "a46c06df687c7c814f0ba670fc5170e452225f413247781d111fae4593bc63f5"
+      },
+      {
+        "path": "scripts/test-managed-core.mjs",
+        "sha256": "be6a734e04de72ec9839bb29aa79d204e3b9a07e5c214e699ee339bd4e27a36b"
+      },
+      {
+        "path": "scripts/test-program-consumer.mjs",
+        "sha256": "31a2eb96db352aaae2a76e2da2a2bb0e327336566331c4f7bdf9fae9658c2664"
+      },
+      {
+        "path": "examples/kiro-panel/src/native-worker.cjs",
+        "sha256": "126b6b4c028b624a76553ffb817d84f93657c385851b5ad1f1b13bf6630d246a"
+      },
+      {
+        "path": "examples/kiro-panel/src/frontend-host.cjs",
+        "sha256": "7bb97c2189cdac0914eee07c782a5c16f953e9ce5db23633ee90e15f88ef5174"
+      },
+      {
+        "path": "tests/unit/frontend-portable-bundle.test.ts",
+        "sha256": "87a2ae7ae293bcc58766a8d1dd690abbc0513ec854bc9ef3014bb94357ea42da"
+      }
+    ]
+  },
+  "frontend": {
+    "repository": "Hello-KU-tty/program",
+    "observedMain": "0858811195753e5c7312a79f3aede53c9aff9571",
+    "observedAt": "2026-09-27T23:45:23Z",
+    "consumerClone": "cce7751dcd40732c700f5576a088ebdf6f91fac7",
+    "consumerAgentBoundary": "DELAYED_DETERMINISTIC_FIXTURE",
+    "comparison": {
+      "source": {
+        "file": "frontend-main-compare-final-0845.json",
+        "sha256": "621d7e8da5101e4d2363ea65fcf56488a717791944b23d3c56f8655f4ebdc023"
+      },
+      "aheadBy": 4,
+      "changedFiles": [
+        "BACKEND_LIVE_TEST_ISSUES_20260928.md",
+        "package.json",
+        "src/agent-panel-view-provider.ts",
+        "src/webview/main.ts",
+        "test/agent-shell-surface.test.ts"
+      ],
+      "controllerPortAndVendorUnchanged": true,
+      "latestFrontendUiTestedHere": false
+    },
+    "frontendWritesPerformed": false,
+    "previousComparison": {
+      "source": {
+        "file": "frontend-main-compare-0827.json",
+        "sha256": "975697e7633fde7a102e855cba23c2035bf3ac034b2d9744c9fc23d744e34f39"
+      },
+      "aheadBy": 2,
+      "changedFiles": [
+        "package.json"
+      ],
+      "onlyChange": "Extension package version 0.0.2 to 0.0.3",
+      "controllerPortAndVendorUnchanged": true
+    },
+    "lastRemoteRecheckKstApprox": "2026-09-28 09:48:52"
+  },
+  "prompts": [
+    {
+      "role": "discovery",
+      "path": "docs/agent-prompts/discovery.md",
+      "version": "1.3.5",
+      "sha256": "d3af4d4906a22e79225055668d500a2fd6303ea31ca35cf38cf9925dcc3d2c9d"
+    },
+    {
+      "role": "builder",
+      "path": "docs/agent-prompts/builder.md",
+      "version": "1.3.10",
+      "sha256": "74f505eea33ad12d2ffd2e415f502fd43e5615ccc2daf8416dad655b20a6c505"
+    },
+    {
+      "role": "helper",
+      "path": "docs/agent-prompts/helper.md",
+      "version": "1.2.0",
+      "sha256": "c6a96ee7d34510e8097b8082bcc087f185ca915257023b8340089f88ed193231"
+    },
+    {
+      "role": "evidence-analyst",
+      "path": "docs/agent-prompts/evidence-analyst.md",
+      "version": "1.0.8",
+      "sha256": "cf84876b9926c815562ab4481388dbff36b0d0083cfe8bade9d9b06a3cfd9cd9"
+    }
+  ],
+  "accountUsageObservation": {
+    "source": "KIRO_ACCOUNT_DASHBOARD_UI",
+    "cumulativeCredits": 815.91,
+    "observedAt": "2026-09-27T23:33:55Z",
+    "overages": "DISABLED",
+    "hardCumulativeLimit": 900,
+    "conservativeNewCallStop": 880,
+    "caveat": "Estimated cumulative dashboard value, not itemized task billing; no model calls after 22:27 UTC."
+  },
+  "performanceMethod": {
+    "scope": "CORE_CALCULATION_NOT_MODEL_HTTP_OR_WINDOWS_LATENCY",
+    "samples": 30,
+    "warmup": 5,
+    "percentile": "NEAREST_RANK",
+    "caveat": "Stages use different frozen or reconstructed references. Do not add gains or treat sample p95 as a general bound. Compare complete responses/state before timings."
+  },
+  "performance": [
+    {
+      "source": {
+        "file": "core-context-paired-v2.json",
+        "sha256": "226d9c28024bdb1bfbb312fe21b500e7e8dd2c9bb6bb3bdb7c8530a18aa57595"
+      },
+      "kind": "SYNTHETIC_SQLITE_CORE_CONTEXT_BENCHMARK",
+      "at": "2026-09-27T16:57:48.451Z",
+      "samples": 30,
+      "referenceRevision": "04117c520c10e732af709b0d064c020d1d001e55",
+      "referenceScope": "APPLICATION_SOURCE_WITH_CURRENT_SQLITE_ADAPTER",
+      "exactSnapshotEquality": true,
+      "alternatingOrder": true,
+      "selection": "HIGHLIGHTED_SCENARIOS_FULL_ORIGINAL_IDENTIFIED_BY_SHA256",
+      "measurements": [
+        {
+          "variant": "current",
+          "conceptCount": 100,
+          "phase": "before-delivery",
+          "samples": 30,
+          "snapshotSha256": "e263a5741afec0c8ba3894049f25fc4ab85cf9b65c1678e693f3b6a19ec93bba",
+          "medianMs": 3.1542500000000473,
+          "prepareCount": [
+            69
+          ]
+        },
+        {
+          "variant": "reference-application",
+          "conceptCount": 100,
+          "phase": "before-delivery",
+          "samples": 30,
+          "snapshotSha256": "e263a5741afec0c8ba3894049f25fc4ab85cf9b65c1678e693f3b6a19ec93bba",
+          "medianMs": 43.167958,
+          "prepareCount": [
+            2421
+          ]
+        },
+        {
+          "variant": "current",
+          "conceptCount": 100,
+          "phase": "after-delivery",
+          "samples": 30,
+          "snapshotSha256": "e263a5741afec0c8ba3894049f25fc4ab85cf9b65c1678e693f3b6a19ec93bba",
+          "medianMs": 1.601542000000336,
+          "prepareCount": [
+            20
+          ]
+        },
+        {
+          "variant": "reference-application",
+          "conceptCount": 100,
+          "phase": "after-delivery",
+          "samples": 30,
+          "snapshotSha256": "e263a5741afec0c8ba3894049f25fc4ab85cf9b65c1678e693f3b6a19ec93bba",
+          "medianMs": 11.78470900000002,
+          "prepareCount": [
+            820
+          ]
+        },
+        {
+          "variant": "current",
+          "conceptCount": 100,
+          "phase": "new-helper-turn",
+          "samples": 30,
+          "medianMs": 14.95837500000016,
+          "prepareCount": [
+            915
+          ]
+        },
+        {
+          "variant": "reference-application",
+          "conceptCount": 100,
+          "phase": "new-helper-turn",
+          "samples": 30,
+          "medianMs": 32.11891700000069,
+          "prepareCount": [
+            1852
+          ]
+        }
+      ]
+    },
+    {
+      "source": {
+        "file": "core-context-paired-v3.json",
+        "sha256": "e7e5ba7bbe735d5bc6c99872cff768b29ff8f570d56925207271f0ca23415695"
+      },
+      "kind": "SYNTHETIC_SQLITE_CORE_CONTEXT_BENCHMARK",
+      "at": "2026-09-27T18:31:53.702Z",
+      "samples": 30,
+      "referenceRevision": "04117c520c10e732af709b0d064c020d1d001e55",
+      "referenceScope": "APPLICATION_SOURCE_WITH_CURRENT_SQLITE_ADAPTER",
+      "exactSnapshotEquality": true,
+      "alternatingOrder": true,
+      "selection": "HIGHLIGHTED_SCENARIOS_FULL_ORIGINAL_IDENTIFIED_BY_SHA256",
+      "measurements": [
+        {
+          "variant": "current",
+          "conceptCount": 100,
+          "phase": "before-delivery",
+          "samples": 30,
+          "snapshotSha256": "e263a5741afec0c8ba3894049f25fc4ab85cf9b65c1678e693f3b6a19ec93bba",
+          "medianMs": 3.0989999999999327,
+          "prepareCount": [
+            69
+          ]
+        },
+        {
+          "variant": "reference-application",
+          "conceptCount": 100,
+          "phase": "before-delivery",
+          "samples": 30,
+          "snapshotSha256": "e263a5741afec0c8ba3894049f25fc4ab85cf9b65c1678e693f3b6a19ec93bba",
+          "medianMs": 43.491165999999794,
+          "prepareCount": [
+            2421
+          ]
+        },
+        {
+          "variant": "current",
+          "conceptCount": 100,
+          "phase": "after-delivery",
+          "samples": 30,
+          "snapshotSha256": "e263a5741afec0c8ba3894049f25fc4ab85cf9b65c1678e693f3b6a19ec93bba",
+          "medianMs": 1.6039580000001479,
+          "prepareCount": [
+            20
+          ]
+        },
+        {
+          "variant": "reference-application",
+          "conceptCount": 100,
+          "phase": "after-delivery",
+          "samples": 30,
+          "snapshotSha256": "e263a5741afec0c8ba3894049f25fc4ab85cf9b65c1678e693f3b6a19ec93bba",
+          "medianMs": 12.422375000000102,
+          "prepareCount": [
+            820
+          ]
+        },
+        {
+          "variant": "current",
+          "conceptCount": 100,
+          "phase": "new-helper-turn",
+          "samples": 30,
+          "medianMs": 6.716500000000451,
+          "prepareCount": [
+            239
+          ]
+        },
+        {
+          "variant": "reference-application",
+          "conceptCount": 100,
+          "phase": "new-helper-turn",
+          "samples": 30,
+          "medianMs": 29.42241699999977,
+          "prepareCount": [
+            1852
+          ]
+        }
+      ]
+    },
+    {
+      "source": {
+        "file": "restore-paired-after-delivery-repeat-0527.json",
+        "sha256": "a2a99c6603d8921636ce1ef4231d47f37234502e5807154cbdacc728092410e2"
+      },
+      "kind": "SYNTHETIC_SQLITE_RESTORE_BENCHMARK",
+      "at": "2026-09-27T20:27:13.928Z",
+      "samples": 30,
+      "referenceScope": "FROZEN_APPLICATION_WITH_CURRENT_SQLITE_ADAPTER",
+      "referenceModuleSha256": "666211ebf0c34dff0be2f68f944ff2e7d360902559429ad97b0a25f7b9d7f894",
+      "currentApplicationModuleSha256": "3215b8956e9f63b969ffb9ba68e489b70c820c03acb4d44d35c579a01e2c14d6",
+      "currentStorageModuleSha256": "571b7162e6b987bacb39c78ed970dd83f145485ea202d61f077493fa02c25a9e",
+      "sameDatabaseReadOnlyComparison": true,
+      "exactSnapshotEquality": true,
+      "alternatingOrder": true,
+      "selection": "HIGHLIGHTED_SCENARIOS_FULL_ORIGINAL_IDENTIFIED_BY_SHA256",
+      "measurements": [
+        {
+          "variant": "current",
+          "conceptCount": 1000,
+          "helperConversationCount": 20,
+          "deliveryPhase": "after-delivery",
+          "samples": 30,
+          "snapshotSha256": "e80fe68e4b317cde9b7e8b75101bb29e57d5270708740add0f0f3e76e9aafc99",
+          "medianMs": 9.683250000000044,
+          "prepareCount": [
+            69
+          ]
+        },
+        {
+          "variant": "reference-application",
+          "conceptCount": 1000,
+          "helperConversationCount": 20,
+          "deliveryPhase": "after-delivery",
+          "samples": 30,
+          "snapshotSha256": "e80fe68e4b317cde9b7e8b75101bb29e57d5270708740add0f0f3e76e9aafc99",
+          "medianMs": 148.54262500000004,
+          "prepareCount": [
+            109
+          ]
+        }
+      ]
+    },
+    {
+      "source": {
+        "file": "helper-history-paired-0553.json",
+        "sha256": "46088741f98bdafc574e50cf621fbfaa9b9670b2e648d81d7f9695010ed02957"
+      },
+      "kind": "SYNTHETIC_SQLITE_CORE_CONTEXT_BENCHMARK",
+      "at": "2026-09-27T20:52:15.235Z",
+      "samples": 30,
+      "referenceScope": "FROZEN_APPLICATION_MODULE_WITH_CURRENT_SQLITE_ADAPTER",
+      "referenceModuleSha256": "41b47c3df5df3ed60b9f1197785bd6da8b4a88456ec3ac74012b53c72f7c0f8c",
+      "currentApplicationModuleSha256": "eeff01941b668da93e8e8eab11569933a3f50229cc6acb960e8e6fec6be655f5",
+      "helperHistoryCount": 20,
+      "exactSnapshotEquality": true,
+      "alternatingOrder": true,
+      "selection": "HIGHLIGHTED_SCENARIOS_FULL_ORIGINAL_IDENTIFIED_BY_SHA256",
+      "measurements": [
+        {
+          "variant": "current",
+          "conceptCount": 1000,
+          "phase": "new-helper-turn",
+          "samples": 30,
+          "medianMs": 7.548249999999825,
+          "prepareCount": [
+            259
+          ]
+        },
+        {
+          "variant": "reference-application",
+          "conceptCount": 1000,
+          "phase": "new-helper-turn",
+          "samples": 30,
+          "medianMs": 146.7137499999999,
+          "prepareCount": [
+            299
+          ]
+        }
+      ]
+    },
+    {
+      "source": {
+        "file": "helper-history-repro-repeat-0554.json",
+        "sha256": "bfffeda0f154129396e788b96406c60e67d5bae5b786e4ca9ae2e8392c9ff634"
+      },
+      "kind": "SYNTHETIC_SQLITE_CORE_CONTEXT_BENCHMARK",
+      "at": "2026-09-27T20:52:58.756Z",
+      "samples": 30,
+      "referenceScope": "CURRENT_APPLICATION_WITH_FULL_EPISODE_CALL_RECONSTRUCTED",
+      "referenceModuleSha256": "e7d28e43feb3b0f183ee491dfee08775c80032b847f0481083cf2c119a585fde",
+      "currentApplicationModuleSha256": "eeff01941b668da93e8e8eab11569933a3f50229cc6acb960e8e6fec6be655f5",
+      "currentStorageModuleSha256": "00782c94f38460d984ba1ae64c2fe9294b5dc94e8b2f7d6d9d2807a4aa3973de",
+      "helperHistoryCount": 20,
+      "independentEquivalentDatabases": true,
+      "exactSnapshotEquality": true,
+      "exactHelperContextEquality": true,
+      "alternatingOrder": true,
+      "selection": "HIGHLIGHTED_SCENARIOS_FULL_ORIGINAL_IDENTIFIED_BY_SHA256",
+      "measurements": [
+        {
+          "variant": "current",
+          "conceptCount": 1000,
+          "phase": "new-helper-turn",
+          "samples": 30,
+          "medianMs": 7.341541999999208,
+          "prepareCount": [
+            259
+          ]
+        },
+        {
+          "variant": "reference-application",
+          "conceptCount": 1000,
+          "phase": "new-helper-turn",
+          "samples": 30,
+          "medianMs": 134.06104099999902,
+          "prepareCount": [
+            299
+          ]
+        }
+      ]
+    },
+    {
+      "source": {
+        "file": "evidence-history-shared-0638.json",
+        "sha256": "6ac1546ed1040e5d3da11612743db4c17504dd2d8d5b27e7457425cfa8edb034"
+      },
+      "kind": "SYNTHETIC_SQLITE_CORE_CONTEXT_BENCHMARK",
+      "at": "2026-09-27T21:34:26.701Z",
+      "samples": 30,
+      "referenceScope": "FROZEN_APPLICATION_MODULE_WITH_CURRENT_SQLITE_ADAPTER",
+      "referenceModuleSha256": "561a7eca524e21dd9e7acca2687ad3f3098d837e9970edbf015d076cbc15a6fa",
+      "currentApplicationModuleSha256": "35d34c868a3d9cd9ec8dbf724d8c38c16b855fa02cea77f5b5076937ca82bc34",
+      "currentStorageModuleSha256": "bbaafdee124751a6bb7944257ab4704d79448321c39d82ebba5866125ad2e1fe",
+      "helperHistoryCount": 0,
+      "episodeLayout": "shared",
+      "independentEquivalentDatabases": true,
+      "exactSnapshotEquality": true,
+      "exactHelperContextEquality": true,
+      "exactEvidenceTraceEquality": true,
+      "alternatingOrder": true,
+      "selection": "HIGHLIGHTED_SCENARIOS_FULL_ORIGINAL_IDENTIFIED_BY_SHA256",
+      "measurements": [
+        {
+          "variant": "current",
+          "conceptCount": 100,
+          "phase": "evidence-project",
+          "samples": 30,
+          "medianMs": 12.629542000000583,
+          "prepareCount": [
+            813
+          ]
+        },
+        {
+          "variant": "reference-application",
+          "conceptCount": 100,
+          "phase": "evidence-project",
+          "samples": 30,
+          "medianMs": 196.81412499999988,
+          "prepareCount": [
+            2811
+          ]
+        },
+        {
+          "variant": "current",
+          "conceptCount": 1000,
+          "phase": "evidence-concept",
+          "samples": 30,
+          "medianMs": 1.5139999999992142,
+          "prepareCount": [
+            21
+          ]
+        },
+        {
+          "variant": "reference-application",
+          "conceptCount": 1000,
+          "phase": "evidence-concept",
+          "samples": 30,
+          "medianMs": 128.4345830000002,
+          "prepareCount": [
+            8031
+          ]
+        }
+      ]
+    },
+    {
+      "source": {
+        "file": "evidence-history-many-0639.json",
+        "sha256": "017454af91658e92414840709dc33a202f8107e94e8cb3fa4135c3b6c9d6dd03"
+      },
+      "kind": "SYNTHETIC_SQLITE_CORE_CONTEXT_BENCHMARK",
+      "at": "2026-09-27T21:35:38.880Z",
+      "samples": 30,
+      "referenceScope": "FROZEN_APPLICATION_MODULE_WITH_CURRENT_SQLITE_ADAPTER",
+      "referenceModuleSha256": "561a7eca524e21dd9e7acca2687ad3f3098d837e9970edbf015d076cbc15a6fa",
+      "currentApplicationModuleSha256": "35d34c868a3d9cd9ec8dbf724d8c38c16b855fa02cea77f5b5076937ca82bc34",
+      "currentStorageModuleSha256": "bbaafdee124751a6bb7944257ab4704d79448321c39d82ebba5866125ad2e1fe",
+      "helperHistoryCount": 0,
+      "episodeLayout": "one-per-concept",
+      "independentEquivalentDatabases": true,
+      "exactSnapshotEquality": true,
+      "exactHelperContextEquality": true,
+      "exactEvidenceTraceEquality": true,
+      "alternatingOrder": true,
+      "selection": "HIGHLIGHTED_SCENARIOS_FULL_ORIGINAL_IDENTIFIED_BY_SHA256",
+      "measurements": [
+        {
+          "variant": "current",
+          "conceptCount": 100,
+          "phase": "evidence-project",
+          "samples": 30,
+          "medianMs": 16.011874999999236,
+          "prepareCount": [
+            1011
+          ]
+        },
+        {
+          "variant": "reference-application",
+          "conceptCount": 100,
+          "phase": "evidence-project",
+          "samples": 30,
+          "medianMs": 116.07600000000002,
+          "prepareCount": [
+            2811
+          ]
+        },
+        {
+          "variant": "current",
+          "conceptCount": 1000,
+          "phase": "evidence-concept",
+          "samples": 30,
+          "medianMs": 1.4420420000005834,
+          "prepareCount": [
+            21
+          ]
+        },
+        {
+          "variant": "reference-application",
+          "conceptCount": 1000,
+          "phase": "evidence-concept",
+          "samples": 30,
+          "medianMs": 117.4677499999998,
+          "prepareCount": [
+            8031
+          ]
+        }
+      ]
+    },
+    {
+      "source": {
+        "file": "analysis-lifecycle-reconstructed-0747.json",
+        "sha256": "a5cc48b1efcb4ede576ce16f608ada6d215f94550fa1997b76ada845f6f4a224"
+      },
+      "at": "2026-09-27T22:44:12.961Z",
+      "scope": "SYNTHETIC_SQLITE_APPLICATION_MUTATIONS_NO_MODELS_NO_HTTP",
+      "referenceScope": "FIVE_FULL_AGGREGATE_CALLS_RECONSTRUCTED",
+      "samples": 30,
+      "warmup": 5,
+      "order": "ALTERNATING",
+      "percentile": "NEAREST_RANK",
+      "fixtureSha256": "51f852bafacaf7ff0cd27c235199ed1a35f54b615fa2e359b909b293dfe10c70",
+      "currentSourceSha256": "96db4198264ae211480245708d35a2870df0fee4fee9241370e09596a0d1c08e",
+      "currentModuleSha256": "37ddb930cace3c9d007727d98bd5c3db0ae7d57ca023ce387e6154efa71ae49e",
+      "referenceModuleSha256": "2a578a4c0336d5b0cacdc14bab8da7e47109937bf17f3c4056bc3d9717c693b6",
+      "storageModuleSha256": "bbaafdee124751a6bb7944257ab4704d79448321c39d82ebba5866125ad2e1fe",
+      "selection": "HIGHLIGHTED_SCENARIOS_FULL_ORIGINAL_IDENTIFIED_BY_SHA256",
+      "measurements": [
+        {
+          "conceptCount": 1000,
+          "observationsAndAllTablesEqual": true,
+          "finalDatabaseSha256": "5ad29482fcf75674bb7610797b27d53bcd2d7dca943b85d87d835db1dac53405",
+          "integrity": [
+            {
+              "quickCheck": "ok",
+              "foreignKeyViolations": 0
+            },
+            {
+              "quickCheck": "ok",
+              "foreignKeyViolations": 0
+            }
+          ],
+          "current": {
+            "closeEpisode": {
+              "p50Ms": 1.231083000000126,
+              "minPrepares": 42,
+              "maxPrepares": 50
+            },
+            "terminalFailure": {
+              "p50Ms": 0.24608299999999872,
+              "minPrepares": 14,
+              "maxPrepares": 14
+            },
+            "manualRetry": {
+              "p50Ms": 0.28620800000044255,
+              "minPrepares": 17,
+              "maxPrepares": 17
+            },
+            "recoverTerminal": {
+              "p50Ms": 0.21991700000035053,
+              "minPrepares": 14,
+              "maxPrepares": 14
+            },
+            "submitEmptyResult": {
+              "p50Ms": 7.01320799999985,
+              "minPrepares": 39,
+              "maxPrepares": 39
+            }
+          },
+          "reference": {
+            "closeEpisode": {
+              "p50Ms": 7.49420900000041,
+              "minPrepares": 44,
+              "maxPrepares": 52
+            },
+            "terminalFailure": {
+              "p50Ms": 6.231416999999965,
+              "minPrepares": 16,
+              "maxPrepares": 16
+            },
+            "manualRetry": {
+              "p50Ms": 6.833665999999994,
+              "minPrepares": 19,
+              "maxPrepares": 19
+            },
+            "recoverTerminal": {
+              "p50Ms": 6.316124999999829,
+              "minPrepares": 16,
+              "maxPrepares": 16
+            },
+            "submitEmptyResult": {
+              "p50Ms": 12.760959000000184,
+              "minPrepares": 41,
+              "maxPrepares": 41
+            }
+          }
+        }
+      ]
+    },
+    {
+      "source": {
+        "file": "analysis-lifecycle-repeat-0748.json",
+        "sha256": "c0b3660a65a20ba63b38e3ef13696a8468e2b537d99cf37b5e2c2ca3b04aa58d"
+      },
+      "at": "2026-09-27T22:45:35.270Z",
+      "scope": "SYNTHETIC_SQLITE_APPLICATION_MUTATIONS_NO_MODELS_NO_HTTP",
+      "referenceScope": "FIVE_FULL_AGGREGATE_CALLS_RECONSTRUCTED",
+      "samples": 30,
+      "warmup": 5,
+      "order": "ALTERNATING",
+      "percentile": "NEAREST_RANK",
+      "fixtureSha256": "51f852bafacaf7ff0cd27c235199ed1a35f54b615fa2e359b909b293dfe10c70",
+      "currentSourceSha256": "96db4198264ae211480245708d35a2870df0fee4fee9241370e09596a0d1c08e",
+      "currentModuleSha256": "37ddb930cace3c9d007727d98bd5c3db0ae7d57ca023ce387e6154efa71ae49e",
+      "referenceModuleSha256": "2a578a4c0336d5b0cacdc14bab8da7e47109937bf17f3c4056bc3d9717c693b6",
+      "storageModuleSha256": "bbaafdee124751a6bb7944257ab4704d79448321c39d82ebba5866125ad2e1fe",
+      "selection": "HIGHLIGHTED_SCENARIOS_FULL_ORIGINAL_IDENTIFIED_BY_SHA256",
+      "measurements": [
+        {
+          "conceptCount": 1000,
+          "observationsAndAllTablesEqual": true,
+          "finalDatabaseSha256": "5ad29482fcf75674bb7610797b27d53bcd2d7dca943b85d87d835db1dac53405",
+          "integrity": [
+            {
+              "quickCheck": "ok",
+              "foreignKeyViolations": 0
+            },
+            {
+              "quickCheck": "ok",
+              "foreignKeyViolations": 0
+            }
+          ],
+          "current": {
+            "closeEpisode": {
+              "p50Ms": 1.2484159999994517,
+              "minPrepares": 42,
+              "maxPrepares": 50
+            },
+            "terminalFailure": {
+              "p50Ms": 0.249416999999994,
+              "minPrepares": 14,
+              "maxPrepares": 14
+            },
+            "manualRetry": {
+              "p50Ms": 0.2924159999993208,
+              "minPrepares": 17,
+              "maxPrepares": 17
+            },
+            "recoverTerminal": {
+              "p50Ms": 0.2262500000001637,
+              "minPrepares": 14,
+              "maxPrepares": 14
+            },
+            "submitEmptyResult": {
+              "p50Ms": 7.055666000000201,
+              "minPrepares": 39,
+              "maxPrepares": 39
+            }
+          },
+          "reference": {
+            "closeEpisode": {
+              "p50Ms": 7.501666999999543,
+              "minPrepares": 44,
+              "maxPrepares": 52
+            },
+            "terminalFailure": {
+              "p50Ms": 6.45141700000022,
+              "minPrepares": 16,
+              "maxPrepares": 16
+            },
+            "manualRetry": {
+              "p50Ms": 6.953875000000153,
+              "minPrepares": 19,
+              "maxPrepares": 19
+            },
+            "recoverTerminal": {
+              "p50Ms": 6.769208000000162,
+              "minPrepares": 16,
+              "maxPrepares": 16
+            },
+            "submitEmptyResult": {
+              "p50Ms": 13.303540999999768,
+              "minPrepares": 41,
+              "maxPrepares": 41
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "cancellation": {
+    "source": {
+      "file": "native-helper-cancel-queue-final-0730.json",
+      "sha256": "86a8d531bb1c2cda6c5e855aeea6ebde54577105d7d9f1b4860436e4a5d814f2"
+    },
+    "status": "PASS",
+    "startedAt": "2026-09-27T22:27:27.698Z",
+    "completedAt": "2026-09-27T22:27:57.622Z",
+    "durationMs": 29923.624709000003,
+    "coreAckAfterRequestMs": 4.05279100000007,
+    "nativeConfirmationObservedAfterRequestMs": 36.76591600000029,
+    "queueOrder": {
+      "acceptedBeforeNativeCancelTerminal": true,
+      "invokedOnlyAfterNativeCancelTerminal": true,
+      "retryCreatedAt": "2026-09-27T22:27:36.623Z",
+      "nativeCancelTerminalAt": "2026-09-27T22:27:36.630Z",
+      "retryNativeStartedAt": "2026-09-27T22:27:37.342Z"
+    },
+    "endpointCounts": {
+      "helperCount": 2,
+      "analystCount": 1
+    },
+    "sameObservedWindow": true,
+    "durableCancelledCheckpointUnchanged": true,
+    "recoveryAnalysis": [
+      {
+        "status": "SUCCEEDED",
+        "proposalCount": 0,
+        "acceptedCount": 0,
+        "rejectedCount": 0
+      }
+    ],
+    "claimBoundary": "Isolated-worker ordered status observations, not run-ID-bound typed native ACK or proof of all races."
+  },
+  "readOnlyActualCoreAudit": {
+    "source": {
+      "file": "native-views-final-host-closed-0842.json",
+      "sha256": "672d18d337ff7733468934a98d31c709b42885f1b8bab2ee230a758ff5588e32"
+    },
+    "at": "2026-09-27T23:41:40.004Z",
+    "projects": 16,
+    "filteredViews": 77,
+    "sha256": "1cd273ee287488e190374baac188ad17cee3da80f63a42b1fc568bf698b6984b",
+    "modelCalls": 0,
+    "globalIdle": true,
+    "referenceMatched": true
+  },
+  "readOnlySoak": {
+    "source": {
+      "file": "native-read-soak-0821.json",
+      "sha256": "46c3559f22bde5bef31056fe9883e16249f09ff83f0261b4e9253cbaf5a67b57"
+    },
+    "status": "PASS",
+    "startedAt": "2026-09-27T23:20:22.226Z",
+    "completedAt": "2026-09-27T23:35:22.879Z",
+    "elapsedMs": 900653,
+    "cycles": 86,
+    "projects": 16,
+    "filteredViewsPerCycle": 77,
+    "viewRequests": 9374,
+    "databaseTableCount": 50,
+    "allViewsAndTablesUnchangedEveryCycle": true,
+    "noNewRuns": true,
+    "globalIdleBeforeAndAfter": true,
+    "sourceViewsSha256": "1cd273ee287488e190374baac188ad17cee3da80f63a42b1fc568bf698b6984b",
+    "initialResidentKiB": 122080,
+    "observedResidentKiB": {
+      "min": 122080,
+      "max": 245744,
+      "last": 245744
+    },
+    "integrity": {
+      "quickCheck": "ok",
+      "foreignKeyViolations": 0
+    },
+    "modelCalls": 0,
+    "scope": "ONE_IDLE_MAC_CORE_FIXED_SYNTHETIC_DATA_SERIAL_READS",
+    "caveat": "Observed RSS and response equality only; not proof of no memory leak, a load capacity guarantee, model latency, or Windows behavior."
+  },
+  "actionReportInventory": {
+    "source": {
+      "file": "summary-0803.json",
+      "sha256": "c43c925302df9115912f9063fa906d0e73310d456ef7c55b054be721a8977205"
+    },
+    "reportCount": 60,
+    "statuses": {
+      "FAILED": 5,
+      "PASS": 55
+    },
+    "caveat": "Includes non-model actions, failed experiments and different scenarios. Counts are neither model-call counts nor a model quality success rate."
+  },
+  "fullCheck": {
+    "command": "VIBE_E2E_FRONTEND_PORT=4183 pnpm check",
+    "source": {
+      "file": "check-frontend-lease-final-0940.log",
+      "sha256": "fd75cf120b195ce4f0345fabb66c137696a9622d916a4249d9c5664517aa5f46"
+    },
+    "exitCode": 0,
+    "unit": {
+      "pass": 130,
+      "skip": 3
+    },
+    "integration": {
+      "pass": 325,
+      "skip": 8
+    },
+    "eval": {
+      "pass": 41
+    },
+    "campusDrop": {
+      "pass": 3
+    },
+    "smoke": {
+      "pass": 6
+    },
+    "e2e": {
+      "pass": 12,
+      "durationSeconds": 54
+    },
+    "skipCaveat": "Platform skips are not Windows validation."
+  },
+  "additionalFinalChecks": {
+    "panelCjs": {
+      "source": {
+        "file": "panel-handoff-final-0942.log",
+        "sha256": "0ce1e395f9816fea1de5f254658fbe1af8a19e9248aad56977979975a3981fe9"
+      },
+      "exitCode": 0,
+      "pass": 161,
+      "skip": 2
+    },
+    "jsonEnrichmentAndMeasurementTools": {
+      "source": {
+        "file": "measurement-final-0836.log",
+        "sha256": "e6fd90c4e7e8ad3e09a2ec50e7bea1f9412b1c795e9a6d1c4fcdc14cd3ad3065"
+      },
+      "exitCode": 0,
+      "pass": 34
+    },
+    "panelBuild": {
+      "source": {
+        "file": "panel-build-handoff-final-0942.log",
+        "sha256": "0a2442afee1813999e6dbb945a30eb317b73b43d1dec60f1744d083d7f6f063e"
+      },
+      "exitCode": 0
+    },
+    "actualProgramConsumer": {
+      "source": {
+        "file": "program-consumer-handoff-final-0942.log",
+        "sha256": "52c691cfd7e1e5730173216f2bae7226e89f14c8a2958d6f48d0fc1d3c70af39"
+      },
+      "exitCode": 0,
+      "boundary": "ACTUAL_CONTROLLER_PORT_AUTHENTICATED_HTTP_SSE_SQLITE",
+      "agentBoundary": "DELAYED_DETERMINISTIC_FIXTURE",
+      "additionalChecks": [
+        "Four classified native failure codes reach actual port",
+        "Repeated failed-run reads do not invoke another Agent",
+        "Explicit same-Project/session PREVIEW retry invokes once",
+        "New port restores durable preview without Agent call",
+        "Original port retains old failed-run cache: frontend limitation, not fixed here"
+      ]
+    },
+    "typecheckAfterRevocationAssertion": {
+      "source": {
+        "file": "typecheck-frontend-revocation-0926.log",
+        "sha256": "4d5967a2362efe90b42b898777cddeb4c813222898e2dd429d71dc7927d1c4d5"
+      },
+      "exitCode": 0
+    },
+    "nativeFailureRevocation": {
+      "source": {
+        "file": "native-failure-revocation-0926.log",
+        "sha256": "588c2c4b2c08a94163ccfa7a2581bbb65fad768daf03acccc123968479d2c8c0"
+      },
+      "exitCode": 0,
+      "pass": 1,
+      "scope": "ADDED_ASSERTIONS_FOR_REVOKED_GRANT_401_ROUTE_404_DESCRIPTOR_REVOKED",
+      "includedInLatestFullCheck": true
+    },
+    "portableBundleCompilationOnly": {
+      "source": {
+        "file": "frontend-bundle-compilation-0933.log",
+        "sha256": "3c96f41a2234665a27e1ab732b83da5c010cc0b9cb6b19b27b38d96ca71c94ad"
+      },
+      "exitCode": 0,
+      "pass": 2,
+      "scope": "IN_MEMORY_COMPILATION_IMPORT_ONLY_NO_WINDOWS_EXECUTION_OR_DEPLOYABLE_ARTIFACT",
+      "includedInLatestFullCheck": true
+    }
+  },
+  "packagingPreflight": {
+    "source": {
+      "file": "portable-build-early-reject-0802.json",
+      "sha256": "b2275dd4afce904e069c4091b3170318339bbf4608e8fc5006925e4fd1dcccd8"
+    },
+    "at": "2026-09-27T23:00:04.107Z",
+    "status": "PASS",
+    "scope": "ACTUAL_MAC_BUILD_ENTRY_EXPECTED_EARLY_REJECTION",
+    "expectedError": "NODE_DISTRIBUTION_UNVERIFIED",
+    "outputAbsentBefore": true,
+    "outputAbsentAfter": true,
+    "durationMs": 38,
+    "modelCalls": 0,
+    "windowsExecution": "NOT_RUN"
+  },
+  "generatedAppBoundaryRecheck": {
+    "http": {
+      "source": {
+        "file": "streaming-independent-http-repeat-0813.json",
+        "sha256": "8dc91018b91ce091defd8d06b5b8e99616e539e73d59bf9c22c33b6ccdf1e374"
+      },
+      "observedAt": "2026-09-27T23:12:09.336Z",
+      "passed": 19,
+      "total": 20,
+      "failures": [
+        {
+          "name": "fractional_limit",
+          "expected": 400,
+          "status": 200,
+          "semanticMatch": true,
+          "leakedOutsideCanary": false,
+          "stillHealthy": true,
+          "pass": false,
+          "exitCode": null,
+          "signal": "SIGTERM",
+          "stderrBytes": 0
+        }
+      ],
+      "allHealthyAfterProbe": true,
+      "outsideCanaryLeak": false,
+      "modelCalls": 0,
+      "generatedCodeChanged": false
+    },
+    "runtime": {
+      "source": {
+        "file": "streaming-runtime-boundaries-0813.json",
+        "sha256": "10596206323d3a5511dcf9465d90598eecb1fe281c67f65c84c12eb961646343"
+      },
+      "at": "2026-09-27T23:12:14.109Z",
+      "kind": "INDEPENDENT_GENERATED_RUNTIME_BOUNDARY_AUDIT",
+      "generatedCodeChanged": false,
+      "modelCalls": 0,
+      "sourceAndCompiledSha256": {
+        "src/server/logSearch.ts": "57bd50fed33e7a2d13a3f55fdcb645010f70b180dc54de23e2824a629fc668ec",
+        "src/core/lineReader.ts": "d5d93f819012586eef805712c3ef157522eec27cb0d60fe026b56fde36596e03",
+        "src/smoke.ts": "7e1c275e3307e4915a1b491bdf90a4723174a24d70de53990b476ed396cbb4ea",
+        "dist/server/logSearch.js": "6d3718bbb1e82b0a973c69324841cefcdbc8fb0d955776b08cb9ce85d3db18fd",
+        "dist/core/lineReader.js": "4be695ed5d74b6aee0e53aea2409f220af5b658e278c4260807904438944fd68"
+      },
+      "limits": [
+        {
+          "input": 0,
+          "accepted": false,
+          "status": 400
+        },
+        {
+          "input": 0.5,
+          "accepted": true,
+          "normalizedLimit": 0
+        },
+        {
+          "input": 1,
+          "accepted": true,
+          "normalizedLimit": 1
+        },
+        {
+          "input": 1.5,
+          "accepted": true,
+          "normalizedLimit": 1
+        },
+        {
+          "input": 1001,
+          "accepted": true,
+          "normalizedLimit": 1000
+        }
+      ],
+      "unbrokenLine": {
+        "producedChunksAtFirstYield": 128,
+        "totalChunks": 128,
+        "chunkBytes": 65536,
+        "yieldedCharacters": 8388608,
+        "newlinePerChunk": false
+      },
+      "regularLines": {
+        "producedChunksAtFirstYield": 2,
+        "totalChunks": 128,
+        "chunkBytes": 65536,
+        "yieldedCharacters": 65535,
+        "newlinePerChunk": true
+      },
+      "verdict": "REPRODUCED_KNOWN_LIMITATIONS_NOT_MODEL_QUALITY_PASS",
+      "claims": [
+        "Positive-integer error policy accepts 0.5 and normalizes it to zero.",
+        "An 8 MiB unbroken line is fully consumed and retained before its first yield; line-count limits are not byte memory bounds.",
+        "This is a bounded 8 MiB functional counterexample, not a GB-scale or peak-RSS benchmark."
+      ]
+    }
+  },
+  "shutdown": {
+    "source": {
+      "file": "stopped-runtime-audit-0843.json",
+      "sha256": "99cd971dfb05a554c79002282e731bbc3e6f544e06dd976b1764f9c6d6e4f894"
+    },
+    "at": "2026-09-27T23:42:30.398Z",
+    "status": "PASS",
+    "ownedCoreExitCode": 0,
+    "activeLockAbsent": true,
+    "stoppedOwnerRecordPreserved": true,
+    "ownedListenerConnectionRefused": true,
+    "allDatabaseTablesUnchangedSinceSoak": true,
+    "databaseTableCount": 50,
+    "integrity": {
+      "quickCheck": "ok",
+      "foreignKeyViolations": 0
+    },
+    "developmentWindow": "ONLY_APPROVED_DEVELOPMENT_WINDOW_CLOSED_VIA_UI",
+    "otherKiroWindowsOrExistingServerStopped": false,
+    "databaseAndTemporaryArtifactsPreserved": true,
+    "finalRecheck": {
+      "source": {
+        "file": "stopped-runtime-audit-user-finish-0950.json",
+        "sha256": "fa0b9f8404db1336f95ad9a892bfa2372b42774af6d5c475766466f66929adec"
+      },
+      "kind": "OWNED_SYNTHETIC_CORE_STOPPED_AUDIT",
+      "at": "2026-09-28T00:50:11.498Z",
+      "status": "PASS",
+      "activeLockAbsent": true,
+      "stoppedOwnerRecordPreserved": true,
+      "ownedListenerConnectionRefused": true,
+      "allDatabaseTablesUnchangedSinceSoak": true,
+      "tableCount": 50,
+      "integrity": {
+        "quickCheck": "ok",
+        "foreignKeyViolations": 0
+      },
+      "databaseAndArtifactsPreserved": true,
+      "modelCalls": 0
+    }
+  },
+  "limitations": [
+    "Analyst v1.0.8 is retained for output structure only; unseen semantic-oracle results tie baseline and future plans may be misclassified as performed applications.",
+    "Builder output retained a fractional-limit runtime failure and bounded smoke/resource limitations; generated output was not patched and passed off as model success.",
+    "Helper v1.2.1 and Discovery variants were rejected; baseline Helper quality limitations remain.",
+    "No real learner understanding, Windows runtime/installation/latency, frontend native completion on another machine, or production readiness is established by this receipt.",
+    "The old frontend-handoff script reuses prior Windows validation metadata and must not label these Mac changes as freshly Windows-verified."
+  ],
+  "details": [
+    "docs/spikes/T19_MAC_PERFORMANCE_HANDOFF_20260928.md",
+    "docs/spikes/T19_MAC_PERFORMANCE_20260928.md",
+    "docs/spikes/t19-analyst-prompt-experiments/README.md"
+  ],
+  "phaseOneFullCheck": {
+    "command": "VIBE_E2E_FRONTEND_PORT=4183 pnpm check",
+    "source": {
+      "file": "check-final-0836.log",
+      "sha256": "cf51e300071825ce7c39ed64ecb1a1e62432f5997cff07349c2b74843c441aef"
+    },
+    "exitCode": 0,
+    "unit": {
+      "pass": 123,
+      "skip": 3
+    },
+    "integration": {
+      "pass": 323,
+      "skip": 8
+    },
+    "eval": {
+      "pass": 41
+    },
+    "campusDrop": {
+      "pass": 3
+    },
+    "smoke": {
+      "pass": 6
+    },
+    "e2e": {
+      "pass": 12,
+      "durationSeconds": 53.6
+    },
+    "skipCaveat": "Platform skips are not Windows validation."
+  },
+  "phaseOneAdditionalFinalChecks": {
+    "panelCjs": {
+      "source": {
+        "file": "panel-final-0836.log",
+        "sha256": "a4b38bf3b57f33fd11e24023b9defb788dd9c405a04d4caa6c31c0bf0aa2d868"
+      },
+      "exitCode": 0,
+      "pass": 123,
+      "skip": 2
+    },
+    "jsonEnrichmentAndMeasurementTools": {
+      "source": {
+        "file": "measurement-final-0836.log",
+        "sha256": "e6fd90c4e7e8ad3e09a2ec50e7bea1f9412b1c795e9a6d1c4fcdc14cd3ad3065"
+      },
+      "exitCode": 0,
+      "pass": 34
+    },
+    "panelBuild": {
+      "source": {
+        "file": "panel-build-final-0837.log",
+        "sha256": "0a2442afee1813999e6dbb945a30eb317b73b43d1dec60f1744d083d7f6f063e"
+      },
+      "exitCode": 0
+    },
+    "actualProgramConsumer": {
+      "source": {
+        "file": "program-consumer-final-0838.log",
+        "sha256": "a68c0dd29b44d4ebedf8aafee47ae7d9ccca806b5e81c714ebef33a3c0ccf69d"
+      },
+      "exitCode": 0,
+      "boundary": "ACTUAL_CONTROLLER_PORT_AUTHENTICATED_HTTP_SSE_SQLITE",
+      "agentBoundary": "DELAYED_DETERMINISTIC_FIXTURE"
+    }
+  },
+  "finalPerformanceRecheck": {
+    "scope": "FINAL_COMPILED_MAC_CORE_SYNTHETIC_SQLITE_NO_MODELS_NO_HTTP_NOT_WINDOWS",
+    "samples": 30,
+    "originalPerformanceTablePreserved": true,
+    "restore": {
+      "source": {
+        "file": "final-restore-recheck-0946.json",
+        "sha256": "8e9fe68eed87f100d3e9726f9655d455b18024bd6dac3098c04db1de01db739e"
+      },
+      "at": "2026-09-28T00:43:18.840Z",
+      "exactSnapshotEquality": true,
+      "measurements": [
+        {
+          "variant": "current",
+          "medianMs": 9.665416999999707,
+          "prepareCount": [
+            69
+          ]
+        },
+        {
+          "variant": "reference-application",
+          "medianMs": 139.34516699999995,
+          "prepareCount": [
+            109
+          ]
+        }
+      ]
+    },
+    "evidence": {
+      "source": {
+        "file": "final-evidence-recheck-0946.json",
+        "sha256": "015a34840e8bfc77117b0404ace8f5fc851c1e0e35706022638bfbff11c33e66"
+      },
+      "at": "2026-09-28T00:43:26.435Z",
+      "episodeLayout": "one-per-concept",
+      "exactSnapshotEquality": true,
+      "exactHelperContextEquality": true,
+      "exactEvidenceTraceEquality": true,
+      "measurements": [
+        {
+          "variant": "current",
+          "medianMs": 1.4986670000007507,
+          "prepareCount": [
+            21
+          ]
+        },
+        {
+          "variant": "reference-application",
+          "medianMs": 114.95408300000054,
+          "prepareCount": [
+            8031
+          ]
+        }
+      ]
+    },
+    "analysisLifecycle": {
+      "source": {
+        "file": "final-lifecycle-recheck-0946.json",
+        "sha256": "804b0d310f7f544bfc6e76a373fc5263b13161407f2c968a5d2da6d1c517c1b4"
+      },
+      "at": "2026-09-28T00:43:30.823Z",
+      "observationsAndAllTablesEqual": true,
+      "integrity": [
+        {
+          "quickCheck": "ok",
+          "foreignKeyViolations": 0
+        },
+        {
+          "quickCheck": "ok",
+          "foreignKeyViolations": 0
+        }
+      ],
+      "selectedMeasurements": [
+        {
+          "name": "closeEpisode",
+          "currentP50Ms": 1.352542000000085,
+          "referenceP50Ms": 7.4377910000002885
+        },
+        {
+          "name": "manualRetry",
+          "currentP50Ms": 0.3113749999999982,
+          "referenceP50Ms": 6.504166000000168
+        },
+        {
+          "name": "recoverTerminal",
+          "currentP50Ms": 0.23329200000011951,
+          "referenceP50Ms": 6.6837500000001455
+        },
+        {
+          "name": "submitEmptyResult",
+          "currentP50Ms": 7.132124999999633,
+          "referenceP50Ms": 13.148208000000068
+        }
+      ]
+    }
+  },
+  "frontendReliabilityFollowup": {
+    "userDeadlineKst": "2026-09-28T10:00:00+09:00",
+    "modelsInvoked": 0,
+    "b2": {
+      "status": "SOURCE_FIXED_MAC_REGRESSIONS_PASSED_WINDOWS_NOT_RUN",
+      "baselineReproduction": {
+        "file": "equal-package-core-reuse-0850.json",
+        "sha256": "8ce2504a5edfcca15319f41040dd8f7e6cea46738c8d6ef35e1e283abe0bf39d"
+      },
+      "lifecycleCjsCases": 17,
+      "identityIncludes": [
+        "resource root",
+        "executable",
+        "args",
+        "sorted env"
+      ],
+      "sharedOwnerKilled": false,
+      "legacyOwnerReused": false,
+      "windowsRelocationTestAddedButNotRun": true,
+      "incompatibleOldOwnerLeaseRenewed": false,
+      "periodicLeaseDrain": {
+        "baseline": {
+          "source": {
+            "file": "core-lifecycle-renew-race-before-split-0937.log",
+            "sha256": "55ce5ad4f7dbe35a99a6e58b8ab9cfe667aea8b638b91f28c2dcf039821aca55"
+          },
+          "pass": 14,
+          "fail": 2,
+          "status": "RACE_REPRODUCED_NOT_FIXED_AT_THAT_TIME"
+        },
+        "after": {
+          "source": {
+            "file": "core-lifecycle-renew-race-final-0939.log",
+            "sha256": "e3882b3f5f148bad02ce1233c976412e96cdff99c2e5f9a08345702d7e018349"
+          },
+          "pass": 17,
+          "fail": 0,
+          "status": "PASS"
+        },
+        "boundedMaintenanceSerialized": true,
+        "pendingRenewalDrainedBeforeRelease": true,
+        "renewalAfterStopPrevented": true,
+        "scope": "ACTUAL_LIFECYCLE_MODULE_WITH_VM_HTTP_AND_CLOCK_NOT_WINDOWS"
+      }
+    },
+    "b1": {
+      "status": "BOUNDED_STRUCTURED_CLASSIFICATION_AND_PROPAGATION_VERIFIED",
+      "codes": [
+        "NATIVE_QUOTA_EXCEEDED",
+        "NATIVE_AUTH_REQUIRED",
+        "NATIVE_ACCESS_DENIED",
+        "NATIVE_MODEL_UNAVAILABLE",
+        "NATIVE_RATE_LIMITED",
+        "NATIVE_SERVICE_UNAVAILABLE",
+        "NATIVE_RPC_REJECTED"
+      ],
+      "rawProviderDataExposed": false,
+      "automaticPaidRetry": false,
+      "quotaPreflightAdded": false,
+      "actualWindowsRpcPayloadVerified": false,
+      "classifierCjsCases": 13,
+      "nativeClientInjectedResponseCases": 5,
+      "workerFailureCases": 7,
+      "sessionClosedStatusIsNotRunSuccess": true
+    },
+    "b3": {
+      "explicitSameProjectRetry": "VERIFIED_WITH_REAL_CORE_AND_SYNTHETIC_AGENT_BOUNDARY",
+      "frontendOldRunCache": "ACTION_REQUIRED_NOT_MODIFIED",
+      "durableFailureHistory": "NOT_IMPLEMENTED",
+      "projectAbandonApi": "NOT_IMPLEMENTED",
+      "idempotencyScope": "WHILE_RUN_RETAINED_IN_SAME_RUNTIME_MAX_100_RUNS_NOT_DURABLE"
+    },
+    "b4": {
+      "trustGateAndGrantRecovery": "VM_REGRESSION_PASSED",
+      "workspaceSwitchFailureCause": "NOT_PROVEN_TO_BE_TRUST",
+      "automaticOriginalFolderReturn": false
+    },
+    "b5": {
+      "failedRunAuthorityRevocation": "REAL_HTTP_AND_SAVED_DESCRIPTOR_VERIFIED",
+      "windowsLingeringBridgeLifetime": "NOT_VERIFIED",
+      "roleFileCleanup": "NOT_PERFORMED",
+      "enterprisePolicyEffect": "NOT_VERIFIED"
+    },
+    "newWindowsKitOrVsix": "NOT_BUILT_OR_DELIVERED",
+    "userApprovedEarlyFinishKstApprox": "2026-09-28 09:50"
+  },
+  "completion": {
+    "scope": "MAC_BACKEND_PERFORMANCE_AND_FRONTEND_RELIABILITY_FOLLOWUP",
+    "userApprovedEarlyFinishKstApprox": "2026-09-28 09:50",
+    "previousDeadlineKst": "2026-09-28T10:00:00+09:00",
+    "windowsValidationComplete": false,
+    "upperT19TasksComplete": false
+  }
+}

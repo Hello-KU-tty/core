@@ -176,9 +176,10 @@ async function materializePackagedRoleRuntime(runtime, job, binding) {
   try { config = JSON.parse(await readFile(canonicalConfig, 'utf8')) }
   catch { throw gate('NATIVE_PACKAGED_ROLE_CONFIG_INVALID') }
   const server = config?.mcpServers?.['vibe-native-core']
+  const expectedPrompt = runtime.prompts[job.role].text
   if (runtime.windowsProduct) {
     const descriptor = runtime.runtimeDescriptor
-    if (config.name !== job.roleName || config.prompt !== runtime.prompts[job.role].text ||
+    if (config.name !== job.roleName || config.prompt !== expectedPrompt ||
         Object.keys(config.mcpServers ?? {}).join(',') !== 'vibe-native-core' ||
         server?.command !== descriptor.executable ||
         JSON.stringify(server?.args) !== JSON.stringify([...descriptor.args, runtime.bridgeScriptPath, bindingFile, workspace]) ||
@@ -186,7 +187,7 @@ async function materializePackagedRoleRuntime(runtime, job, binding) {
       throw gate('NATIVE_PACKAGED_ROLE_CONFIG_INVALID')
     return // Core already wrote the verified portable command; never mutate an active role file.
   }
-  if (config.name !== job.roleName || config.prompt !== runtime.prompts[job.role].text ||
+  if (config.name !== job.roleName || config.prompt !== expectedPrompt ||
       Object.keys(config.mcpServers ?? {}).join(',') !== 'vibe-native-core' ||
       typeof server?.command !== 'string' ||
       !Array.isArray(server.args) || server.args.length !== 3 ||
@@ -195,7 +196,7 @@ async function materializePackagedRoleRuntime(runtime, job, binding) {
     throw gate('NATIVE_PACKAGED_ROLE_CONFIG_INVALID')
   const next = {
     ...config,
-    prompt: runtime.prompts[job.role].text,
+    prompt: expectedPrompt,
     mcpServers: { 'vibe-native-core': {
       ...server,
       command: runtime.nodePath,

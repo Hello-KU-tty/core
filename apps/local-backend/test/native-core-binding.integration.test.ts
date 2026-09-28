@@ -1,8 +1,9 @@
 import { randomBytes, randomUUID } from 'node:crypto'
-import { mkdtemp } from 'node:fs/promises'
+import { mkdtemp, realpath, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
+import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'
 import { ApplicationService, WorkspacePathPolicy } from '@vibe-helper/application'
 import {
   builderTaskSchema,
@@ -13,7 +14,7 @@ import {
   projectCandidateRevisionSchema,
   projectSchema,
 } from '@vibe-helper/contracts'
-import { WorkflowRuntime } from '@vibe-helper/runtime'
+import { privateDirectory, WorkflowRuntime } from '@vibe-helper/runtime'
 import { openInMemorySqliteStorage } from '@vibe-helper/storage-sqlite'
 import { describe, expect, it } from 'vitest'
 import {
@@ -187,6 +188,58 @@ describe('experimental native Core binding', () => {
         isError: true,
         structuredContent: { code: 'AGENT_RUN_SCOPE_MISMATCH' },
       })
+      // Exercise the actual child-process facade, not only its pure decoder.
+      // Invalid JSON must be an actionable MCP tool error and leave Core intact.
+      await privateDirectory(root)
+      const workspace = await realpath(root)
+      const descriptorFile = join(workspace, 'binding.json')
+      await writeFile(
+        descriptorFile,
+        JSON.stringify({
+          role: 'BUILDER',
+          projectId: ids.project,
+          taskId: ids.task,
+          correlationId: ids.correlation,
+          workspace,
+          toolNames: binding.toolNames,
+          authorization: binding.authorization,
+          url: url.href,
+        }),
+        { mode: 0o600 },
+      )
+      const stdio = new Client({ name: 'native-stdio-error-test', version: '0.1.0' })
+      try {
+        await stdio.connect(
+          new StdioClientTransport({
+            command: process.execPath,
+            args: [resolve('scripts/native-core-stdio-bridge.mjs'), descriptorFile, workspace],
+            stderr: 'pipe',
+          }),
+        )
+        const invalid = await stdio.callTool({
+          name: 'complete_task',
+          arguments: {
+            inputJson: '{"report":{"limitations":["private-fixture-value"]}',
+          },
+        })
+        expect(invalid.isError).toBe(true)
+        const text = invalid.content?.find((item) => item.type === 'text')
+        if (!text || text.type !== 'text') throw new Error('MISSING_TOOL_ERROR')
+        expect(JSON.parse(text.text)).toMatchObject({
+          code: 'BRIDGE_ENVELOPE_JSON_INVALID',
+          syntax: { reason: 'INCOMPLETE_JSON' },
+        })
+        expect(text.text).not.toContain('private-fixture-value')
+        const after = await stdio.callTool({ name: 'get_builder_task', arguments: args })
+        expect(after.isError).not.toBe(true)
+        expect(after.structuredContent).toEqual(read.structuredContent)
+        await writeFile(descriptorFile, JSON.stringify({ status: 'REVOKED' }), { mode: 0o600 })
+        await expect(stdio.callTool({ name: 'get_builder_task', arguments: args })).rejects.toThrow(
+          'BRIDGE_BINDING_REVOKED',
+        )
+      } finally {
+        await stdio.close()
+      }
       binding.revoke()
       await expect(client.callTool({ name: 'get_builder_task', arguments: args })).rejects.toThrow()
     } finally {

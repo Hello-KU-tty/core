@@ -8,7 +8,7 @@
   "contributes": {
     "commands": [
       { "command": "vibeHelper.localPanel", "title": "Vibe Helper: Open Local Integration Panel" },
-      { "command": "vibeHelper.nativeCleanEvaluationRun", "title": "Vibe Helper: Run Bounded Synthetic Validation (7 Analyst cells)" }
+      { "command": "vibeHelper.nativeCleanEvaluationRun", "title": "Vibe Helper: Run Bounded Synthetic Validation (up to 8 Analyst cells)" }
     ],
     "configuration": {
       "title": "Vibe Helper Local Core",

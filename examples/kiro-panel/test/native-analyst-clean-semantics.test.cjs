@@ -1,11 +1,19 @@
 const assert = require('node:assert/strict')
+const { createHash } = require('node:crypto')
 const { readFile } = require('node:fs/promises')
 const { test } = require('node:test')
 const { join } = require('node:path')
 const fixture = require('../../../tests/eval/fixtures/prompt-regressions/evidence-analyst-v1.0.6-clean-semantics.json')
 const fixtureV107 = require('../../../tests/eval/fixtures/prompt-regressions/evidence-analyst-v1.0.7-claim-temporality.json')
+const fixtureV108 = require('../../../tests/eval/fixtures/prompt-regressions/evidence-analyst-v1.0.8-source-first.json')
+const heldOutV108 = require('../../../tests/eval/fixtures/prompt-regressions/evidence-analyst-v1.0.8-held-out.json')
+const pairedUnseen = require('../../../tests/eval/fixtures/prompt-regressions/evidence-analyst-paired-unseen-20260928.json')
+const fixtureV109 = require('../../../tests/eval/fixtures/prompt-regressions/evidence-analyst-v1.0.9-source-first.json')
+const crossDomainV109 = require('../../../tests/eval/fixtures/prompt-regressions/evidence-analyst-v1.0.9-held-out.json')
+const unusedUnseenV109 = require('../../../tests/eval/fixtures/prompt-regressions/evidence-analyst-v1.0.9-unseen.json')
 const {
-  MAX_TURNS, EXPECTED_CASE_IDS, EXPECTED_CASE_IDS_V1_0_7,
+  MAX_TURNS, ABSOLUTE_MAX_TURNS, EXPECTED_CASE_IDS, EXPECTED_CASE_IDS_V1_0_7,
+  EXPECTED_CASE_IDS_V1_0_8,
   buildSyntheticCase, evaluateText,
   runNativeAnalystCleanSemantics,
 } = require('../src/native-analyst-clean-semantics.cjs')
@@ -14,13 +22,101 @@ const MODEL_ID = 'catalog-confirmed-model'
 const WINDOW_ID = 17
 const MESSAGE_MARKER = '\n\nSynthetic Episode context: '
 
+test('runs eight same-input baseline cells only with the explicit comparison protocol', async () => {
+  for (const original of [fixtureV108, heldOutV108, pairedUnseen]) {
+    const paired = { ...original, promptVersion: '1.0.7', comparisonProtocol: 'SAME_EIGHT_CASES_V1' }
+    const deps = await dependencies(paired)
+    deps.rolePrompt = await readFile(join(__dirname, '../../../tests/eval/fixtures/prompt-regressions/evidence-analyst-v1.0.7-canonical.md'), 'utf8')
+    for (let index = 0; index < paired.cases.length; index++)
+      assert.deepEqual(buildSyntheticCase(paired.cases[index], index, deps.contracts),
+        buildSyntheticCase(original.cases[index], index, deps.contracts))
+    const host = fakeHost(paired.cases, resultForV107)
+    const result = await runNativeAnalystCleanSemantics({ ...deps, ...host })
+    assert.equal(result.metadata.promptVersion, '1.0.7')
+    assert.equal(result.metadata.turns, 8)
+    assert.equal(result.metadata.deterministicStatus, 'PASSED')
+    assert.equal(host.sessions.length, 8)
+    await assert.rejects(runNativeAnalystCleanSemantics({ ...deps, ...fakeHost([], resultForV107),
+      fixture: { ...paired, comparisonProtocol: undefined } }), /ANALYST_CLEAN_FIXTURE_INVALID/)
+    await assert.rejects(runNativeAnalystCleanSemantics({ ...deps, ...fakeHost([], resultForV107),
+      fixture: { ...paired, cases: [...paired.cases, paired.cases[0]] } }), /ANALYST_CLEAN_FIXTURE_INVALID/)
+  }
+})
+
+test('freezes new paired inputs after both prompts and never embeds oracle concepts', async () => {
+  const baseline = await readFile(join(__dirname, '../../../tests/eval/fixtures/prompt-regressions/evidence-analyst-v1.0.7-canonical.md'), 'utf8')
+  const candidate = await readFile(join(__dirname, '../../../docs/agent-prompts/evidence-analyst.md'), 'utf8')
+  assert.equal(createHash('sha256').update(baseline).digest('hex'), pairedUnseen.frozenPromptSha256['1.0.7'])
+  assert.equal(createHash('sha256').update(candidate).digest('hex'), pairedUnseen.frozenPromptSha256['1.0.8'])
+  assert.equal(pairedUnseen.modelRunStatus, 'NOT_RUN')
+  assert.equal(pairedUnseen.cases.length, 8)
+  const deps = await dependencies(pairedUnseen)
+  const oldMessages = new Set([...fixtureV108.cases, ...heldOutV108.cases, ...unusedUnseenV109.cases]
+    .map(item => item.userMessage).filter(value => value !== null))
+  for (const [index, item] of pairedUnseen.cases.entries()) {
+    const context = buildSyntheticCase(item, index, deps.contracts)
+    assert.deepEqual(context.episode.conceptCandidates, [])
+    if (item.userMessage !== null) assert.equal(oldMessages.has(item.userMessage), false)
+    for (const profile of item.expected.claimProfiles ?? [])
+      for (const excerpt of profile.claimExcerpts) assert.ok(item.userMessage.includes(excerpt))
+  }
+  const host = fakeHost(pairedUnseen.cases, resultForV107)
+  const result = await runNativeAnalystCleanSemantics({ ...deps, ...host })
+  assert.equal(result.metadata.deterministicStatus, 'PASSED')
+  assert.equal(host.sessions.length, 8)
+})
+
+test('retains the unexecuted v1.0.9 unseen corpus with valid input provenance', async () => {
+  assert.equal(unusedUnseenV109.modelRunStatus, 'NOT_RUN')
+  const archived = await readFile(join(__dirname, '..', '..', '..', 'docs', 'spikes',
+    't19-analyst-prompt-experiments', 'evidence-analyst-v1.0.9.md'), 'utf8')
+  assert.equal(createHash('sha256').update(archived).digest('hex'),
+    unusedUnseenV109.authoredAfterPromptSha256)
+  const deps = await dependencies(unusedUnseenV109)
+  for (const [index, item] of unusedUnseenV109.cases.entries()) {
+    const context = buildSyntheticCase(item, index, deps.contracts)
+    assert.deepEqual(context.episode.conceptCandidates, [])
+    for (const profile of item.expected.claimProfiles ?? [])
+      for (const excerpt of profile.claimExcerpts)
+        assert.ok(item.userMessage.includes(excerpt))
+    if (item.userMessage === null) {
+      assert.equal(item.decisionResolution.selectedOptionIndex,
+        item.decisionRequest.recommendedOptionIndex)
+      assert.equal(item.decisionResolution.rationale, undefined)
+    }
+  }
+})
+
+test('v1.0.9 preserves both prior corpora and strict oracles rather than relabeling them unseen', async () => {
+  assert.deepEqual(fixtureV109.cases, fixtureV108.cases)
+  assert.deepEqual(crossDomainV109.cases, heldOutV108.cases)
+  for (const corpus of [fixtureV109, crossDomainV109]) {
+    assert.match(corpus.claimBoundary, /not unseen validation/)
+    const deps = await dependencies(corpus)
+    const previous = corpus === fixtureV109 ? fixtureV108 : heldOutV108
+    for (let index = 0; index < corpus.cases.length; index++)
+      assert.deepEqual(buildSyntheticCase(corpus.cases[index], index, deps.contracts),
+        buildSyntheticCase(previous.cases[index], index, deps.contracts))
+    const host = fakeHost(corpus.cases, resultForV107)
+    const result = await runNativeAnalystCleanSemantics({ ...deps, ...host })
+    assert.equal(result.metadata.turns, 8)
+    assert.equal(result.metadata.deterministicStatus, 'PASSED')
+    assert.equal(result.metadata.promptVersion, '1.0.9')
+    assert.equal(host.sessions.length, 8)
+  }
+  const archive = await readFile(join(__dirname, '..', '..', '..', 'docs', 'spikes',
+    't19-analyst-prompt-experiments', 'evidence-analyst-v1.0.8.md'), 'utf8')
+  assert.equal(createHash('sha256').update(archive).digest('hex'),
+    'cf84876b9926c815562ab4481388dbff36b0d0083cfe8bade9d9b06a3cfd9cd9')
+})
+
 async function dependencies(selectedFixture = fixture) {
   const contracts = await import('../../../packages/contracts/dist/index.js')
   const canonicalRolePrompt = await readFile(join(__dirname, '..', '..', '..', 'docs',
     'agent-prompts', 'evidence-analyst.md'), 'utf8')
-  const rolePrompt = selectedFixture.promptVersion === '1.0.6' ?
-    canonicalRolePrompt.replace('> Prompt version: `1.0.7`',
-      '> Prompt version: `1.0.6`') : canonicalRolePrompt
+  // Stubbed transport tests exercise fixture routing, not historical model compliance.
+  const rolePrompt = canonicalRolePrompt.replace(/^> Prompt version: `[^`]+`$/m,
+    `> Prompt version: \`${selectedFixture.promptVersion}\``)
   return {
     fixture: selectedFixture, contracts, rolePrompt,
     model: { id: MODEL_ID, confirmed: true, source: 'IDE_CONFIG_OPTION',
@@ -118,9 +214,9 @@ function fakeHost(cases, responseFor = resultFor) {
           prompts.push(prompt)
           const context = JSON.parse(prompt.slice(prompt.lastIndexOf(MESSAGE_MARKER) +
             MESSAGE_MARKER.length))
-          const item = cases.find(candidate =>
-            candidate.userMessage === context.events.find(event =>
-              event.payload.type === 'USER_MESSAGE').payload.redactedExcerpt)
+          const message = context.events.find(event =>
+            event.payload.type === 'USER_MESSAGE')?.payload.redactedExcerpt ?? null
+          const item = cases.find(candidate => candidate.userMessage === message)
           return { stopReason: 'end_turn', text: responseFor(item, context) }
         },
         close: () => { session.closed = true },
@@ -183,6 +279,11 @@ test('runs one fresh attested read-only H session per case with no retry or Core
   assert.equal(result.metadata.model.id, MODEL_ID)
   assert.equal(result.metadata.model.configuration, 'NOT_EXPOSED')
   assert.equal(result.metadata.cells.length, MAX_TURNS)
+  for (const [index, cell] of result.metadata.cells.entries()) {
+    assert.equal(cell.composedPromptSha256,
+      createHash('sha256').update(host.prompts[index]).digest('hex'))
+    assert.equal(cell.composedPromptBytes, Buffer.byteLength(host.prompts[index], 'utf8'))
+  }
   assert.ok(result.metadata.cells.every(cell =>
     cell.status === 'COMPLETE' && cell.deterministicStatus === 'PASSED'))
   assert.equal(Object.keys(result.display).length, MAX_TURNS)
@@ -350,4 +451,85 @@ test('runs the v1.0.7 seven-cell plan with fresh sessions and no Core mutation',
   assert.equal(result.metadata.cellRetryCount, 0)
   assert.equal(host.sessions.length, 7)
   assert.equal(new Set(host.sessions).size, 7)
+})
+
+test('preserves all seven v1.0.7 inputs and oracles and adds a click without invented user words', async () => {
+  const { contracts } = await dependencies(fixtureV108)
+  assert.deepEqual(fixtureV108.cases.slice(0, 7), fixtureV107.cases)
+  assert.deepEqual(fixtureV108.cases.map(item => item.id), EXPECTED_CASE_IDS_V1_0_8)
+  for (let index = 0; index < 7; index += 1)
+    assert.deepEqual(buildSyntheticCase(fixtureV108.cases[index], index, contracts),
+      buildSyntheticCase(fixtureV107.cases[index], index, contracts))
+  const item = fixtureV108.cases[7]
+  const context = buildSyntheticCase(item, 7, contracts)
+  assert.equal(context.episode.type, 'DECISION')
+  assert.equal(context.events.length, 2)
+  assert.equal(context.events[0].actor.kind, 'AGENT')
+  assert.equal(context.events[0].payload.type, 'DECISION_REQUESTED')
+  assert.equal(context.events[1].actor.kind, 'USER')
+  assert.equal(context.events[1].payload.type, 'DECISION_RESOLVED')
+  assert.equal(context.events[1].payload.rationaleProvided, false)
+  assert.equal(context.events.some(event => event.payload.type === 'USER_MESSAGE'), false)
+  assert.equal(context.decisionContext.resolution.rationale, undefined)
+  assert.equal(context.decisionContext.resolution.customProposal, undefined)
+  assert.equal(context.decisionContext.resolution.selectedOptionId,
+    context.decisionContext.request.recommendedOptionId)
+  assert.equal(evaluateText(resultForV107(item, context), context, item, contracts)
+    .deterministicStatus, 'PASSED')
+  const invalid = JSON.parse(resultForV107(item, context))
+  delete invalid.noEvidenceReason
+  invalid.proposals = [{
+    concept: { originalExpression: '입력 경계 불변식', proposedCanonicalName: '경계 검증' },
+    signal: 'REPHRASE', strength: 'NONE', promptDependence: 'DIRECTLY_LED',
+    userEvidenceSources: item.userEvidenceSources, contextSources: [],
+    redactedEvidenceExcerpt: '입력 경계 불변식',
+    rationale: 'A schema-valid NONE item still has no user-authored quote.',
+    maximumSupportedState: null, misconception: { action: 'NONE' },
+  }]
+  const rejected = evaluateText(JSON.stringify(invalid), context, item, contracts)
+  assert.equal(rejected.schemaValid, true)
+  assert.equal(rejected.quoteProvenanceValid, false)
+  assert.equal(rejected.deterministicStatus, 'FAILED')
+  assert.throws(() => buildSyntheticCase({ ...item, userMessage: 'Invented rationale' },
+    7, contracts), /ANALYST_CLEAN_USER_SOURCE_INVALID/)
+  assert.throws(() => buildSyntheticCase({ ...item, decisionResolution: {
+    ...item.decisionResolution, rationale: 'Invented rationale' } }, 7, contracts),
+  /ANALYST_CLEAN_DECISION_FIXTURE_INVALID/)
+})
+
+test('runs exactly eight v1.0.8 cells while retaining seven-cell historical budgets', async () => {
+  const deps = await dependencies(fixtureV108)
+  const host = fakeHost(fixtureV108.cases, resultForV107)
+  const result = await runNativeAnalystCleanSemantics({ ...deps, ...host })
+  assert.equal(result.metadata.maxTurns, ABSOLUTE_MAX_TURNS)
+  assert.equal(result.metadata.turns, 8)
+  assert.equal(result.metadata.deterministicStatus, 'PASSED')
+  assert.equal(host.sessions.length, 8)
+  assert.equal(new Set(host.sessions).size, 8)
+  assert.equal(result.metadata.coreMutationCount, 0)
+  assert.equal(result.metadata.cellRetryCount, 0)
+  await assert.rejects(runNativeAnalystCleanSemantics({ ...deps, ...host,
+    fixture: { ...fixtureV108, cases: [...fixtureV108.cases, fixtureV108.cases[7]] } }),
+  /ANALYST_CLEAN_FIXTURE_INVALID/)
+})
+
+test('held-out contexts contain no oracle-derived Concept candidates or expected classifications', async () => {
+  const deps = await dependencies(heldOutV108)
+  for (const [index, item] of heldOutV108.cases.entries()) {
+    const context = buildSyntheticCase(item, index, deps.contracts)
+    assert.deepEqual(context.episode.conceptCandidates, [])
+    if (context.decisionContext)
+      assert.deepEqual(context.decisionContext.request.relatedConceptNames, [])
+    const message = JSON.stringify(context)
+    assert.equal(message.includes('claimProfiles'), false)
+    assert.equal(message.includes('allowedStrengths'), false)
+    assert.notEqual(item.userMessage, fixtureV108.cases[index].userMessage ?? 'NO_MESSAGE')
+    const output = evaluateText(resultForV107(item, context), context, item, deps.contracts)
+    assert.equal(output.deterministicStatus, 'PASSED')
+  }
+  const host = fakeHost(heldOutV108.cases, resultForV107)
+  const result = await runNativeAnalystCleanSemantics({ ...deps, ...host })
+  assert.equal(result.metadata.turns, 8)
+  assert.equal(result.metadata.deterministicStatus, 'PASSED')
+  assert.equal(result.metadata.coreMutationCount, 0)
 })

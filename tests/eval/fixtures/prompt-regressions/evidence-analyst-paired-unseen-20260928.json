@@ -1,0 +1,126 @@
+{
+  "promptVersion": "1.0.8",
+  "fixtureId": "paired-held-out-lifetimes-order-and-normalization",
+  "revisesFixture": null,
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED",
+  "fixtureProvenance": "SYNTHETIC_UI_TRANSCRIPT",
+  "modelRunStatus": "NOT_RUN",
+  "authoredAt": "2026-09-27T21:53:00Z",
+  "frozenPromptSha256": {
+    "1.0.7": "0d0c7f132f75f36246b87447d57ff5c6d0b7b9ed4d1eb368e792bdc25cea149c",
+    "1.0.8": "cf84876b9926c815562ab4481388dbff36b0d0083cfe8bade9d9b06a3cfd9cd9"
+  },
+  "claimBoundary": "New synthetic inputs authored after both compared prompts were frozen. Neither prompt is edited for this corpus. Same eight inputs and strict claim oracles for both versions; empty conceptCandidates. No reinterpretation of the earlier unexecuted v1.0.9 corpus. This evaluates prompt compliance, not actual learner understanding. Performed-action claims remain unverified self-reports under the existing Core policy.",
+  "cases": [
+    {
+      "id": "request_only", "observedKind": "REQUEST_ONLY", "conceptCandidateMode": "NONE",
+      "precedingAgentContribution": null,
+      "userMessage": "서버를 다시 시작했을 때 열려 있던 연결이 어떻게 되는지 설명해 주세요.",
+      "userEvidenceSources": [{ "kind": "USER_MESSAGE", "conversationId": "conversation_74000000-0000-4000-8000-000000000001", "messageId": "message_74000000-0000-4000-8000-000000000002" }],
+      "expected": { "oracleMode": "NO_PROPOSALS", "reason": "A request for an explanation supplies no user claim." }
+    },
+    {
+      "id": "future_plan_after_light_hint", "observedKind": "FUTURE_PLAN_WITH_PREDICTION", "conceptCandidateMode": "NONE",
+      "precedingAgentContribution": "화면을 닫을 때 백그라운드 작업도 생각해 보세요.",
+      "userMessage": "화면을 닫아도 타이머를 해제하지 않으면 콜백이 사라진 화면의 상태를 갱신하려 할 수 있으니 다음에는 화면 종료 때 타이머를 정리하겠어요.",
+      "userEvidenceSources": [{ "kind": "USER_MESSAGE", "conversationId": "conversation_74000000-0000-4000-8000-000000000003", "messageId": "message_74000000-0000-4000-8000-000000000004" }],
+      "expected": {
+        "oracleMode": "CLAIM_PROFILES", "minimumStateSupportingProposals": 1,
+        "forbiddenSignals": ["JUSTIFIED_DECISION", "APPLICATION"],
+        "claimProfiles": [{ "id": "future_callback_after_view_close", "claimExcerpts": ["콜백이 사라진 화면의 상태를 갱신하려 할 수 있으니"], "allowedSignals": ["PREDICTION"], "allowedStrengths": ["MEDIUM", "STRONG"], "allowedPromptDependence": ["LIGHT_HINT"], "allowedMaximumSupportedStates": ["EXPLAINED"] }],
+        "reason": "A predicted consequence after a light hint supports at most EXPLAINED; the future cleanup plan is neither performed work nor a recorded choice."
+      }
+    },
+    {
+      "id": "own_explanation_independent", "observedKind": "TIMELESS_DEFINITION", "conceptCandidateMode": "NONE",
+      "precedingAgentContribution": null,
+      "userMessage": "사전식 정렬은 숫자의 크기가 아니라 앞에서부터 문자를 비교하므로 문자열 10은 문자열 2보다 앞에 놓입니다.",
+      "userEvidenceSources": [{ "kind": "USER_MESSAGE", "conversationId": "conversation_74000000-0000-4000-8000-000000000005", "messageId": "message_74000000-0000-4000-8000-000000000006" }],
+      "expected": {
+        "oracleMode": "CLAIM_PROFILES", "minimumStateSupportingProposals": 1,
+        "forbiddenSignals": ["PREDICTION", "JUSTIFIED_DECISION", "APPLICATION"],
+        "claimProfiles": [{ "id": "lexicographic_definition", "claimExcerpts": ["숫자의 크기가 아니라 앞에서부터 문자를 비교하므로", "문자열 10은 문자열 2보다 앞에 놓입니다"], "allowedSignals": ["REPHRASE"], "allowedStrengths": ["MEDIUM", "STRONG"], "allowedPromptDependence": ["INDEPENDENT"], "allowedMaximumSupportedStates": ["EXPLAINED"] }],
+        "reason": "This states a timeless rule with an example, not a not-yet-observed experiment."
+      }
+    },
+    {
+      "id": "actual_reasoned_choice", "observedKind": "REASONED_CHOICE", "conceptCandidateMode": "NONE",
+      "precedingAgentContribution": "로그를 시간순으로 정렬할지 도착한 순서로 남길지 골라 주세요.",
+      "userMessage": "원래 도착 순서를 잃으면 지연된 응답의 원인을 추적하기 어려우므로 정렬하지 않고 입력 순서를 유지하겠습니다.",
+      "decisionRequest": {
+        "question": "로그를 시간순으로 정렬할까요, 도착 순서를 유지할까요?",
+        "reasonRequiredNow": "로그 표시 순서를 정해야 구현을 이어갈 수 있습니다.",
+        "options": [
+          { "label": "시간순 정렬", "description": "기록된 시간을 기준으로 순서를 바꿉니다.", "impacts": ["시간 흐름대로 읽습니다."], "tradeoffs": ["정렬 단계가 추가됩니다."] },
+          { "label": "도착 순서 유지", "description": "입력된 순서대로 표시합니다.", "impacts": ["입력 순서를 유지합니다."], "tradeoffs": ["기록 시간이 앞뒤로 바뀔 수 있습니다."] }
+        ],
+        "recommendedOptionIndex": 0,
+        "recommendationRationale": "기록된 시간 흐름을 한눈에 보기 쉽습니다.",
+        "agentHintMustNotContain": ["지연된 응답의 원인을 추적하기 어려우므로", "원인을 추적"]
+      },
+      "decisionEvent": { "type": "DECISION_RESOLVED", "decisionId": "decision_74000000-0000-4000-8000-000000000007", "rationaleProvided": true },
+      "decisionResolution": { "source": "USER", "selectedOptionIndex": 1, "rationale": "원래 도착 순서를 잃으면 지연된 응답의 원인을 추적하기 어려우므로 정렬하지 않고 입력 순서를 유지하겠습니다." },
+      "userEvidenceSources": [
+        { "kind": "USER_MESSAGE", "conversationId": "conversation_74000000-0000-4000-8000-000000000008", "messageId": "message_74000000-0000-4000-8000-000000000009" },
+        { "kind": "USER_DECISION", "decisionId": "decision_74000000-0000-4000-8000-000000000007" }
+      ],
+      "expected": {
+        "oracleMode": "CLAIM_PROFILES", "minimumStateSupportingProposals": 1, "forbiddenSignals": ["APPLICATION"],
+        "claimProfiles": [{ "id": "user_reason_for_arrival_order", "claimExcerpts": ["지연된 응답의 원인을 추적하기 어려우므로", "정렬하지 않고 입력 순서를 유지하겠습니다"], "allowedSignals": ["JUSTIFIED_DECISION"], "allowedStrengths": ["STRONG"], "allowedPromptDependence": ["LIGHT_HINT"], "allowedMaximumSupportedStates": ["DEMONSTRATED"] }],
+        "reason": "The options are Agent-authored but the rationale for the nonrecommended selected option is supplied by the user."
+      }
+    },
+    {
+      "id": "actual_performed_application", "observedKind": "COMPLETED_ACTION_AND_OBSERVATION", "conceptCandidateMode": "NONE",
+      "precedingAgentContribution": null,
+      "userMessage": "테스트에서 빈 문자열과 공백만 있는 입력을 전송해 각각 400 응답을 확인했고, 이어서 유효한 입력을 보내 200 응답이 오는 것도 확인했습니다.",
+      "userEvidenceSources": [{ "kind": "USER_MESSAGE", "conversationId": "conversation_74000000-0000-4000-8000-000000000011", "messageId": "message_74000000-0000-4000-8000-000000000012" }],
+      "expected": {
+        "oracleMode": "CLAIM_PROFILES", "minimumStateSupportingProposals": 1, "forbiddenSignals": ["PREDICTION", "JUSTIFIED_DECISION"],
+        "claimProfiles": [{ "id": "completed_invalid_and_recovery_probe", "claimExcerpts": ["빈 문자열과 공백만 있는 입력을 전송해 각각 400 응답을 확인했고", "유효한 입력을 보내 200 응답이 오는 것도 확인했습니다"], "allowedSignals": ["APPLICATION"], "allowedStrengths": ["STRONG"], "allowedPromptDependence": ["INDEPENDENT"], "allowedMaximumSupportedStates": ["DEMONSTRATED"] }],
+        "reason": "A reported completed probe and observed result is APPLICATION under current Core policy, not a future prediction. It is not independently attested execution."
+      }
+    },
+    {
+      "id": "directly_led_repeat", "observedKind": "DIRECT_REPEAT", "conceptCandidateMode": "NONE",
+      "precedingAgentContribution": "TypeScript의 읽기 전용 타입 표시는 실행 중인 객체를 동결하지 않습니다.",
+      "userMessage": "말한 대로 읽기 전용 타입 표시는 실행 중인 객체를 동결하지 않는군요.",
+      "userEvidenceSources": [{ "kind": "USER_MESSAGE", "conversationId": "conversation_74000000-0000-4000-8000-000000000013", "messageId": "message_74000000-0000-4000-8000-000000000014" }],
+      "expected": {
+        "oracleMode": "CLAIM_PROFILES", "minimumStateSupportingProposals": 0, "maximumStateSupportingProposals": 0,
+        "claimProfiles": [{ "id": "direct_repeat_of_readonly_rule", "claimExcerpts": ["읽기 전용 타입 표시는 실행 중인 객체를 동결하지"], "allowedSignals": ["REPHRASE"], "allowedStrengths": ["NONE", "WEAK"], "allowedPromptDependence": ["DIRECTLY_LED"], "allowedMaximumSupportedStates": [null] }],
+        "reason": "Repeating an Agent-supplied rule cannot support a learned-state increase."
+      }
+    },
+    {
+      "id": "independent_future_prediction", "observedKind": "ACTUAL_FUTURE_PREDICTION", "conceptCandidateMode": "NONE",
+      "precedingAgentContribution": null,
+      "userMessage": "앞뒤 공백을 제거한 문자열을 Map의 키로 쓴다면 a 뒤에 공백이 있는 입력과 공백 없는 a를 차례로 저장할 때 같은 키가 되므로 마지막에는 항목이 하나만 남을 거예요.",
+      "userEvidenceSources": [{ "kind": "USER_MESSAGE", "conversationId": "conversation_74000000-0000-4000-8000-000000000015", "messageId": "message_74000000-0000-4000-8000-000000000016" }],
+      "expected": {
+        "oracleMode": "CLAIM_PROFILES", "minimumStateSupportingProposals": 1, "forbiddenSignals": ["JUSTIFIED_DECISION", "APPLICATION"],
+        "claimProfiles": [{ "id": "future_normalized_key_collision", "claimExcerpts": ["같은 키가 되므로 마지막에는 항목이 하나만 남을 거예요"], "allowedSignals": ["PREDICTION"], "allowedStrengths": ["STRONG"], "allowedPromptDependence": ["INDEPENDENT"], "allowedMaximumSupportedStates": ["DEMONSTRATED"] }],
+        "reason": "A concrete independent causal prediction of a future outcome retains the existing strong prediction policy."
+      }
+    },
+    {
+      "id": "bare_recommendation_without_user_words", "observedKind": "BARE_RECOMMENDATION_CLICK", "conceptCandidateMode": "NONE",
+      "precedingAgentContribution": null, "userMessage": null,
+      "decisionRequest": {
+        "question": "요청을 받은 즉시 저장할까요, 입력 검증을 통과한 뒤 저장할까요?",
+        "reasonRequiredNow": "저장 순서를 정해야 다음 구현을 이어갈 수 있습니다.",
+        "options": [
+          { "label": "즉시 저장", "description": "입력을 먼저 기록합니다.", "impacts": ["모든 입력 기록이 남습니다."], "tradeoffs": ["별도 검증 단계가 필요합니다."] },
+          { "label": "검증 후 저장", "description": "검증에 통과한 입력만 기록합니다.", "impacts": ["검증된 입력만 저장됩니다."], "tradeoffs": ["검증 단계가 앞에 있습니다."] }
+        ],
+        "recommendedOptionIndex": 1,
+        "recommendationRationale": "저장 경계에서 잘못된 입력을 거절할 수 있습니다."
+      },
+      "decisionEvent": { "type": "DECISION_RESOLVED", "decisionId": "decision_74000000-0000-4000-8000-000000000017", "rationaleProvided": false },
+      "decisionResolution": { "source": "USER", "selectedOptionIndex": 1 },
+      "userEvidenceSources": [{ "kind": "USER_DECISION", "decisionId": "decision_74000000-0000-4000-8000-000000000017" }],
+      "expected": { "oracleMode": "NO_PROPOSALS", "reason": "A recommendation click without user words does not provide an attributable conceptual claim." }
+    }
+  ]
+}

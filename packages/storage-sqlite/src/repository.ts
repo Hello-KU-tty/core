@@ -2,6 +2,7 @@ import {
   type BuilderTaskAggregate,
   type DiscoveryAggregate,
   type EpisodeAggregate,
+  type EpisodeHistory,
   PersistenceError,
   type EvidenceTrace,
   type IdempotencyReceipt,
@@ -1759,6 +1760,16 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
     })
   }
 
+  readEpisodeHistory(projectId: string, episodeId: string): EpisodeHistory | null {
+    if (
+      !projectSchema.shape.id.safeParse(projectId).success ||
+      !episodeSchema.shape.id.safeParse(episodeId).success
+    ) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Episode history identity is invalid')
+    }
+    return this.#read(() => this.#episodeHistory(projectId, episodeId))
+  }
+
   readEpisodeAggregate(projectId: string, episodeId: string): EpisodeAggregate | null {
     if (
       !projectSchema.shape.id.safeParse(projectId).success ||
@@ -1767,25 +1778,9 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
       throw new PersistenceError('VALIDATION_FAILED', 'Episode aggregate identity is invalid')
     }
     return this.#read(() => {
-      const episode = this.#headRecord(
-        `SELECT revisions.payload_json, revisions.payload_hash
-         FROM episodes heads
-         JOIN episode_revisions revisions
-           ON revisions.episode_id = heads.id AND revisions.revision = heads.head_revision
-         WHERE heads.project_id = ? AND heads.id = ?`,
-        [projectId, episodeId],
-        episodeSchema,
-      )
-      if (episode === null) return null
-      const events = this.#recordList(
-        `SELECT events.payload_json, events.payload_hash
-         FROM episode_event_edges edges
-         JOIN activity_events events ON events.id = edges.event_id
-         WHERE edges.episode_id = ? AND edges.episode_revision = ?
-         ORDER BY edges.position ASC`,
-        [episode.id, episode.revision],
-        activityEventSchema,
-      )
+      const history = this.#episodeHistory(projectId, episodeId)
+      if (history === null) return null
+      const { episode, events } = history
       const conceptIds = new Set(
         episode.conceptCandidates.flatMap((candidate) =>
           candidate.conceptId === undefined ? [] : [candidate.conceptId],
@@ -2066,6 +2061,30 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
     })
   }
 
+  readRecentEpisodeHistoryForProject(projectId: string, limit: number): readonly EpisodeHistory[] {
+    if (!projectSchema.shape.id.safeParse(projectId).success || !Number.isInteger(limit)) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Recent Episode query is invalid')
+    }
+    if (limit < 1 || limit > 50) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Recent Episode limit must be 1 through 50')
+    }
+    return this.#read(() => {
+      // Preserve the full API's status selection and order. Validate every selected
+      // Episode/Event before the Application applies its relevance and summary limits.
+      const rows = this.#sqlite
+        .prepare<[string, number], { readonly id: string }>(
+          `SELECT id FROM episodes
+           WHERE project_id = ? AND status != 'OPEN'
+           ORDER BY updated_at DESC LIMIT ?`,
+        )
+        .all(projectId, limit)
+      return rows.flatMap((row) => {
+        const history = this.#episodeHistory(projectId, row.id)
+        return history === null ? [] : [history]
+      })
+    })
+  }
+
   readRecentHelperConversationAggregatesForProject(
     projectId: string,
     limit: number,
@@ -2106,6 +2125,36 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
         )
         .get(projectId)
       return row?.count ?? 0
+    })
+  }
+
+  readRecentHelperConversationHistoryForProject(
+    projectId: string,
+    limit: number,
+  ): readonly EpisodeHistory[] {
+    if (!projectSchema.shape.id.safeParse(projectId).success || !Number.isInteger(limit)) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Helper conversation query is invalid')
+    }
+    if (limit < 1 || limit > 20) {
+      throw new PersistenceError(
+        'VALIDATION_FAILED',
+        'Helper conversation limit must be 1 through 20',
+      )
+    }
+    return this.#read(() => {
+      // Use the same selection/order as the full aggregate API. Do not truncate Events:
+      // the Application owns the last-five USER/Helper summary projection.
+      const rows = this.#sqlite
+        .prepare<[string, number], { readonly id: string }>(
+          `SELECT id FROM episodes
+           WHERE project_id = ? AND type = 'HELPER_CONVERSATION'
+           ORDER BY updated_at DESC LIMIT ?`,
+        )
+        .all(projectId, limit)
+      return rows.flatMap((row) => {
+        const history = this.#episodeHistory(projectId, row.id)
+        return history === null ? [] : [history]
+      })
     })
   }
 
@@ -2380,19 +2429,27 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
     })
   }
 
-  readEvidenceTracesForProject(projectId: string): readonly EvidenceTrace[] {
-    if (!projectSchema.shape.id.safeParse(projectId).success) {
-      throw new PersistenceError('VALIDATION_FAILED', 'Project ID is invalid')
+  readEvidenceTracesForProject(projectId: string, conceptId?: string): readonly EvidenceTrace[] {
+    if (
+      !projectSchema.shape.id.safeParse(projectId).success ||
+      (conceptId !== undefined && !canonicalConceptSchema.shape.id.safeParse(conceptId).success)
+    ) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Project Evidence query identity is invalid')
     }
     return this.#read(() => {
+      const conceptFilter = conceptId === undefined ? '' : ' AND concept_id = ?'
+      const parameters =
+        conceptId === undefined
+          ? [projectId, projectId]
+          : [projectId, conceptId, projectId, conceptId]
       const rows = this.#sqlite
-        .prepare<[string, string], { readonly concept_id: string }>(
-          `SELECT DISTINCT concept_id FROM accepted_evidence WHERE project_id = ?
+        .prepare<string[], { readonly concept_id: string }>(
+          `SELECT DISTINCT concept_id FROM accepted_evidence WHERE project_id = ?${conceptFilter}
            UNION SELECT DISTINCT concept_id FROM evidence_proposals
-             WHERE project_id = ? AND concept_id IS NOT NULL
+             WHERE project_id = ? AND concept_id IS NOT NULL${conceptFilter}
            ORDER BY concept_id ASC`,
         )
-        .all(projectId, projectId)
+        .all(...parameters)
       return rows.flatMap((row) => {
         const trace = this.readEvidenceTrace(row.concept_id)
         return trace === null ? [] : [trace]
@@ -2400,17 +2457,19 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
     })
   }
 
-  readRecentEvidenceTraces(limit: number): readonly EvidenceTrace[] {
+  readRecentConceptLedgers(limit: number): readonly ConceptLedgerEntry[] {
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
-      throw new PersistenceError('VALIDATION_FAILED', 'Evidence Trace limit is invalid')
+      throw new PersistenceError('VALIDATION_FAILED', 'Concept Ledger limit is invalid')
     }
+    return this.#read(() => this.#allLedgerHeads(limit))
+  }
+
+  readRecentEvidenceTraces(limit: number): readonly EvidenceTrace[] {
     return this.#read(() =>
-      this.#allLedgerHeads()
-        .slice(0, limit)
-        .flatMap((ledger) => {
-          const trace = this.readEvidenceTrace(ledger.concept.id)
-          return trace === null ? [] : [trace]
-        }),
+      this.readRecentConceptLedgers(limit).flatMap((ledger) => {
+        const trace = this.readEvidenceTrace(ledger.concept.id)
+        return trace === null ? [] : [trace]
+      }),
     )
   }
 
@@ -2521,14 +2580,37 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
     )
   }
 
-  #allLedgerHeads(): readonly ConceptLedgerEntry[] {
+  #episodeHistory(projectId: string, episodeId: string): EpisodeHistory | null {
+    const episode = this.#headRecord(
+      `SELECT revisions.payload_json, revisions.payload_hash
+       FROM episodes heads
+       JOIN episode_revisions revisions
+         ON revisions.episode_id = heads.id AND revisions.revision = heads.head_revision
+       WHERE heads.project_id = ? AND heads.id = ?`,
+      [projectId, episodeId],
+      episodeSchema,
+    )
+    if (episode === null) return null
+    const events = this.#recordList(
+      `SELECT events.payload_json, events.payload_hash
+       FROM episode_event_edges edges
+       JOIN activity_events events ON events.id = edges.event_id
+       WHERE edges.episode_id = ? AND edges.episode_revision = ?
+       ORDER BY edges.position ASC`,
+      [episode.id, episode.revision],
+      activityEventSchema,
+    )
+    return { episode, events }
+  }
+
+  #allLedgerHeads(limit?: number): readonly ConceptLedgerEntry[] {
     return this.#recordList(
       `SELECT revisions.payload_json, revisions.payload_hash
        FROM concept_ledgers heads
        JOIN concept_ledger_revisions revisions
          ON revisions.ledger_id = heads.id AND revisions.revision = heads.head_revision
-       ORDER BY revisions.updated_at DESC`,
-      [],
+       ORDER BY revisions.updated_at DESC${limit === undefined ? '' : ' LIMIT ?'}`,
+      limit === undefined ? [] : [limit],
       conceptLedgerEntrySchema,
     )
   }

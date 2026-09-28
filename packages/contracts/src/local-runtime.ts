@@ -52,7 +52,9 @@ export const localRunRequestSchema = z.discriminatedUnion('kind', [
     kind: z.literal('BUILDER'),
     taskId: taskIdSchema,
     expectedTaskRevision: expectedRevisionSchema,
-    message: nonEmptyTextSchema,
+    // An explicit frontend start/resume may add no new instruction. The
+    // confirmed Task and durable Decision state still bind the Builder run.
+    message: z.string().trim().max(4_000),
   }),
   z.strictObject({
     ...metadata,

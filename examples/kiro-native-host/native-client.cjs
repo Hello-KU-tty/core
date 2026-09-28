@@ -15,6 +15,7 @@ const { assertCloudConfigAbsent, waitForOwnedCloudPull } =
   require('./native-cloud-pull-attestation.cjs')
 const { waitForOwnedSilentCloudPull } = require('./native-cloud-silent-attestation.cjs')
 const { withScopedCloudDebug } = require('./native-cloud-debug-scope.cjs')
+const { classifyNativeRpcError } = require('./native-rpc-error.cjs')
 
 const EXPECTED = Object.freeze({ vscode: '1.109.5', kiroExtensions: ['1.0.653', '1.0.794'] })
 const D_WORKSPACE_NAME = 'project_efc36445-7551-495f-bf4e-c66b82c871a8'
@@ -492,7 +493,7 @@ async function connectObserver(vscode, workspace, onPermissionRequest, onPermiss
       if (!waiter) return
       pending.delete(message.id)
       clearTimeout(waiter.timer)
-      if (message.error) waiter.reject(new NativeGateError('NATIVE_RPC_REJECTED'))
+      if (Object.hasOwn(message, 'error')) waiter.reject(new NativeGateError(classifyNativeRpcError(message.error)))
       else waiter.resolve(message.result)
     } else if (message.method === '_kiro/tools/didChange') {
       const sessionId = message.params?.sessionId
@@ -1366,10 +1367,10 @@ async function openNativeRole(vscode, options) {
     options.bridgeScriptPath, options.runtimeDescriptor)
   else if (!toolLessRole(workspace, role))
     throw new NativeGateError('NATIVE_TOOLLESS_ROLE_NOT_VERIFIED')
-  let windowsCatalog = null
+  let roleCatalog = null
   const client = await connectObserver(vscode, workspace, options.onPermissionRequest,
     options.onPermissionTelemetry, event => {
-      if (event.kind === 'TOOLS_DID_CHANGE') windowsCatalog = event
+      if (event.kind === 'TOOLS_DID_CHANGE') roleCatalog = event
       options.onProtocolTelemetry?.(event)
     },
     options.onUserInputRequest, options.windowsProduct === true)
@@ -1424,15 +1425,22 @@ async function openNativeRole(vscode, options) {
         const value = await client.explainPermission(sessionId, 'mcp', `vibe-native-core/${tool}`)
         if (value.effect !== 'allow') throw new NativeGateError('NATIVE_MCP_POLICY_UNVERIFIED')
       }
-      for (let n = 0; n < 40 && (!windowsCatalog || requireMcp && !windowsCatalog.mcpTagCount); n++)
+    }
+    // A mode ACK does not mean its asynchronous MCP catalog is ready. On the
+    // pinned Mac host the empty catalog arrives before the bridge connects;
+    // prompting then can expose an empty/stale tool list to the first turn.
+    // Keep the same fail-closed readiness check as Windows before any model call.
+    if (options.windowsProduct || requireMcp && diagnostic.extensionVersion === '1.0.794') {
+      for (let n = 0; n < 40 && (!roleCatalog || requireMcp && !roleCatalog.mcpTagCount); n++)
         await new Promise(resolve => setTimeout(resolve, 250))
-      const allowedBuiltinCount = options.productBuilder ? 3 : 0
-      if (!windowsCatalog?.valid || windowsCatalog.builtinWeb || windowsCatalog.builtinSubagent ||
-          windowsCatalog.builtinSpec || windowsCatalog.builtinContext ||
-          windowsCatalog.tagCount !== windowsCatalog.mcpTagCount + allowedBuiltinCount ||
-          (options.productBuilder && !(windowsCatalog.builtinRead && windowsCatalog.builtinWrite && windowsCatalog.builtinShell)) ||
-          (!requireMcp && windowsCatalog.mcpTagCount !== 0) ||
-          (requireMcp && windowsCatalog.mcpTagCount < 1)) throw new NativeGateError('NATIVE_ROLE_CATALOG_UNVERIFIED')
+      const allowedBuiltinCount = options.productBuilder ? 3 : options.syntheticSrcWrite ? 2 : 0
+      if (!roleCatalog?.valid || roleCatalog.builtinWeb || roleCatalog.builtinSubagent ||
+          roleCatalog.builtinSpec || roleCatalog.builtinContext ||
+          roleCatalog.tagCount !== roleCatalog.mcpTagCount + allowedBuiltinCount ||
+          (allowedBuiltinCount >= 2 && !(roleCatalog.builtinRead && roleCatalog.builtinWrite)) ||
+          (options.productBuilder && !roleCatalog.builtinShell) ||
+          (!requireMcp && roleCatalog.mcpTagCount !== 0) ||
+          (requireMcp && roleCatalog.mcpTagCount < 1)) throw new NativeGateError('NATIVE_ROLE_CATALOG_UNVERIFIED')
     }
     if (probeMode)
       await probe.wait(probe.verify(workspace).markerDirectory)

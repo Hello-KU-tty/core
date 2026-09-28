@@ -1,6 +1,7 @@
 import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import Database from 'better-sqlite3'
 
 import type { PersistenceError } from '@vibe-helper/application'
 import {
@@ -31,7 +32,7 @@ import {
   projectCandidateRevisionSchema,
   projectSchema,
 } from '@vibe-helper/contracts'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { openInMemorySqliteStorage, openSqliteStorage } from '../src/index.js'
 import {
@@ -159,6 +160,429 @@ const repositoryOf = (storage: Awaited<ReturnType<typeof openInMemorySqliteStora
   storage.repository
 
 describe('SQLite persistence repository', () => {
+  it('filters direct project Evidence membership before hydrating full Concept traces', async () => {
+    const dataDirectory = await mkdtemp(join(tmpdir(), 'vibe-evidence-filter-'))
+    const initial = await openSqliteStorage({ dataDirectory })
+    const conceptId = 'concept_00000000-0000-4000-8000-000000985201'
+    const unusedConceptId = 'concept_00000000-0000-4000-8000-000000985202'
+    const foreignProjectId = 'project_00000000-0000-4000-8000-000000985201'
+    try {
+      appendRecoveryGraph(initial.repository)
+      initial.repository.appendProject({
+        ...records.project,
+        id: foreignProjectId,
+        title: 'Unrelated project',
+      })
+      for (const [id, canonicalName] of [
+        [conceptId, 'Rejected-only concept'],
+        [unusedConceptId, 'Unrelated concept'],
+      ]) {
+        if (!id || !canonicalName) throw new Error('FIXTURE_REQUIRED')
+        initial.repository.appendCanonicalConcept({ ...records.concept, id, canonicalName })
+      }
+      const proposal = {
+        ...records.evidenceProposal,
+        id: 'evidence_proposal_00000000-0000-4000-8000-000000985201',
+        concept: {
+          ...records.evidenceProposal.concept,
+          canonicalConceptId: conceptId,
+          proposedCanonicalName: 'Rejected-only concept',
+        },
+      }
+      initial.repository.appendEvidenceProposal(proposal)
+      initial.repository.appendEvidenceDecision({
+        ...records.evidenceDecision,
+        id: 'evidence_decision_00000000-0000-4000-8000-000000985201',
+        evidenceProposalId: proposal.id,
+        outcome: 'REJECTED',
+        reasonCode: 'INSUFFICIENT_EVIDENCE',
+      })
+    } finally {
+      initial.close()
+    }
+    const storage = await openSqliteStorage({ dataDirectory })
+    try {
+      const r = storage.repository
+      const all = r.readEvidenceTracesForProject(ids.project)
+      expect(all.map((trace) => trace.concept.id)).toEqual([ids.concept, conceptId])
+      const read = vi.spyOn(r, 'readEvidenceTrace')
+      expect(r.readEvidenceTracesForProject(ids.project, ids.concept)).toEqual([all[0]])
+      expect(read).toHaveBeenCalledExactlyOnceWith(ids.concept)
+      read.mockClear()
+      expect(r.readEvidenceTracesForProject(ids.project, conceptId)).toEqual([all[1]])
+      expect(read).toHaveBeenCalledExactlyOnceWith(conceptId)
+      read.mockClear()
+      for (const [projectId, filteredConcept] of [
+        [foreignProjectId, ids.concept],
+        [ids.project, unusedConceptId],
+        [ids.project, 'concept_00000000-0000-4000-8000-000000985299'],
+      ]) {
+        if (!projectId || !filteredConcept) throw new Error('FIXTURE_REQUIRED')
+        expect(r.readEvidenceTracesForProject(projectId, filteredConcept)).toEqual([])
+      }
+      expect(read).not.toHaveBeenCalled()
+      for (const [projectId, filteredConcept] of [
+        ['invalid', ids.concept],
+        [ids.project, 'invalid'],
+      ]) {
+        if (!projectId) throw new Error('FIXTURE_REQUIRED')
+        expect(() => r.readEvidenceTracesForProject(projectId, filteredConcept)).toThrowError(
+          expect.objectContaining({ code: 'VALIDATION_FAILED' }),
+        )
+      }
+      if (storage.databasePath === null) throw new Error('FILE_DATABASE_REQUIRED')
+      const tamper = new Database(storage.databasePath)
+      try {
+        tamper
+          .prepare('UPDATE concept_ledger_revisions SET payload_hash = ? WHERE ledger_id = ?')
+          .run('0'.repeat(64), records.ledger.id)
+      } finally {
+        tamper.close()
+      }
+      expect(() => r.readEvidenceTracesForProject(ids.project, ids.concept)).toThrowError(
+        expect.objectContaining({ code: 'CORRUPT_DATABASE' }),
+      )
+    } finally {
+      storage.close()
+    }
+  })
+
+  it('still verifies stored Ledger hashes in the bounded read path', async () => {
+    const dataDirectory = await mkdtemp(join(tmpdir(), 'vibe-ledger-read-integrity-'))
+    const storage = await openSqliteStorage({ dataDirectory })
+    try {
+      appendRecoveryGraph(storage.repository)
+      if (storage.databasePath === null) throw new Error('FILE_DATABASE_REQUIRED')
+      const tamper = new Database(storage.databasePath)
+      try {
+        tamper
+          .prepare('UPDATE concept_ledger_revisions SET payload_hash = ? WHERE ledger_id = ?')
+          .run('0'.repeat(64), records.ledger.id)
+      } finally {
+        tamper.close()
+      }
+      expect(() => storage.repository.readRecentConceptLedgers(1)).toThrowError(
+        expect.objectContaining({ code: 'CORRUPT_DATABASE' }),
+      )
+      expect(() => storage.repository.readRecentEvidenceTraces(1)).toThrowError(
+        expect.objectContaining({ code: 'CORRUPT_DATABASE' }),
+      )
+    } finally {
+      storage.close()
+    }
+  })
+
+  it.each([false, true])(
+    'preserves the original full-query order across tied Ledger timestamps (reverse=%s)',
+    async (reverse) => {
+      const dataDirectory = await mkdtemp(join(tmpdir(), 'vibe-ledger-tied-order-'))
+      const storage = await openSqliteStorage({ dataDirectory })
+      try {
+        appendRecoveryGraph(storage.repository)
+        const entries = Array.from({ length: 110 }, (_, n) => n + 1)
+        if (reverse) entries.reverse()
+        storage.transaction((r) => {
+          for (const n of entries) {
+            const identity = (prefix: string) =>
+              `${prefix}_00000000-0000-4000-8000-${String(986000 + n).padStart(12, '0')}`
+            const concept = {
+              ...records.concept,
+              id: identity('concept'),
+              canonicalName: `Tied synthetic concept ${n}`,
+            }
+            const proposal = {
+              ...records.evidenceProposal,
+              id: identity('evidence_proposal'),
+              concept: {
+                ...records.evidenceProposal.concept,
+                canonicalConceptId: concept.id,
+                proposedCanonicalName: concept.canonicalName,
+              },
+            }
+            const decision = {
+              ...records.evidenceDecision,
+              id: identity('evidence_decision'),
+              evidenceProposalId: proposal.id,
+            }
+            const evidence = {
+              ...records.evidence,
+              id: identity('evidence'),
+              conceptId: concept.id,
+              evidenceProposalId: proposal.id,
+              evidenceDecisionId: decision.id,
+            }
+            const ledger = {
+              ...records.ledger,
+              id: identity('concept_ledger'),
+              concept,
+              acceptedAliases: [],
+              openIssues: [],
+              state: {
+                ...records.ledger.state,
+                conceptId: concept.id,
+                acceptedEvidenceIds: [evidence.id],
+              },
+            }
+            r.appendCanonicalConcept(concept)
+            r.appendEvidenceProposal(proposal)
+            r.appendEvidenceDecision(decision)
+            r.appendAcceptedEvidence(evidence)
+            r.appendConceptLedger(ledger)
+            // A current head need not be the first inserted revision. Keep all
+            // updatedAt values tied, including the updated heads.
+            if (n % 3 === 0) r.appendConceptLedger({ ...ledger, revision: 2 })
+          }
+        })
+        if (storage.databasePath === null) throw new Error('FILE_DATABASE_REQUIRED')
+        const audit = new Database(storage.databasePath, { readonly: true })
+        let originalOrder: ReturnType<typeof conceptLedgerEntrySchema.parse>[]
+        try {
+          originalOrder = audit
+            .prepare(`SELECT revisions.payload_json
+            FROM concept_ledgers heads JOIN concept_ledger_revisions revisions
+              ON revisions.ledger_id = heads.id AND revisions.revision = heads.head_revision
+            ORDER BY revisions.updated_at DESC`)
+            .all()
+            .map((row) =>
+              conceptLedgerEntrySchema.parse(
+                JSON.parse((row as { payload_json: string }).payload_json),
+              ),
+            )
+        } finally {
+          audit.close()
+        }
+        expect(originalOrder).toHaveLength(111)
+        for (const limit of [1, 5, 20, 100]) {
+          expect(storage.repository.readRecentConceptLedgers(limit)).toEqual(
+            originalOrder.slice(0, limit),
+          )
+          expect(
+            storage.repository.readRecentEvidenceTraces(limit).map((trace) => trace.ledger),
+          ).toEqual(originalOrder.slice(0, limit))
+        }
+        expect(storage.checkIntegrity()).toEqual({ quickCheck: 'ok', foreignKeyViolations: 0 })
+      } finally {
+        storage.close()
+      }
+    },
+  )
+
+  it('reads bounded recent Ledger heads without rebuilding Evidence histories', async () => {
+    const storage = await openInMemorySqliteStorage()
+    try {
+      appendRecoveryGraph(storage.repository)
+      const next = conceptLedgerEntrySchema.parse({
+        ...records.ledger,
+        revision: 2,
+        updatedAt: '2026-08-25T04:00:00.000Z',
+      })
+      storage.repository.appendConceptLedger(next)
+      const readTrace = vi.spyOn(storage.repository, 'readEvidenceTrace')
+      expect(storage.repository.readRecentConceptLedgers(1)).toEqual([next])
+      expect(readTrace).not.toHaveBeenCalled()
+      expect(storage.repository.readRecentEvidenceTraces(1).map((trace) => trace.ledger)).toEqual([
+        next,
+      ])
+      expect(readTrace).toHaveBeenCalledTimes(1)
+      for (const limit of [0, -1, 101, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+        expect(() => storage.repository.readRecentConceptLedgers(limit)).toThrowError(
+          expect.objectContaining({ code: 'VALIDATION_FAILED' }),
+        )
+        expect(() => storage.repository.readRecentEvidenceTraces(limit)).toThrowError(
+          expect.objectContaining({ code: 'VALIDATION_FAILED' }),
+        )
+      }
+    } finally {
+      storage.close()
+    }
+  })
+
+  it('keeps closed history status selection, latest revisions and event order after reopen', async () => {
+    const dataDirectory = await mkdtemp(join(tmpdir(), 'vibe-closed-history-read-'))
+    const first = await openSqliteStorage({ dataDirectory })
+    appendRecoveryGraph(first.repository)
+    const open = episodeSchema.parse({
+      ...records.episode,
+      id: 'episode_00000000-0000-4000-8000-000000000910',
+      type: 'HELPER_CONVERSATION',
+      status: 'OPEN',
+      endedAt: undefined,
+      closeReason: undefined,
+    })
+    first.repository.appendEpisode(open)
+    first.repository.appendEpisode({
+      ...records.episode,
+      id: 'episode_00000000-0000-4000-8000-000000000911',
+      type: 'BUILD_TASK',
+      status: 'ANALYSIS_FAILED',
+      endedAt: '2026-08-25T05:00:00.000Z',
+    })
+    first.repository.appendEpisode({
+      ...records.episode,
+      revision: 2,
+      status: 'ANALYZED',
+      endedAt: '2026-08-25T06:00:00.000Z',
+    })
+    const foreignProjectId = 'project_00000000-0000-4000-8000-000000000912'
+    const foreignEventId = 'event_00000000-0000-4000-8000-000000000912'
+    const foreignEpisodeId = 'episode_00000000-0000-4000-8000-000000000912'
+    first.repository.appendProject({
+      ...records.project,
+      id: foreignProjectId,
+      generatedWorkspacePath: 'projects/synthetic-foreign-history',
+    })
+    first.repository.appendActivityEvent({
+      ...records.event,
+      id: foreignEventId,
+      projectId: foreignProjectId,
+      taskId: undefined,
+      decisionId: undefined,
+    })
+    first.repository.appendEpisode({
+      ...records.episode,
+      id: foreignEpisodeId,
+      projectId: foreignProjectId,
+      taskId: undefined,
+      decisionId: undefined,
+      eventIds: [foreignEventId],
+      endedAt: '2026-08-25T07:00:00.000Z',
+    })
+    const full = first.repository.readRecentEpisodeAggregatesForProject(ids.project, 50)
+    expect(full.map(({ episode }) => episode.status)).toEqual(['ANALYZED', 'ANALYSIS_FAILED'])
+    first.close()
+    const storage = await openSqliteStorage({ dataDirectory })
+    try {
+      const fullRead = vi.spyOn(storage.repository, 'readEpisodeAggregate')
+      const expected = full.map(({ episode, events }) => ({ episode, events }))
+      for (const history of expected)
+        expect(storage.repository.readEpisodeHistory(ids.project, history.episode.id)).toEqual(
+          history,
+        )
+      expect(storage.repository.readEpisodeHistory(ids.project, open.id)).toEqual({
+        episode: open,
+        events: [records.event],
+      })
+      expect(storage.repository.readEpisodeHistory(ids.project, foreignEpisodeId)).toBeNull()
+      expect(storage.repository.readEpisodeHistory(foreignProjectId, ids.episode)).toBeNull()
+      expect(
+        storage.repository.readEpisodeHistory(
+          ids.project,
+          'episode_00000000-0000-4000-8000-000000000999',
+        ),
+      ).toBeNull()
+      expect(
+        storage.repository.readEpisodeHistory(foreignProjectId, foreignEpisodeId)?.episode.id,
+      ).toBe(foreignEpisodeId)
+      for (const [projectId, episodeId] of [
+        ['../outside', ids.episode],
+        [ids.project, '../outside'],
+      ]) {
+        if (!projectId || !episodeId) throw new Error('FIXTURE_REQUIRED')
+        expect(() => storage.repository.readEpisodeHistory(projectId, episodeId)).toThrowError(
+          expect.objectContaining({ code: 'VALIDATION_FAILED' }),
+        )
+      }
+      expect(storage.repository.readRecentEpisodeHistoryForProject(ids.project, 50)).toEqual(
+        expected,
+      )
+      expect(storage.repository.readRecentEpisodeHistoryForProject(ids.project, 1)).toEqual(
+        expected.slice(0, 1),
+      )
+      expect(fullRead).not.toHaveBeenCalled()
+      expect(
+        storage.repository
+          .readRecentEpisodeHistoryForProject(foreignProjectId, 50)
+          .map(({ episode }) => episode.id),
+      ).toEqual([foreignEpisodeId])
+      expect(
+        storage.repository.readRecentEpisodeHistoryForProject(
+          'project_00000000-0000-4000-8000-000000000913',
+          50,
+        ),
+      ).toEqual([])
+      for (const limit of [0, -1, 51, 1.5, Number.NaN, Number.POSITIVE_INFINITY])
+        expect(() =>
+          storage.repository.readRecentEpisodeHistoryForProject(ids.project, limit),
+        ).toThrowError(expect.objectContaining({ code: 'VALIDATION_FAILED' }))
+      expect(() =>
+        storage.repository.readRecentEpisodeHistoryForProject('../outside', 1),
+      ).toThrowError(expect.objectContaining({ code: 'VALIDATION_FAILED' }))
+    } finally {
+      storage.close()
+    }
+  })
+
+  it('reads scoped validated Helper history without full Evidence hydration after reopen', async () => {
+    const dataDirectory = await mkdtemp(join(tmpdir(), 'vibe-helper-history-read-'))
+    const first = await openSqliteStorage({ dataDirectory })
+    appendRecoveryGraph(first.repository)
+    first.repository.appendEpisode({
+      ...records.episode,
+      id: 'episode_00000000-0000-4000-8000-000000000901',
+      type: 'HELPER_CONVERSATION',
+      conversationId: ids.conversation,
+    })
+    const full = first.repository.readRecentHelperConversationAggregatesForProject(ids.project, 20)
+    expect(full).toHaveLength(1)
+    first.close()
+    const storage = await openSqliteStorage({ dataDirectory })
+    try {
+      const readFull = vi.spyOn(storage.repository, 'readEpisodeAggregate')
+      expect(
+        storage.repository.readRecentHelperConversationHistoryForProject(ids.project, 20),
+      ).toEqual(full.map(({ episode, events }) => ({ episode, events })))
+      expect(readFull).not.toHaveBeenCalled()
+      expect(
+        storage.repository.readRecentHelperConversationHistoryForProject(
+          'project_00000000-0000-4000-8000-000000000902',
+          20,
+        ),
+      ).toEqual([])
+      for (const limit of [0, 21, 1.5, Number.NaN])
+        expect(() =>
+          storage.repository.readRecentHelperConversationHistoryForProject(ids.project, limit),
+        ).toThrowError(expect.objectContaining({ code: 'VALIDATION_FAILED' }))
+      expect(() =>
+        storage.repository.readRecentHelperConversationHistoryForProject('../outside', 1),
+      ).toThrowError(expect.objectContaining({ code: 'VALIDATION_FAILED' }))
+    } finally {
+      storage.close()
+    }
+  })
+
+  it('rejects corrupt Episode and Event hashes in the lightweight Helper history read', async () => {
+    for (const table of ['episode_revisions', 'activity_events']) {
+      const dataDirectory = await mkdtemp(join(tmpdir(), 'vibe-helper-history-integrity-'))
+      const storage = await openSqliteStorage({ dataDirectory })
+      try {
+        appendRecoveryGraph(storage.repository)
+        storage.repository.appendEpisode({
+          ...records.episode,
+          id: 'episode_00000000-0000-4000-8000-000000000903',
+          type: 'HELPER_CONVERSATION',
+          conversationId: ids.conversation,
+        })
+        const tamper = new Database(storage.databasePath)
+        try {
+          tamper.prepare(`UPDATE ${table} SET payload_hash = ?`).run('0'.repeat(64))
+        } finally {
+          tamper.close()
+        }
+        expect(() => storage.repository.readEpisodeHistory(ids.project, ids.episode)).toThrowError(
+          expect.objectContaining({ code: 'CORRUPT_DATABASE' }),
+        )
+        expect(() =>
+          storage.repository.readRecentHelperConversationHistoryForProject(ids.project, 20),
+        ).toThrowError(expect.objectContaining({ code: 'CORRUPT_DATABASE' }))
+        expect(() =>
+          storage.repository.readRecentEpisodeHistoryForProject(ids.project, 20),
+        ).toThrowError(expect.objectContaining({ code: 'CORRUPT_DATABASE' }))
+      } finally {
+        storage.close()
+      }
+    }
+  })
+
   it('restores the current project and evidence projections after a close and reopen', async () => {
     const dataDirectory = await mkdtemp(join(tmpdir(), 'vibe-helper-recovery-'))
     const first = await openSqliteStorage({ dataDirectory })

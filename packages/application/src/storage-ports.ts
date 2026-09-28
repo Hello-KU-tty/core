@@ -102,9 +102,12 @@ export interface BuilderTaskAggregate {
   readonly completionReport: TaskCompletionReport | null
 }
 
-export interface EpisodeAggregate {
+export interface EpisodeHistory {
   readonly episode: Episode
   readonly events: readonly ActivityEvent[]
+}
+
+export interface EpisodeAggregate extends EpisodeHistory {
   readonly relevantLedgerEntries: readonly ConceptLedgerEntry[]
   readonly evidenceProposals: readonly EvidenceProposal[]
 }
@@ -173,6 +176,8 @@ export interface PersistenceRepository {
   readBuilderTaskAggregate(projectId: string, taskId: string): BuilderTaskAggregate | null
   readLatestTaskForProject(projectId: string): BuilderTask | null
   readEpisodeAggregate(projectId: string, episodeId: string): EpisodeAggregate | null
+  /** Validated current Episode and ordered Events, without unused Ledger/Evidence hydration. */
+  readEpisodeHistory(projectId: string, episodeId: string): EpisodeHistory | null
   readAnalysisJob(projectId: string, analysisJobId: string): AnalysisJob | null
   readAnalysisJobForEpisode(projectId: string, episodeId: string): AnalysisJob | null
   readPendingAnalysisJobs(limit: number): readonly AnalysisJob[]
@@ -198,10 +203,17 @@ export interface PersistenceRepository {
     projectId: string,
     limit: number,
   ): readonly EpisodeAggregate[]
+  /** Same closed-Episode selection as full aggregates, without Evidence hydration. */
+  readRecentEpisodeHistoryForProject(projectId: string, limit: number): readonly EpisodeHistory[]
   readRecentHelperConversationAggregatesForProject(
     projectId: string,
     limit: number,
   ): readonly EpisodeAggregate[]
+  /** Validated current Episodes and ordered Events, without unrelated Evidence hydration. */
+  readRecentHelperConversationHistoryForProject(
+    projectId: string,
+    limit: number,
+  ): readonly EpisodeHistory[]
   countHelperConversationsForProject(projectId: string): number
   readCanonicalConceptById(conceptId: string): CanonicalConcept | null
   readCanonicalConceptByName(canonicalName: string): CanonicalConcept | null
@@ -209,7 +221,10 @@ export interface PersistenceRepository {
   readEvaluationRun(evaluationRunId: string): EvaluationRun | null
   readBaselineResult(baselineResultId: string): BaselineResult | null
   readEvidenceTrace(conceptId: string): EvidenceTrace | null
-  readEvidenceTracesForProject(projectId: string): readonly EvidenceTrace[]
+  /** Direct project membership, optionally restricted to one validated Concept ID. */
+  readEvidenceTracesForProject(projectId: string, conceptId?: string): readonly EvidenceTrace[]
+  /** Recent validated Ledger heads, without reconstructing their full Evidence audit history. */
+  readRecentConceptLedgers(limit: number): readonly ConceptLedgerEntry[]
   readRecentEvidenceTraces(limit: number): readonly EvidenceTrace[]
   readRecentUserEvidenceTracesForTasks(
     projectId: string,

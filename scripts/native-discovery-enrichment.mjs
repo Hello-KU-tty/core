@@ -7,7 +7,7 @@ import {
   candidatePreviewSchema,
   discoverySubmitCandidateEnrichmentsToolInputBaseSchema,
 } from '../packages/contracts/dist/discovery.js'
-import { decodeBoundedJsonEnvelope } from './native-json-envelope.mjs'
+import { decodeBoundedJsonEnvelope, jsonEnvelopeFailure } from './native-json-envelope.mjs'
 
 const IMMUTABLE_FIELDS = [
   'title',
@@ -26,6 +26,85 @@ const nativeInputSchema = discoverySubmitCandidateEnrichmentsToolInputBaseSchema
 const schemaText = JSON.stringify(z.toJSONSchema(nativeInputSchema))
 if (Buffer.byteLength(schemaText, 'utf8') > 65_536)
   throw new Error('BRIDGE_ENRICHMENT_SCHEMA_TOO_LARGE')
+
+// Only schema-owned names, bounded indices and issue codes may reach the
+// Agent/receipt. Zod messages, supplied values and unknown property names can
+// contain secrets and must never be forwarded as diagnostic text.
+const knownFields = new Set()
+function collectSchemaFields(value) {
+  if (!value || typeof value !== 'object') return
+  for (const key of Object.keys(value.properties ?? {})) knownFields.add(key)
+  for (const child of Object.values(value)) collectSchemaFields(child)
+}
+collectSchemaFields(JSON.parse(schemaText))
+const issueCodes = new Set([
+  'invalid_type',
+  'invalid_value',
+  'too_small',
+  'too_big',
+  'invalid_format',
+  'unrecognized_keys',
+  'custom',
+])
+const inputDiagnostics = new WeakMap()
+const failureCodes = new Set([
+  'BRIDGE_ENRICHMENT_CANDIDATES_REQUIRED',
+  'BRIDGE_ENRICHMENT_IMMUTABLE_FIELDS_FORBIDDEN',
+  'BRIDGE_ENRICHMENT_INPUT_INVALID',
+  'BRIDGE_ENRICHMENT_SCOPE_MISMATCH',
+  'BRIDGE_ENRICHMENT_MODE_MISMATCH',
+  'BRIDGE_ENRICHMENT_BINDING_INVALID',
+  'BRIDGE_ENRICHMENT_CONTEXT_INVALID',
+  'BRIDGE_ENRICHMENT_CONTEXT_STALE',
+  'BRIDGE_ENRICHMENT_BATCH_INVALID',
+  'BRIDGE_ENVELOPE_WRAPPER_INVALID',
+  'BRIDGE_ENVELOPE_JSON_REQUIRED',
+  'BRIDGE_ENVELOPE_JSON_TOO_LARGE',
+  'BRIDGE_ENVELOPE_JSON_INVALID',
+  'BRIDGE_ENVELOPE_OBJECT_REQUIRED',
+])
+
+function invalidInput(issues) {
+  const error = new Error('BRIDGE_ENRICHMENT_INPUT_INVALID')
+  inputDiagnostics.set(error, {
+    issueCount: Math.min(issues.length, 100),
+    issues: issues.slice(0, 8).map((issue) => ({
+      path: issue.path
+        .slice(0, 6)
+        .map((segment) =>
+          typeof segment === 'string' && knownFields.has(segment)
+            ? segment
+            : Number.isInteger(segment) && segment >= 0 && segment <= 50
+              ? segment
+              : 'UNKNOWN',
+        ),
+      code: issueCodes.has(issue.code) ? issue.code : 'OTHER',
+      ...(issue.code === 'unrecognized_keys' && Array.isArray(issue.keys)
+        ? {
+            unknownKeyCount: Math.min(issue.keys.length, 100),
+            // This fixed transport field is not a Candidate meaning field.
+            // Do not strip it or accept arbitrary nested metadata silently.
+            ...(issue.keys.includes('__tool_use_purpose')
+              ? { transportMetadataNotAllowedHere: true }
+              : {}),
+          }
+        : {}),
+    })),
+  })
+  return error
+}
+
+export function nativeEnrichmentFailure(error) {
+  const envelope = jsonEnvelopeFailure(error)
+  if (envelope.code !== 'BRIDGE_ENVELOPE_UNKNOWN') return envelope
+  const code = failureCodes.has(error?.message) ? error.message : 'BRIDGE_ENRICHMENT_FAILED'
+  const shape = inputDiagnostics.get(error)
+  return { code, ...(shape ? { shape } : {}) }
+}
+
+export function nativeEnrichmentToolError(failure) {
+  return { isError: true, content: [{ type: 'text', text: JSON.stringify(failure) }] }
+}
 
 export function isNativeEnrichmentTool(role, name) {
   return role === 'DISCOVERY' && name === 'submit_candidate_enrichments'
@@ -65,7 +144,7 @@ export async function bindNativeEnrichment(binding, name, rawArguments, readCont
       throw new Error('BRIDGE_ENRICHMENT_IMMUTABLE_FIELDS_FORBIDDEN')
   }
   const parsed = nativeInputSchema.safeParse(rawInput)
-  if (!parsed.success) throw new Error('BRIDGE_ENRICHMENT_INPUT_INVALID')
+  if (!parsed.success) throw invalidInput(parsed.error.issues)
   const input = parsed.data
   if (
     input.projectId !== binding.projectId ||

@@ -1,0 +1,398 @@
+{
+  "promptVersion": "1.0.9",
+  "revisesFixture": null,
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED",
+  "fixtureProvenance": "SYNTHETIC_UI_TRANSCRIPT",
+  "modelRunStatus": "NOT_RUN",
+  "claimBoundary": "New synthetic persistence, reference-copy, input-recovery and FIFO inputs authored after the v1.0.9 canonical prompt was frozen at the recorded SHA. No oracle-derived concept candidates. This is bounded prompt-compliance evaluation, not human learning.",
+  "cases": [
+    {
+      "id": "request_only",
+      "observedKind": "REQUEST_ONLY",
+      "precedingAgentContribution": null,
+      "userMessage": "Undo를 여러 번 누르면 어떤 기록이 남는지 설명해 주세요.",
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_73000000-0000-4000-8000-000000000001",
+          "messageId": "message_73000000-0000-4000-8000-000000000002"
+        }
+      ],
+      "expected": {
+        "oracleMode": "NO_PROPOSALS",
+        "reason": "Only an explanation request, not a user claim."
+      },
+      "conceptCandidateMode": "NONE"
+    },
+    {
+      "id": "future_plan_after_light_hint",
+      "observedKind": "FUTURE_PLAN_WITH_PREDICTION",
+      "precedingAgentContribution": "저장 도중 실행이 중단되는 경우도 생각해 보세요.",
+      "userMessage": "저장 중 전원이 꺼지면 대상 파일이 일부만 기록될 수 있으니 다음에는 임시 파일에 먼저 쓰고 교체하겠어요.",
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_73000000-0000-4000-8000-000000000003",
+          "messageId": "message_73000000-0000-4000-8000-000000000004"
+        }
+      ],
+      "expected": {
+        "oracleMode": "CLAIM_PROFILES",
+        "minimumStateSupportingProposals": 1,
+        "forbiddenSignals": [
+          "JUSTIFIED_DECISION",
+          "APPLICATION"
+        ],
+        "claimProfiles": [
+          {
+            "id": "future_partial_write",
+            "claimExcerpts": [
+              "대상 파일이 일부만 기록될 수 있으니"
+            ],
+            "allowedSignals": [
+              "PREDICTION"
+            ],
+            "allowedStrengths": [
+              "MEDIUM",
+              "STRONG"
+            ],
+            "allowedPromptDependence": [
+              "LIGHT_HINT"
+            ],
+            "allowedMaximumSupportedStates": [
+              "EXPLAINED"
+            ]
+          }
+        ],
+        "reason": "The predicted interruption result is separate from the future plan; no performed application or resolved choice."
+      },
+      "conceptCandidateMode": "NONE"
+    },
+    {
+      "id": "own_explanation_independent",
+      "observedKind": "TIMELESS_DEFINITION",
+      "precedingAgentContribution": null,
+      "userMessage": "배열을 펼쳐 새 배열을 만들어도 내부 객체는 같은 참조라서 새 배열의 객체 속성을 바꾸면 원래 배열에서도 그 변경이 보입니다.",
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_73000000-0000-4000-8000-000000000005",
+          "messageId": "message_73000000-0000-4000-8000-000000000006"
+        }
+      ],
+      "expected": {
+        "oracleMode": "CLAIM_PROFILES",
+        "minimumStateSupportingProposals": 1,
+        "forbiddenSignals": [
+          "PREDICTION",
+          "JUSTIFIED_DECISION",
+          "APPLICATION"
+        ],
+        "claimProfiles": [
+          {
+            "id": "shallow_reference_definition",
+            "claimExcerpts": [
+              "내부 객체는 같은 참조라서",
+              "새 배열의 객체 속성을 바꾸면 원래 배열에서도 그 변경이 보입니다"
+            ],
+            "allowedSignals": [
+              "REPHRASE"
+            ],
+            "allowedStrengths": [
+              "MEDIUM",
+              "STRONG"
+            ],
+            "allowedPromptDependence": [
+              "INDEPENDENT"
+            ],
+            "allowedMaximumSupportedStates": [
+              "EXPLAINED"
+            ]
+          }
+        ],
+        "reason": "Timeless shallow-copy semantics, not a particular future experiment."
+      },
+      "conceptCandidateMode": "NONE"
+    },
+    {
+      "id": "actual_reasoned_choice",
+      "observedKind": "REASONED_CHOICE",
+      "precedingAgentContribution": "제출 실패 때 입력 내용을 유지하거나 비우는 방식 중 하나를 선택해 주세요.",
+      "userMessage": "오류가 없는 항목까지 다시 적으면 새 오타가 생길 수 있으므로 실패한 제출의 입력 내용은 그대로 유지하겠습니다.",
+      "decisionRequest": {
+        "question": "제출 실패 후 입력 내용을 유지할까요, 비울까요?",
+        "reasonRequiredNow": "실패 후 화면 동작을 정해야 합니다.",
+        "options": [
+          {
+            "label": "비우기",
+            "description": "입력 칸을 빈 값으로 만듭니다.",
+            "impacts": [
+              "입력을 초기화합니다."
+            ],
+            "tradeoffs": [
+              "초기화 동작이 필요합니다."
+            ]
+          },
+          {
+            "label": "유지하기",
+            "description": "입력 값을 그대로 둡니다.",
+            "impacts": [
+              "기존 값을 보여 줍니다."
+            ],
+            "tradeoffs": [
+              "입력 상태를 보관합니다."
+            ]
+          }
+        ],
+        "recommendedOptionIndex": 0,
+        "recommendationRationale": "초기 상태로 돌아갑니다.",
+        "agentHintMustNotContain": [
+          "새 오타",
+          "오류가 없는 항목"
+        ]
+      },
+      "decisionEvent": {
+        "type": "DECISION_RESOLVED",
+        "decisionId": "decision_73000000-0000-4000-8000-000000000007",
+        "rationaleProvided": true
+      },
+      "decisionResolution": {
+        "source": "USER",
+        "selectedOptionIndex": 1,
+        "rationale": "오류가 없는 항목까지 다시 적으면 새 오타가 생길 수 있으므로 실패한 제출의 입력 내용은 그대로 유지하겠습니다."
+      },
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_73000000-0000-4000-8000-000000000008",
+          "messageId": "message_73000000-0000-4000-8000-000000000009"
+        },
+        {
+          "kind": "USER_DECISION",
+          "decisionId": "decision_73000000-0000-4000-8000-000000000007"
+        }
+      ],
+      "expected": {
+        "oracleMode": "CLAIM_PROFILES",
+        "minimumStateSupportingProposals": 1,
+        "forbiddenSignals": [
+          "APPLICATION"
+        ],
+        "claimProfiles": [
+          {
+            "id": "user_input_recovery_choice",
+            "claimExcerpts": [
+              "오류가 없는 항목까지 다시 적으면 새 오타가 생길 수 있으므로",
+              "실패한 제출의 입력 내용은 그대로 유지하겠습니다"
+            ],
+            "allowedSignals": [
+              "JUSTIFIED_DECISION"
+            ],
+            "allowedStrengths": [
+              "STRONG"
+            ],
+            "allowedPromptDependence": [
+              "LIGHT_HINT"
+            ],
+            "allowedMaximumSupportedStates": [
+              "DEMONSTRATED"
+            ]
+          }
+        ],
+        "reason": "The user supplies a new rationale for an actual structured selection after Agent-provided alternatives."
+      },
+      "conceptCandidateMode": "NONE"
+    },
+    {
+      "id": "actual_performed_application",
+      "observedKind": "COMPLETED_ACTION_AND_OBSERVATION",
+      "precedingAgentContribution": null,
+      "userMessage": "이름 목록에서 같은 객체를 공유하던 부분을 각각 새 객체로 만들었고 한 항목의 이름만 바꿔 다른 항목은 그대로임을 확인했습니다.",
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_73000000-0000-4000-8000-000000000011",
+          "messageId": "message_73000000-0000-4000-8000-000000000012"
+        }
+      ],
+      "expected": {
+        "oracleMode": "CLAIM_PROFILES",
+        "minimumStateSupportingProposals": 1,
+        "forbiddenSignals": [
+          "PREDICTION",
+          "JUSTIFIED_DECISION"
+        ],
+        "claimProfiles": [
+          {
+            "id": "completed_reference_isolation",
+            "claimExcerpts": [
+              "각각 새 객체로 만들었고",
+              "한 항목의 이름만 바꿔 다른 항목은 그대로임을 확인했습니다"
+            ],
+            "allowedSignals": [
+              "APPLICATION"
+            ],
+            "allowedStrengths": [
+              "STRONG"
+            ],
+            "allowedPromptDependence": [
+              "INDEPENDENT"
+            ],
+            "allowedMaximumSupportedStates": [
+              "DEMONSTRATED"
+            ]
+          }
+        ],
+        "currentCoreDisposition": "NATURAL_LANGUAGE_SELF_REPORT_ELIGIBLE",
+        "provenanceLimitation": "The source records the user's completed-action self-report; it does not independently attest that the interaction occurred.",
+        "reason": "Specific completed adjustment and observed result, with self-report provenance."
+      },
+      "conceptCandidateMode": "NONE"
+    },
+    {
+      "id": "directly_led_repeat",
+      "observedKind": "DIRECT_REPEAT",
+      "precedingAgentContribution": "FIFO 큐에서는 먼저 넣은 항목을 먼저 꺼냅니다.",
+      "userMessage": "FIFO 큐에서는 먼저 넣은 항목을 먼저 꺼내는군요.",
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_73000000-0000-4000-8000-000000000013",
+          "messageId": "message_73000000-0000-4000-8000-000000000014"
+        }
+      ],
+      "expected": {
+        "oracleMode": "CLAIM_PROFILES",
+        "minimumStateSupportingProposals": 0,
+        "maximumStateSupportingProposals": 0,
+        "claimProfiles": [
+          {
+            "id": "direct_fifo_repeat",
+            "claimExcerpts": [
+              "먼저 넣은 항목을 먼저 꺼내는군요"
+            ],
+            "allowedSignals": [
+              "REPHRASE"
+            ],
+            "allowedStrengths": [
+              "NONE",
+              "WEAK"
+            ],
+            "allowedPromptDependence": [
+              "DIRECTLY_LED"
+            ],
+            "allowedMaximumSupportedStates": [
+              null
+            ]
+          }
+        ],
+        "reason": "Directly repeated Agent answer cannot support a state."
+      },
+      "conceptCandidateMode": "NONE"
+    },
+    {
+      "id": "independent_future_prediction",
+      "observedKind": "ACTUAL_FUTURE_PREDICTION",
+      "precedingAgentContribution": null,
+      "userMessage": "비어 있는 FIFO 큐에 P, Q를 차례로 넣고 하나를 꺼내면 P가 나오고 Q 하나가 남을 거예요.",
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_73000000-0000-4000-8000-000000000015",
+          "messageId": "message_73000000-0000-4000-8000-000000000016"
+        }
+      ],
+      "expected": {
+        "oracleMode": "CLAIM_PROFILES",
+        "minimumStateSupportingProposals": 1,
+        "forbiddenSignals": [
+          "JUSTIFIED_DECISION",
+          "APPLICATION"
+        ],
+        "claimProfiles": [
+          {
+            "id": "future_fifo_remaining_item",
+            "claimExcerpts": [
+              "P가 나오고 Q 하나가 남을 거예요"
+            ],
+            "allowedSignals": [
+              "PREDICTION"
+            ],
+            "allowedStrengths": [
+              "STRONG"
+            ],
+            "allowedPromptDependence": [
+              "INDEPENDENT"
+            ],
+            "allowedMaximumSupportedStates": [
+              "DEMONSTRATED"
+            ]
+          }
+        ],
+        "reason": "Independent concrete not-yet-observed FIFO result."
+      },
+      "conceptCandidateMode": "NONE"
+    },
+    {
+      "id": "bare_recommendation_without_user_words",
+      "observedKind": "BARE_RECOMMENDATION_CLICK",
+      "precedingAgentContribution": null,
+      "userMessage": null,
+      "decisionRequest": {
+        "question": "제출 실패 후 입력 내용을 유지할까요, 비울까요?",
+        "reasonRequiredNow": "실패 후 화면 동작을 정해야 합니다.",
+        "options": [
+          {
+            "label": "비우기",
+            "description": "입력 칸을 빈 값으로 만듭니다.",
+            "impacts": [
+              "입력을 초기화합니다."
+            ],
+            "tradeoffs": [
+              "초기화 동작이 필요합니다."
+            ]
+          },
+          {
+            "label": "유지하기",
+            "description": "입력 값을 그대로 둡니다.",
+            "impacts": [
+              "기존 값을 보여 줍니다."
+            ],
+            "tradeoffs": [
+              "입력 상태를 보관합니다."
+            ]
+          }
+        ],
+        "recommendedOptionIndex": 0,
+        "recommendationRationale": "초기 상태로 돌아갑니다.",
+        "agentHintMustNotContain": [
+          "새 오타",
+          "오류가 없는 항목"
+        ]
+      },
+      "decisionEvent": {
+        "type": "DECISION_RESOLVED",
+        "decisionId": "decision_73000000-0000-4000-8000-000000000017",
+        "rationaleProvided": false
+      },
+      "decisionResolution": {
+        "source": "USER",
+        "selectedOptionIndex": 0
+      },
+      "userEvidenceSources": [
+        {
+          "kind": "USER_DECISION",
+          "decisionId": "decision_73000000-0000-4000-8000-000000000017"
+        }
+      ],
+      "expected": {
+        "oracleMode": "NO_PROPOSALS",
+        "reason": "A structured click contains no user-authored words or rationale."
+      },
+      "conceptCandidateMode": "NONE"
+    }
+  ],
+  "fixtureId": "source-first-unseen-persistence-references-fifo",
+  "authoredAfterPromptSha256": "ad839e32fd2e22f3071fbd1e8ea60d8069ef3657f5035019769786661a09a77f"
+}

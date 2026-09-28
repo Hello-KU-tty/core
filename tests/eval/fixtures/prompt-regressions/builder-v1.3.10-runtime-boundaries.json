@@ -1,0 +1,48 @@
+{
+  "promptVersion": "1.3.10",
+  "kind": "MECHANICAL_PROMPT_REGRESSION",
+  "containsPersonalData": false,
+  "liveResult": "OBSERVED_WITH_LIMITATIONS",
+  "automatedQualityVerdict": "NOT_ASSERTED",
+  "nativeObservation": {
+    "fixture": "streaming_no_personal_need",
+    "firstTurnReport": "native-v1310-streaming-builder-1.json",
+    "firstTurnMs": 199401,
+    "pendingDecisionReads": 1,
+    "resumeReport": "native-v1310-streaming-resume-1.json",
+    "resumeMs": 285308,
+    "durableTaskCompleted": true,
+    "completeTaskSubmissions": 1,
+    "completionScopeErrors": 0,
+    "independentBuildTypecheckAndTests": "PASS_12_TESTS",
+    "independentHttpReport": "streaming-independent-http-1.json",
+    "independentHttpProbes": "19_PASS_1_FAIL_FRACTIONAL_LIMIT",
+    "invalidJsonShapesKeepServerAlive": true,
+    "outsideAndSymlinkSyntheticCanaryBlocked": true,
+    "observedLimitations": [
+      "Compiled directory test target still needed a repair to an explicit file glob.",
+      "A positive fractional limit is floored to zero rather than rejected as non-integer.",
+      "Generated smoke reserves then releases an OS port before child bind, leaving a race.",
+      "Generated smoke has per-request and readiness deadlines but no single total deadline or awaited SIGKILL close.",
+      "The GB-scale claim was not measured; an arbitrarily long line can still grow the line buffer."
+    ],
+    "claimBoundary": "A held-out synthetic app completed with these observed improvements and remaining defects. This is not a paired latency result, proof of general output correctness, or Windows validation."
+  },
+  "baselineReports": ["native-unseen-dedup-resume-1.json", "dedup-independent-http-1.json"],
+  "requiredRules": [
+    "외부 입력은 파싱에 성공해도 아직 `unknown`이다",
+    "TypeScript 단언으로 검증을 대신하지 마라",
+    "서버가 계속 살아 있는지 실제 HTTP 회귀 테스트로 확인한다",
+    "OS가 배정한 사용 가능한 포트",
+    "각 HTTP 요청과 전체 준비 대기에 timeout",
+    "소유 child의 실제 종료까지 제한 시간 안에 기다리고",
+    "현재 Learning Spec의 `scope[].conceptNames`와 category를 정확히 사용하라",
+    "구현 사실을 숨기지 마라"
+  ],
+  "reviewAxes": [
+    "Fresh unseen generated app validates untrusted payloads and stays alive after invalid input",
+    "Owned bounded smoke checks actual assets, detects early child exit and awaits cleanup",
+    "Completion scope matches current Core contract without hiding additional implementation",
+    "Existing Decision, read-only roles, workspace and Windows guards are preserved"
+  ]
+}

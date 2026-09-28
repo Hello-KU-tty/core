@@ -24,6 +24,8 @@ import {
 } from '@vibe-helper/contracts'
 import { requiredEvidenceConceptNames } from '@vibe-helper/domain'
 import { describe, expect, it } from 'vitest'
+import { BUILDER_PROMPT_VERSION } from '../../packages/kiro-adapter/src/builder-agent.js'
+import { DISCOVERY_PROMPT_VERSION } from '../../packages/kiro-adapter/src/discovery-agent.js'
 
 import {
   createCalibrationArtifacts,
@@ -497,7 +499,7 @@ describe('T15 Discovery Agent Spec persistence recovery', () => {
       readonly containsPersonalData: boolean
     }
 
-    expect(prompt).toContain('Prompt version: `1.3.5`')
+    expect(prompt).toContain(`Prompt version: \`${DISCOVERY_PROMPT_VERSION}\``)
     expect(prompt).toContain('확인 질문이나 설명으로 끝내지 마라')
     expect(performance).toMatchObject({
       promptVersion: '1.1.6',
@@ -600,7 +602,7 @@ describe('T15 Discovery Agent v1.1.9 historical compact preview enrichment', () 
       readonly containsPersonalData: boolean
     }
 
-    expect(prompt).toContain('Prompt version: `1.3.5`')
+    expect(prompt).toContain(`Prompt version: \`${DISCOVERY_PROMPT_VERSION}\``)
     expect(prompt).toContain('lightweight preview를 정확히 10개')
     expect(prompt).toContain('summary·coreInteraction·technologyNecessity는 각각 45자')
     expect(prompt).toContain('가장 잘 맞는 하나만 사용')
@@ -647,7 +649,7 @@ describe('T15 Discovery Agent v1.2.0 just-in-time selected enrichment', () => {
       readonly containsPersonalData: boolean
     }
 
-    expect(prompt).toContain('Prompt version: `1.3.5`')
+    expect(prompt).toContain(`Prompt version: \`${DISCOVERY_PROMPT_VERSION}\``)
     expect(prompt).toContain('`SELECTED`')
     expect(prompt).toContain('`requestedPreviews`에 있는 수만큼만 완성')
     expect(fixture).toMatchObject({
@@ -724,7 +726,7 @@ describe('T19 native Discovery complete JSON envelope regression', () => {
       readonly containsPersonalData: boolean
     }
     expect(fixture.promptVersion).toBe('1.3.2')
-    expect(prompt).toContain('> Prompt version: `1.3.5`')
+    expect(prompt).toContain(`> Prompt version: \`${DISCOVERY_PROMPT_VERSION}\``)
     expect(prompt).toContain('원래 전체 입력 객체')
     expect(prompt).toContain('`submit_candidate_merge`')
     expect(prompt).toContain('빈 배열·객체까지 명시')
@@ -839,7 +841,7 @@ describe('T19 Discovery v1.3.5 full-preview product-value review', () => {
       revisedPromptNativeResult: 'OBSERVED_MIXED',
       automatedQualityVerdict: 'NOT_ASSERTED',
     })
-    expect(prompt).toContain('> Prompt version: `1.3.5`')
+    expect(prompt).toContain(`> Prompt version: \`${DISCOVERY_PROMPT_VERSION}\``)
     expect(prompt).toContain(fixture.historicalRuleDelta.revisedRule)
     expect(prompt).not.toContain(fixture.historicalRuleDelta.priorRule)
     expect(fixture.observedPreviews).toHaveLength(10)
@@ -911,7 +913,7 @@ describe('T19 Discovery v1.3.4 optional actual Decision forecast', () => {
       'utf8',
     )
     expect(fixture.promptVersion).toBe('1.3.4')
-    expect(prompt).toContain('> Prompt version: `1.3.5`')
+    expect(prompt).toContain(`> Prompt version: \`${DISCOVERY_PROMPT_VERSION}\``)
     expect(prompt).toContain('`expectedDecisions` 필드는 항상 제출하되')
     expect(prompt).toContain('갈림길이 없으면 빈 배열 `[]`')
     expect(prompt).toContain('교육을 위한 선택지나 정답이 정해진 구현 질문을 후보로 만들지 마라')
@@ -1179,7 +1181,7 @@ describe('T11 Builder prompt regression', () => {
       readonly containsPersonalData: boolean
     }
 
-    expect(prompt).toContain('Prompt version: `1.3.8`')
+    expect(prompt).toContain('Prompt version: `1.3.10`')
     expect(prompt).toContain('.vibe-helper/result.json')
     expect(prompt).toContain('HOST=127.0.0.1')
     expect(prompt).toContain('동적 `PORT`')
@@ -1226,9 +1228,25 @@ describe('T11 Builder prompt regression', () => {
 })
 
 describe('T19 Builder validation regression', () => {
+  it('keeps bounded Decision waiting, explicit compiled tests and accurate guarantee claims', async () => {
+    const prompt = await readFile(path.join(workspaceRoot, 'docs/agent-prompts/builder.md'), 'utf8')
+    const fixture = (await loadInput(
+      'tests/eval/fixtures/prompt-regressions/builder-v1.3.9-bounded-turn.json',
+    )) as {
+      requiredRules: string[]
+    }
+    expect(fixture).toMatchObject({
+      promptVersion: '1.3.9',
+      containsPersonalData: false,
+      liveResult: 'OBSERVED_WITH_LIMITATIONS',
+    })
+    for (const rule of fixture.requiredRules) expect(prompt).toContain(rule)
+    expect(prompt).toContain('guard 거절은 실행 성공이 아니다')
+    expect(prompt).toContain('Task 완료 시 `complete_task`')
+  })
   it('uses the prepared Windows tool entry without changing legacy commands or success criteria', async () => {
     const prompt = await readFile(path.join(workspaceRoot, 'docs/agent-prompts/builder.md'), 'utf8')
-    expect(prompt).toContain('Prompt version: `1.3.8`')
+    expect(prompt).toContain('Prompt version: `1.3.10`')
     expect(prompt).toContain('.\\.kiro\\vibe-tools.cmd pnpm run build')
     expect(prompt).toContain('기존 macOS/CLI 경로에는 이 접두어를 붙이지 않는다')
     expect(prompt).toContain('진입점이 없거나 도구 준비에 실패하면 실패 상태를 보고한다')
@@ -1287,7 +1305,102 @@ describe('T19 Builder validation regression', () => {
   })
 })
 
+describe('T19 rejected Discovery full canonical product interaction candidate', () => {
+  it('keeps count, provenance and optional-Need policy without treating wording tests as model quality', async () => {
+    const fixture = (await loadInput(
+      'tests/eval/fixtures/prompt-regressions/discovery-v1.3.7-product-interactions.json',
+    )) as { requiredRules: string[]; preservedRules: string[]; promptVersion: string }
+    const prompt = await readFile(
+      path.join(workspaceRoot, 'docs/spikes/t19-discovery-quality-rejected/discovery-v1.3.7.md'),
+      'utf8',
+    )
+    expect(fixture).toMatchObject({
+      promptVersion: '1.3.7',
+      liveResult: 'MIXED_NOT_ADOPTED',
+      containsPersonalData: false,
+      automatedQualityVerdict: 'NOT_ASSERTED',
+    })
+    for (const rule of [...fixture.requiredRules, ...fixture.preservedRules])
+      expect(prompt).toContain(rule)
+  })
+})
+
+describe('T19 runtime and rejected final-check candidates', () => {
+  it('tracks Builder wording separately from native quality evidence', async () => {
+    const fixture = (await loadInput(
+      'tests/eval/fixtures/prompt-regressions/builder-v1.3.10-runtime-boundaries.json',
+    )) as {
+      requiredRules: string[]
+    }
+    const prompt = await readFile(path.join(workspaceRoot, 'docs/agent-prompts/builder.md'), 'utf8')
+    expect(fixture).toMatchObject({
+      promptVersion: BUILDER_PROMPT_VERSION,
+      liveResult: 'OBSERVED_WITH_LIMITATIONS',
+      containsPersonalData: false,
+      automatedQualityVerdict: 'NOT_ASSERTED',
+    })
+    expect(prompt).toContain(`Prompt version: \`${BUILDER_PROMPT_VERSION}\``)
+    for (const rule of fixture.requiredRules) expect(prompt).toContain(rule)
+  })
+  it('retains the exact rejected final-check prompt without enabling it in production', async () => {
+    const fixture = (await loadInput(
+      'tests/eval/fixtures/prompt-regressions/discovery-v1.3.8-final-check.json',
+    )) as {
+      requiredRules: string[]
+    }
+    const prompt = await readFile(
+      path.join(workspaceRoot, 'docs/spikes/t19-discovery-quality-rejected/discovery-v1.3.8.md'),
+      'utf8',
+    )
+    expect(fixture).toMatchObject({
+      promptVersion: '1.3.8',
+      liveResult: 'MIXED_NOT_ADOPTED',
+      automatedQualityVerdict: 'NOT_ASSERTED',
+    })
+    expect(createHash('sha256').update(prompt).digest('hex')).toBe(
+      'e1da72766c7bfc67c31607bc9ae81f9f89e68b45f0d326b48b3f98f0ce84fe5e',
+    )
+    for (const rule of fixture.requiredRules) expect(prompt).toContain(rule)
+    const canonical = await readFile(
+      path.join(workspaceRoot, 'docs/agent-prompts/discovery.md'),
+      'utf8',
+    )
+    expect(canonical).toContain('Prompt version: `1.3.5`')
+    expect(canonical).not.toContain('## 제출 직전 점검')
+  })
+})
+
 describe('T12 Helper prompt regression', () => {
+  it('archives the mixed Helper candidate without treating wording checks as answer quality', async () => {
+    const fixture = (await loadInput(
+      'tests/eval/fixtures/prompt-regressions/helper-v1.2.1-evidence-boundaries.json',
+    )) as { requiredRules: string[]; preservedRules: string[] }
+    const prompt = await readFile(
+      path.join(workspaceRoot, 'docs/spikes/t19-helper-quality-experiments/helper-v1.2.1.md'),
+      'utf8',
+    )
+    expect(fixture).toMatchObject({
+      promptVersion: '1.2.1',
+      kind: 'MECHANICAL_PROMPT_REGRESSION',
+      containsPersonalData: false,
+      automatedQualityVerdict: 'NOT_ASSERTED',
+      liveResult: 'MIXED_NOT_ADOPTED',
+    })
+    expect(prompt).toContain('Prompt version: `1.2.1`')
+    expect(createHash('sha256').update(prompt).digest('hex')).toBe(
+      '03761b8670c755c56d38cfc4e02aa73b54fe046fe0339caa984bdba5fdd85301',
+    )
+    const canonical = await readFile(
+      path.join(workspaceRoot, 'docs/agent-prompts/helper.md'),
+      'utf8',
+    )
+    expect(createHash('sha256').update(canonical).digest('hex')).toBe(
+      'c6a96ee7d34510e8097b8082bcc087f185ca915257023b8340089f88ed193231',
+    )
+    for (const rule of [...fixture.requiredRules, ...fixture.preservedRules])
+      expect(prompt).toContain(rule)
+  })
+
   it('keeps current Decision help concise, claim-level and available at a high Concept State', async () => {
     const fixture = evaluationFixtureSchema.parse(
       await loadInput('tests/eval/fixtures/prompt-regressions/helper-v1.0-analogy.manifest.json'),
@@ -1476,7 +1589,7 @@ describe('T13 Evidence Analyst prompt regression', () => {
     expect(fixture.claimBoundary).toContain(
       'does not prove live model compliance or human learning',
     )
-    expect(prompt).toContain('Prompt version: `1.0.7`')
+    expect(prompt).toContain('Prompt version: `1.0.8`')
     expect(prompt).toContain('미래 계획·조건부 해결책·Agent 지시는 수행이 아니다')
     expect(prompt).toContain('구조화된 `USER_DECISION` 근거')
     expect(prompt).toContain('자연어 자기 보고라는 provenance 한계')
@@ -1675,7 +1788,7 @@ describe('T13 Evidence Analyst prompt regression', () => {
       }),
     )
     expect(fixture.claimBoundary).toContain('does not retcon the v1.0.6 fixture')
-    expect(prompt).toContain('Prompt version: `1.0.7`')
+    expect(prompt).toContain('Prompt version: `1.0.8`')
     expect(prompt).toContain('발화 시점에 아직 관찰하지 않은')
     expect(prompt).toContain('일반 조건·정의나 이미 확인한 과거 관찰')
 
@@ -1765,7 +1878,7 @@ describe('T13 Evidence Analyst prompt regression', () => {
       redactionStatus: 'VERIFIED_REDACTED',
       liveNativeResult: 'PENDING',
     })
-    expect(prompt).toContain('Prompt version: `1.0.7`')
+    expect(prompt).toContain('Prompt version: `1.0.8`')
     expect(prompt).toContain('실제로 선택한 이유 있는 제품·기술 방향')
     expect(prompt).toContain('그 답이 방향만 제시했는지 이미 결론을 제공했는지 확인할 수 없다')
     expect(prompt).toContain('같은 Task에서 방금 들은 설명을 바로 사용한 것은 Transfer가 아니다')
@@ -1890,7 +2003,7 @@ describe('T13 Evidence Analyst prompt regression', () => {
       'utf8',
     )
     expect(fixture).toMatchObject({ promptVersion: '1.0.2', containsPersonalData: false })
-    expect(prompt).toContain('Prompt version: `1.0.7`')
+    expect(prompt).toContain('Prompt version: `1.0.8`')
     expect(prompt).toContain('최대 120자')
     expect(fixture.longUserMessage.length).toBeGreaterThan(120)
 
@@ -1959,7 +2072,7 @@ describe('T13 Evidence Analyst prompt regression', () => {
     )
     expect(fixture).toMatchObject({ promptVersion: '1.0.3', containsPersonalData: false })
     expect(fixture.userMessage).toContain(fixture.conceptPhrase)
-    expect(prompt).toContain('Prompt version: `1.0.7`')
+    expect(prompt).toContain('Prompt version: `1.0.8`')
     expect(prompt).toContain('`concept.originalExpression`은 생략할 수 없는')
 
     const proposal = {
@@ -1999,6 +2112,35 @@ describe('T13 Evidence Analyst prompt regression', () => {
         noEvidenceReason: 'No direct USER phrase supports a Concept proposal in this Episode.',
       }).success,
     ).toBe(true)
+  })
+
+  it('keeps the source-first Analyst fixture comparable and forbids invented words for a bare click', async () => {
+    const fixture = (await loadInput(
+      'tests/eval/fixtures/prompt-regressions/evidence-analyst-v1.0.8-source-first.json',
+    )) as { promptVersion: string; cases: readonly unknown[] }
+    const previous = (await loadInput(
+      'tests/eval/fixtures/prompt-regressions/evidence-analyst-v1.0.7-claim-temporality.json',
+    )) as { cases: readonly unknown[] }
+    const prompt = await readFile(
+      path.join(workspaceRoot, 'docs/agent-prompts/evidence-analyst.md'),
+      'utf8',
+    )
+    expect(fixture.promptVersion).toBe('1.0.8')
+    expect(fixture.cases.slice(0, 7)).toEqual(previous.cases)
+    expect(fixture.cases).toHaveLength(8)
+    expect(fixture.cases[7]).toMatchObject({
+      id: 'bare_recommendation_without_user_words',
+      userMessage: null,
+      decisionEvent: { rationaleProvided: false },
+      decisionResolution: { source: 'USER', selectedOptionIndex: 1 },
+      expected: { oracleMode: 'NO_PROPOSALS' },
+    })
+    expect(prompt).toContain('출처를 먼저 확인하는 판정 순서')
+    expect(prompt).toContain('NONE 항목도 만들지 말고 proposals를 빈 배열로 반환')
+    expect(prompt).toContain('MEDIUM은 다른 Signal이어도 최대 EXPLAINED')
+    expect(prompt).toContain('concept 객체를 정확히 한 번만')
+    expect(prompt).toContain('misconception은 {"action":"NONE"}')
+    expect(prompt).toContain('userEvidenceSources에 반드시 들어가야')
   })
 
   it('separates directly led NONE from independent STRONG Evidence in one Episode', async () => {

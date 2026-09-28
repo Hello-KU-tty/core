@@ -18,12 +18,20 @@ import {
   loadCoreResources,
   MANAGED_NODE,
 } from '../packages/runtime/dist/portable-core.js'
+import { verifyPortableBuildSource } from './portable-build-preflight.mjs'
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const target = process.argv[2] ?? `${process.platform}-${process.arch}`
 if (target !== 'win32-x64') throw new Error('PORTABLE_TARGET_UNVERIFIED')
 const output = join(repository, 'dist', `portable-core-${target}`)
 if (!output.startsWith(`${join(repository, 'dist')}${sep}`)) throw new Error('OUTPUT_PATH_UNSAFE')
+// Reject an unsupported build executable or license before replacing any existing
+// generated package. In particular, a Mac Node is not the verified Windows source.
+const nodeLicensePath = await verifyPortableBuildSource(
+  process.execPath,
+  MANAGED_NODE.sha256,
+  process.env.VIBE_NODE_DISTRIBUTION_LICENSE,
+)
 await mkdir(join(repository, 'dist'), { recursive: true })
 if ((await realpath(join(repository, 'dist'))) !== join(repository, 'dist'))
   throw new Error('OUTPUT_PARENT_UNSAFE')
@@ -181,22 +189,7 @@ for (const name of ['discovery', 'builder', 'helper', 'evidence-analyst']) {
   await mkdir(join(output, 'agent-prompts'), { recursive: true })
   await writeFile(join(output, 'agent-prompts', `${name}.md`), data)
 }
-// This build runs with the exact development Node distribution already verified in W1.
-if (sha256(await readFile(process.execPath)) !== MANAGED_NODE.sha256)
-  throw new Error('NODE_DISTRIBUTION_UNVERIFIED')
-// Some verified runtime caches contain node.exe without its distribution license.
-// Reuse that binary and accept only the exact official v24.19.0 license as a sidecar.
-const nodeLicense = process.env.VIBE_NODE_DISTRIBUTION_LICENSE
-if (
-  nodeLicense &&
-  sha256(await readFile(nodeLicense)) !==
-    '148eacf7863ef4329224a29398623077200a27194aa075569faf4a0a85566ca5'
-)
-  throw new Error('NODE_DISTRIBUTION_LICENSE_UNVERIFIED')
-await copy(
-  nodeLicense ? resolve(nodeLicense) : join(dirname(process.execPath), 'LICENSE'),
-  'licenses/node-LICENSE',
-)
+await copy(nodeLicensePath, 'licenses/node-LICENSE')
 const licenses = new Map()
 for (const input of inputs) {
   if (!input.includes(`${sep}node_modules${sep}`)) continue

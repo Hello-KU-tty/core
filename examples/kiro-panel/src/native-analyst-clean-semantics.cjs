@@ -1,6 +1,7 @@
 const { createHash } = require('node:crypto')
 
 const MAX_TURNS = 7
+const ABSOLUTE_MAX_TURNS = 8
 const SOFT_TIMEOUT_MS = 60_000
 const NATIVE_PROMPT_RPC_TIMEOUT_MS = 240_000
 const PROMPT_MAX_BYTES = 400_000
@@ -21,6 +22,10 @@ const EXPECTED_CASE_IDS_V1_0_7 = [
   'actual_performed_application',
   'directly_led_repeat',
   'independent_future_prediction',
+]
+const EXPECTED_CASE_IDS_V1_0_8 = [
+  ...EXPECTED_CASE_IDS_V1_0_7,
+  'bare_recommendation_without_user_words',
 ]
 
 function fail(code) { return Object.assign(new Error(code), { code }) }
@@ -74,21 +79,29 @@ function allowedSourceSubset(proposal, expected) {
 }
 
 function validateFixture(fixture) {
+  const pairedBaseline = fixture?.promptVersion === '1.0.7' &&
+    fixture.comparisonProtocol === 'SAME_EIGHT_CASES_V1'
   const expectedCaseIds = fixture?.promptVersion === '1.0.6' ? EXPECTED_CASE_IDS :
-    fixture?.promptVersion === '1.0.7' ? EXPECTED_CASE_IDS_V1_0_7 : null
+    pairedBaseline ? EXPECTED_CASE_IDS_V1_0_8 :
+    fixture?.promptVersion === '1.0.7' ? EXPECTED_CASE_IDS_V1_0_7 :
+    ['1.0.8', '1.0.9'].includes(fixture?.promptVersion) ? EXPECTED_CASE_IDS_V1_0_8 : null
   if (!fixture || expectedCaseIds === null ||
       fixture.fixtureProvenance !== 'SYNTHETIC_UI_TRANSCRIPT' ||
       fixture.modelRunStatus !== 'NOT_RUN' || fixture.containsPersonalData !== false ||
-      !Array.isArray(fixture.cases) || fixture.cases.length !== MAX_TURNS ||
+      !Array.isArray(fixture.cases) || fixture.cases.length !== expectedCaseIds.length ||
+      fixture.cases.length > ABSOLUTE_MAX_TURNS ||
       fixture.cases.some((item, index) => item?.id !== expectedCaseIds[index]))
     throw fail('ANALYST_CLEAN_FIXTURE_INVALID')
 }
 
 function buildDecisionContext(item, scope, resolutionId, userReference) {
   const decisionId = item.decisionEvent?.decisionId
+  const bareRecommendation = item.id === 'bare_recommendation_without_user_words'
   if (typeof decisionId !== 'string' ||
       item.decisionResolution?.source !== 'USER' ||
-      typeof item.decisionResolution.rationale !== 'string')
+      (bareRecommendation ? (item.decisionResolution.rationale !== undefined ||
+        item.decisionEvent.rationaleProvided !== false || userReference !== undefined) :
+        typeof item.decisionResolution.rationale !== 'string'))
     throw fail('ANALYST_CLEAN_DECISION_FIXTURE_INVALID')
   const optionA = entityId('decision_option', 1)
   const optionB = entityId('decision_option', 2)
@@ -119,7 +132,8 @@ function buildDecisionContext(item, scope, resolutionId, userReference) {
     recommendedOptionId: optionIds[specified?.recommendedOptionIndex ?? 1],
     recommendationRationale: specified?.recommendationRationale ??
       '사용자 입력 비율을 임의로 바꾸지 않습니다.',
-    relatedConceptNames: ['경계 불변식'], sourceReferences: [userReference],
+    relatedConceptNames: item.conceptCandidateMode === 'NONE' ? [] : ['경계 불변식'],
+    sourceReferences: userReference === undefined ? [] : [userReference],
     independentWorkCanContinue: false, requestedAt: '2026-09-15T00:00:00.000Z',
     source: { kind: 'AGENT', role: 'BUILDER' },
     redactionStatus: 'VERIFIED_REDACTED',
@@ -133,9 +147,10 @@ function buildDecisionContext(item, scope, resolutionId, userReference) {
       schemaVersion: 1, id: resolutionId, decisionId,
       projectId: scope.projectId, taskId: scope.taskId,
       correlationId: scope.correlationId, expectedContextVersion: 1,
-      selectionKind: 'OPTION',
+      selectionKind: bareRecommendation ? 'RECOMMENDATION' : 'OPTION',
       selectedOptionId: optionIds[item.decisionResolution.selectedOptionIndex ?? 1],
-      rationale: item.decisionResolution.rationale, helperUsed: true,
+      ...(bareRecommendation ? {} : { rationale: item.decisionResolution.rationale }),
+      helperUsed: true,
       resolvedAt: '2026-09-15T00:00:03.000Z', source: { kind: 'USER' },
       redactionStatus: 'VERIFIED_REDACTED',
     },
@@ -150,7 +165,10 @@ function buildSyntheticCase(item, index, contracts) {
   const correlationId = entityId('corr', ordinal)
   const userReference = item.userEvidenceSources.find(source =>
     source.kind === 'USER_MESSAGE')
-  if (!userReference || typeof item.userMessage !== 'string')
+  const bareRecommendation = item.id === 'bare_recommendation_without_user_words'
+  if (bareRecommendation ? (userReference !== undefined || item.userMessage !== null ||
+    item.precedingAgentContribution !== null) :
+    (!userReference || typeof item.userMessage !== 'string'))
     throw fail('ANALYST_CLEAN_USER_SOURCE_INVALID')
   const events = []
   if (item.precedingAgentContribution !== null) {
@@ -167,7 +185,7 @@ function buildSyntheticCase(item, index, contracts) {
       sourceReferences: [agentReference], redactionStatus: 'VERIFIED_REDACTED',
     })
   }
-  events.push({
+  if (!bareRecommendation) events.push({
     schemaVersion: 1, id: entityId('event', 0x200 + ordinal), projectId, taskId,
     conversationId: userReference.conversationId, correlationId,
     sequence: events.length, actor: { kind: 'USER' },
@@ -178,7 +196,7 @@ function buildSyntheticCase(item, index, contracts) {
   })
   let decisionContext = null
   let decisionId
-  if (item.id === 'actual_reasoned_choice') {
+  if (item.id === 'actual_reasoned_choice' || bareRecommendation) {
     decisionId = item.decisionEvent?.decisionId
     const decisionReference = item.userEvidenceSources.find(source =>
       source.kind === 'USER_DECISION')
@@ -187,6 +205,19 @@ function buildSyntheticCase(item, index, contracts) {
     const resolutionId = entityId('decision_resolution', ordinal)
     decisionContext = buildDecisionContext(item,
       { projectId, taskId, correlationId }, resolutionId, userReference)
+    if (bareRecommendation) {
+      if (decisionContext.resolution.selectedOptionId !==
+          decisionContext.request.recommendedOptionId)
+        throw fail('ANALYST_CLEAN_DECISION_FIXTURE_INVALID')
+      events.push({
+        schemaVersion: 1, id: entityId('event', 0x100 + ordinal), projectId, taskId,
+        decisionId, correlationId, sequence: events.length,
+        actor: { kind: 'AGENT', role: 'BUILDER' },
+        occurredAt: '2026-09-15T00:00:00.000Z',
+        payload: { type: 'DECISION_REQUESTED', decisionId },
+        sourceReferences: [], redactionStatus: 'VERIFIED_REDACTED',
+      })
+    }
     events.push({
       schemaVersion: 1, id: entityId('event', 0x300 + ordinal), projectId, taskId,
       decisionId, correlationId, sequence: events.length, actor: { kind: 'USER' },
@@ -196,15 +227,20 @@ function buildSyntheticCase(item, index, contracts) {
       sourceReferences: [decisionReference], redactionStatus: 'VERIFIED_REDACTED',
     })
   }
-  const candidateExpressions = item.expected?.claimProfiles?.flatMap(profile =>
-    profile.claimExcerpts) ?? (item.userClaimExcerpt === undefined ? [] :
-    [item.userClaimExcerpt])
+  if (item.conceptCandidateMode !== undefined && item.conceptCandidateMode !== 'NONE')
+    throw fail('ANALYST_CLEAN_CONCEPT_CANDIDATES_INVALID')
+  const candidateExpressions = item.conceptCandidateMode === 'NONE' ? [] :
+    item.expected?.claimProfiles?.flatMap(profile =>
+      profile.claimExcerpts) ?? (item.userClaimExcerpt === undefined ? [] :
+      [item.userClaimExcerpt])
   const context = {
     schemaVersion: 1, correlationId,
     episode: {
       schemaVersion: 1, id: episodeId, projectId, taskId,
       ...(decisionId === undefined ? {} : { decisionId }),
-      conversationId: userReference.conversationId, correlationId, revision: 1,
+      ...(userReference === undefined ? {} :
+        { conversationId: userReference.conversationId }),
+      correlationId, revision: 1,
       type: decisionId === undefined ? 'HELPER_CONVERSATION' : 'DECISION',
       status: 'PENDING_ANALYSIS', eventIds: events.map(event => event.id),
       conceptCandidates: [...new Set(candidateExpressions)].map(originalExpression =>
@@ -393,6 +429,7 @@ async function runNativeAnalystCleanSemantics(input) {
     expectedWindowId, openSession, openBarrier, assertIdle, onCell, signal } = input
   const contexts = fixture.cases.map((item, index) =>
     ({ item, context: buildSyntheticCase(item, index, contracts) }))
+  const turnBudget = fixture.cases.length
   const armSoftTimeout = input.armSoftTimeout ?? (onTimeout => {
     const timer = setTimeout(onTimeout, SOFT_TIMEOUT_MS)
     return () => clearTimeout(timer)
@@ -406,7 +443,7 @@ async function runNativeAnalystCleanSemantics(input) {
   let windowId = null
   for (const { item, context } of contexts) {
     if (signal?.aborted) break
-    if (turns >= MAX_TURNS) throw fail('ANALYST_CLEAN_TURN_BUDGET_EXCEEDED')
+    if (turns >= turnBudget) throw fail('ANALYST_CLEAN_TURN_BUDGET_EXCEEDED')
     const message = JSON.stringify(context)
     const prompt = composeAnalystPrompt({ rolePrompt, message,
       provenance: 'SYNTHETIC_REDACTED_EVAL_INPUT' })
@@ -462,7 +499,8 @@ async function runNativeAnalystCleanSemantics(input) {
       const completed = { caseId: item.id, status: 'COMPLETE', modelId: model.id,
         windowId: session.windowId, elapsedMs: Math.max(0, Date.now() - started),
         modelElapsedMs: Math.max(0, Date.now() - promptStarted),
-        inputSha256: digest(message), ...evaluation }
+        inputSha256: digest(message), composedPromptSha256: digest(prompt),
+        composedPromptBytes: Buffer.byteLength(prompt, 'utf8'), ...evaluation }
       cells.push(completed)
       display[item.id] = response.text
       emit(onCell, completed)
@@ -484,7 +522,7 @@ async function runNativeAnalystCleanSemantics(input) {
       session?.close()
     }
   }
-  const finished = cells.length === MAX_TURNS &&
+  const finished = cells.length === turnBudget &&
     cells.every(cell => cell.status === 'COMPLETE')
   return {
     metadata: {
@@ -500,7 +538,7 @@ async function runNativeAnalystCleanSemantics(input) {
       semanticInterpretationReviewStatus: finished ? 'NEEDS_REVIEW' :
         'BLOCKED_BY_EXECUTION_FAILURE',
       humanReviewStatus: finished ? 'NEEDS_REVIEW' : 'BLOCKED_BY_EXECUTION_FAILURE',
-      maxTurns: MAX_TURNS, turns, promptVersion: fixture.promptVersion,
+      maxTurns: turnBudget, turns, promptVersion: fixture.promptVersion,
       promptSha256: digest(rolePrompt), fixtureSha256: digest(JSON.stringify(fixture)),
       model: { id: model.id, confirmed: true, source: model.source,
         configuration: model.configuration ?? 'NOT_EXPOSED' },
@@ -513,7 +551,8 @@ async function runNativeAnalystCleanSemantics(input) {
 }
 
 module.exports = {
-  MAX_TURNS, SOFT_TIMEOUT_MS, EXPECTED_CASE_IDS, EXPECTED_CASE_IDS_V1_0_7,
+  MAX_TURNS, ABSOLUTE_MAX_TURNS, SOFT_TIMEOUT_MS, EXPECTED_CASE_IDS,
+  EXPECTED_CASE_IDS_V1_0_7, EXPECTED_CASE_IDS_V1_0_8,
   buildSyntheticCase,
   evaluateText, runNativeAnalystCleanSemantics,
 }

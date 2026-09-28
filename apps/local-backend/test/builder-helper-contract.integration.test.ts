@@ -300,12 +300,19 @@ describe('frontend Builder/Helper contract over the loopback Core', () => {
           taskId: ids.task,
           expectedTaskRevision: staleRevision - 1,
           idempotencyKey: entityId('idem'),
-          message: 'Continue with my decision.',
+          message: '',
         }),
       ).rejects.toMatchObject({ code: 'STALE_TASK_REVISION' })
 
       // Builder turn 2 applies the Decision and completes through the Core report.
       behaviours.push(async (request) => {
+        expect(request.message).toContain(
+          'Continue the current Task from durable Context/Decision state.',
+        )
+        expect(request.message).toContain(
+          'No additional user message was provided for this explicit Builder start/resume.',
+        )
+        expect(request.message).not.toContain('Exact user message:')
         const before = await client.restoreProject(ids.project)
         const context = before.liveContext
         if (context === null || before.currentTask === null) throw new Error('CONTEXT_REQUIRED')
@@ -384,7 +391,7 @@ describe('frontend Builder/Helper contract over the loopback Core', () => {
         taskId: ids.task,
         expectedTaskRevision: staleRevision,
         idempotencyKey: entityId('idem'),
-        message: 'Continue with my decision.',
+        message: '',
       })
       const secondResult = await watch(second.id)
       expect(secondResult.run).toMatchObject({ status: 'SUCCEEDED', errorCode: null })

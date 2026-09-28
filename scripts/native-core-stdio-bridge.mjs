@@ -17,6 +17,8 @@ import {
   advertiseNativeEnrichment,
   bindNativeEnrichment,
   isNativeEnrichmentTool,
+  nativeEnrichmentFailure,
+  nativeEnrichmentToolError,
 } from './native-discovery-enrichment.mjs'
 import { restoreDiscoveryEmptyCollections } from './native-discovery-transport.mjs'
 import {
@@ -24,6 +26,7 @@ import {
   decodeJsonEnvelope,
   envelopeFailureReceipt,
   isJsonEnvelopeTool,
+  jsonEnvelopeToolError,
 } from './native-json-envelope.mjs'
 import { allowedNativeReceipt } from './native-receipt-scope.mjs'
 import nativePrivatePaths from '../examples/kiro-native-host/native-private-directory.cjs'
@@ -189,7 +192,7 @@ async function start() {
     } catch (error) {
       if (isJsonEnvelopeTool(binding.role, name))
         await receipt(envelopeFailureReceipt(binding.role, name, rawArguments, error))
-      throw error
+      return jsonEnvelopeToolError(error)
     }
     if (envelope.decoded)
       await receipt({
@@ -215,13 +218,13 @@ async function start() {
           return state.isError === true ? null : state.structuredContent
         })
       } catch (error) {
-        const code =
-          typeof error?.message === 'string' &&
-          /^BRIDGE_(?:ENRICHMENT|ENVELOPE)_[A-Z_]+$/.test(error.message)
-            ? error.message
-            : 'BRIDGE_ENRICHMENT_FAILED'
-        await receipt({ event: 'NATIVE_ENRICHMENT_INPUT_REJECTED', role: binding.role, code })
-        throw new Error(code)
+        const failure = nativeEnrichmentFailure(error)
+        await receipt({
+          event: 'NATIVE_ENRICHMENT_INPUT_REJECTED',
+          role: binding.role,
+          ...failure,
+        })
+        return nativeEnrichmentToolError(failure)
       }
       await receipt({
         event: 'NATIVE_ENRICHMENT_IMMUTABLE_FROM_CORE',

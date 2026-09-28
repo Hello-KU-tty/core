@@ -1,0 +1,25 @@
+{
+  "promptVersion": "1.3.6",
+  "kind": "MECHANICAL_CANONICAL_PHASE_ROUTING",
+  "adoption": "REJECTED_NATIVE_LATENCY_AND_QUALITY",
+  "containsPersonalData": false,
+  "modelQualityVerdict": "NOT_ASSERTED",
+  "modelLatencyVerdict": "NOT_ASSERTED",
+  "sharedRequiredText": [
+    "사용자가 명시적으로 프로젝트를 확정할 때까지",
+    "NO_RELEVANT_EVIDENCE",
+    "OBSERVED`를 사용자의 이해 증거로 과장하지 마라",
+    "누락된 의미값은 추측하거나 기본값으로 채우지 마라",
+    "직접 데이터베이스를 수정하지 마라"
+  ],
+  "phases": [
+    { "mode": "PREVIEW", "required": "lightweight preview를 정확히 10개", "excluded": "## Learning Spec" },
+    { "mode": "ENRICH_FIRST", "required": "FIRST`는 위치 1~5", "excluded": "## 빠른 PREVIEW turn" },
+    { "mode": "ENRICH_SECOND", "required": "SECOND`는 6~10", "excluded": "## 빠른 PREVIEW turn" },
+    { "mode": "ENRICH_SELECTED", "required": "requestedPreviews`에 있는 수만큼만", "excluded": "## Learning Spec" },
+    { "mode": "ROUND", "required": "carriedCandidates", "excluded": "## 빠른 SPEC turn" },
+    { "mode": "MERGE", "required": "Core가 pending MERGE에서 계산", "excluded": "## 빠른 PREVIEW turn" },
+    { "mode": "SPEC", "required": "이 Agent에 보이는 유일한 Core tool", "excluded": "## SPEC recovery turn" },
+    { "mode": "SPEC_RECOVERY", "required": "get_discovery_context`를 정확히 한 번 호출", "excluded": "## 빠른 SPEC turn" }
+  ]
+}

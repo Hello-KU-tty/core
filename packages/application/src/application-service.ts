@@ -110,7 +110,7 @@ import {
 import {
   type BuilderTaskAggregate,
   type DiscoveryAggregate,
-  type EpisodeAggregate,
+  type EpisodeHistory,
   type EvidenceTrace,
   type IdempotencyReceipt,
   PersistenceError,
@@ -465,7 +465,7 @@ export class ApplicationService {
           ? null
           : repository.readBuilderTaskAggregate(request.projectId, currentTask.id)
       const helperConversations = repository
-        .readRecentHelperConversationAggregatesForProject(
+        .readRecentHelperConversationHistoryForProject(
           request.projectId,
           request.helperConversationLimit,
         )
@@ -496,8 +496,7 @@ export class ApplicationService {
               previewRound: discoveryAggregate.previewRound,
               candidateEnrichments: discoveryAggregate.candidateEnrichments,
               relevantLedgerEntries: repository
-                .readRecentEvidenceTraces(100)
-                .flatMap((trace) => (trace.ledger === null ? [] : [trace.ledger]))
+                .readRecentConceptLedgers(100)
                 .filter((entry) => discoveryBasisIds.has(entry.concept.id)),
               personalization: discoveryPersonalization,
             })
@@ -539,7 +538,7 @@ export class ApplicationService {
     })
   }
 
-  #helperConversationSummary(aggregate: EpisodeAggregate): HelperConversationSummary {
+  #helperConversationSummary(aggregate: EpisodeHistory): HelperConversationSummary {
     const userExcerpts = aggregate.events.flatMap((event) =>
       event.payload.type === 'USER_MESSAGE' ? [event.payload.redactedExcerpt] : [],
     )
@@ -584,6 +583,7 @@ export class ApplicationService {
     trace: EvidenceTrace,
     evidenceRecords: EvidenceTrace['acceptedEvidence'],
     purpose: PersonalizationBasis['purpose'],
+    sourceProjectCache: Map<string, Project | null>,
   ): PersonalizationBasis | null {
     if (trace.ledger === null) return null
     const evidence = [...evidenceRecords]
@@ -592,8 +592,12 @@ export class ApplicationService {
     if (evidence.length === 0) return null
     const sourceProjects = unique(
       evidence.flatMap((record) => {
-        const recovery = repository.recoverProject(record.projectId)
-        return recovery === null ? [] : [{ id: recovery.project.id, title: recovery.project.title }]
+        let project = sourceProjectCache.get(record.projectId)
+        if (project === undefined) {
+          project = repository.recoverProject(record.projectId)?.project ?? null
+          sourceProjectCache.set(record.projectId, project)
+        }
+        return project === null ? [] : [{ id: project.id, title: project.title }]
       }),
     ).filter(
       (project, index, projects) =>
@@ -639,21 +643,29 @@ export class ApplicationService {
     )
     const existing = repository.readPersonalizationTrace(personalizationId)
     if (existing !== null) return existing
-    const traces = repository.readRecentEvidenceTraces(100)
-    const basis = traces
-      .flatMap((trace) => {
-        const priorEvidence = trace.acceptedEvidence.filter(
-          (evidence) => evidence.projectId !== aggregate.project.id,
-        )
-        const item = this.#personalizationBasis(
-          repository,
-          trace,
-          priorEvidence,
-          'DISCOVERY_TIE_BREAK',
-        )
-        return item === null ? [] : [item]
-      })
-      .slice(0, 5)
+    const basis: PersonalizationBasis[] = []
+    const sourceProjectCache = new Map<string, Project | null>()
+    let hasTrace = false
+    // Preserve the existing most-recent-100 order and first-five-eligible rule.
+    // Reconstruct full Evidence only while it can still contribute to the basis.
+    // This is request-local work, not a cache of mutable Core state.
+    for (const ledger of repository.readRecentConceptLedgers(100)) {
+      const trace = repository.readEvidenceTrace(ledger.concept.id)
+      if (trace === null) continue
+      hasTrace = true
+      const priorEvidence = trace.acceptedEvidence.filter(
+        (evidence) => evidence.projectId !== aggregate.project.id,
+      )
+      const item = this.#personalizationBasis(
+        repository,
+        trace,
+        priorEvidence,
+        'DISCOVERY_TIE_BREAK',
+        sourceProjectCache,
+      )
+      if (item !== null) basis.push(item)
+      if (basis.length === 5) break
+    }
     const personalization = personalizationTraceSchema.parse({
       schemaVersion: 1,
       id: personalizationId,
@@ -664,7 +676,7 @@ export class ApplicationService {
       basis,
       ...(basis.length > 0
         ? {}
-        : { fallbackReason: traces.length === 0 ? 'NO_LEDGER' : 'NO_PRIOR_PROJECT_EVIDENCE' }),
+        : { fallbackReason: hasTrace ? 'NO_PRIOR_PROJECT_EVIDENCE' : 'NO_LEDGER' }),
       createdAt: this.#timestamp(),
       source: { kind: 'CORE' },
       redactionStatus: 'VERIFIED_REDACTED',
@@ -684,37 +696,48 @@ export class ApplicationService {
       readonly relatedConceptNames: readonly string[]
       readonly directTaskIds: readonly string[]
     },
+    heads: readonly Pick<EvidenceTrace, 'concept' | 'ledger'>[],
+    traceCache: Map<string, EvidenceTrace | null>,
   ): PersonalizationTrace {
     const personalizationId = deterministicPersonalizationId(
       `helper:${input.projectId}:${input.taskId}:${input.correlationId}`,
     )
     const existing = repository.readPersonalizationTrace(personalizationId)
     if (existing !== null) return existing
-    const traces = repository.readRecentEvidenceTraces(100)
+    const sourceProjectCache = new Map<string, Project | null>()
     const explicitNames = new Set(input.relatedConceptNames.map(normalizedConceptName))
     const question = normalizedConceptName(input.question)
-    const relevantTraces = traces.filter((trace) => {
+    const relevantHeads = heads.filter((trace) => {
       const names = [trace.concept.canonicalName, ...(trace.ledger?.acceptedAliases ?? [])].map(
         normalizedConceptName,
       )
       return names.some((name) => explicitNames.has(name) || question.includes(name))
     })
-    const lexicalBasis = relevantTraces
-      .flatMap((trace) => {
-        const purpose = trace.acceptedEvidence.some(
-          (evidence) => evidence.projectId !== input.projectId,
-        )
-          ? ('HELPER_PAST_EXPERIENCE_CONNECTION' as const)
-          : ('HELPER_EXPLANATION_START' as const)
-        const item = this.#personalizationBasis(repository, trace, trace.acceptedEvidence, purpose)
-        return item === null ? [] : [item]
-      })
-      .slice(0, 5)
+    const lexicalBasis: PersonalizationBasis[] = []
+    for (const head of relevantHeads) {
+      const trace = this.#cachedEvidenceTrace(repository, head.concept.id, traceCache)
+      if (trace === null) continue
+      const purpose = trace.acceptedEvidence.some(
+        (evidence) => evidence.projectId !== input.projectId,
+      )
+        ? ('HELPER_PAST_EXPERIENCE_CONNECTION' as const)
+        : ('HELPER_EXPLANATION_START' as const)
+      const item = this.#personalizationBasis(
+        repository,
+        trace,
+        trace.acceptedEvidence,
+        purpose,
+        sourceProjectCache,
+      )
+      if (item !== null) lexicalBasis.push(item)
+      if (lexicalBasis.length === 5) break
+    }
     const directTaskIds = new Set(input.directTaskIds)
     const taskTraces =
       directTaskIds.size === 0
         ? []
         : repository.readRecentUserEvidenceTracesForTasks(input.projectId, input.directTaskIds, 10)
+    for (const trace of taskTraces) traceCache.set(trace.concept.id, trace)
     const taskBasis = taskTraces
       .flatMap((trace) => {
         const userEvidence = trace.acceptedEvidence.filter(
@@ -729,6 +752,7 @@ export class ApplicationService {
           trace,
           userEvidence,
           'HELPER_TASK_USER_EVIDENCE_CONNECTION',
+          sourceProjectCache,
         )
         return item === null ? [] : [item]
       })
@@ -755,13 +779,25 @@ export class ApplicationService {
       basis,
       ...(basis.length > 0
         ? {}
-        : { fallbackReason: traces.length === 0 ? 'NO_LEDGER' : 'NO_RELEVANT_CONCEPT' }),
+        : { fallbackReason: heads.length === 0 ? 'NO_LEDGER' : 'NO_RELEVANT_CONCEPT' }),
       createdAt: this.#timestamp(),
       source: { kind: 'CORE' },
       redactionStatus: 'VERIFIED_REDACTED',
     })
     repository.appendPersonalizationTrace(personalization)
     return personalization
+  }
+
+  #cachedEvidenceTrace(
+    repository: PersistenceRepository,
+    conceptId: string,
+    cache: Map<string, EvidenceTrace | null>,
+  ): EvidenceTrace | null {
+    const cached = cache.get(conceptId)
+    if (cached !== undefined) return cached
+    const trace = repository.readEvidenceTrace(conceptId)
+    cache.set(conceptId, trace)
+    return trace
   }
 
   #startDiscovery(request: Extract<UiRequest, { kind: 'UI_START_DISCOVERY' }>): CommandReceipt {
@@ -831,9 +867,7 @@ export class ApplicationService {
       return {
         aggregate,
         personalization: this.#discoveryPersonalization(repository, aggregate),
-        ledgerEntries: repository
-          .readRecentEvidenceTraces(100)
-          .flatMap((trace) => (trace.ledger === null ? [] : [trace.ledger])),
+        ledgerEntries: repository.readRecentConceptLedgers(100),
       }
     })
     if (scoped === null) throw this.#notFound(request.correlationId, 'DISCOVERY_NOT_FOUND')
@@ -3071,9 +3105,15 @@ export class ApplicationService {
       request.taskId,
       request.correlationId,
     )
-    const traces = this.#storage.transaction((repository) =>
-      repository.readRecentEvidenceTraces(100),
+    const heads = this.#storage.transaction((repository) =>
+      repository.readRecentConceptLedgers(100).flatMap((ledger) => {
+        // Match readEvidenceTrace's latest Canonical Concept, not a potentially
+        // older copy embedded in the Ledger. Both heads retain hash/schema checks.
+        const concept = repository.readCanonicalConceptById(ledger.concept.id)
+        return concept === null ? [] : [{ concept, ledger }]
+      }),
     )
+    const traceCache = new Map<string, EvidenceTrace | null>()
     const currentVersion = aggregate.liveContext?.contextVersion ?? null
     if (
       currentVersion !== null &&
@@ -3104,7 +3144,7 @@ export class ApplicationService {
       ...(aggregate.liveContext?.activeConceptNames ?? []),
       ...(focusedDecision?.relatedConceptNames ?? []),
       ...activeDecisions.flatMap((decision) => decision.relatedConceptNames),
-      ...traces.flatMap((trace) => {
+      ...heads.flatMap((trace) => {
         const names = [trace.concept.canonicalName, ...(trace.ledger?.acceptedAliases ?? [])]
         return names.some((name) => question.includes(name.toLocaleLowerCase('en-US')))
           ? [trace.concept.canonicalName]
@@ -3112,26 +3152,33 @@ export class ApplicationService {
       }),
     ]).map((name) => name.toLocaleLowerCase('en-US'))
     const personalization = this.#storage.transaction((repository) =>
-      this.#helperPersonalization(repository, {
-        projectId: request.projectId,
-        taskId: aggregate.task.id,
-        ...(request.decisionId === undefined ? {} : { decisionId: request.decisionId }),
-        correlationId: request.correlationId,
-        question: request.question,
-        relatedConceptNames: relevanceNames,
-        directTaskIds: unique([
-          aggregate.task.id,
-          ...aggregate.task.prerequisiteTaskIds,
-          ...(aggregate.task.finalUpgrade === undefined
-            ? []
-            : [aggregate.task.finalUpgrade.sourceTaskId]),
-        ]),
-      }),
+      this.#helperPersonalization(
+        repository,
+        {
+          projectId: request.projectId,
+          taskId: aggregate.task.id,
+          ...(request.decisionId === undefined ? {} : { decisionId: request.decisionId }),
+          correlationId: request.correlationId,
+          question: request.question,
+          relatedConceptNames: relevanceNames,
+          directTaskIds: unique([
+            aggregate.task.id,
+            ...aggregate.task.prerequisiteTaskIds,
+            ...(aggregate.task.finalUpgrade === undefined
+              ? []
+              : [aggregate.task.finalUpgrade.sourceTaskId]),
+          ]),
+        },
+        heads,
+        traceCache,
+      ),
     )
     const personalizationConceptIds = new Set(personalization.basis.map((basis) => basis.conceptId))
+    // The cache exists for this synchronous request only. Existing persisted
+    // personalization may reference concepts outside the recent window.
     const basisTraces = this.#storage.transaction((repository) =>
       personalization.basis.flatMap((basis) => {
-        const trace = repository.readEvidenceTrace(basis.conceptId)
+        const trace = this.#cachedEvidenceTrace(repository, basis.conceptId, traceCache)
         return trace === null ? [] : [trace]
       }),
     )
@@ -3143,11 +3190,11 @@ export class ApplicationService {
           entries.findIndex((candidate) => candidate.id === entry.id) === index,
       )
       .slice(0, 5)
-    const recentEpisodeAggregates = this.#storage.transaction((repository) =>
-      repository.readRecentEpisodeAggregatesForProject(request.projectId, 20),
+    const recentEpisodeHistory = this.#storage.transaction((repository) =>
+      repository.readRecentEpisodeHistoryForProject(request.projectId, 20),
     )
     const relevantNameSet = new Set(relevanceNames)
-    const recentEpisodes = recentEpisodeAggregates
+    const recentEpisodes = recentEpisodeHistory
       .filter((candidate) => {
         const sameTask = candidate.episode.taskId === aggregate.task.id
         const relatedConcept = candidate.episode.conceptCandidates.some((concept) =>
@@ -3548,7 +3595,7 @@ export class ApplicationService {
             'Only a failed Analysis Job can be retried manually.',
           )
         }
-        const aggregate = repository.readEpisodeAggregate(request.projectId, current.episodeId)
+        const aggregate = repository.readEpisodeHistory(request.projectId, current.episodeId)
         if (aggregate === null) throw this.#notFound(request.correlationId, 'EPISODE_NOT_FOUND')
         const episodeResult = transitionEpisodeAnalysis({
           current: aggregate.episode,
@@ -3678,7 +3725,7 @@ export class ApplicationService {
         }
         repository.appendAnalysisJob(result.value)
         if (terminal) {
-          const aggregate = repository.readEpisodeAggregate(current.projectId, current.episodeId)
+          const aggregate = repository.readEpisodeHistory(current.projectId, current.episodeId)
           if (aggregate === null) throw this.#notFound(request.correlationId, 'EPISODE_NOT_FOUND')
           const episodeResult = transitionEpisodeAnalysis({
             current: aggregate.episode,
@@ -3747,7 +3794,7 @@ export class ApplicationService {
       }
       repository.appendAnalysisJob(result.value)
       if (terminal) {
-        const aggregate = repository.readEpisodeAggregate(request.projectId, current.episodeId)
+        const aggregate = repository.readEpisodeHistory(request.projectId, current.episodeId)
         if (aggregate === null) throw this.#notFound(request.correlationId, 'EPISODE_NOT_FOUND')
         const episodeResult = transitionEpisodeAnalysis({
           current: aggregate.episode,
@@ -3787,7 +3834,7 @@ export class ApplicationService {
         request.correlationId,
         'ANALYSIS_JOB_STALE',
       )
-      const aggregate = repository.readEpisodeAggregate(request.projectId, job.episodeId)
+      const aggregate = repository.readEpisodeHistory(request.projectId, job.episodeId)
       if (aggregate === null) throw this.#notFound(request.correlationId, 'EPISODE_NOT_FOUND')
       return { job, episode: aggregate.episode }
     })
@@ -4145,15 +4192,39 @@ export class ApplicationService {
       if (recovery === null) {
         throw this.#notFound(request.correlationId, 'PROJECT_NOT_FOUND')
       }
+      // Reuse validated records only inside this read transaction. Keep the
+      // Episode/Event and selected Evidence validation, visibility and response order.
+      const sourceProjects = new Map<string, Project | null>([
+        [request.projectId, recovery.project],
+      ])
+      const sourceEpisodes = new Map<string, Episode | null>()
+      const discoveryCorrelations = new Map<string, string | null>()
+      const sourceProject = (projectId: string): Project | null => {
+        if (!sourceProjects.has(projectId))
+          sourceProjects.set(projectId, repository.recoverProject(projectId)?.project ?? null)
+        return sourceProjects.get(projectId) ?? null
+      }
+      const sourceEpisode = (projectId: string, episodeId: string): Episode | null => {
+        const key = `${projectId}:${episodeId}`
+        if (!sourceEpisodes.has(key))
+          sourceEpisodes.set(
+            key,
+            repository.readEpisodeHistory(projectId, episodeId)?.episode ?? null,
+          )
+        return sourceEpisodes.get(key) ?? null
+      }
       const personalization = repository
         .readPersonalizationTracesForProject(request.projectId, 100)
         .filter((trace) => {
           if (trace.target.kind !== 'DISCOVERY_SESSION') return true
-          const aggregate = repository.readDiscoveryAggregate(
-            trace.projectId,
-            trace.target.discoverySessionId,
-          )
-          return aggregate?.session.correlationId === trace.correlationId
+          const key = `${trace.projectId}:${trace.target.discoverySessionId}`
+          if (!discoveryCorrelations.has(key))
+            discoveryCorrelations.set(
+              key,
+              repository.readDiscoveryAggregate(trace.projectId, trace.target.discoverySessionId)
+                ?.session.correlationId ?? null,
+            )
+          return discoveryCorrelations.get(key) === trace.correlationId
         })
       const personalizationEvidenceIds = new Set(
         personalization.flatMap((trace) => trace.basis.flatMap((basis) => basis.evidenceIds)),
@@ -4161,7 +4232,13 @@ export class ApplicationService {
       const personalizationIssueIds = new Set(
         personalization.flatMap((trace) => trace.basis.flatMap((basis) => basis.openIssueIds)),
       )
-      const directTraces = repository.readEvidenceTracesForProject(request.projectId)
+      const directTraces = repository.readEvidenceTracesForProject(
+        request.projectId,
+        request.conceptId,
+      )
+      const traceCache = new Map<string, EvidenceTrace | null>(
+        directTraces.map((trace) => [trace.concept.id, trace]),
+      )
       const allowedConceptIds = new Set([
         ...directTraces.map((trace) => trace.concept.id),
         ...personalization.flatMap((trace) => trace.basis.map((basis) => basis.conceptId)),
@@ -4172,7 +4249,7 @@ export class ApplicationService {
       const conceptIds =
         request.conceptId === undefined ? [...allowedConceptIds] : [request.conceptId]
       const concepts = conceptIds.flatMap((conceptId) => {
-        const trace = repository.readEvidenceTrace(conceptId)
+        const trace = this.#cachedEvidenceTrace(repository, conceptId, traceCache)
         if (trace === null) return []
         const evidence = trace.acceptedEvidence.flatMap((record) => {
           if (
@@ -4181,9 +4258,9 @@ export class ApplicationService {
           ) {
             return []
           }
-          const episode = repository.readEpisodeAggregate(record.projectId, record.episodeId)
-          const sourceProject = repository.recoverProject(record.projectId)
-          if (episode === null || sourceProject === null) return []
+          const episode = sourceEpisode(record.projectId, record.episodeId)
+          const project = sourceProject(record.projectId)
+          if (episode === null || project === null) return []
           const proposal =
             'evidenceProposalId' in record
               ? trace.proposals.find((candidate) => candidate.id === record.evidenceProposalId)
@@ -4193,14 +4270,12 @@ export class ApplicationService {
               evidenceId: record.id,
               kind: record.kind,
               projectId: record.projectId,
-              projectTitle: sourceProject.project.title,
+              projectTitle: project.title,
               ...(record.taskId === undefined ? {} : { taskId: record.taskId }),
               episodeId: record.episodeId,
-              episodeType: episode.episode.type,
-              episodeStatus: episode.episode.status,
-              ...(episode.episode.endedAt === undefined
-                ? {}
-                : { episodeEndedAt: episode.episode.endedAt }),
+              episodeType: episode.type,
+              episodeStatus: episode.status,
+              ...(episode.endedAt === undefined ? {} : { episodeEndedAt: episode.endedAt }),
               acceptedAt: record.acceptedAt,
               ...('supportsState' in record ? { supportsState: record.supportsState } : {}),
               ...('signal' in record ? { signal: record.signal } : {}),
@@ -4223,17 +4298,17 @@ export class ApplicationService {
             (candidate) => candidate.id === decision.evidenceProposalId,
           )
           if (proposal === undefined || proposal.projectId !== request.projectId) return []
-          const episode = repository.readEpisodeAggregate(proposal.projectId, proposal.episodeId)
-          const sourceProject = repository.recoverProject(proposal.projectId)
-          if (episode === null || sourceProject === null) return []
+          const episode = sourceEpisode(proposal.projectId, proposal.episodeId)
+          const project = sourceProject(proposal.projectId)
+          if (episode === null || project === null) return []
           return [
             {
               proposalId: proposal.id,
               evidenceDecisionId: decision.id,
               projectId: proposal.projectId,
-              projectTitle: sourceProject.project.title,
+              projectTitle: project.title,
               episodeId: proposal.episodeId,
-              episodeType: episode.episode.type,
+              episodeType: episode.type,
               proposedConceptName: proposal.concept.proposedCanonicalName,
               signal: proposal.signal,
               strength: proposal.strength,
@@ -4812,7 +4887,7 @@ export class ApplicationService {
     endedAt: string,
     closeReason: string,
   ): AnalysisJob {
-    const aggregate = repository.readEpisodeAggregate(current.projectId, current.id)
+    const aggregate = repository.readEpisodeHistory(current.projectId, current.id)
     if (aggregate === null) throw this.#notFound(current.correlationId, 'EPISODE_NOT_FOUND')
     const proposed = episodeSchema.parse({
       ...current,

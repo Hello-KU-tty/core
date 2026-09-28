@@ -45,6 +45,25 @@ function fail(code: string): never {
   throw new Error(code)
 }
 export const sha256 = (data: Uint8Array): string => createHash('sha256').update(data).digest('hex')
+/** Compare only after resources and runtime were verified; this hash grants no authority. */
+export function coreInstallationIdentity(
+  resources: Pick<CoreResources, 'root'>,
+  runtime: Pick<CoreRuntimeDescriptor, 'executable' | 'args' | 'env'>,
+): string {
+  return createHash('sha256')
+    .update(
+      JSON.stringify({
+        version: 1,
+        root: resources.root,
+        executable: runtime.executable,
+        args: runtime.args,
+        env: Object.fromEntries(
+          Object.entries(runtime.env).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+        ),
+      }),
+    )
+    .digest('hex')
+}
 export const sameRuntimePath = (left: string, right: string): boolean =>
   process.platform === 'win32'
     ? resolve(left).toLowerCase() === resolve(right).toLowerCase()

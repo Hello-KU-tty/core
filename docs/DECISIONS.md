@@ -1,5 +1,44 @@
 # 결정 기록
 
+## 2026-09-28: 맥에서 시간·크레딧을 제한한 백엔드 성능 개선
+
+- **08:00 portable 빌드 사전검사:** 기존 Windows 전용 builder는 Node 배포본 SHA/sidecar license를 산출물 삭제·생성 후에 확인했다. 동일한 pin/라이선스 정책을 파일 변경 전 preflight로 이동하고 기본 license도 기존 copy의 regular/non-symlink 검사를 미리 수행한다. Mac을 Windows 지원 환경으로 승격하거나 source gate를 우회하지 않는다. 목적은 지원하지 않는 빌드 실행이 기존 생성 package를 지우고 불완전한 산출물을 남기지 않게 하는 것이다. Windows 실제 package 생성/실행은 해당 환경에서 재평가한다.
+
+- **07:49 Analysis lifecycle 채택:** 아래 다섯 조회를 EpisodeHistory로 제한한다. 독립 SQLite·동일 clock/id·5회 warmup+30회 교대·0/100/1000 Ledger에서 정상 응답, stale/금지 오류, idempotent 재생 및 모든 SQLite 테이블이 매 회 동일했다. 1000개에서 close7.494→1.231ms, retry6.834→0.286ms, terminal timeout6.316→0.220ms, 결과 제출12.761→7.013ms; 반복도 같은 방향이다. 실제 Analyst context/Evidence 판정의 full aggregate는 남는다. 대상46검사, actual program 소비와 전체check(integration321+8SKIP/E2E12) PASS, 실제16Project/77filteredview 재시작 전후 동일로 유지한다. 합성 Core 계산치이며 모델/HTTP/Windows 수치가 아니다. 초기 비교 bundle의 오류 class identity, fixture 필수 Evidence 누락, 도구 lint, 기존4173포트 충돌 실패는 보존하고 각각 도구·격리 실행만 수정했다.
+
+- **07:40 Analysis lifecycle 후보:** Helper Episode 닫기, 실패·timeout의 terminal 전환, 명시적 재시도, 결과 제출의 초기 Episode 확인은 full Ledger/proposal을 사용하지 않는다. 이 다섯 호출만 기존 validated EpisodeHistory reader로 바꾸어 비교한다. 실제 Analyst context와 Evidence batch 판정의 full aggregate, Final Upgrade gate, 상태·revision·idempotency·인용/정책은 변경하지 않는다. 변경 전 Application bundle을 동결했으며, 독립 SQLite의 동일 요청/저장 상태 비교와 실패·재시도·timeout 회귀 및 전체 검증 전에는 채택하지 않는다. 요청하지 않은 전체 Ledger의 검증을 대신 수행하는 API로 lifecycle을 취급하지 않으며, 사용되는 Episode/Event head·schema·hash 검증은 그대로다.
+
+- **07:15 Analyst 판정:** v1.0.8은 출력 구조 신뢰성 개선 범위로 유지한다. 동일8개 source-first에서 원본3/8(schema6/8)→후보6/8(schema8/8) 두회; 별도8개 두묶음은각5/8동률,4/8동률이고schema는원본8/8·5/8→후보8/8·8/8이다. inputSHA/oracle고정,Haiku/freshH/retry0/Core변이0. 지연개선은없으며일반의미정확도·학습효과·Windows PASS가아니다. 선택의독립성/직접반복/인용/계획과수행오분류가남고,순수Core정책offline대조에서는잘못된인용·DIRECTLY_LED상승을거절하지만미래계획APPLICATION의미오류는수락가능했다. 정책변경이나자동보정없이[한정판정·전표본](spikes/t19-analyst-prompt-experiments/README.md)을기록하며상위T19의미품질완료로세지않는다. eval-only exactSHA107비교선택/최대8회상한·새고정corpus를추가했고정상runtime에는임의prompt override를열지않았다.
+
+- **06:41 Evidence 조회 채택:** read transaction 내 validated trace/Project/Episode/session correlation 재사용, 단일Concept 요청의 parameterized direct-membership SQL filter, Episode/Event 전용 reader를 적용한다. accepted/proposal 양쪽 Project membership·rejected-only Concept·personalization 가시성·현재rev·선택한 Evidence/Episode/Event 무결성·배열순서·100Concept contract는 유지한다. full aggregate/Analyst·Core 학습 정책·frontend/protocol·DB schema 변경 없음. 합성1000이력의 단일Concept 계산128.435→1.514ms(SQL8031→21), 개념별Episode100개 전체116.076→16.012ms. 독립DB 전체응답동등성·반복재현·대상22검사·actualprogram projector·전체check(integration319/E2E12) PASS다. 실제native DB16Project/77filtered view도 새Core 전후 SHA가 같았다. Mac Core 계산치이지 모델/Windows/일반P95 보장은 아니다.
+- **06:21 취소/재요청 판정:** actual program/native에서 취소후pair재사용·Project전환·새Helper회복을 확인했다. 재요청이 native 취소terminal170ms 전에 Core에 수락되고 terminal뒤에만 모델실행된표본과 worker-owned terminal지연 model-0 회귀를 보강했다. 원본harness의 premature Analyst-idle FAIL은 보존하고 후속readonly감사로 정상종료를 별도확인한다. worker제품로직은 바꾸지 않고 모든race/Windows안전으로 확대하지 않는다.
+
+- **05:58 Helper 맥락 조회 채택:** 최근 closed Episode20개의 요약은 full Evidence/Ledger를 사용하지 않으므로 validated EpisodeHistory만 읽는다. 상태·순서·scope·head·Event 무결성·관련성/first5 projection과 전체 HelperContext를 유지하고 기존 full aggregate·Analyst·개인화 정책은 바꾸지 않는다. 독립SQLite 두 개/동일 입력/30회교대의 전체응답동등성과 대상19검사·전체check·actualprogram소비가 통과했다. 1,000Concept/20Helper대화 계산 중앙값146.714→7.548ms, 재구성 반복134.061→7.342ms 관측. 모델/Windows/일반P95 보장은 아니다.
+
+- **05:47 Helper 후보 기각:** v1.2.1의 일반 근거 경계 규칙을 세 완료 합성 Task에서 실제 실행했다. 일부 평균 비용·EXCLUDED 구분은 좋아졌지만 기존 버전 반복도 API 부재 단정을 피했고, 유니온의 구조적 타입을 exact-object 보장으로 과장했다. 실제 생성 타입의 strict tsc 반례가 통과했다. 안정된 개선 증거가 없어 원문 v1.2.0으로 복귀하며, 기본 버전의 품질 제한도 그대로 기록한다. [원문·결과·판정](spikes/t19-helper-quality-experiments/README.md)을 보존하고 평가 oracle/gate를 느슨하게 만들지 않는다.
+
+- **05:30 복원 조회 채택:** UI_RESTORE_PROJECT_SESSION의 최근 Helper 요약은 Episode/Event만 사용하므로 별도 validated history read를 도입한다. 기존 full aggregate API와 Analyst/정책 경로는 그대로 두고, 동일 project·최근20개 선택 순서·head revision·Event 순서·schema/hash 검증·Application의 역할별 최근5개 projection을 보존한다. 같은 DB의 read-only 교대30회 비교에서 전체 응답이 동일했고 1,000 Concept/20대화의 delivered 중앙값148.543→9.683ms, prepare109→69였다. model latency/일반 P95/Windows 수치가 아니며 새 cache·schema migration·protocol 변경은 없다. 전체 check와 actual program 소비 검증 통과로 유지한다.
+
+- **04:20 Analyst 후보 평가:** canonical v1.0.7의 실제 Haiku clean baseline 7개 중 2개만 oracle를 통과했다. v1.0.8 source-first/상태 상한/필수 출력 구조의 일반 규칙을 실험하고, 기존 7개 입력·oracle를 보존한 채 사용자 작성 문자열 없는 추천 클릭 1개를 추가한다. fixture와 native 실행은 사용자 학습의 증거가 아니며 Core provenance/상태 정책은 변경하지 않는다. 실측 반복과 unseen 회귀 전에는 채택으로 표시하지 않는다.
+- **05:14 후속 판정:** v1.0.9 실제 Haiku는 2/8, 필수 필드 누락 6개로 퇴행해 기각했다. tail 반복 5/8도 기각했다. 두 변형은 archive로 남기고 canonical/gate/build는 v1.0.8 후보로 복귀했다. Core 자동 보정·출처/정답 완화 없이 기존 실패를 보존하며 후보 최종 채택은 별도 판정한다.
+- **05:10 Analyst 정리 후보:** tail 반복은 5/8로 개선 근거가 없어 기각했다. v1.0.9는 사용자 출처→Agent 의존성→관찰 종류→Strength→State 상한→출력 검증을 순서화하고 중복 문구를 정리한다. 기존 정책·출처·issue·Transfer·AGENT_SUPPORT 경계를 유지하며 12,775→7,020자로 줄였다. 앞선 두 corpus의 입력과 strict oracle를 그대로 복사하되 버전/fixture lineage만 변경한다. 이 입력은 v1.0.9 기준 unseen이 아니라고 명시하며 후속 별도 입력과 실측 전에는 채택하지 않는다.
+- **05:02 Analyst 배치 실험:** v1.0.8의 동일한 최종 출력 점검 절을 Episode 입력 뒤에도 그대로 반복하는 `CANONICAL_FINAL_CHECK_TAIL_V1`을 임시 평가 host에서만 비교한다. canonical SHA와 합성 provenance를 고정하고, 정책·oracle·Core·제품 composer는 변경하지 않는다. 실제 조합 prompt의 SHA/bytes와 추가 절 SHA를 기록한다. 반복·별도 corpus 검증 전 제품 채택이나 일반 정확도 개선으로 표시하지 않는다.
+
+- **승인:** 사용자가 Goal을 적용해 현재 맥에서 성능 판단·수정·평가를 반복하고, 제출 전 Windows에서 다시 평가하도록 지시했다. 프론트 저장소는 실제 요청 흐름의 읽기 전용 기준으로 사용한다.
+- **기간:** 2026-09-28 01:31 KST부터 같은 날 09:00 KST까지다. Goal 등록 문구의 임시 날짜 `2026-09-29`보다 그 문구의 “현재 시각 확인 후 다음 도래하는 오전 9시” 조건과 실제 시작 시각을 우선한다. 마감은 `2026-09-28T00:00:00Z`다.
+- **예산:** 계정 대시보드는 시작 점검에서 756.89 used / 1,000 covered, overages disabled를 표시했다. 사용자가 **계정 누적 900크레딧** 상한(초기 143.11 여유)을 확인했다. 사용량은 추정·갱신 지연이 있을 수 있으므로 소규모 실행 묶음으로 확인하고 우선 누적 880을 호출 중단선으로 두어 20크레딧 여유를 남긴다. 구독/초과 과금 설정은 변경하지 않는다.
+- **범위:** 진행 중 T19의 인계 후 개선이다. local protocol 1, SDK 요청/응답·오류·취소·복원, revision/idempotency, provenance와 역할 권한은 유지한다. 실제 native 모델 측정, 모델 없는 소비/회귀 검사, 의미 품질 검토를 구분하고 실패도 표본에 포함한다. 새 제품 범위·의존성·지원 버전 확대는 없다.
+- **판정:** 변경 전후 같은 fixture/환경을 반복 비교하고 별도 unseen 입력으로 회귀를 확인한다. 소표본으로 장기 P95나 사람 학습 효과를 주장하지 않는다. Mac의 일반 코드·프롬프트 개선을 Windows native/package PASS로 확대하지 않는다. 채택/기각 이유와 Windows 재평가 절차를 결과 문서에 남긴다.
+- **보존:** 기존 사용자 변경·DB·설치된 확장·일반 profile을 보존하고 새로운 합성 실행 root에서 평가한다. commit/push, 프론트 저장소 변경, hosted 배포는 수행하지 않는다.
+- **계획·기록:** [T19 맥 성능 개선](spikes/T19_MAC_PERFORMANCE_20260928.md).
+- **실측 호환성 보완:** 최신 program의 `resumeAfterDecision()`는 명시적 재개 클릭을 빈 Builder 메시지로 전달한다. 기존 SDK가 모델 전 이를 거절하는 것을 실제 소비 경로에서 재현했다. Builder 메시지만 필수 string/trim/최대 4,000자 검증을 유지하면서 길이 0을 허용한다. 이는 protocol 1의 하위 호환 입력 확장이며 Task/revision/idempotency·완료/권한 gate는 그대로다. Helper 질문과 Discovery의 선택적 메시지 제한은 바꾸지 않는다. Core가 임의의 사용자 지시나 선택 근거를 만들어 넣지 않고, 추가 지시가 없는 명시적 시작/재개임을 host instruction으로 구분한다. 프론트 파일은 수정하지 않는다.
+- **후속 실험:** native Discovery는 단계별 최소 tool만 제공하면서 전체 canonical prompt를 매번 전달했다. 기존 Crew의 단계 분리 원칙을 native에도 적용하는 후보를 비교한다. 공통 안전·명시적 사용자 선택·provenance 규칙과 해당 phase 규칙은 canonical Markdown에서만 추출한다. Core/packaged host가 같은 순수 composer로 정확히 일치하는 prompt를 검증하며, 임의 prompt override·새 도구·권한 확대는 허용하지 않는다. Builder의 pending Decision 조회는 명시적 재개 전 반복 polling을 피하도록 별도 버전/fixture로 평가한다. 실측 전 속도·품질 개선으로 확정하지 않는다.
+
+- **03:25 실측 판정:** native 단계별 prompt Trial A/B는 입력을 줄였지만 출력 길이·다양성·재시도 결과가 안정적으로 개선되지 않았다. 제품은 full canonical Discovery v1.3.5로 복귀한다. 기각 composer/fixture는 `docs/spikes/t19-phase-prompt-rejected/`에 재현용으로 격리하고 production import/export를 제거한다. Builder v1.3.9의 fresh build 평가는 계속 후보 상태다.
+- **03:57 후속:** Helper 이력 lazy hydration은 최신 Canonical head 검증과 요청 내 cache만 사용하며 paired 전체 응답 동등성/전체 check를 통과했다. full Discovery v1.3.7은 다양성 일부 개선에도 길이·기술 과장이 남아 그대로 채택하지 않고 v1.3.8 후보를 평가한다. Builder v1.3.9의 fresh Decision 대기는 1회 조회를 지켰지만 생성 앱의 JSON null crash와 completion scope 오류가 확인돼 v1.3.10 후보에서 generic runtime/검증/보고 규칙을 보강한다. prompt fixture 통과와 실제 모델 품질은 별도 판정한다.
+- **복원 라우팅:** single-window protected H 요청은 활성 역할이 없는 경우 검증된 Project W로만 이동 대상으로 제공한다. Discovery root에서 이전 Project의 Helper가 모델 0회로 대기한 재현에 따른 수정이다. H editor 이동, 권한 확대, 잘못된 Project의 claim, Windows separate-H 정책 변경은 허용하지 않는다. 실행 중 window 재로드는 하지 않는다.
+- **04:12 판정:** Discovery v1.3.8도 4개 실제 fixture에서 형식·저장 성공과 별개로 기술 과장과 후보 중복이 남아 미채택. v1.3.7/1.3.8 원문/실측은 archive로 보존하고 canonical Discovery는 1.3.5로 복귀한다. Builder 1.3.10은 held-out 진행 중으로 전체 의미 품질 통과를 주장하지 않는다. 기존 Analyst 7-cell 비교는 사용자 승인 임시 root만의 W/H 연결로 재사용하며 legacy/product scope gate·read-only·모델 확인을 완화하지 않는다.
+
 ## 2026-09-25: 정확한 Kiro 1.1.70 일반 설치 지원과 W5 완료
 
 - **판정:** 사용자 현재 버전 W5 완료 요청에 따라 0.3.15에서 exact IDE/Agent/source pin을 유지한 일반 설치를 지원한다. 새 Personal Need 유무의 실제 native 프로젝트, 도구 자동 준비, 결과 앱, 분석/다음 context, History, 취소와 Core 재시작을 검증했다. [최종 결과](spikes/T19_W5_KIRO_1170_GENERAL_MODE_RESULTS_20260925.md)를 따른다.
@@ -856,3 +895,18 @@
 - **Core 수정:** Helper가 context를 읽을 때 기록되는 PersonalizationTrace는 답변 기록 전이므로 취소·실패 turn에도 남는다. `UI_PREPARE_FINAL_UPGRADE_TASK`는 같은 Project/Task/correlation의 `HELPER_RESPONSE` Activity Event가 있는 trace만 허용하고 아니면 `FINAL_UPGRADE_HELPER_TURN_NOT_RECORDED`로 거절한다. UI 사전 필터를 위해 Helper conversation 요약에 선택 필드 `correlationId`를 추가한다. DB migration은 없다.
 - **SDK 범위:** reference panel JS에만 있던 규칙을 `@vibe-helper/frontend-client`의 순수 helper로 제공한다(run event projection, Builder turn 판정, Decision 해결 요청 생성, Evidence 표시 상태, Final Upgrade 후보, worker 상태 분류). Core 권한·gate·Concept State 계산을 대신하지 않고, Agent 출력·run 성공·card click을 이해 상태로 표시하지 않는다. 새 dependency·install script·범용 file/shell tool은 없다.
 - **검증 구분:** 현재 PC의 clean clone 적용·새 clone 검증·프론트 TS/테스트/build·VSIX 조립, 실제 Core HTTP/SSE 계약 test와 consumer 검사를 근거로 한다. 이번 변경으로 모델을 호출한 native 재실측은 하지 않았다. 지원 pin(Kiro 1.1.70/Agent 1.1.158) 확대는 새 source capability 실측 전 하지 않는다.
+
+## 2026-09-28: 10시 연장과 프론트 B2 설치 identity 검증
+
+- **승인:** 사용자가08:50 마감을10:00 KST로 연장하고 최신 프론트 실측 인계사항 수정에 집중하도록 지시했다. Goal objective도 사용자 편집으로10시로 변경됐다. 누적900크레딧과 기존 권한·프론트/외부쓰기 경계는 유지한다.
+- **원인:** 같은 manifest hash만으로 다른 확장 설치 경로의 Core를 공유하면 기존 Core가 작성한 bridge/runtime 경로와 새 host 검증값이 다르다. 프론트 보고와 실제 lifecycle 모듈의 격리 재현이 일치했다.
+- **수정 방향:** 검증된 resource root와 실행 executable/args/env를 private owner의 한정 해시 identity로 기록하고 host 선택값과 비교한다. package hash도 그대로 비교하며 identity 없는 legacy owner는 호환됐다고 추정하지 않는다. 불일치 owner에는 lease를 새로 갱신하지 않고 기존45초 시작 예산 안에서 정상 lease 만료/종료를 기다린다. 다른 창이 계속 사용하면 `CORE_UPDATE_WAITING_FOR_OWNER_EXIT`로 중단한다. shared PID 강제 종료·lock 삭제·role config 검증 완화·임의 host 경로 수락은 하지 않는다.
+- **검증:** 순수 identity 테스트, 실제 lifecycle CJS의 격리 clock/owner/lease 회귀, Windows 재현 script의 동일내용/다른설치경로 조건을 보강한다. 모델0 Mac 검증과 실제 Windows 설치 검증은 분리하며 새 portable/kit을 Windows 검증 없이 배포하지 않는다. 새로운 의존성·DB migration·UI/SDK protocol 변경은 없다.
+- **09:34 보강:** 실제lifecycle 격리검사에서 느린 주기RENEW의 중첩과 pending RENEW보다 먼저 끝나는 dispose를 각각 재현했다. maintenance를1개로 제한하고 stop뒤새갱신을막으며 dispose는진행중유한요청정리후RELEASE한다. 이전2개FAIL/수정후17회귀PASS를보존한다. Core lease기간과다른host소유권은바꾸지않는다.
+
+## 2026-09-28: 프론트 B1 오류 분류와 B3/B4 복구 경계
+
+- **결정:** native JSON-RPC error의 한정된 own type/name/code와 최대4KiB structured serialization만 quota/auth/access/model/rate/service의 고정 `NATIVE_*` 코드로 분류한다. shared `-32000`만으로 auth라고 추정하지 않고 미지정·상충·malformed 오류는 `NATIVE_RPC_REJECTED`다. provider message/request ID/경로/토큰을 UI·worker 로그에 복사하지 않으며 자동 유료 재시도·모델교체·quota API를 추가하지 않는다.
+- **근거와 한계:** pinned Mac Agent source의 RequestError/model-registry와 프론트의 Windows service exception 보고를 대조했다. 실제 Windows JSON-RPC가 같은 structured 정보를 보내는지는 새 Windows 평가에서 확인해야 한다. service log와 RPC payload를 동일시하지 않는다. 합성 response→native-client, worker→relay complete/status, 실제 HTTP/SSE·SQLite→run, 실제 program port→안전한 오류 메시지의 각 경계를 모델0으로 검증한다.
+- **재시도:** 기존 Core `startRun({ kind: 'DISCOVERY', phase: 'PREVIEW', ... })`와 새 idempotency key를 공식 명시적 재시도 경로로 유지한다. 같은 key는 같은 runtime에 기록이 남아 있는 동안 원래 run을 반환한다. 최대100개 retention에서 terminal run과 key가 함께 제거되며 재시작도 map을 지운다. 영구 dedup이 아니므로 유실된 요청을 자동 재전송하지 않는다. program 포트는 옛 preview run을 캐시하므로 새 run ID를 반영하는 frontend 작업이 필요하며 frontend 소스를 여기서 수정하지 않는다.
+- **durability/Trust:** run은 현재 transient이고 Core 재시작 뒤 Project/Session과 달리 보존되지 않는다. 실패 History/abandon은 별도 계약·저장 설계 없이 임의로 끼워 넣지 않는다. 정확한 Trust gate는 `NATIVE_WORKSPACE_TRUST_REQUIRED`와 사용자 grant 후 준비이며, `WORKSPACE_SWITCH_UNCONFIRMED`를 Trust 문제로 단정하지 않는다. 임의 창 복귀·남은 bridge PID 종료·role file 삭제·Enterprise 정책 완화는 하지 않는다.

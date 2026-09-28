@@ -9,6 +9,7 @@ import { LOCAL_PROTOCOL_VERSION, projectSessionSnapshotSchema } from '@vibe-help
 import { KiroAcpSession } from '@vibe-helper/kiro-adapter/acp-node'
 import {
   type CoreResources,
+  coreInstallationIdentity,
   currentCoreRuntime,
   loadCoreResources,
   ownedPrivateDirectory,
@@ -215,6 +216,7 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
             packageHash: createHash('sha256')
               .update(JSON.stringify(resources.manifest))
               .digest('hex'),
+            runtimeIdentity: coreInstallationIdentity(resources, currentCoreRuntime()),
           }
         : {}),
     }),

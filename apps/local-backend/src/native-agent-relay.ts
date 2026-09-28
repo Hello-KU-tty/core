@@ -389,11 +389,15 @@ export class NativeAgentRelay implements WorkflowAgentPort {
   }
   pendingWorkspace(): string | null {
     // H never becomes an editor workspace switch target. In single-window
-    // mode its jobs are claimed by the authoritative Project W worker.
-    return (
-      [...this.#jobs.values()].find((j) => j.state === 'WAITING' && !j.separateHost)?.workspace ??
-      null
+    // mode a restored Helper/Analyst request can arrive while the idle editor
+    // still shows Discovery or another Project. Route to its authoritative W,
+    // not the protected H workspace. The worker switches only while idle;
+    // claim() still enforces project scope and role/session isolation.
+    const next = [...this.#jobs.values()].find(
+      (job) => job.state === 'WAITING' && (!job.separateHost || job.protectedBuiltin),
     )
+    if (!next) return null
+    return next.protectedBuiltin ? next.projectWorkspace : next.workspace
   }
   pendingHelperWorkspace(): string | null {
     return (

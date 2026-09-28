@@ -1,0 +1,48 @@
+{
+  "promptVersion": "1.2.1",
+  "kind": "MECHANICAL_PROMPT_REGRESSION",
+  "containsPersonalData": false,
+  "liveResult": "MIXED_NOT_ADOPTED",
+  "automatedQualityVerdict": "NOT_ASSERTED",
+  "nativeObservation": {
+    "executionResult": "THREE_SUCCEEDED_HELPER_RECORDED",
+    "reports": [
+      "native-helper-v121-dedup-0541.json",
+      "native-helper-v121-streaming-0542.json",
+      "native-helper-v121-unions-0543.json"
+    ],
+    "observedLimitations": [
+      "Baseline rerun already avoids the prior API-absence claim, so improvement is not stable paired evidence.",
+      "Generator response initially omits chunk and collected-result memory despite later qualifying unbounded line length.",
+      "Union response overstates exact-object safety; actual generated types accept a non-fresh Available value with borrower under strict TypeScript."
+    ],
+    "decision": "REJECT_AND_RESTORE_V1_2_0"
+  },
+  "baselineReports": [
+    "native-helper-v3-dedup-complete-2.json",
+    "native-helper-v120-dedup-repeat-0538.json"
+  ],
+  "requiredRules": [
+    "코드에서 직접 확인한 사실, 일반적인 원리, 아직 확인되지 않은 환경 조건을 구분하라",
+    "어떤 기능을 수동으로 구현했다는 사실만으로 표준 API가 없거나 해당 런타임에서 지원되지 않는다고 추론하지 마라",
+    "`EXCLUDED`는 계획의 범위이지 코드 전체에서 부재를 확인한 결과가 아니다",
+    "평균적인 조회 비용을 무조건적인 최악 시간 보장으로",
+    "타입 검사를 런타임 입력 검증으로"
+  ],
+  "preservedRules": [
+    "프로젝트 파일을 수정하거나 shell을 실행하지 마라",
+    "사용자를 대신해 제품 또는 기술 결정을 확정하지 마라",
+    "확인된 구현부터 짧게 설명하고",
+    "NO_RELEVANT_EVIDENCE",
+    "REFERENCE_ONLY",
+    "억지 퀴즈를 만들지 마라"
+  ],
+  "reviewAxes": [
+    "Every current implementation claim is supported by the supplied code excerpts",
+    "Manual implementation is not used as evidence of API unavailability",
+    "Spec scope and unseen files are not used as proof of implementation absence",
+    "Average complexity, runtime validation, and measured test limits are qualified",
+    "A useful direct explanation remains read-only and does not resolve decisions"
+  ],
+  "claimBoundary": "Wording checks only. Live native responses require separate claim-level review; sequential Helper calls add history and are not fixed-context paired accuracy or latency evidence."
+}

@@ -11,7 +11,7 @@ import {
   evidenceBatchApplicationResultSchema,
 } from '@vibe-helper/contracts'
 
-export const EVIDENCE_ANALYST_PROMPT_VERSION = '1.0.7' as const
+export const EVIDENCE_ANALYST_PROMPT_VERSION = '1.0.8' as const
 export const EVIDENCE_ANALYST_PROMPT_SOURCE = 'docs/agent-prompts/evidence-analyst.md' as const
 export const EVIDENCE_ANALYST_AGENT_NAME = 'vibe-helper-evidence-analyst' as const
 

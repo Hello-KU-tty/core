@@ -44,6 +44,34 @@ const event = (sequence: number, body: Partial<LocalRunEvent>): LocalRunEvent =>
 })
 
 describe('external frontend SDK stream', () => {
+  it('sends the explicit Builder resume message unchanged, while rejecting an empty Helper question', async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => Response.json(run))
+    const client = new LocalCoreClient(connection, { fetch: fetcher })
+    const request = {
+      kind: 'BUILDER' as const,
+      projectId,
+      taskId: `task_${randomUUID()}`,
+      expectedTaskRevision: 2,
+      idempotencyKey: `idem_${randomUUID()}`,
+      message: '',
+    }
+    await expect(client.startRun(request)).resolves.toEqual(run)
+    expect(JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body))).toEqual({
+      protocolVersion: 1,
+      request,
+    })
+    await expect(
+      client.startRun({
+        kind: 'HELPER',
+        projectId,
+        taskId: request.taskId,
+        idempotencyKey: `idem_${randomUUID()}`,
+        message: '',
+      }),
+    ).rejects.toThrow()
+    expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+
   it('keeps the frontend loading/partial/failure fixtures on the real run contract', async () => {
     const fixture = JSON.parse(
       await readFile(

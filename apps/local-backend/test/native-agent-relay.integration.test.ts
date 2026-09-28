@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { chmod, mkdir, mkdtemp, readFile, readdir, realpath, symlink } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readdir, readFile, realpath, symlink } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -173,6 +173,57 @@ describe('native IDE Agent relay', { timeout: 60_000 }, () => {
     expect(builderJob.bindingFile).not.toBeNull()
     relay.complete(builderJob.id, { text: 'Builder turn ended.', stopReason: 'end_turn' })
     await builder
+    expect(relay.pendingWorkspace()).toBeNull()
+
+    // Restoring a previous Project after Discovery has no new Builder job to
+    // route the editor back to W. H stays protected and never becomes a target.
+    const restoredHelper = invoke('HELPER', 'Explain the restored Project.')
+    await expect.poll(() => relay.pendingWorkspace(), { timeout: 5000 }).toBe(workspace)
+    expect(relay.pendingHelperWorkspace()).toBeNull()
+    expect(relay.claim(discoveryWorkspace)).toBeNull()
+    expect(relay.claim(join(workspaces, 'projects', 'unrelated'))).toBeNull()
+    const restoredHelperJob = await waitClaim()
+    expect(restoredHelperJob).toMatchObject({
+      role: 'HELPER',
+      protectedBuiltin: true,
+      projectWorkspace: workspace,
+      workspace: builderJob.helperHostWorkspace,
+      bindingFile: null,
+      message: '',
+    })
+    expect(relay.pendingWorkspace()).toBeNull()
+    relay.complete(restoredHelperJob.id, {
+      text: 'Read-only restored context.',
+      stopReason: 'end_turn',
+    })
+    await restoredHelper
+
+    const restoredAnalyst = invoke('EVIDENCE_ANALYST', '{"episode":"restored-synthetic"}')
+    await expect.poll(() => relay.pendingWorkspace(), { timeout: 5000 }).toBe(workspace)
+    expect(relay.claim(discoveryWorkspace)).toBeNull()
+    const restoredAnalystJob = await waitClaim()
+    expect(restoredAnalystJob.protectedBuiltin).toBe(true)
+    relay.complete(restoredAnalystJob.id, { text: '{"proposals":[]}', stopReason: 'end_turn' })
+    await restoredAnalyst
+    expect(relay.pendingWorkspace()).toBeNull()
+
+    const cancelled = new AbortController()
+    const cancelledHelper = relay.invoke({
+      mode: 'HELPER',
+      projectId: ids.project,
+      taskId: ids.task,
+      correlationId: ids.correlation,
+      helperQuestion: 'Cancelled before model.',
+      message: 'Read-only request.',
+      signal: cancelled.signal,
+      onEvent: () => undefined,
+    })
+    const rejected = expect(cancelledHelper).rejects.toMatchObject({ code: 'CANCELLED' })
+    await expect.poll(() => relay.pendingWorkspace(), { timeout: 5000 }).toBe(workspace)
+    cancelled.abort()
+    await rejected
+    expect(relay.pendingWorkspace()).toBeNull()
+    expect(relay.claim(workspace)).toBeNull()
     await relay.close()
     storage.close()
   })
@@ -242,6 +293,11 @@ describe('native IDE Agent relay', { timeout: 60_000 }, () => {
       requestedCandidateIds: [],
       toolNames: ['get_discovery_context', 'submit_candidate_previews'],
     })
+    const canonicalDiscovery = await readFile(resolve('docs/agent-prompts/discovery.md'), 'utf8')
+    const previewConfig = JSON.parse(
+      await readFile(join(canonicalWorkspaces, '.kiro/agents', `${job.roleName}.json`), 'utf8'),
+    )
+    expect(previewConfig.prompt).toBe(canonicalDiscovery)
     expect(boundedCoreRole(canonicalWorkspaces, job.roleName, descriptor, job.bindingFile)).toBe(
       true,
     )
@@ -404,6 +460,13 @@ describe('native IDE Agent relay', { timeout: 60_000 }, () => {
       requestedCandidateIds: [selectedId],
       toolNames: ['get_discovery_context', 'submit_candidate_enrichments'],
     })
+    const enrichmentConfig = JSON.parse(
+      await readFile(
+        join(canonicalWorkspaces, '.kiro/agents', `${selectedJob.roleName}.json`),
+        'utf8',
+      ),
+    )
+    expect(enrichmentConfig.prompt).toBe(canonicalDiscovery)
     relay.complete(selectedJob.id, { text: 'Submitted.', stopReason: 'end_turn' })
     await selectedPending
     await expect(

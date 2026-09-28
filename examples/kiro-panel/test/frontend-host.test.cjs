@@ -5,7 +5,7 @@ const { runInNewContext } = require('node:vm')
 const { test } = require('node:test')
 
 function harness({ trusted = true, supported = true, fail = false } = {}) {
-  let listener, stopped = 0, workers = 0, starts = 0, mutations = 0
+  let listener, trustListener, stopped = 0, workers = 0, starts = 0, mutations = 0
   const code = readFileSync(join(__dirname, '../src/frontend-host.cjs'), 'utf8')
   const rawClient = { health: async () => ({}), listProjects: async () => ({ projects: [] }),
     execute: async value => { mutations++; return value }, startRun: async () => { mutations++ },
@@ -16,7 +16,9 @@ function harness({ trusted = true, supported = true, fail = false } = {}) {
         resources: { promptDirectory: '/portable/prompts' }, runtime: {} } },
     retry() { return this.start() }, async dispose() { stopped++ } }
   const modules = {
-    vscode: { workspace: { isTrusted: trusted, onDidGrantWorkspaceTrust: () => ({ dispose() {} }) } },
+    vscode: { workspace: { isTrusted: trusted, onDidGrantWorkspaceTrust(fn) {
+      trustListener = fn; return { dispose() { trustListener = undefined } }
+    } } },
     'node:fs/promises': { mkdir: async () => {}, realpath: async value => value, readFile: async () => 'prompt' },
     'node:path': require('node:path'),
     '@vibe-helper/frontend-client/node': {},
@@ -35,6 +37,7 @@ function harness({ trusted = true, supported = true, fail = false } = {}) {
   const module = { exports: {} }
   runInNewContext(code, { module, require: name => modules[name] ?? {}, process })
   return { create: () => module.exports.createFrontendHost({ extensionPath: '/extension', globalStorageUri: { fsPath: '/private' } }),
+    grantTrust() { modules.vscode.workspace.isTrusted = true; trustListener?.() },
     counters: () => ({ stopped, workers, starts, mutations }) }
 }
 test('host deduplicates preparation, guards early mutation and disposes once', async () => {
@@ -68,4 +71,25 @@ test('Core failure rejects without a demo transport or path in status', async ()
   assert.doesNotMatch(JSON.stringify(host.getStatus()), /private|token|connection.json/)
   assert.equal(h.counters().workers, 0)
   await host.dispose()
+})
+test('Trust gate has an exact cause, preserves History and recovers only after user grant', async () => {
+  const h = harness({ trusted: false }), host = await h.create()
+  await host.prepare()
+  assert.equal(host.getStatus().nativeErrorCode, 'NATIVE_WORKSPACE_TRUST_REQUIRED')
+  assert.deepEqual(await host.client.listProjects(), { projects: [] })
+  await assert.rejects(host.client.startRun({}), /NATIVE_WORKSPACE_TRUST_REQUIRED/)
+  await assert.rejects(host.client.execute({ kind: 'UI_START_DISCOVERY' }), /NATIVE_WORKSPACE_TRUST_REQUIRED/)
+  assert.equal(h.counters().workers, 0)
+  assert.equal(h.counters().mutations, 0)
+  h.grantTrust()
+  await host.prepare()
+  assert.equal(host.getStatus().native, 'WORKER_READY')
+  assert.equal(host.getStatus().nativeErrorCode, null)
+  assert.equal(h.counters().workers, 1)
+  await host.client.startRun({})
+  assert.equal(h.counters().mutations, 1)
+  await host.dispose()
+  const starts = h.counters().starts
+  h.grantTrust()
+  assert.equal(h.counters().starts, starts)
 })

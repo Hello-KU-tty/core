@@ -1,0 +1,464 @@
+{
+  "promptVersion": "1.0.9",
+  "revisesFixture": "evidence-analyst-v1.0.8-held-out.json",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED",
+  "fixtureProvenance": "SYNTHETIC_UI_TRANSCRIPT",
+  "modelRunStatus": "NOT_RUN",
+  "claimBoundary": "Same cases and strict oracles as the frozen v1.0.8 corpus. Inputs were authored before v1.0.9, so this is cross-domain regression, not unseen validation of v1.0.9. Measures prompt compliance only, not human learning.",
+  "cases": [
+    {
+      "id": "request_only",
+      "observedKind": "REQUEST_ONLY",
+      "precedingAgentContribution": null,
+      "userMessage": "읽기 캐시를 비우면 다음 조회가 어떻게 달라지는지 원인과 결과를 설명해 주세요.",
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_72000000-0000-4000-8000-000000000001",
+          "messageId": "message_72000000-0000-4000-8000-000000000002"
+        }
+      ],
+      "expected": {
+        "oracleMode": "NO_PROPOSALS",
+        "reason": "The user asks for an explanation without supplying a claim."
+      },
+      "conceptCandidateMode": "NONE"
+    },
+    {
+      "id": "future_plan_after_light_hint",
+      "observedKind": "FUTURE_PLAN_WITH_PREDICTION",
+      "precedingAgentContribution": "응답이 요청 순서와 다르게 도착할 가능성도 생각해 보세요.",
+      "userMessage": "두 검색을 연속으로 보내면 늦게 돌아오는 첫 응답이 둘째 검색 결과를 덮어쓸 수 있으니 다음에는 요청 번호를 비교해야겠어요.",
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_72000000-0000-4000-8000-000000000003",
+          "messageId": "message_72000000-0000-4000-8000-000000000004"
+        }
+      ],
+      "expected": {
+        "oracleMode": "CLAIM_PROFILES",
+        "minimumStateSupportingProposals": 1,
+        "forbiddenSignals": [
+          "JUSTIFIED_DECISION",
+          "APPLICATION"
+        ],
+        "claimProfiles": [
+          {
+            "id": "out_of_order_result",
+            "claimExcerpts": [
+              "늦게 돌아오는 첫 응답이 둘째 검색 결과를 덮어쓸 수 있으니"
+            ],
+            "allowedSignals": [
+              "PREDICTION"
+            ],
+            "allowedStrengths": [
+              "MEDIUM",
+              "STRONG"
+            ],
+            "allowedPromptDependence": [
+              "LIGHT_HINT"
+            ],
+            "allowedMaximumSupportedStates": [
+              "EXPLAINED"
+            ]
+          }
+        ],
+        "reason": "The causal future result may support a prediction, while the plan to recheck is not an application or decision."
+      },
+      "conceptCandidateMode": "NONE"
+    },
+    {
+      "id": "own_explanation_independent",
+      "observedKind": "TIMELESS_DEFINITION",
+      "precedingAgentContribution": null,
+      "userMessage": "Map은 한 키에 하나의 값을 연결하므로 같은 키에 set을 다시 하면 항목이 추가되는 대신 그 키의 값이 바뀝니다.",
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_72000000-0000-4000-8000-000000000005",
+          "messageId": "message_72000000-0000-4000-8000-000000000006"
+        }
+      ],
+      "expected": {
+        "oracleMode": "CLAIM_PROFILES",
+        "minimumStateSupportingProposals": 1,
+        "forbiddenSignals": [
+          "PREDICTION",
+          "JUSTIFIED_DECISION",
+          "APPLICATION"
+        ],
+        "claimProfiles": [
+          {
+            "id": "unique_key_definition",
+            "claimExcerpts": [
+              "한 키에 하나의 값을 연결하므로"
+            ],
+            "allowedSignals": [
+              "REPHRASE"
+            ],
+            "allowedStrengths": [
+              "MEDIUM",
+              "STRONG"
+            ],
+            "allowedPromptDependence": [
+              "INDEPENDENT"
+            ],
+            "allowedMaximumSupportedStates": [
+              "EXPLAINED"
+            ]
+          },
+          {
+            "id": "replacement_definition",
+            "claimExcerpts": [
+              "같은 키에 set을 다시 하면 항목이 추가되는 대신 그 키의 값이 바뀝니다"
+            ],
+            "allowedSignals": [
+              "REPHRASE"
+            ],
+            "allowedStrengths": [
+              "MEDIUM",
+              "STRONG"
+            ],
+            "allowedPromptDependence": [
+              "INDEPENDENT"
+            ],
+            "allowedMaximumSupportedStates": [
+              "EXPLAINED"
+            ]
+          }
+        ],
+        "reason": "Both clauses define a timeless boundary invariant; conditional grammar alone does not make either clause a future prediction."
+      },
+      "conceptCandidateMode": "NONE"
+    },
+    {
+      "id": "actual_reasoned_choice",
+      "observedKind": "REASONED_CHOICE",
+      "precedingAgentContribution": "제한을 넘은 수치를 자동 조정하거나 요청을 거절하는 방식 중 하나를 선택해 주세요.",
+      "userMessage": "요청한 수와 실제 처리 수가 달라지면 실험 결과를 비교할 수 없으므로 제한을 넘은 요청은 거절하겠습니다.",
+      "decisionRequest": {
+        "question": "처리 개수 제한을 넘은 입력을 자동 조정할까요, 요청을 거절할까요?",
+        "reasonRequiredNow": "서버의 입력 처리 동작을 정해야 합니다.",
+        "options": [
+          {
+            "label": "자동 조정",
+            "description": "개수를 허용된 최대값으로 바꿉니다.",
+            "impacts": [
+              "요청 처리를 이어갑니다."
+            ],
+            "tradeoffs": [
+              "조정 로직을 둡니다."
+            ]
+          },
+          {
+            "label": "요청 거절",
+            "description": "오류 응답을 반환합니다.",
+            "impacts": [
+              "사용자가 수치를 바꿔 다시 요청합니다."
+            ],
+            "tradeoffs": [
+              "한 번의 입력 단계가 추가됩니다."
+            ]
+          }
+        ],
+        "recommendedOptionIndex": 0,
+        "recommendationRationale": "입력 흐름을 이어갈 수 있습니다.",
+        "agentHintMustNotContain": [
+          "실험 결과를 비교할 수 없으므로",
+          "실험 결과"
+        ]
+      },
+      "decisionEvent": {
+        "type": "DECISION_RESOLVED",
+        "decisionId": "decision_72000000-0000-4000-8000-000000000007",
+        "rationaleProvided": true
+      },
+      "decisionResolution": {
+        "source": "USER",
+        "selectedOptionIndex": 1,
+        "rationale": "요청한 수와 실제 처리 수가 달라지면 실험 결과를 비교할 수 없으므로 제한을 넘은 요청은 거절하겠습니다."
+      },
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_72000000-0000-4000-8000-000000000008",
+          "messageId": "message_72000000-0000-4000-8000-000000000009"
+        },
+        {
+          "kind": "USER_DECISION",
+          "decisionId": "decision_72000000-0000-4000-8000-000000000007"
+        }
+      ],
+      "expected": {
+        "oracleMode": "CLAIM_PROFILES",
+        "minimumStateSupportingProposals": 1,
+        "forbiddenSignals": [
+          "APPLICATION"
+        ],
+        "claimProfiles": [
+          {
+            "id": "comparison_preserving_choice",
+            "claimExcerpts": [
+              "실험 결과를 비교할 수 없으므로"
+            ],
+            "allowedSignals": [
+              "JUSTIFIED_DECISION"
+            ],
+            "allowedStrengths": [
+              "STRONG"
+            ],
+            "allowedPromptDependence": [
+              "LIGHT_HINT"
+            ],
+            "allowedMaximumSupportedStates": [
+              "DEMONSTRATED"
+            ]
+          },
+          {
+            "id": "selected_rejection",
+            "claimExcerpts": [
+              "제한을 넘은 요청은 거절하겠습니다"
+            ],
+            "allowedSignals": [
+              "JUSTIFIED_DECISION"
+            ],
+            "allowedStrengths": [
+              "STRONG"
+            ],
+            "allowedPromptDependence": [
+              "LIGHT_HINT"
+            ],
+            "allowedMaximumSupportedStates": [
+              "DEMONSTRATED"
+            ]
+          }
+        ],
+        "reason": "The Agent supplies alternatives and recommends the other option; the user independently supplies the reason for the selected behavior. One or multiple claim-level proposals are allowed."
+      },
+      "conceptCandidateMode": "NONE"
+    },
+    {
+      "id": "actual_performed_application",
+      "observedKind": "COMPLETED_ACTION_AND_OBSERVATION",
+      "precedingAgentContribution": null,
+      "userMessage": "빈 Set에 a를 두 번 넣고 크기가 1인 것을 확인한 다음 b를 추가해 크기가 2가 되는 것을 확인했습니다.",
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_72000000-0000-4000-8000-000000000011",
+          "messageId": "message_72000000-0000-4000-8000-000000000012"
+        }
+      ],
+      "expected": {
+        "oracleMode": "CLAIM_PROFILES",
+        "minimumStateSupportingProposals": 1,
+        "forbiddenSignals": [
+          "PREDICTION",
+          "JUSTIFIED_DECISION"
+        ],
+        "claimProfiles": [
+          {
+            "id": "completed_duplicate_probe",
+            "claimExcerpts": [
+              "a를 두 번 넣고 크기가 1인 것을 확인한 다음"
+            ],
+            "allowedSignals": [
+              "APPLICATION"
+            ],
+            "allowedStrengths": [
+              "STRONG"
+            ],
+            "allowedPromptDependence": [
+              "INDEPENDENT"
+            ],
+            "allowedMaximumSupportedStates": [
+              "DEMONSTRATED"
+            ]
+          },
+          {
+            "id": "completed_distinct_probe",
+            "claimExcerpts": [
+              "b를 추가해 크기가 2가 되는 것을 확인했습니다"
+            ],
+            "allowedSignals": [
+              "APPLICATION"
+            ],
+            "allowedStrengths": [
+              "STRONG"
+            ],
+            "allowedPromptDependence": [
+              "INDEPENDENT"
+            ],
+            "allowedMaximumSupportedStates": [
+              "DEMONSTRATED"
+            ]
+          }
+        ],
+        "currentCoreDisposition": "NATURAL_LANGUAGE_SELF_REPORT_ELIGIBLE",
+        "provenanceLimitation": "The source records the user's completed-action self-report; it does not independently attest that the interaction occurred.",
+        "reason": "The action and result were already completed and observed, so they are application claims rather than predictions."
+      },
+      "conceptCandidateMode": "NONE"
+    },
+    {
+      "id": "directly_led_repeat",
+      "observedKind": "DIRECT_REPEAT",
+      "precedingAgentContribution": "같은 객체를 Set에 여러 번 넣어도 크기는 더 늘지 않습니다.",
+      "userMessage": "말한 대로 같은 객체를 Set에 여러 번 넣어도 크기는 더 늘지 않네요.",
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_72000000-0000-4000-8000-000000000013",
+          "messageId": "message_72000000-0000-4000-8000-000000000014"
+        }
+      ],
+      "expected": {
+        "oracleMode": "CLAIM_PROFILES",
+        "minimumStateSupportingProposals": 0,
+        "maximumStateSupportingProposals": 0,
+        "claimProfiles": [
+          {
+            "id": "direct_repeat",
+            "claimExcerpts": [
+              "같은 객체를 Set에 여러 번 넣어도 크기는 더 늘지 않네요"
+            ],
+            "allowedSignals": [
+              "REPHRASE"
+            ],
+            "allowedStrengths": [
+              "NONE",
+              "WEAK"
+            ],
+            "allowedPromptDependence": [
+              "DIRECTLY_LED"
+            ],
+            "allowedMaximumSupportedStates": [
+              null
+            ]
+          }
+        ],
+        "reason": "Either no Proposal or a non-state-supporting directly-led record is acceptable."
+      },
+      "conceptCandidateMode": "NONE"
+    },
+    {
+      "id": "independent_future_prediction",
+      "observedKind": "ACTUAL_FUTURE_PREDICTION",
+      "precedingAgentContribution": null,
+      "userMessage": "비어 있는 Map에 키 k의 값을 1로 넣은 뒤 같은 키에 2를 넣으면, 키가 같아서 크기는 1이고 get(k)는 마지막 값 2를 반환할 거예요.",
+      "userEvidenceSources": [
+        {
+          "kind": "USER_MESSAGE",
+          "conversationId": "conversation_72000000-0000-4000-8000-000000000015",
+          "messageId": "message_72000000-0000-4000-8000-000000000016"
+        }
+      ],
+      "expected": {
+        "oracleMode": "CLAIM_PROFILES",
+        "minimumStateSupportingProposals": 1,
+        "forbiddenSignals": [
+          "JUSTIFIED_DECISION",
+          "APPLICATION"
+        ],
+        "claimProfiles": [
+          {
+            "id": "future_unique_key_size",
+            "claimExcerpts": [
+              "키가 같아서 크기는 1이고"
+            ],
+            "allowedSignals": [
+              "PREDICTION"
+            ],
+            "allowedStrengths": [
+              "STRONG"
+            ],
+            "allowedPromptDependence": [
+              "INDEPENDENT"
+            ],
+            "allowedMaximumSupportedStates": [
+              "DEMONSTRATED"
+            ]
+          },
+          {
+            "id": "future_replacement_value",
+            "claimExcerpts": [
+              "get(k)는 마지막 값 2를 반환할 거예요"
+            ],
+            "allowedSignals": [
+              "PREDICTION"
+            ],
+            "allowedStrengths": [
+              "STRONG"
+            ],
+            "allowedPromptDependence": [
+              "INDEPENDENT"
+            ],
+            "allowedMaximumSupportedStates": [
+              "DEMONSTRATED"
+            ]
+          }
+        ],
+        "reason": "This is a concrete not-yet-observed result prediction. The existing strong independent prediction policy remains intact."
+      },
+      "conceptCandidateMode": "NONE"
+    },
+    {
+      "id": "bare_recommendation_without_user_words",
+      "observedKind": "BARE_RECOMMENDATION_CLICK",
+      "precedingAgentContribution": null,
+      "userMessage": null,
+      "decisionRequest": {
+        "question": "처리 개수 제한을 넘은 입력을 자동 조정할까요, 요청을 거절할까요?",
+        "reasonRequiredNow": "서버의 입력 처리 동작을 정해야 합니다.",
+        "options": [
+          {
+            "label": "자동 조정",
+            "description": "개수를 허용된 최대값으로 바꿉니다.",
+            "impacts": [
+              "요청 처리를 이어갑니다."
+            ],
+            "tradeoffs": [
+              "조정 로직을 둡니다."
+            ]
+          },
+          {
+            "label": "요청 거절",
+            "description": "오류 응답을 반환합니다.",
+            "impacts": [
+              "사용자가 수치를 바꿔 다시 요청합니다."
+            ],
+            "tradeoffs": [
+              "한 번의 입력 단계가 추가됩니다."
+            ]
+          }
+        ],
+        "recommendedOptionIndex": 1,
+        "recommendationRationale": "검증 오류를 요청자에게 표시합니다.",
+        "agentHintMustNotContain": []
+      },
+      "decisionEvent": {
+        "type": "DECISION_RESOLVED",
+        "decisionId": "decision_72000000-0000-4000-8000-000000000017",
+        "rationaleProvided": false
+      },
+      "decisionResolution": {
+        "source": "USER",
+        "selectedOptionIndex": 1
+      },
+      "userEvidenceSources": [
+        {
+          "kind": "USER_DECISION",
+          "decisionId": "decision_72000000-0000-4000-8000-000000000017"
+        }
+      ],
+      "expected": {
+        "oracleMode": "NO_PROPOSALS",
+        "reason": "A recommendation click contains no attributable user words. Agent-authored choices and related concepts cannot supply originalExpression, including for NONE evidence."
+      },
+      "conceptCandidateMode": "NONE"
+    }
+  ],
+  "fixtureId": "source-first-held-out-collections-and-requests"
+}

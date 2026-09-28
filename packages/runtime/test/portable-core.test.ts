@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   CORE_NODE_VERSIONS,
+  coreInstallationIdentity,
   currentCoreRuntime,
   MANAGED_NODE,
   runtimeEnvironment,
@@ -8,6 +9,28 @@ import {
 } from '../src/portable-core.js'
 
 describe('portable Core runtime boundaries', () => {
+  it('binds a shared Core to the exact verified installation and role runtime', () => {
+    const resources = { root: 'C:\\extensions\\panel-0.0.3\\portable' }
+    const runtime = { executable: 'C:\\tools\\node.exe', args: [] as string[], env: {} }
+    const identity = coreInstallationIdentity(resources, runtime)
+    expect(identity).toMatch(/^[a-f0-9]{64}$/)
+    expect(coreInstallationIdentity({ ...resources }, { ...runtime })).toBe(identity)
+    expect(
+      coreInstallationIdentity({ root: 'C:\\extensions\\panel-0.0.2\\portable' }, runtime),
+    ).not.toBe(identity)
+    expect(
+      coreInstallationIdentity(resources, { ...runtime, executable: 'C:\\other\\node.exe' }),
+    ).not.toBe(identity)
+    expect(coreInstallationIdentity(resources, { ...runtime, args: ['--different'] })).not.toBe(
+      identity,
+    )
+    expect(
+      coreInstallationIdentity(resources, { ...runtime, env: { ELECTRON_RUN_AS_NODE: '1' } }),
+    ).not.toBe(identity)
+    expect(coreInstallationIdentity(resources, { ...runtime, env: { A: '1', B: '2' } })).toBe(
+      coreInstallationIdentity(resources, { ...runtime, env: { B: '2', A: '1' } }),
+    )
+  })
   it('accepts Windows case differences without accepting another directory', () => {
     expect(sameRuntimePath('C:/Data/Core', 'C:/Data/Other')).toBe(false)
     if (process.platform === 'win32')

@@ -127,6 +127,32 @@ try {
     401,
   )
   record('crash_rotation_history_preserved')
+  // Frontend B2: unchanged package bytes at a new extension installation root
+  // must not inherit the old Core's embedded bridge/runtime paths.
+  const relocatedRoot = join(root, '같은 내용 새 설치 경로')
+  await cp(installed, relocatedRoot, { recursive: true })
+  const relocatedResources = await api.loadCoreResources(relocatedRoot)
+  assert.equal(
+    createHash('sha256').update(JSON.stringify(relocatedResources.manifest)).digest('hex'),
+    createHash('sha256').update(JSON.stringify(resources.manifest)).digest('hex'),
+  )
+  const relocated = create(relocatedResources)
+  await assert.rejects(relocated.start(), /CORE_UPDATE_WAITING_FOR_OWNER_EXIT/)
+  assert.equal((await restoredClient.health()).backendInstanceId, newDescriptor.backendInstanceId)
+  record('same_package_different_installation_does_not_reuse_or_kill_live_core')
+  await shared.dispose()
+  await reloaded.dispose()
+  // No manual process termination: the normal last-host lease expiry releases
+  // the old owner while the new host remains inside its bounded start budget.
+  await relocated.retry()
+  const relocatedClient = await sdk.connectLocalCore(connectionFile)
+  assert.notEqual(
+    (await relocatedClient.health()).backendInstanceId,
+    newDescriptor.backendInstanceId,
+  )
+  assert.deepEqual((await relocatedClient.restoreProject(projectId)).project, before.project)
+  assert.notEqual((await sdk.readLocalConnection(connectionFile)).token, newDescriptor.token)
+  record('same_package_installation_relocation_waits_for_lease_exit_and_preserves_history')
   const updatedRoot = join(root, '업데이트 패키지')
   await cp(installed, updatedRoot, { recursive: true })
   const journalPath = join(updatedRoot, 'drizzle/meta/_journal.json')
@@ -158,6 +184,7 @@ try {
   record('update_does_not_kill_active_owner')
   await shared.dispose()
   await reloaded.dispose()
+  await relocated.dispose()
   await waitUntil(async () => {
     try {
       await readFile(ownerFile)

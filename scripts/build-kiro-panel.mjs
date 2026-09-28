@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { spawnSync } from 'node:child_process'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { build } from 'esbuild'
@@ -56,10 +57,29 @@ await build({
   platform: 'node',
   format: 'esm',
   target: 'node24',
+  // Bundled CommonJS helpers still require Node builtins at runtime. Keep the
+  // ESM entry point while providing the same scoped require as portable Core.
+  banner: {
+    js: "import { createRequire as __nativeRequire } from 'node:module'; const require = __nativeRequire(import.meta.url);",
+  },
   sourcemap: false,
   legalComments: 'eof',
   logLevel: 'warning',
 })
+// No binding, credential, network, or model is involved: reaching the scope
+// guard proves the actual bundle loaded, instead of only checking its hash.
+const bridgeStartup = spawnSync(
+  process.execPath,
+  [resolve(runtimeRoot, 'native-core-stdio-bridge.mjs')],
+  { encoding: 'utf8', timeout: 10_000, maxBuffer: 64 * 1024 },
+)
+if (
+  bridgeStartup.error ||
+  bridgeStartup.status !== 1 ||
+  bridgeStartup.stdout !== '' ||
+  bridgeStartup.stderr.trim() !== 'BRIDGE_SCOPE_REQUIRED'
+)
+  throw new Error('NATIVE_PACKAGED_BRIDGE_STARTUP_UNVERIFIED')
 const runtimeConfig = JSON.parse(await readFile(resolve(panelRoot, 'runtime-config.json'), 'utf8'))
 const bridge = await readFile(resolve(runtimeRoot, 'native-core-stdio-bridge.mjs'))
 const assets = {

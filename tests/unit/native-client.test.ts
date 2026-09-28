@@ -265,6 +265,43 @@ function pinnedKiroInstallation() {
   return root
 }
 
+function coreWorkspace() {
+  const root = workspace()
+  const binding = {
+    role: 'DISCOVERY',
+    toolNames: ['get_discovery_context', 'submit_candidate_previews'],
+    url: 'http://127.0.0.1:49732/mcp/native-00000000-0000-4000-8000-000000000001',
+    authorization: 'Bearer synthetic-test-binding',
+  }
+  writeFileSync(
+    join(root, '.kiro', 'agents', `${role}.json`),
+    JSON.stringify({
+      name: role,
+      tools: binding.toolNames.map((name) => `@vibe-native-core/${name}`),
+      mcpServers: {
+        'vibe-native-core': {
+          url: binding.url,
+          headers: { Authorization: binding.authorization },
+        },
+      },
+      includeMcpJson: false,
+      includePowers: false,
+      permissions: {
+        rules: [
+          ...binding.toolNames.map((name) => ({
+            capability: 'mcp',
+            match: [`vibe-native-core/${name}`],
+            effect: 'allow',
+          })),
+          { capability: 'fs_write', effect: 'deny' },
+          { capability: 'shell', effect: 'deny' },
+        ],
+      },
+    }),
+  )
+  return { root, binding }
+}
+
 function fakeVscode(root, overrides = {}) {
   return {
     version: overrides.version ?? '1.109.5',
@@ -306,7 +343,9 @@ function fakeVscode(root, overrides = {}) {
 class FakeWebSocket {
   static responses = 'complete'
   static silentRpc: string | null = null
+  static promptRpcError: unknown = undefined
   static discoveryMode = false
+  static delayedCatalog: 'safe' | 'empty' | 'builtin' | 'invalid' | 'foreign' | null = null
   static editUpdateToolId = null
   static editPermissionToolId = 'str_replace'
   static created = 0
@@ -336,6 +375,18 @@ class FakeWebSocket {
     const message = JSON.parse(raw)
     FakeWebSocket.sent.push(message)
     if (message.method === FakeWebSocket.silentRpc) return
+    if (message.method === 'session/prompt' && FakeWebSocket.promptRpcError !== undefined) {
+      queueMicrotask(() =>
+        this.emit('message', {
+          data: JSON.stringify({
+            jsonrpc: '2.0',
+            id: message.id,
+            error: FakeWebSocket.promptRpcError,
+          }),
+        }),
+      )
+      return
+    }
     if (message.method === 'session/new' && FakeWebSocket.responses === 'earlyToolCatalog') {
       for (const sessionId of ['session_foreign_0002', 'session_synthetic_0001'])
         this.emit('message', {
@@ -381,6 +432,35 @@ class FakeWebSocket {
             ]
           : [{ id: 'mode', currentValue: role }],
       })
+    if (message.method === 'session/set_config_option' && FakeWebSocket.delayedCatalog) {
+      const catalog = FakeWebSocket.delayedCatalog
+      const emitCatalog = (tags, sessionId = 'session_synthetic_0001') =>
+        this.emit('message', {
+          data: JSON.stringify({
+            jsonrpc: '2.0',
+            method: '_kiro/tools/didChange',
+            params: { sessionId, tags },
+          }),
+        })
+      emitCatalog([])
+      setTimeout(() => {
+        const tags = [
+          { source: 'mcp', tag: '@vibe-native-core/get_discovery_context', description: 'Read' },
+          {
+            source: 'mcp',
+            tag: '@vibe-native-core/submit_candidate_previews',
+            description: 'Save',
+          },
+        ]
+        if (catalog === 'builtin')
+          tags.push({ source: 'builtin', tag: 'shell', description: 'Forbidden' })
+        if (catalog === 'invalid') tags[0].source = 'unknown'
+        emitCatalog(
+          catalog === 'empty' ? [] : tags,
+          catalog === 'foreign' ? 'session_foreign_0002' : 'session_synthetic_0001',
+        )
+      }, 150)
+    }
     if (
       message.method === 'session/prompt' &&
       ['complete', 'splitNewline'].includes(FakeWebSocket.responses)
@@ -768,7 +848,9 @@ afterEach(() => {
   FakeWebSocket.closed = 0
   FakeWebSocket.responses = 'complete'
   FakeWebSocket.silentRpc = null
+  FakeWebSocket.promptRpcError = undefined
   FakeWebSocket.discoveryMode = false
+  FakeWebSocket.delayedCatalog = null
   FakeWebSocket.editUpdateToolId = null
   FakeWebSocket.editPermissionToolId = 'str_replace'
   FakeWebSocket.sent = []
@@ -777,6 +859,86 @@ afterEach(() => {
 })
 
 describe('private Kiro native connection gate', () => {
+  it.each([
+    [{ code: -32603, data: { name: 'UsageLimitReachedError' } }, 'NATIVE_QUOTA_EXCEEDED'],
+    [
+      { code: -32000, data: { errorType: 'ModelRegistryUnauthenticatedError' } },
+      'NATIVE_AUTH_REQUIRED',
+    ],
+    [
+      { code: -32000, data: { errorType: 'ModelRegistryUnavailableError' } },
+      'NATIVE_MODEL_UNAVAILABLE',
+    ],
+    [null, 'NATIVE_RPC_REJECTED'],
+    [{ code: -32603, data: { name: 'UnknownError' } }, 'NATIVE_RPC_REJECTED'],
+  ])('forwards only a classified native RPC failure %j', async (payload, code) => {
+    const root = workspace()
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    const session = await openNativeRole(fakeVscode(root), {
+      workspace: root,
+      role,
+      requireMcp: false,
+    })
+    FakeWebSocket.promptRpcError = payload
+    try {
+      await expect(session.prompt('Synthetic prompt')).rejects.toMatchObject({
+        code,
+        message: code,
+      })
+      expect(
+        FakeWebSocket.sent.filter((message) => message.method === 'session/prompt'),
+      ).toHaveLength(1)
+    } finally {
+      session.close()
+    }
+  })
+  it('waits for the pinned Mac MCP catalog after the mode ACK, before returning a prompt handle', async () => {
+    vi.useFakeTimers()
+    const { root, binding } = coreWorkspace()
+    FakeWebSocket.delayedCatalog = 'safe'
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    let opened = false
+    const opening = openNativeRole(fakeVscode(root, { kiroExtensionVersion: '1.0.794' }), {
+      workspace: root,
+      role,
+      binding,
+    }).then((session) => {
+      opened = true
+      return session
+    })
+    await vi.advanceTimersByTimeAsync(100)
+    expect(opened).toBe(false)
+    expect(FakeWebSocket.sent.some((message) => message.method === 'session/prompt')).toBe(false)
+    await vi.advanceTimersByTimeAsync(500)
+    const session = await opening
+    expect(opened).toBe(true)
+    await session.prompt('Synthetic prompt')
+    expect(FakeWebSocket.sent.some((message) => message.method === 'session/prompt')).toBe(true)
+    session.close()
+  })
+
+  it.each(['empty', 'builtin', 'invalid', 'foreign'] as const)(
+    'refuses a %s Mac catalog without spending a model turn',
+    async (catalog) => {
+      vi.useFakeTimers()
+      const { root, binding } = coreWorkspace()
+      FakeWebSocket.delayedCatalog = catalog
+      vi.stubGlobal('WebSocket', FakeWebSocket)
+      const opening = openNativeRole(fakeVscode(root, { kiroExtensionVersion: '1.0.794' }), {
+        workspace: root,
+        role,
+        binding,
+      })
+      const rejected = expect(opening).rejects.toMatchObject({
+        code: 'NATIVE_ROLE_CATALOG_UNVERIFIED',
+      })
+      await vi.advanceTimersByTimeAsync(11_000)
+      await rejected
+      expect(FakeWebSocket.sent.some((message) => message.method === 'session/prompt')).toBe(false)
+      expect(FakeWebSocket.closed).toBe(1)
+    },
+  )
+
   it.each([
     ['initialize', 'INITIALIZE', 15_000],
     ['session/new', 'SESSION_NEW', 30_000],

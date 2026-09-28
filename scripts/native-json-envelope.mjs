@@ -23,6 +23,47 @@ const MAX_BUILDER_INPUT_BYTES = 131_072
 // admits that existing 512 KiB field without claiming full 2 MiB equivalence.
 const MAX_DISCOVERY_INPUT_BYTES = 1_048_576
 const MAX_SCHEMA_BYTES = 65_536
+const syntaxDiagnostics = new WeakMap()
+const failureCodes = new Set([
+  'BRIDGE_ENVELOPE_WRAPPER_INVALID',
+  'BRIDGE_ENVELOPE_JSON_REQUIRED',
+  'BRIDGE_ENVELOPE_JSON_TOO_LARGE',
+  'BRIDGE_ENVELOPE_JSON_INVALID',
+  'BRIDGE_ENVELOPE_OBJECT_REQUIRED',
+])
+
+function invalidJson(cause, text) {
+  const error = new Error('BRIDGE_ENVELOPE_JSON_INVALID')
+  // V8 may include part of the supplied string in its error message. Never
+  // forward that message. Only a bounded offset and fixed classification leave.
+  const position = /\bat position (\d+)\b/.exec(cause?.message ?? '')?.[1]
+  const offset = position === undefined ? null : Number(position)
+  const validOffset = Number.isInteger(offset) && offset >= 0 && offset <= text.length
+  const incomplete =
+    (validOffset && offset === text.length) ||
+    /^Unexpected end of JSON input$/.test(cause?.message ?? '')
+  syntaxDiagnostics.set(error, {
+    reason: incomplete ? 'INCOMPLETE_JSON' : 'INVALID_JSON_SYNTAX',
+    ...(validOffset ? { offset } : {}),
+    instruction: incomplete
+      ? 'Resubmit the complete inputJson. Close every enclosing object/array and string; do not omit the outer argument object closing brace.'
+      : 'Resubmit valid JSON in inputJson with correctly escaped strings and delimiters.',
+  })
+  return error
+}
+
+export function jsonEnvelopeFailure(error) {
+  const code = failureCodes.has(error?.message) ? error.message : 'BRIDGE_ENVELOPE_UNKNOWN'
+  const syntax = syntaxDiagnostics.get(error)
+  return { code, ...(syntax ? { syntax } : {}) }
+}
+
+export function jsonEnvelopeToolError(error) {
+  return {
+    isError: true,
+    content: [{ type: 'text', text: JSON.stringify(jsonEnvelopeFailure(error)) }],
+  }
+}
 
 export function isJsonEnvelopeTool(role, name) {
   return ENVELOPED_TOOLS[role]?.has(name) === true
@@ -76,8 +117,8 @@ export function decodeBoundedJsonEnvelope(argumentsValue, maxInputBytes = MAX_BU
   let input
   try {
     input = JSON.parse(argumentsValue.inputJson)
-  } catch {
-    throw new Error('BRIDGE_ENVELOPE_JSON_INVALID')
+  } catch (cause) {
+    throw invalidJson(cause, argumentsValue.inputJson)
   }
   if (!input || typeof input !== 'object' || Array.isArray(input))
     throw new Error('BRIDGE_ENVELOPE_OBJECT_REQUIRED')
@@ -100,10 +141,8 @@ export function envelopeFailureReceipt(role, name, argumentsValue, error) {
         : Array.isArray(value)
           ? 'array'
           : typeof value
-  const code =
-    typeof error?.message === 'string' && /^BRIDGE_ENVELOPE_[A-Z_]{1,80}$/.test(error.message)
-      ? error.message
-      : 'BRIDGE_ENVELOPE_UNKNOWN'
+  const code = failureCodes.has(error?.message) ? error.message : 'BRIDGE_ENVELOPE_UNKNOWN'
+  const syntax = syntaxDiagnostics.get(error)
   return {
     event: 'NATIVE_JSON_ENVELOPE_REJECTED',
     role,
@@ -111,5 +150,6 @@ export function envelopeFailureReceipt(role, name, argumentsValue, error) {
     code,
     inputJsonType,
     inputJsonBytes: typeof value === 'string' ? Buffer.byteLength(value, 'utf8') : null,
+    ...(syntax ? { syntax } : {}),
   }
 }
