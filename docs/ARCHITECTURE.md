@@ -31,7 +31,7 @@ T02에서 active LTS와 macOS/Windows 호환성을 검토해 세부 도구를 �
 | 영역 | 선택 | 비고 |
 |---|---|---|
 | 개발 Runtime | Node.js 24.19.0 LTS | source build의 `.node-version`과 engine preflight로 고정; 제품 runtime 범위는 T19-W에서 별도 검증 |
-| Workspace | pnpm 11.12.0 workspace | apps/packages 분리와 단일 lockfile |
+| Workspace | pnpm 11.13.1 workspace | apps/packages 분리와 단일 lockfile |
 | Language | TypeScript 7.0.2 strict ESM | project reference와 package public export 사용 |
 | Unit/integration test | Vitest 4.1.11 | TypeScript domain과 adapter test |
 | Browser test | Playwright 1.62.1 | Crew App 핵심 flow와 접근성 smoke |
@@ -639,7 +639,7 @@ Crew App의 `permissions.api`는 T01에서 host SDK의 client-side path guard로
 ### 10.1 계획
 
 - Node.js 24.19.0 LTS
-- pnpm 11.12.0 workspace
+- pnpm 11.13.1 workspace
 - local Kiro/Crew account/session
 - SQLite local file
 - TypeScript project fixture

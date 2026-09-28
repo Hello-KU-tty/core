@@ -307,6 +307,10 @@ function startNativeWorker(context, connectionFile, runtime) {
             record(file, `PERMISSION_${phase}_${job.role}_${kind}`)
         },
         onProtocolTelemetry: (summary) => {
+          if (summary?.kind === 'OPENING_OBSERVER_CLOSED') {
+            record(file, `OPENING_OBSERVER_CLOSED_${job.role}`)
+            return
+          }
           if (summary?.kind === 'RPC_TIMEOUT') {
             const operation = ['INITIALIZE', 'SESSION_NEW', 'SESSION_CONFIG', 'PERMISSION_EXPLAIN',
               'PERMISSION_LIST', 'POLICY_CHECK', 'PROMPT', 'CANCEL'].includes(summary.operation)
@@ -419,7 +423,7 @@ function startNativeWorker(context, connectionFile, runtime) {
           coreAction: update.coreAction, envelopeInputAction: update.envelopeInputAction,
           coreIsError: update.coreIsError,
           coreSuccess: update.coreSuccess, coreErrorCode: update.coreErrorCode,
-          bridgeErrorCode: update.bridgeErrorCode,
+          bridgeErrorCode: update.bridgeErrorCode, nativeErrorCode: update.nativeErrorCode,
           relativePath: update.relativePath, command: update.command,
           shellExitCode: update.shellExitCode,
           kiroOutputTransformation: update.kiroOutputTransformation,

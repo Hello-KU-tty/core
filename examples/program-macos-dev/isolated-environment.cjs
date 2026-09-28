@@ -45,7 +45,7 @@ async function configureWorkspaceEnvironment(vscode, context, root) {
   scoped.replace('PATH', PINNED_PATH, {
     applyAtProcessCreation: true, applyAtShellIntegration: true,
   })
-  scoped.description = 'Mac verification only: Node 24.19.0 / pnpm 11.12.0. New terminals required.'
+  scoped.description = 'Mac verification only: Node 24.19.0 / pnpm 11.13.1. New terminals required.'
 }
 
 module.exports = { isolatedCoreRoot, configureWorkspaceEnvironment, PINNED_PATH }

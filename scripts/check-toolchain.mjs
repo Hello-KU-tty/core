@@ -1,5 +1,5 @@
 const expectedNode = '24.19.0'
-const expectedPnpm = '11.12.0'
+const expectedPnpm = '11.13.1'
 
 const failures = []
 

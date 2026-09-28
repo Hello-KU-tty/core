@@ -57,7 +57,7 @@ await assert.rejects(invoke(['pnpm', 'install', '--frozen-lockfile']), (error) =
   error.stderr.includes('PROJECT_PACKAGE_CONFIG_DENIED'),
 )
 const cacheRoot = join(toolRoot, 'pnpm-cache')
-const cache = join(cacheRoot, 'pnpm-11.12.0')
+const cache = join(cacheRoot, 'pnpm-11.13.1')
 const archive = await readFile(join(cache, 'package.tgz'))
 await appendFile(join(cache, 'dist/pnpm.mjs'), '\n// synthetic corruption\n')
 await assert.rejects(

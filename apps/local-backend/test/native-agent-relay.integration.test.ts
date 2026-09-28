@@ -330,6 +330,33 @@ describe('native IDE Agent relay', { timeout: 60_000 }, () => {
       }),
     ).not.toThrow()
     const safeUpdate = (events[0] as { update: Record<string, unknown> }).update
+    const missingFile = {
+      ...safeUpdate,
+      protocolKind: 'read',
+      toolName: 'read',
+      coreAction: null,
+      coreIsError: null,
+      coreSuccess: null,
+      nativeStatus: 'failed',
+      relativePath: 'tsconfig.app.json',
+      nativeErrorCode: 'NATIVE_FILE_NOT_FOUND',
+    }
+    expect(() => relay.event(job.id, { kind: 'TOOL', update: missingFile })).not.toThrow()
+    expect(events.pop()).toMatchObject({
+      update: {
+        nativeErrorCode: 'NATIVE_FILE_NOT_FOUND',
+        nativeStatus: 'failed',
+        toolName: 'read',
+      },
+    })
+    for (const patch of [
+      { nativeStatus: 'completed' },
+      { toolName: 'shell', protocolKind: 'execute' },
+      { nativeErrorCode: 'PRIVATE_ERROR' },
+    ])
+      expect(() =>
+        relay.event(job.id, { kind: 'TOOL', update: { ...missingFile, ...patch } }),
+      ).toThrow('NATIVE_EVENT_INVALID')
     // Recording an observed command is separate from granting shell permission.
     const shellUpdate = {
       ...safeUpdate,

@@ -1181,7 +1181,7 @@ describe('T11 Builder prompt regression', () => {
       readonly containsPersonalData: boolean
     }
 
-    expect(prompt).toContain('Prompt version: `1.3.10`')
+    expect(prompt).toContain(`Prompt version: \`${BUILDER_PROMPT_VERSION}\``)
     expect(prompt).toContain('.vibe-helper/result.json')
     expect(prompt).toContain('HOST=127.0.0.1')
     expect(prompt).toContain('동적 `PORT`')
@@ -1246,7 +1246,7 @@ describe('T19 Builder validation regression', () => {
   })
   it('uses the prepared Windows tool entry without changing legacy commands or success criteria', async () => {
     const prompt = await readFile(path.join(workspaceRoot, 'docs/agent-prompts/builder.md'), 'utf8')
-    expect(prompt).toContain('Prompt version: `1.3.10`')
+    expect(prompt).toContain(`Prompt version: \`${BUILDER_PROMPT_VERSION}\``)
     expect(prompt).toContain('.\\.kiro\\vibe-tools.cmd pnpm run build')
     expect(prompt).toContain('기존 macOS/CLI 경로에는 이 접두어를 붙이지 않는다')
     expect(prompt).toContain('진입점이 없거나 도구 준비에 실패하면 실패 상태를 보고한다')
@@ -1334,7 +1334,7 @@ describe('T19 runtime and rejected final-check candidates', () => {
     }
     const prompt = await readFile(path.join(workspaceRoot, 'docs/agent-prompts/builder.md'), 'utf8')
     expect(fixture).toMatchObject({
-      promptVersion: BUILDER_PROMPT_VERSION,
+      promptVersion: '1.3.10',
       liveResult: 'OBSERVED_WITH_LIMITATIONS',
       containsPersonalData: false,
       automatedQualityVerdict: 'NOT_ASSERTED',
@@ -1342,6 +1342,38 @@ describe('T19 runtime and rejected final-check candidates', () => {
     expect(prompt).toContain(`Prompt version: \`${BUILDER_PROMPT_VERSION}\``)
     for (const rule of fixture.requiredRules) expect(prompt).toContain(rule)
   })
+  it('wires Builder language and shell rules without claiming live model quality', async () => {
+    const fixture = (await loadInput(
+      'tests/eval/fixtures/prompt-regressions/builder-v1.3.11-language-and-validation.json',
+    )) as {
+      requiredRules: string[]
+      reviewCases: { expectedLanguage: string; personalNeed: boolean }[]
+      negativeNarration: string[]
+      preserveVerbatim: string[]
+    }
+    expect(fixture).toMatchObject({
+      promptVersion: BUILDER_PROMPT_VERSION,
+      kind: 'MECHANICAL_PROMPT_REGRESSION',
+      containsPersonalData: false,
+      liveResult: 'NOT_RUN',
+      automatedQualityVerdict: 'NOT_ASSERTED',
+    })
+    const prompt = await readFile(path.join(workspaceRoot, 'docs/agent-prompts/builder.md'), 'utf8')
+    for (const rule of fixture.requiredRules) expect(prompt).toContain(rule)
+    expect(new Set(fixture.reviewCases.map((item) => item.expectedLanguage))).toEqual(
+      new Set(['ko', 'en']),
+    )
+    expect(new Set(fixture.reviewCases.map((item) => item.personalNeed))).toEqual(
+      new Set([true, false]),
+    )
+    expect(fixture.negativeNarration).toHaveLength(2)
+    expect(fixture.preserveVerbatim).toEqual([
+      'pnpm run build',
+      'src/app.ts',
+      'NATIVE_FILE_NOT_FOUND',
+    ])
+  })
+
   it('retains the exact rejected final-check prompt without enabling it in production', async () => {
     const fixture = (await loadInput(
       'tests/eval/fixtures/prompt-regressions/discovery-v1.3.8-final-check.json',

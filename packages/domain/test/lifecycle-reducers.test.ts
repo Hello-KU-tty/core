@@ -451,6 +451,19 @@ describe('Task and Decision reducers', () => {
     expect(failedAcceptance.trace.reasonCode).toBe('TASK_ACCEPTANCE_FAILED')
   })
 
+  it.each([
+    { validationResults: [] },
+    { validationResults: [{ name: 'build', status: 'NOT_RUN', summary: 'Permission denied' }] },
+  ])('rejects completion when validation was not run: %j', ({ validationResults }) => {
+    const result = transitionBuilderTask({
+      current: builderTaskFixture,
+      proposed: completedTask,
+      completionReport: { ...completionReportFixture, validationResults },
+    })
+    expect(result.outcome).toBe('REJECTED')
+    expect(result.trace.reasonCode).toBe('TASK_VALIDATION_NOT_RUN')
+  })
+
   it('rejects terminal Task transitions and accepts exact replays as no-ops', () => {
     expect(
       transitionBuilderTask({ current: builderTaskFixture, proposed: builderTaskFixture }).outcome,

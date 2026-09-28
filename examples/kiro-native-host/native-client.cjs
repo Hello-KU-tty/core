@@ -94,6 +94,8 @@ function nativeToolName(update) {
   return null
 }
 
+const { nativeReadErrorCode } = require('./native-tool-diagnostic.cjs')
+
 function safeRelativePath(workspace, path) {
   if (typeof path !== 'string' || path.length > 512) return null
   const location = relative(realpathSync(workspace), resolve(realpathSync(workspace), path))
@@ -1452,7 +1454,16 @@ async function openNativeRole(vscode, options) {
         client, sessionId, modeId: role, modeSelection: selected,
       })
     }
-  } catch (error) { if (sessionId) client.cancel(sessionId); client.close(); throw error }
+  } catch (error) {
+    try { if (sessionId) client.cancel(sessionId) }
+    finally {
+      client.close()
+      // Observer closure is not proof that Kiro disposed its shared MCP pool.
+      try { options.onProtocolTelemetry?.({ kind: 'OPENING_OBSERVER_CLOSED',
+        cancelRequested: Boolean(sessionId) }) } catch { /* diagnostic only */ }
+    }
+    throw error
+  }
   let active = false
   let ended = false
   const cancel = () => {
@@ -1542,12 +1553,16 @@ async function openNativeRole(vscode, options) {
           } else if (kind === 'tool_call' || kind === 'tool_call_update') {
             const previous = typeof update?.toolCallId === 'string' ?
               toolSummaries.get(update.toolCallId) : null
+            // Correlate partial activity updates for display only. Permission requests
+            // are validated separately against their own unmodified input.
             const rawInput = update?.rawInput && typeof update.rawInput === 'object' &&
-              !Array.isArray(update.rawInput) ? update.rawInput : previous?.rawInput ?? {}
+              !Array.isArray(update.rawInput) ? { ...previous?.rawInput, ...update.rawInput } : previous?.rawInput ?? {}
             const protocolKind = typeof update?.kind === 'string' ? update.kind : previous?.kind
+            const nativeToolIdClass = update?._meta?.kiro?.toolId === 'user_input' ? 'USER_INPUT' :
+              typeof update?._meta?.kiro?.toolId === 'string' ? 'OTHER' : previous?.nativeToolIdClass ?? null
             if (typeof update?.toolCallId === 'string')
               toolSummaries.set(update.toolCallId, { kind: protocolKind, rawInput,
-                title: update?.title ?? previous?.title })
+                title: update?.title ?? previous?.title, nativeToolIdClass })
             const locations = Array.isArray(update?.locations) ? update.locations : []
             const title = typeof (update?.title ?? previous?.title) === 'string' ?
               (update?.title ?? previous.title).toLowerCase() : ''
@@ -1602,8 +1617,7 @@ async function openNativeRole(vscode, options) {
                 .includes(protocolKind) ? protocolKind : 'unknown',
               nativeStatus: ['pending', 'in_progress', 'completed', 'failed']
                 .includes(update?.status) ? update.status : 'unknown',
-              nativeToolIdClass: update?._meta?.kiro?.toolId === 'user_input' ? 'USER_INPUT' :
-                typeof update?._meta?.kiro?.toolId === 'string' ? 'OTHER' : null,
+              nativeToolIdClass,
               ...(probeMode ? {
                 probeToolId: [
                   'orchestrate_subagent', 'invoke_sub_agent', 'subagent_response',
@@ -1640,7 +1654,8 @@ async function openNativeRole(vscode, options) {
               } : {}),
               toolId: typeof update?.toolCallId === 'string' ? createHash('sha256')
                 .update(`${sessionId}\u0000${update.toolCallId}`).digest('hex').slice(0, 12) : null,
-              toolName, relativePath: toolName === 'read' || toolName === 'search' ||
+              toolName, nativeErrorCode: nativeReadErrorCode(toolName, update?.status, update?.rawOutput),
+              relativePath: toolName === 'read' || toolName === 'search' ||
                 toolName === 'write' ?
                 safeRelativePath(workspace, rawInput.path) : null,
               coreAction,

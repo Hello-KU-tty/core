@@ -527,6 +527,7 @@ export class NativeAgentRelay implements WorkflowAgentPort {
       const coreAction = update.coreAction
       const envelopeInputAction = update.envelopeInputAction ?? null
       const bridgeErrorCode = update.bridgeErrorCode ?? null
+      const nativeErrorCode = update.nativeErrorCode ?? null
       const nativeToolIdClass = update.nativeToolIdClass ?? null
       const commandPattern =
         /^(?:\.\\\.kiro\\vibe-tools\.cmd )?(?:node --test(?: [A-Za-z0-9._/:=-]+)*|pnpm test(?: [A-Za-z0-9._/:=,-]+)*|pnpm rebuild esbuild|pnpm run [a-zA-Z0-9:_-]+(?: -- [A-Za-z0-9._/:=,-]+)*|pnpm install --frozen-lockfile|pnpm install --lockfile-only --ignore-scripts --ignore-pnpmfile|npm test(?: -- [A-Za-z0-9._/:=,-]+)*|npm run [a-zA-Z0-9:_-]+(?: -- [A-Za-z0-9._/:=,-]+)*|npm install(?: --include=dev)?)$/
@@ -608,6 +609,11 @@ export class NativeAgentRelay implements WorkflowAgentPort {
             coreAction !== null ||
             update.rawOutputType !== 'object' ||
             !update.rawInputKeys.includes('inputJson'))) ||
+        (nativeErrorCode !== null &&
+          (nativeErrorCode !== 'NATIVE_FILE_NOT_FOUND' ||
+            toolName !== 'read' ||
+            kind !== 'read' ||
+            update.nativeStatus !== 'failed')) ||
         (path !== null &&
           ((toolName !== 'read' && toolName !== 'search' && toolName !== 'write') ||
             typeof path !== 'string' ||
@@ -658,6 +664,7 @@ export class NativeAgentRelay implements WorkflowAgentPort {
           coreSuccess: update.coreSuccess,
           coreErrorCode: update.coreErrorCode,
           ...(bridgeErrorCode === null ? {} : { bridgeErrorCode }),
+          ...(nativeErrorCode === null ? {} : { nativeErrorCode }),
           relativePath: path,
           command,
           ...(shellExitCode === null ? {} : { shellExitCode }),

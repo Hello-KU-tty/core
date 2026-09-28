@@ -1,6 +1,7 @@
 # Vibe Helper 프로젝트 브리프
 
 > 상태: 구현 전 승인된 입력 브리프
+> 2026-09-29 유지보수 승인: 프론트 B7~B11 보완에 포함해 broken pnpm 11.12.0 개발·생성 앱 pin을 11.13.1로 교체한다. Node 24.19.0·frozen install·권한 경계는 유지하며 과거 도구 실측 기록은 당시 사실로 보존한다.
 > 작성 기준일: 2026-08-24
 > 범위 갱신: 2026-09-07 사용자 승인으로 T19에 자체 Kiro IDE 패널의 Discovery·Spec·Builder·Helper·History 실제 연결과 frontend 로컬 실행 인계를 포함한다.
 > 실험 승인: 2026-09-12 사용자는 별도 worktree에서 Kiro IDE 내장 Agent를 실행기로 쓰는 T19-N 실험을 승인했다. 기존 CLI/Crew 경로와 T19 Windows 완료 gate는 유지하며, 내장 경로의 지원·권한·Core 연결·stream·중지는 실측 전 제품 기능으로 간주하지 않는다.
@@ -230,7 +231,7 @@ Prompt Dependence:
 - backend/bridge의 실행 환경은 검증 가능한 Kiro 내장 런타임, 기존 호환 Node, 확장 전용 폴더의 자동 준비 런타임 순서로 선택한다. 모든 사용자에게 Node를 중복 배포하지 않으며 OS/architecture·필요 API·SQLite 로딩을 확인한다. 정확한 지원 범위는 Windows 실측으로 정한다.
 - 확장에는 빌드된 JS·UI·native worker/bridge·canonical prompt·해당 플랫폼 SQLite library·migration·배포 metadata를 포함한다. 사용자 DB/token과 source checkout은 포함하지 않는다. 기존 SQLite 드라이버를 유지하고 불필요한 저장소 재작성을 하지 않는다.
 - 생성 앱의 빌드·실행용 Node/pnpm은 Core용 런타임과 구분한다. 기존 호환 도구를 재사용하고 필요한 도구와 앱 의존성만 자동 준비한다. 관리자 설치·전역 PATH 변경은 요구하지 않는다. 다운로드가 필요한 첫 실행은 network가 필요하며 offline 무설치를 보장하지 않는다.
-- 제품 런타임은 검증된 버전 범위를 지원하는 방향으로 전환한다. 현재 개발용 Node.js 24.19.0/pnpm 11.12.0 pin·preflight는 후속 결정과 검증 없이 우회하지 않는다. Node 버전 유연화는 private Kiro API나 권한 검증 해제를 뜻하지 않는다.
+- 제품 런타임은 검증된 버전 범위를 지원하는 방향으로 전환한다. 현재 개발용 Node.js 24.19.0/pnpm 11.13.1 pin·preflight는 후속 결정과 검증 없이 우회하지 않는다(2026-09-29 broken pnpm 교체 승인). Node 버전 유연화는 private Kiro API나 권한 검증 해제를 뜻하지 않는다.
 - Windows native Agent·SQLite·MCP·process lifecycle·Builder/Helper 수직 흐름은 아직 미검증이다. 현재 fail-closed를 조건문 삭제로 해제하거나 CLI/Mock을 실제 native 성공으로 표시하지 않는다. 기존 CLI/Crew source는 회귀·복구 근거로 보존한다.
 
 ## 15. MVP 정의

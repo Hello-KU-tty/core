@@ -48,7 +48,7 @@ beforeEach(async () => {
       source: 'MANAGED_PNPM',
       executable: join(root, 'pnpm.mjs'),
       kind: 'JS',
-      version: '11.12.0',
+      version: '11.13.1',
     },
   }
 })

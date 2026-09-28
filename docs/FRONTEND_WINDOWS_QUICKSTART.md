@@ -143,7 +143,7 @@ Helper는 `kind: 'HELPER'`, 같은 `projectId/taskId`, 새 idempotency key, 사�
 
 이번 지원은 Windows x64 build 26200, **Kiro 1.1.70 / Agent 1.1.158 / API 1.131.0**의 검증된 설치 source다. Kiro commit `8ce1870416c7dc7e51fffb01765d93ef7ad55102`, Agent entry SHA-256 `cf6a5124f2fed75144b9d4236e0ffff85a5b22732d739807070783323c071b87`. ARM64·다른 Kiro/Agent source를 지원한다고 표시하지 않는다. 검사 자체는 host에 포함돼 있다.
 
-이번 실제 frontend host는 Kiro 내장 Node를 재사용했다. 기존 runtime 선택 경로는 Kiro → 호환 기존 Node → private runtime 다운로드 순서이며, 다운로드 경로는 네트워크가 필요하다. 생성 앱의 도구 준비는 별도 자동 경로다. backend source 개발 pin은 Node **24.19.0 / pnpm 11.12.0**이고 프론트의 npm 사용과 별개다.
+이번 실제 frontend host는 Kiro 내장 Node를 재사용했다. 기존 runtime 선택 경로는 Kiro → 호환 기존 Node → private runtime 다운로드 순서이며, 다운로드 경로는 네트워크가 필요하다. 생성 앱의 도구 준비는 별도 자동 경로다. backend source 개발 pin은 Node **24.19.0 / pnpm 11.13.1**이고 프론트의 npm 사용과 별개다.
 
 ## 7. 백엔드에서 재생성
 

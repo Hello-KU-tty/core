@@ -22,7 +22,7 @@ git log -1 --oneline
 
 ## 2. 개발 환경과 재빌드
 
-- 개발 도구는 **Node.js 24.19.0 / pnpm 11.12.0**이다. `.node-version`, frozen lockfile과 preflight를 유지한다. 이전 PC의 임시 도구 경로나 Playwright cache 환경 변수를 그대로 복사하지 않는다.
+- 개발 도구는 **Node.js 24.19.0 / pnpm 11.13.1**이다. `.node-version`, frozen lockfile과 preflight를 유지한다. 이전 PC의 임시 도구 경로나 Playwright cache 환경 변수를 그대로 복사하지 않는다.
 - 실제 W5 native 검증 대상은 **Windows x64, Kiro 1.1.14 / Agent 1.1.28 / API 1.131.0** 및 source attestation을 통과하는 설치다. Kiro host Node 24.18.0 재사용 관측과 repository 개발 pin을 구분한다. 다른 Kiro source/버전, ARM64 또는 macOS에 Windows PASS를 적용하지 않는다.
 - 다른 OS에서는 소스 검토와 해당 환경에서 가능한 회귀부터 진행한다. 지원하지 않는 Kiro 설치를 맞추기 위해 자동 downgrade하거나 source/권한 gate를 해제하지 않는다. 계정 로그인과 Workspace Trust는 실제 사용자 단계다.
 

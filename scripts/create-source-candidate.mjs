@@ -228,7 +228,7 @@ export async function createSourceCandidate(backend, frontend) {
     schemaVersion: 1,
     status: 'PRIVATE_REVIEW_CANDIDATE_NOT_RELEASE',
     createdAt: new Date().toISOString(),
-    toolchain: { node: '24.19.0', pnpm: '11.12.0' },
+    toolchain: { node: '24.19.0', pnpm: '11.13.1' },
     modelCalls: 0,
     published: false,
     windowsInstallersIncluded: false,
@@ -262,7 +262,7 @@ scope and limitations. Preserve LICENSE/notice files when distributing dependenc
 this candidate contains lockfiles and the project's own vendored SDK, not installed
 third-party dependency trees. Nothing here grants a new redistribution license.
 
-Select Node 24.19.0 and pnpm 11.12.0; do not bypass preflight.
+Select Node 24.19.0 and pnpm 11.13.1; do not bypass preflight.
 In backend: pnpm install --frozen-lockfile; pnpm check; pnpm panel:build.
 In frontend: npm ci --ignore-scripts; npm run typecheck; npm test; npm run build.
 Then from backend: node scripts/test-program-consumer.mjs ../frontend.

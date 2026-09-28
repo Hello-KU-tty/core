@@ -26,7 +26,7 @@ async function checkInstallPolicy(workspace) {
     pkg.pnpm ||
     pkg.devEngines ||
     pkg.workspaces ||
-    (pkg.packageManager && pkg.packageManager !== 'pnpm@11.12.0')
+    (pkg.packageManager && pkg.packageManager !== 'pnpm@11.13.1')
   )
     throw new Error('PROJECT_PACKAGE_CONFIG_DENIED')
   if (

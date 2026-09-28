@@ -1,5 +1,14 @@
 # 결정 기록
 
+## 2026-09-29: B7~B11 보완과 broken pnpm pin 교체
+
+- **승인:** 사용자 B7~B11 검토 후 구현·검증·커밋·답변 문서·push 진행 승인. 기존 pnpm 11.12.0 exact pin의 변경을 포함한다.
+- **도구 결정:** pnpm 공식 `installPnpm.ts`는 11.12.0/11.13.0을 binary 누락 broken release로 차단하며 npm metadata는 11.13.1 이상을 안내한다. 최소 수정인 **11.13.1**을 선택해 개발 pin과 생성 앱용 검증 archive를 동기화한다. Node 24.19.0, frozen install, lifecycle allowlist와 preflight는 유지한다. 기존 도구·전역 PATH는 덮어쓰지 않고 별도 private 설치로 검증한다. archive의 SHA-512를 npm metadata에 고정하고 증가한 36.5MB unpacked 크기에 맞춰 압축 해제 상한만 48MiB로 조정한다. 과거 11.12.0 실측 기록은 재작성하지 않는다.
+- **근거:** https://github.com/pnpm/pnpm/blob/main/pnpm11/engine/pm/commands/src/self-updater/installPnpm.ts 및 https://registry.npmjs.org/pnpm/11.13.1 (2026-09-29 확인). 이는 Windows 신규 kit 실행 PASS를 뜻하지 않는다.
+- **archive 후속 검증:** 공식 11.13.1 archive의 GNU 긴 파일명(type L)을 기존 파서가 거절함을 재현했다. SHA-512 일치 후 최대513 bytes·단일 NUL 종료·다음 정규 파일 header와 prefix 일치 조건으로만 지원한다. symlink/hardlink/PAX·경로 이탈은 계속 거절한다. 실제891 files acquisition·offline cache 재사용·변조 archive 거절·무스크립트 lock 생성 PASS.
+- **런타임 경계:** B7에는 내용 없는 고정 단계 진단을 더하고 새 명시적 요청의 session 재생성을 검증한다. Kiro 내부 MCP 시작 원인은 미확정이며 catalog gate 연장·우회, 자동 유료 모델 재시도, 사용자 창 종료·shared PID kill을 하지 않는다. B8은 정확한 실패 이유와 입력 형식을 알리되 shell 허용 범위를 늘리지 않는다. B9의 표시용 fallback은 권한 판단과 분리하고 파일 없음도 실패 사실을 유지한다.
+- **언어:** B11은 canonical Builder prompt와 version/fixture를 갱신한다. 사용자에게 보이는 서술에만 사용자 언어·한국어 기본·내부 규칙 인용 방지를 적용하고 tool ID, 명령, 코드, 진단 원문을 번역하거나 숨기지 않는다. 기계적 fixture와 실제 모델 품질 검증을 명확히 구분한다.
+
 ## 2026-09-29: B6의 native endpoint를 현재 확장 창에 바인딩
 
 - **승인:** 사용자가 프론트 B6 검토 후 보완과 commit을 요청했다. 기존 T19의 host 라우팅 결함 수정이며 push·Windows 설치물 배포는 포함하지 않는다.

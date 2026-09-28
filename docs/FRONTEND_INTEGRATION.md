@@ -34,7 +34,7 @@ Crew 설치·proxy secret·작성자의 계정은 필요 없다. 내장 Agent �
 
 ## 1. 설치·실행 — PowerShell
 
-필수: Git, Node.js **24.19.0**, pnpm **11.12.0**, 검증할 Kiro IDE/CLI, 본인 로그인. Core Node와 IDE 내장 Node는 별도다. 실측 조합은 macOS arm64, Kiro IDE 1.0.337(내장 Node 22.22.0), CLI **2.21.1 / engine v2 / claude-haiku-4.5**다.
+필수: Git, Node.js **24.19.0**, pnpm **11.13.1**, 검증할 Kiro IDE/CLI, 본인 로그인. Core Node와 IDE 내장 Node는 별도다. 실측 조합은 macOS arm64, Kiro IDE 1.0.337(내장 Node 22.22.0), CLI **2.21.1 / engine v2 / claude-haiku-4.5**다.
 
 [Kiro 공식 설치 안내](https://kiro.dev/docs/getting-started/installation/)는 IDE Windows 10/11과 CLI Windows 11/PowerShell을 구분한다. Windows가 이 CLI 2.21.1/v2 조합을 제공하는지는 확인 전이다. 최신 CLI 3.x와 호환된다고 가정하거나 사용자 Kiro를 임의 downgrade하지 않는다. 해당 조합을 설치할 수 없거나 doctor가 거절하면 Windows 버전/architecture와 IDE/CLI 버전을 backend 담당자에게 전달하고 지원 경로를 먼저 결정한다. WSL은 전제하지 않는다.
 

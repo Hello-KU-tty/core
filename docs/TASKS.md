@@ -772,6 +772,13 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 
 **2026-09-28 제출 준비 재개:** 사용자가 실제 프론트 checkout의 직접 기능·성능 수정과 Mac 연결 검증을 승인했다. Windows 전용 작업은 이번 실행에서 제외하며 아래 T19-F1부터 진행한다. 앞선 시간·프론트 수정 금지 기록은 당시 세션에 한정한다. 기존 상위 완료 gate는 검증 없이 닫지 않는다.
 
+#### [x] T19-F8. 프론트 B7~B11 런타임·도구·언어 보완
+
+- **승인/선행 조건:** 2026-09-29 사용자 검토 후 작업 승인. B10의 개발 pin 변경, 기존 collaborator 경로의 commit/push와 프론트 답변 갱신을 포함한다. 기존 사용자 실험 파일·Kiro 창·데이터는 보존한다.
+- **범위:** 설치 가능한 pnpm 11.x exact pin/무결성과 개발·생성 앱 계약 동기화; B7 bridge 초기화 단계 진단과 실패 후 새 session 경계; B8 shell 입력/lockfile 거절 원인과 검증 미실행 보고; B9 안전한 표시용 tool 분류/파일 없음 코드; B11 사용자 언어와 내부 규칙 인용 방지 prompt·fixture.
+- **산출물/완료 조건:** 경계별 회귀, frozen install, 전체 check 및 panel/client build, frontend 답변과 commit/push. 모델 없는 검증과 실제 Kiro/Windows 검증을 구분한다. MCP catalog·permission gate를 완화하거나 사용자 창을 자동 종료하지 않는다. 재현되지 않은 Kiro 내부 원인은 해결로 단정하지 않는다.
+- **검증:** Node24.19.0/pnpm11.13.1 frozen install, 공식 archive891 files·실제 acquisition/offline 재사용·무스크립트 lock 생성 PASS. 전체 check의 E2E 이전 단계(unit171+skip3/integration375+skip8/eval42/Campus3/smoke6) PASS. sandbox Chromium 거절 뒤 허용된 실행 환경·4273 포트의 E2E12 PASS. panel/client build와 CJS/bridge169+skip2 PASS. 모델0. [프론트 답변과 잔여 실측 조건](FRONTEND_B7_B11_RESPONSE_20260929.md). B7의 Kiro 내부 원인/Windows 실제 재발과 B11 모델 언어 품질은 미확정이며 상위 T19 gate를 닫지 않는다.
+
 #### [x] T19-F7. 같은 생성 폴더의 다중 Kiro 창 라우팅 복구
 
 - **승인/선행 조건:** 2026-09-29 사용자 B6 보완·검증·commit 요청. 최신 backend `d02ef61`과 프론트 보고 `031ae154`를 대조했고 같은 폴더의 서로 다른 endpoint 두 개가 `NATIVE_ENDPOINT_AMBIGUOUS`로 거절됨을 재현했다.

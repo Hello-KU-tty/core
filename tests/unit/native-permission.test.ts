@@ -713,7 +713,9 @@ describe('native Builder permission gate', () => {
         (reason: string) => reasons.push(reason),
       )
       expect(chosen).toBeNull()
-      expect(reasons).toEqual([expected])
+      expect(reasons).toEqual(
+        expected === 'TIMEOUT_INVALID' ? ['TIMEOUT_ABOVE_MAXIMUM', expected] : [expected],
+      )
       expect(reasons[0]).not.toContain(root)
       expect(reasons[0]).not.toContain('secret')
     }
@@ -730,6 +732,63 @@ describe('native Builder permission gate', () => {
       ),
     ).toBe('allow-1')
     expect(reasons).toEqual(['ALLOWED'])
+  })
+
+  it.each([
+    ['120000', 'TIMEOUT_TYPE_INVALID'],
+    [0, 'TIMEOUT_BELOW_MINIMUM'],
+    [1.5, 'TIMEOUT_INTEGER_REQUIRED'],
+    [300001, 'TIMEOUT_ABOVE_MAXIMUM'],
+  ])('explains timeout refusal without retaining raw values: %j', async (timeout, reason) => {
+    const reasons: string[] = []
+    expect(
+      await chooseNativeBuilderPermission(
+        { toolName: 'shell', rawInput: { command: 'pnpm test', timeout }, options: option },
+        workspace(),
+        (code) => reasons.push(code),
+      ),
+    ).toBeNull()
+    expect(reasons).toEqual([reason, 'TIMEOUT_INVALID'])
+  })
+
+  it('distinguishes missing manifest, forbidden config and invalid Windows workspace config', async () => {
+    const root = workspace()
+    const reasons: string[] = []
+    const request = {
+      toolName: 'shell',
+      rawInput: {
+        command: 'pnpm install --lockfile-only --ignore-scripts --ignore-pnpmfile',
+        cwd: '.',
+        timeout: 120000,
+        run_in_background: false,
+      },
+      options: option,
+    }
+    const check = () =>
+      chooseNativeBuilderPermission(
+        request,
+        root,
+        (code) => reasons.push(code),
+        async (command) => command,
+      )
+    expect(await check()).toBeNull()
+    expect(reasons).toEqual(['LOCKFILE_MANIFEST_MISSING', 'LOCKFILE_PREPARE_DENIED'])
+    reasons.length = 0
+    writeFileSync(join(root, 'package.json'), '{"name":"synthetic","private":true}')
+    writeFileSync(join(root, 'pnpm-workspace.yaml'), 'packages:\n  - "outside/*"\n')
+    expect(await check()).toBeNull()
+    expect(reasons).toEqual(['LOCKFILE_WORKSPACE_CONFIG_DENIED', 'LOCKFILE_PREPARE_DENIED'])
+    reasons.length = 0
+    writeFileSync(
+      join(root, 'pnpm-workspace.yaml'),
+      'packages:\n  - "."\nallowBuilds:\n  esbuild: true\n',
+    )
+    expect(await check()).toBe('allow-1')
+    expect(reasons).toEqual(['LOCKFILE_PREPARE_ALLOWED'])
+    reasons.length = 0
+    writeFileSync(join(root, '.npmrc'), 'synthetic-secret')
+    expect(await check()).toBeNull()
+    expect(reasons).toEqual(['LOCKFILE_PACKAGE_CONFIG_PRESENT', 'LOCKFILE_PREPARE_DENIED'])
   })
 
   it('records the unresolved package-script escape gate without executing a script', async () => {

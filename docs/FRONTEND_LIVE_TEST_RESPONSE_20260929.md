@@ -1,5 +1,7 @@
 # 9월 29일 프론트 B6 후속 답변
 
+> **최신 추가 답변:** [B7~B11 보완·pnpm 11.13.1·프론트 적용 안내](FRONTEND_B7_B11_RESPONSE_20260929.md). 아래 pnpm 11.12.0 검증 수치는 B6 당시 기록이며 현재 개발 pin은 11.13.1이다.
+
 대상: [프론트 B6 추가 커밋](https://github.com/Hello-KU-tty/program/commit/031ae154b9172701caa1d3b79fdb404f0f5ae52c).
 수정 backend: [`a4a6632`](https://github.com/Hello-KU-tty/core/commit/a4a6632), 브랜치 `codex/windows-extension-runtime-20260923` (T19-F7).
 아래는 소스 수정과 macOS 모델 없는 검증이며, Windows 새 kit/VSIX 설치·실제 두 창 검증 완료 기록이 아니다.

@@ -917,6 +917,40 @@ describe('private Kiro native connection gate', () => {
     session.close()
   })
 
+  it('closes a failed opening and creates a fresh session for the next explicit attempt', async () => {
+    vi.useFakeTimers()
+    const { root, binding } = coreWorkspace()
+    FakeWebSocket.delayedCatalog = 'empty'
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    const telemetry: unknown[] = []
+    const options = {
+      workspace: root,
+      role,
+      binding,
+      onProtocolTelemetry: (summary: unknown) => telemetry.push(summary),
+    }
+    const vscode = fakeVscode(root, { kiroExtensionVersion: '1.0.794' })
+    const failed = expect(openNativeRole(vscode, options)).rejects.toMatchObject({
+      code: 'NATIVE_ROLE_CATALOG_UNVERIFIED',
+    })
+    await vi.advanceTimersByTimeAsync(11000)
+    await failed
+    expect(FakeWebSocket.closed).toBe(1)
+    expect(telemetry).toContainEqual({ kind: 'OPENING_OBSERVER_CLOSED', cancelRequested: true })
+    expect(
+      FakeWebSocket.sent.filter((message) => message.method === 'session/prompt'),
+    ).toHaveLength(0)
+    FakeWebSocket.delayedCatalog = 'safe'
+    const next = openNativeRole(vscode, options)
+    await vi.advanceTimersByTimeAsync(1000)
+    const session = await next
+    expect(FakeWebSocket.sent.filter((message) => message.method === 'session/new')).toHaveLength(2)
+    await session.prompt('Synthetic explicit retry')
+    expect(
+      FakeWebSocket.sent.filter((message) => message.method === 'session/prompt'),
+    ).toHaveLength(1)
+  })
+
   it.each(['empty', 'builtin', 'invalid', 'foreign'] as const)(
     'refuses a %s Mac catalog without spending a model turn',
     async (catalog) => {
@@ -959,7 +993,12 @@ describe('private Kiro native connection gate', () => {
       const failed = expect(opening).rejects.toMatchObject({ code: 'NATIVE_RPC_TIMEOUT' })
       await vi.advanceTimersByTimeAsync(timeout)
       await failed
-      expect(telemetry).toEqual([{ kind: 'RPC_TIMEOUT', operation }])
+      expect(telemetry).toEqual([
+        { kind: 'RPC_TIMEOUT', operation },
+        ...(operation === 'SESSION_NEW'
+          ? [{ kind: 'OPENING_OBSERVER_CLOSED', cancelRequested: false }]
+          : []),
+      ])
       expect(FakeWebSocket.sent.some((value) => value.method === 'session/prompt')).toBe(false)
       expect(FakeWebSocket.closed).toBe(1)
     },

@@ -17,10 +17,10 @@ import { isPrivateDirectory } from './private-directory.js'
 
 const execute = promisify(execFile)
 export const PROJECT_PNPM = Object.freeze({
-  version: '11.12.0',
-  url: 'https://registry.npmjs.org/pnpm/-/pnpm-11.12.0.tgz',
+  version: '11.13.1',
+  url: 'https://registry.npmjs.org/pnpm/-/pnpm-11.13.1.tgz',
   integrity:
-    'ggpvvQ2fBMImY4ACrq0eRTQKkTndXcB3wdg+9EqiSByOtmN7TJqmlqPH41uoGOSc8nIT5fK5ETjQm3o+JuiYug==',
+    'svx2g7imUlQU59E+G6KMqt3elr9m7FQL+ut+cCuB8+C+TR8pXt9/n+A5Z0Co3ORQnFgt33mJH0VD/qMtN2RfJQ==',
   maxBytes: 12 * 1024 * 1024,
 })
 export const PROJECT_TOOL_COMMAND = '.\\.kiro\\vibe-tools.cmd '
@@ -43,16 +43,17 @@ const errorCode = (error: unknown): string =>
     ? error.message
     : 'PROJECT_TOOL_REJECTED'
 
-/** Parse only the pinned npm archive's ordinary files. No links, PAX, devices or traversal. */
+/** Pinned npm regular files plus bounded GNU long names. No links, PAX, devices or traversal. */
 export function unpackPnpm(archive: Buffer): Map<string, Buffer> {
   if (
     archive.length > PROJECT_PNPM.maxBytes ||
     createHash('sha512').update(archive).digest('base64') !== PROJECT_PNPM.integrity
   )
     fail('PNPM_DOWNLOAD_HASH_MISMATCH')
-  const tar = gunzipSync(archive, { maxOutputLength: 32 * 1024 * 1024 })
+  const tar = gunzipSync(archive, { maxOutputLength: 48 * 1024 * 1024 })
   const files = new Map<string, Buffer>()
   let offset = 0
+  let longName: string | null = null
   while (offset + 512 <= tar.length) {
     const header = tar.subarray(offset, offset + 512)
     if (header.every((byte) => byte === 0)) break
@@ -72,13 +73,37 @@ export function unpackPnpm(archive: Buffer): Map<string, Buffer> {
     if (
       checksum !== actual ||
       string(345, 155) ||
-      !rawName.startsWith('package/') ||
       !Number.isSafeInteger(size) ||
       size < 0 ||
       offset + 512 + size > tar.length
     )
       fail('PNPM_ARCHIVE_INVALID')
-    const name = rawName.slice(8).replace(/\/$/, '')
+    const type = string(156, 1)
+    // npm 11.13.1 contains names longer than a TAR header's 100 bytes.
+    // L is filename metadata, not a symbolic link (type 2) or hard link (type 1).
+    if (type === 'L') {
+      const payload = tar.subarray(offset + 512, offset + 512 + size)
+      if (
+        longName !== null ||
+        rawName !== '././@LongLink' ||
+        size < 2 ||
+        size > 513 ||
+        payload.at(-1) !== 0 ||
+        payload.subarray(0, -1).includes(0)
+      )
+        fail('PNPM_ARCHIVE_INVALID')
+      longName = payload.subarray(0, -1).toString('utf8')
+      offset += 512 + Math.ceil(size / 512) * 512
+      continue
+    }
+    const fullName = longName ?? rawName
+    if (
+      !fullName.startsWith('package/') ||
+      (longName !== null && ((type !== '0' && type !== '') || fullName.slice(0, 100) !== rawName))
+    )
+      fail('PNPM_ARCHIVE_INVALID')
+    longName = null
+    const name = fullName.slice(8).replace(/\/$/, '')
     if (
       !name ||
       !/^[A-Za-z0-9_@./+-]+$/.test(name) ||
@@ -93,7 +118,6 @@ export function unpackPnpm(archive: Buffer): Map<string, Buffer> {
         )
     )
       fail('PNPM_ARCHIVE_PATH_INVALID')
-    const type = string(156, 1)
     if (type === '5' && size === 0) {
       offset += 512
       continue
@@ -103,6 +127,7 @@ export function unpackPnpm(archive: Buffer): Map<string, Buffer> {
     files.set(name, tar.subarray(offset + 512, offset + 512 + size))
     offset += 512 + Math.ceil(size / 512) * 512
   }
+  if (longName !== null) fail('PNPM_ARCHIVE_INVALID')
   const metadata = JSON.parse(files.get('package.json')?.toString() ?? '{}') as {
     name?: string
     version?: string
