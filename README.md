@@ -1,69 +1,83 @@
 # Vibe Helper
 
-2026-09-28 실제 frontend의 기능 복구와 Mac 개발 환경의 후속 Task까지 bounded native 흐름을 검증했다. [현재 구현·검증 기록](docs/FRONTEND_MAC_PROGRESS_20260928.md), [보안·접근성 감사](docs/T20_AUDIT_20260928.md), [제출 준비 대조표](docs/SUBMISSION_READINESS_20260928.md)와 [제출 Markdown 초안](docs/SUBMISSION.md)을 확인한다. 디자인/탐색 흐름은 유지했고 Windows 전용 작업은 제외했다. 일반 제품 설치, 사람 검증·baseline, 의미 품질과 공식 제출 형식은 미완료이며 Mac 개발 검증을 출하 완료로 표시하지 않는다.
+**만들면서, 이해의 근거를 남기는 Kiro 기반 바이브코딩 개발 환경**
 
-Vibe Helper는 코딩 초보자가 자기에게 실용적인 TypeScript 서비스를 고르고, Kiro Builder와 함께 실제로 만들며, 필요한 순간 Helper와 대화해 개념을 익히도록 돕는 build-first 개발 환경이다. 제품은 개발을 교육용 단계로 끊지 않고 실제 Decision, 작업 맥락과 사용자 행동에서 나온 Evidence를 다음 설명과 project 추천에 연결한다.
+고려대학교 × AWS AI Innovators Challenge 예선 제출 · 팀 Hello-KU-tty
 
-현재 repository는 T00~T18과 Windows 확장 runtime의 T19-W1~W4 구현·검증 결과를 포함한다. Discovery→Learning Spec→Builder/Decision→Helper→Episode 단위 Evidence 분석→다음 개인화→사용자 선택 Final Upgrade→실행 가능한 local 결과까지 하나의 durable 수직 흐름으로 연결돼 있다. 이번 작업은 Windows 전용 T19-W5를 제외하고 실제 frontend T19-F1~F6 및 T20 hardening·제출 준비를 진행했다. 상위 T19/T19-N의 일반 설치·의미 품질 등 잔여 gate는 유지한다. [비공개 source 후보의 독립 재현](docs/SOURCE_REPRODUCIBILITY_20260928.md)은 전체 검사 PASS이며 최종 제출/출시 승인은 아니다. `spikes/kiro-crew/`의 코드는 외부 기능 경계를 확인하기 위한 폐기 가능한 실험물이다.
+Vibe Helper는 코딩 초보자가 배우고 싶은 기술 하나로 시작해 자기에게 필요한 TypeScript 서비스를 실제로 완성하도록 돕는 Kiro IDE 확장이다. 개발 중 필요한 순간에 Helper와 대화하고, 실제로 내린 판단을 근거로 쌓아 다음 설명과 프로젝트 추천까지 개인화한다.
 
-## 문서 읽는 순서
+| 저장소 | 역할 |
+| --- | --- |
+| [Hello-KU-tty/core](https://github.com/Hello-KU-tty/core) (이 저장소) | TypeScript Core, SQLite 저장소, 역할별 MCP, Agent prompt, Kiro native 연동, 평가·테스트 |
+| [Hello-KU-tty/program](https://github.com/Hello-KU-tty/program) | Kiro 확장 frontend: Discovery, Spec, Builder, Helper, History 화면 |
 
-1. `PROJECT_BRIEF.md`: 승인된 목표, 범위와 제약
-2. `docs/SPEC.md`: 검증 가능한 제품 요구와 완료 조건
-3. `docs/ARCHITECTURE.md`: system boundary, data flow와 test 전략
-4. `docs/DECISIONS.md`: 승인된 판단, 제안과 spike 항목
-5. `docs/TASKS.md`: MVP 이전·대회 제출 전·대회 이후 실행 순서
-6. `docs/agent-prompts/`: Discovery, Builder, Helper와 Evidence Analyst의 prompt 계약
+## 해결하려는 문제
 
-`PROJECT_SPEC.md`와 `CONVERSATION_RECORD.md`는 합의의 상세 배경을 보존하는 참고 자료다.
+- AI가 동작하는 코드를 만들어도, 사용자는 중요한 제품·기술 판단의 의미를 모를 수 있다.
+- 설명·퀴즈·진도 중심의 교육 도구는 실제 개발 흐름을 끊는다.
+- 배우고 싶은 기술이 있어도 그 기술이 정말 필요한 프로젝트를 찾기 어렵다.
+- "Agent가 코드를 썼다"와 "사용자가 이해했다"가 쉽게 혼동된다.
 
-다른 기기에서는 [2026-09-24 재개 인계](docs/CROSS_DEVICE_HANDOFF_20260924.md)를 시작점으로 `codex/windows-extension-runtime-20260923`을 받는다. Windows x64의 Kiro 내장 runtime → 기존 호환 Node → 필요한 경우 private runtime 준비, portable Core와 VSIX 0.3.7을 구현했다. [W5 실측 기록](docs/spikes/T19_W5_WINDOWS_RELEASE_RESULTS_20260924.md)에 전체 회귀 PASS와 native 실패를 함께 보존한다. 최신 버전의 양쪽 fresh 수직 흐름, 초기화·취소 안정성, 전체 GUI/frontend와 clean Windows 설치는 아직 검증 중이다. [2026-09-23 인계](docs/WINDOWS_EXTENSION_HANDOFF_20260923.md)는 구현 전 요구와 분기 배경이다.
+## 핵심 원칙
 
-프론트 담당자는 [IDE-only frontend 가이드](docs/FRONTEND_IDE_IMPLEMENTATION_GUIDE.md)에서 SDK·native worker 경계와 UI 계약을 확인한다. [기존 프론트 개발 안내](docs/FRONTEND_INTEGRATION.md)와 [최초 T19 계획](docs/T19_IMPLEMENTATION_PLAN.md)의 PowerShell/CLI 수동 실행은 개발 재현 경로다. 사용자 repository checkout·backend 명령·connection 경로 설정을 제품 완료 조건으로 삼지 않는다. native Windows 실측, 확장 lifecycle·패키징과 전체 수직 흐름 검증은 T19-W에서 진행한다. push는 요청 범위와 저장소 Git 지침을 따른다.
+- **Build-first:** 교육 때문에 개발을 멈추지 않는다. Builder가 실제 서비스를 앞으로 민다.
+- **실제 판단만 요청:** 교육용 가짜 선택지 대신 개발 중 실제로 생긴 Decision만 사용자에게 남긴다.
+- **보수적 Evidence:** 확인 응답, 카드 클릭, Agent 답 반복, Agent가 작성한 코드는 이해의 근거가 아니다. 사용자 본인의 설명·예측·판단·적용만 기록한다.
+- **Local-first:** 상태는 사용자 컴퓨터의 SQLite에 저장한다. cloud sync는 없다.
 
-기존 CLI 독립 개발 경로는 `pnpm install --frozen-lockfile` → `pnpm build` → `pnpm core:init` → `pnpm core:doctor --live` → `pnpm core:start`다. live 진단은 본인 Kiro 모델 사용량을 소비하며 native IDE 검증을 대신하지 않는다. Crew secret이나 `/api/test/agent`는 사용하지 않는다. `pnpm client:pack`으로 외부 소비 SDK를 만들고 `pnpm panel:build` 후 Kiro에서 `examples/kiro-panel`을 F5로 실행한다. 지원 버전·Windows gate·인증 파일 취급은 위 개발 안내를 먼저 읽는다.
-
-## MVP 수직 흐름
+## 사용자 흐름
 
 ```text
-Learning Goal
-  → 반복 가능한 Project Discovery
-  → LEARNER_FOCUS / AGENT_SUPPORT / EXCLUDED Learning Spec
-  → 실제 TypeScript Builder 작업
-  → 실제 Decision에서 Helper와 사용자 판단
-  → Event / Episode / Evidence proposal
-  → deterministic Concept State
-  → 다음 Helper 설명과 Discovery 개인화
+배우고 싶은 기술 입력 (+ 선택적인 개인 필요)
+→ Discovery: 동적 프로젝트 후보 10개, 대화로 좁히기
+→ Learning Spec: 내가 이해할 것 / Agent가 맡을 것 / 제외할 것
+→ Builder: 실제 코드·테스트, 중요한 순간 Decision 요청
+→ Helper: 현재 코드·Decision 맥락으로 읽기 전용 설명
+→ Episode 단위 Evidence 분석 → Concept State 갱신 또는 보류
+→ 다음 Helper 설명과 프로젝트 추천 개인화
+→ 완성된 서비스 실행
 ```
 
-MVP host는 Kiro/Crew이고 Agent 중심 Crew App을 primary surface로 삼는다. Code 중심은 자체 Kiro IDE 패널에서 Discovery·Spec·Builder·Helper를 같은 Core 상태와 실제 Agent에 연결하는 prototype으로 검증한다. Bedrock 별도 경로, Claude Code·Codex adapter, 기존 project import와 cloud sync는 MVP 범위 밖이다.
+Concept State는 `OBSERVED → EXPLAINED → DEMONSTRATED → TRANSFERRED` 순서로만 올라가며, 오해는 상태 강등이 아니라 해결 가능한 open issue로 남는다.
 
-## 현재 상태
+## Agent와 Core
 
-| 구간 | 상태 | 완료된 결과 |
+| 구성 | 하는 일 | 권한 |
 | --- | --- | --- |
-| T00~T07 | 완료 | 승인 문서, Kiro/Crew capability spike, pnpm/TypeScript workspace, strict contract, deterministic reducer, SQLite repository, 역할 고정 MCP와 평가 harness |
-| T08~T13 | 완료 | Candidate revision loop, Learning Spec, 실제 Builder/Decision, read-only Helper, Event/Episode와 no-tool Evidence Analyst |
-| T14 | 완료 | Crew Node backend, same-origin HMAC 경계, Project History와 durable session 복원, Builder/Helper slot binding |
-| T15 | 완료 | Korean-first Discovery/Spec UI, 10개 durable preview와 순차 background enrichment, selection narrowing, Spec revision·Builder 진입, target Crew 설치·복구 검증 |
-| T16 | 완료 | conversation-first Builder/Helper UI, 실제 Decision handoff, native transcript와 완료 결과 |
-| T17 | 완료 | Project Evidence Trace, bounded cross-project retrieval, immutable personalization provenance |
-| T18 | 완료 | hidden Evidence Analyst worker, strict loopback 결과 실행기, optional Final Upgrade, Campus Drop 실행 fixture |
-| T19 / T19-N | 미완료 | 독립 backend·SDK·Kiro 패널과 native 연결 구현. frontend 통합·native 안정성·의미 품질 등 상위 gate 유지 |
-| T19-W1~W4 | 완료 | Windows capability 실측, portable Core/VSIX, runtime 재사용, 확장 lifecycle과 생성 앱 도구 준비 |
-| T19-W5 | 진행 중 | 최신 전체 회귀 PASS, Personal Need 복구 흐름 완주. 최신 fresh 양쪽 흐름·native 초기화/취소·전체 GUI/frontend·clean 설치는 미완료 |
+| Discovery Agent | 후보 생성·수정, Learning Spec 초안 | 코드·shell 없음 |
+| Builder Agent | 실제 코드·테스트·디버깅, Decision 요청 | 생성 workspace 안에서만 write/shell |
+| Helper Agent | 현재 맥락 기반 설명, 선택지 비교 | 읽기 전용 |
+| Evidence Analyst | 종료된 Episode에서 Evidence 제안 | 도구 없음, 제안만 |
+| TypeScript Core | validation, 권한 경계, deterministic 상태 계산, SQLite 저장 | 유일한 상태 변경 주체 |
 
-T18의 Campus Drop fixture는 TypeScript runtime boundary, SQLite metadata와 blob file 분리, SHA-256 token digest, expiry와 1회 consume를 실제 build/test/HTTP 실행으로 검증한다. 제품 결과 실행기는 workspace 안의 strict `.vibe-helper/result.json`과 compiled JavaScript만 읽고, symlink containment를 확인한 뒤 최소 환경의 Node child를 `127.0.0.1` 동적 port에서 감독한다.
+네 Agent는 Kiro IDE의 내장 Agent와 모델 위에서 동작한다. Agent는 제안만 하고, 이해 상태의 판정은 Core의 deterministic reducer가 한다.
 
-알려진 제한으로 첫 유용 반응은 아직 3~5초 stretch goal에 도달하지 않았다. 전체 background 상세 수렴은 최종 측정에서 148.371초였지만 사용자 진행 조건은 아니며, 장기 P95와 background 분포는 T21에서 검증한다. 실행 중 Agent stream/progress의 화면 이탈 후 재연결은 MVP 보장 범위가 아니지만, 저장 완료된 Project·Session·Task·Decision·Context는 Core에서 복원한다.
+## 시스템 구조
 
-평가 실행법과 자동/사람 review 경계는 `tests/eval/README.md`, Agent 회귀 결과는 `tests/eval/results/`, AC 추적표는 `tests/eval/TRACEABILITY.md`에 있다. T01의 상세 계획과 결과는 `docs/spikes/KIRO_CREW_CAPABILITY_SPIKE.md`, `docs/spikes/KIRO_CREW_CAPABILITY_RESULTS.md`에 있다.
+```text
+Kiro IDE
+ └─ Vibe Helper 확장 (Hello-KU-tty/program)
+     ├─ Webview 패널: Discovery · Spec · Builder · Helper · History
+     ├─ Kiro native Agent 실행 (Discovery / Builder / Helper / Analyst)
+     └─ local Core 자동 기동·연결·복구
+          ├─ 인증된 loopback HTTP/SSE + 역할별 MCP
+          ├─ SQLite: Project · Task · Decision · Event/Episode · Evidence
+          ├─ 저장 전 secret·민감 경로 redaction
+          └─ 생성 workspace와 결과 앱 실행 supervisor
+```
 
-## 로컬 개발
+## 설치 (사용자)
+
+1. Kiro IDE를 설치하고 본인 계정으로 로그인한다.
+2. [Hello-KU-tty/program Releases](https://github.com/Hello-KU-tty/program/releases)에서 최신 VSIX를 받는다.
+3. Kiro에서 Extensions → `Install from VSIX…`로 설치한다.
+4. Agent Panel을 열고 배우고 싶은 기술을 입력한다.
+
+별도 서비스 로그인이나 API Key는 없다. 모델 사용량은 사용자 본인의 Kiro 계정에서 차감된다. 첫 실행 때 생성 앱의 도구·의존성 준비를 위해 network가 필요할 수 있다. 지원 OS·버전은 Release 노트를 따른다.
+
+## 개발 환경과 검증
 
 필수 도구는 Node.js 24.19.0과 pnpm 11.12.0이다. `.node-version`, `engines`와 preflight가 다른 runtime을 거절한다.
-
-이는 repository 개발용 pin이다. 제품 사용자 runtime은 T19-W에서 호환 범위와 capability를 검증해 분리하며, 현재 개발 pin을 우회하는 지침이 아니다.
 
 ```bash
 pnpm install --frozen-lockfile
@@ -71,39 +85,64 @@ pnpm exec playwright install chromium
 pnpm check
 ```
 
-`pnpm check`는 formatting, lint, TypeScript build/typecheck, unit, SQLite integration, evaluation calibration, package-boundary 및 artifact smoke와 Chromium E2E를 실행한다. 개별 명령은 다음과 같다.
+`pnpm check`는 format, lint, typecheck, DB schema, unit, SQLite integration, 평가 calibration, Campus Drop fixture, build, smoke와 Chromium E2E를 실행한다. 모든 자동 검사는 실제 모델을 호출하지 않는다. 기본 E2E 포트가 사용 중이면 `VIBE_E2E_FRONTEND_PORT`로 빈 포트를 지정한다.
+
+Kiro native 연동과 확장 패널 검사:
 
 ```bash
-pnpm format:check
-pnpm lint
-pnpm typecheck
-pnpm test:unit
-pnpm test:integration
-pnpm test:eval
-pnpm test:eval:live-discovery # local Kiro 로그인 환경에서 실행하는 bounded live probe
-pnpm test:eval:live-spec      # selected Candidate에서 draft Spec을 저장하는 bounded live probe
-pnpm test:eval:live-builder   # Decision gate를 포함한 bounded Builder live probe
-pnpm test:eval:live-helper    # current context 기반 read-only Helper live probe
-pnpm test:eval:live-analyst   # closed Episode→no-tool Analyst→Core Evidence live probe
-pnpm test:campus-drop        # Golden Path fixture build, unit와 실제 HTTP 회귀
-pnpm build
-pnpm test:smoke
-pnpm test:e2e
+pnpm panel:build
+node --test examples/kiro-panel/test/*.test.cjs
+node --test examples/program-macos-dev/test/*.test.cjs
+node scripts/test-program-consumer.mjs <program checkout 경로>
 ```
 
-## Workspace 경계
+실제 모델을 쓰는 live probe(`pnpm test:eval:live-*`)는 Kiro 로그인 환경에서 본인 계정 사용량을 소비한다. 평가 실행법은 [tests/eval/README.md](tests/eval/README.md)에 있다.
+
+### 최근 검증 결과 (macOS arm64, Node 24.19.0)
+
+| 검사 | 결과 |
+| --- | --- |
+| backend `pnpm check` | unit 137, integration 365, eval 41, Campus Drop 3, smoke 6, E2E 12 PASS (Windows 전용 등 11 SKIP) |
+| Kiro native 연동 회귀 | 161 PASS, 2 SKIP |
+| frontend (`program`) | typecheck, 719 tests, build PASS |
+| 실제 frontend → HTTP/SSE → SQLite consumer | PASS (모델 경계는 deterministic fixture) |
+| 의존성 감사 | backend pnpm audit, frontend npm audit 모두 0건 |
+| 실제 모델 수직 흐름 | 학습 목표 입력 → 후보 10개 → Spec 확정 → Builder Decision → Task 완료 → Helper → 후속 Task로 결과 수정 → 재시작 후 복원 |
+
+실제 흐름 기록은 [docs/FRONTEND_MAC_PROGRESS_20260928.md](docs/FRONTEND_MAC_PROGRESS_20260928.md), 보안·접근성 감사는 [docs/T20_AUDIT_20260928.md](docs/T20_AUDIT_20260928.md), 독립 소스 재현은 [docs/SOURCE_REPRODUCIBILITY_20260928.md](docs/SOURCE_REPRODUCIBILITY_20260928.md)에 있다.
+
+## 알려진 한계
+
+- 실제 초보 사용자 대상 검증과 일반 Kiro와의 비교는 아직 진행하지 않았다. 학습 효과를 수치로 주장하지 않는다.
+- Evidence Analyst가 미래 계획을 실제 수행으로 잘못 분류할 수 있다. Core는 구조·출처·권한을 검증하지만 자연어 의미의 정확성까지 보장하지 않는다.
+- 생성 프로젝트는 새 TypeScript 프로젝트로 한정한다. 기존 프로젝트 import, 다른 coding agent, cloud sync는 범위 밖이다.
+- redaction은 알려진 형태 중심이며 모든 개인정보를 탐지하지 않는다. 생성 코드 실행은 OS 수준 sandbox가 아니다.
+
+## 저장소 구조
 
 ```text
-apps/crew-app             Crew App 실행·bundle 경계
-apps/crew-backend         Crew reverse proxy와 role-bound HTTP MCP composition root
+apps/local-backend        독립 local Core 실행, native Agent relay
 apps/mcp-server           MCP process composition root
+apps/crew-app, crew-backend  초기 Crew App 경로 (회귀 근거로 보존)
 packages/contracts        runtime schema와 shared DTO
 packages/domain           deterministic entity·policy·reducer
-packages/application      use case와 transaction boundary
+packages/application      use case, transaction, redaction 경계
+packages/runtime          workflow·결과 앱 runtime
 packages/storage-sqlite   SQLite repository와 migration
-packages/kiro-adapter     Crew slot·polling·SSE transport 격리
-tests/eval                평가 calibration과 실제 Agent prompt 회귀 경계
-tests/campus-drop-generated 실행 가능한 Campus Drop Golden Path fixture
+packages/frontend-client  확장 frontend가 소비하는 SDK
+packages/kiro-adapter     Kiro/Crew transport 격리
+agents/, docs/agent-prompts/  Discovery·Builder·Helper·Analyst prompt 계약
+examples/kiro-panel       Kiro 확장 host와 native 연동
+tests/                    unit, integration, eval, smoke, E2E, Campus Drop fixture
 ```
 
-T02 package는 후속 작업의 위치와 dependency 방향을 고정했고 T03~T07은 versioned contract, deterministic reducer, durable SQLite repository, Agent/UI 공통 use case, 역할 고정 MCP catalog와 평가 기반을 구현했다. T08~T13은 네 Agent의 prompt·adapter와 Candidate/Spec/Build/Decision/Helper/Evidence 수직 Core 흐름을 연결했다. T14~T18은 그 상태를 실제 Crew App에서 복원·조작하고, Evidence 기반 다음 행동과 실행 가능한 local 결과까지 확장했다.
+## 설계 문서
+
+1. [PROJECT_BRIEF.md](PROJECT_BRIEF.md): 승인된 목표, 범위와 제약
+2. [docs/SPEC.md](docs/SPEC.md): 검증 가능한 제품 요구와 완료 조건
+3. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): system boundary, data flow, test 전략
+4. [docs/DECISIONS.md](docs/DECISIONS.md): 승인된 판단과 spike 결과
+5. [docs/TASKS.md](docs/TASKS.md): 작업 순서와 진행 상태
+6. [docs/agent-prompts/](docs/agent-prompts/): 네 Agent의 prompt 계약
+
+frontend 연동 안내는 [docs/FRONTEND_IDE_IMPLEMENTATION_GUIDE.md](docs/FRONTEND_IDE_IMPLEMENTATION_GUIDE.md), Windows 확장 runtime 기록은 [docs/WINDOWS_EXTENSION_HANDOFF_20260923.md](docs/WINDOWS_EXTENSION_HANDOFF_20260923.md)에서 시작한다. `spikes/`는 외부 기능 경계를 확인한 폐기 가능한 실험물이다.
