@@ -1,8 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { appendFile, lstat, mkdir, readFile, realpath, writeFile } from 'node:fs/promises'
+import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import type { ApplicationService, WorkspacePathPolicy } from '@vibe-helper/application'
-import { redactSensitiveText } from '@vibe-helper/application/redaction'
+import { redactSensitiveText, SensitiveTextStream } from '@vibe-helper/application/redaction'
 import {
   candidateIdSchema,
   helperContextSchema,
@@ -44,6 +45,7 @@ interface NativeJob {
   message: string
   state: 'WAITING' | 'CLAIMED' | 'CANCELLED' | 'DONE'
   onEvent: AgentInvocation['onEvent']
+  textStream: SensitiveTextStream
   resolve: (value: { text: string; stopReason: string }) => void
   reject: (error: Error) => void
   binding: ReturnType<typeof createNativeCoreBinding> | undefined
@@ -75,9 +77,10 @@ const coreActions = new Set([
 ])
 declare const __VIBE_PACKAGED_CORE__: boolean
 const PERSISTENT_NATIVE_RUNTIME =
-  typeof __VIBE_PACKAGED_CORE__ !== 'undefined' && __VIBE_PACKAGED_CORE__
+  process.platform !== 'darwin' ||
+  (typeof __VIBE_PACKAGED_CORE__ !== 'undefined' && __VIBE_PACKAGED_CORE__)
     ? ''
-    : '/Users/hurdoo/Library/Application Support/VibeHelper/NativeExperiment-20260913/runtime'
+    : join(homedir(), 'Library/Application Support/VibeHelper/NativeExperiment-20260913/runtime')
 const HELPER_HOST_PREFIX = '__vibe-native-helper-'
 function redactJobText(text: string, job: NativeJob): string {
   return redactSensitiveText(redactSensitiveText(text, job.workspace), job.projectWorkspace)
@@ -241,6 +244,7 @@ export class NativeAgentRelay implements WorkflowAgentPort {
         promptIssued: false,
         state: 'WAITING',
         onEvent: request.onEvent,
+        textStream: new SensitiveTextStream([workspace, projectWorkspace]),
         resolve,
         reject,
         binding,
@@ -506,7 +510,7 @@ export class NativeAgentRelay implements WorkflowAgentPort {
       throw new WorkflowError('NATIVE_JOB_NOT_CLAIMED')
     const event = value as Record<string, unknown>
     if (event.kind === 'TEXT' && typeof event.text === 'string' && event.text.length <= 65536)
-      job.onEvent({ kind: 'TEXT', text: redactJobText(event.text, job) })
+      this.#emitText(job, job.textStream.push(event.text))
     else if (event.kind === 'TOOL' && typeof event.update === 'object' && event.update !== null) {
       const update = event.update as Record<string, unknown>
       const keys = (value: unknown): value is string[] =>
@@ -703,8 +707,14 @@ export class NativeAgentRelay implements WorkflowAgentPort {
     for (const job of this.#jobs.values())
       this.#finish(job, new WorkflowError('NATIVE_RUNTIME_CLOSED'))
   }
+  #emitText(job: NativeJob, text: string): void {
+    for (let offset = 0; offset < text.length; offset += 65_536)
+      job.onEvent({ kind: 'TEXT', text: text.slice(offset, offset + 65_536) })
+  }
   #finish(job: NativeJob, error?: Error, value?: { text: string; stopReason: string }): void {
     if (job.state === 'DONE' || job.state === 'CANCELLED') return
+    if (error) job.textStream.discard()
+    else this.#emitText(job, job.textStream.finish())
     job.state = error ? 'CANCELLED' : 'DONE'
     job.message = ''
     job.helperQuestion = null

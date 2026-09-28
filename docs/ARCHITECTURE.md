@@ -2,6 +2,7 @@
 
 ## 1. 상태
 
+- 2026-09-28 통합 개선은 별도 `vibe-helper-frontend` checkout의 기존 port/controller/webview를 그대로 사용한다. Mac 검증에서는 현재 Windows portable 자산을 실행·변조하지 않고 검증된 Mac source runtime과 동일 HTTP/SSE 계약을 사용할 수 있는지 먼저 확인한다. 개발 검증용 연결과 Windows 제품 설치 지원은 구분한다.
 - 상태: 사용자 승인 완료, T18 Campus Drop Golden Path 구현 및 검증 완료
 - 기준 입력: [PROJECT_BRIEF.md](../PROJECT_BRIEF.md), [SPEC.md](SPEC.md)
 - T03 versioned contract와 Agent/UI runtime validation, T04 pure reducer와 Evidence policy v1.0.0, T05 SQLite schema/repository/migration, T06 application use case와 역할 고정 MCP server, T07 criterion 기반 evaluation contract와 harness, T08 Candidate loop, T09 Discovery와 Learning Spec, T10 native workspace lifecycle, T11 Builder와 Decision gate, T12 bounded Helper context, T13 Evidence Analyst와 durable Analysis Job, T14 Crew backend와 session restore, T15 Discovery/Spec UI, T16 conversation-first Agent Mode, T17 Evidence Trace와 다음 대화 개인화, T18 hidden Analyst worker·local result runtime·optional Final Upgrade까지 구현됐다.

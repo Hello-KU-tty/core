@@ -770,6 +770,63 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 
 ### [~] T19. 자체 Kiro IDE 패널과 프론트 실제 연동
 
+**2026-09-28 제출 준비 재개:** 사용자가 실제 프론트 checkout의 직접 기능·성능 수정과 Mac 연결 검증을 승인했다. Windows 전용 작업은 이번 실행에서 제외하며 아래 T19-F1부터 진행한다. 앞선 시간·프론트 수정 금지 기록은 당시 세션에 한정한다. 기존 상위 완료 gate는 검증 없이 닫지 않는다.
+
+#### [x] T19-F1. 실제 프론트 PREVIEW 재시도와 실패 복구 안내
+
+- **선행 조건:** 백엔드 `5af5eb0`, frontend `0858811`, 양쪽 인계/명세 확인 및 사용자 직접 수정 승인.
+- **산출물:** 같은 Project/Session의 명시적 PREVIEW 재시도, durable 결과/active run 우선 복구, 중복 클릭·응답 유실·재로드·취소 회귀, 안전한 quota/auth/access/model/rate/service/Trust/update 안내.
+- **완료 조건:** frontend adapter/controller 회귀와 실제 Core HTTP/SSE/SQLite consumer 검사, frontend typecheck/test/build 통과. History 조회만으로 모델 호출 0, native 실패를 성공으로 표시하지 않음, 새 key는 명시적 새 시도에만 발급.
+- **후속:** 실제 UI 및 Mac native 연결, 제출 준비 검증표·실행 자료. Windows 검사와 durable 실패 History/삭제 API는 이 작업에 포함하지 않는다.
+- **검증:** 기존 frontend 540 tests PASS; 실패 재현 6건 후 561 tests·typecheck·build PASS. 실제 frontend controller/port + 인증 HTTP/SSE + SQLite consumer PASS(모델 0). 원래 실패 run 캐시, 동시 재시도, 같은 Project/Session 유지와 안전한 quota 안내를 재검증했다. 결과 기록은 진행 중이며 실제 native 모델 성공과 구분한다.
+
+#### [x] T19-F2. 실제 프론트 단계 연결·재시작 복원과 Mac 화면 검증
+
+- **근거:** 실제 wiring은 새 Discovery Project ID를 Builder의 `bhlr.lastProjectId`에 전달하지 않으며, 기존 integration test는 ID를 미리 seed한다. History 행도 조회 결과를 화면에 적용하지 않아 이어서 보기 동작을 검증하지 못했다.
+- **범위:** 기존 화면/버튼을 유지하고 durable Core snapshot으로 Discovery·Spec·Build 상태를 복원한다. 새 Agent 호출은 명시적 사용자 action에만 허용한다. 실제 provider wiring과 신규·재로드·프로젝트 전환·실패 회귀를 추가한다.
+- **Mac:** exact Mac source gate를 유지한 개발 검증용 실행부에 동일 frontend 소스/웹뷰를 연결한다. Windows portable·VSIX 지원을 변경하지 않는다.
+- **모델 예산:** 사용자가 이번 세션에도 계정 누적 900 상한을 승인했다. 신규 호출 중단선 880과 15분 이내 usage 재확인을 유지한다. 자동 overage·계정 변경은 하지 않는다.
+- **완료 조건:** ID를 seed하지 않은 Discovery→Spec→Builder/Helper wiring, 저장 복원 시 새 Agent 0, 실제 화면 확인 및 가능하면 새 native 수직 흐름 근거. 불가능한 구간은 구체적인 호환성/외부 조건으로 보고한다.
+- **재개 승인:** 2026-09-28 사용자가 현재 backend `kiro-native-recovery` 폴더만의 Workspace Trust 승인을 명시하고 계속 진행하도록 요청했다. 상위 `.local-experiments` 신뢰, 계정/overage 변경은 승인 범위가 아니다. 이후 필요한 사용자 승인은 알림이 가는 입력 요청으로 받는다.
+- **현재 검증:** frontend712 tests/typecheck/build, actual provider+HTTP/SSE+SQLite consumer, backend 전체 check/E2E12 PASS. 진행 중 Discovery 복원12건·Spec 미준비 버튼3건·Helper 분석 상태4건에 이어 Decision/native 초안4건·완료/Decision 복원5건·결과/폴더 버튼2건·업그레이드 연결2건을 보완했다. 실제 Mac에서 새 PREVIEW/JIT/SPEC→Decision 선택→기본 Task COMPLETED→Chrome 결과 실행→Evidence-aware Helper(basis5)→sequence2 Task COMPLETED→Chrome의 브라우저 실행까지 연결했다. 후속 앱의 fresh 복사본 frozen install/typecheck/build/17 tests/smoke PASS. 원래 서버 실행 불일치를 후속 목표로 교정했으며 Helper의 동률 순서 설명 오류는 한계로 보존한다. 전체 backendcheck는 unit137+3SKIP/integration330+8SKIP/eval41/Campus3/smoke6/E2E12 PASS다. [현재 작업 기록](FRONTEND_MAC_PROGRESS_20260928.md).
+- **완료 판정 17:38:** 실제 frontend의 저장 복원·명시적 선택·동시 Helper·Evidence→다음 개인화·결과 실행을 합성 입력/native receipt/Chrome으로 확인했다. 사용자 이해 근거는0이며 Agent 코드·설명·클릭을 이해로 올리지 않았다. 구서버 재사용 결함2개를 재현하고 bounded compiled-content 검사8 tests로 보완했으며, idle 검증 Core만 재시작해 최신 앱을 다시 실행했다. F2 범위 완료이며 Windows/general-install/상위T19-N·사람 pilot·최종 제출 완료는 아니다. 모든 MVP surface/data path의 이 검증 경로가 연결됐으므로 다음은 T20 감사다.
+- **실화면 후속:** 해결된 Decision 선택 버튼 차단, stream hydrate 입력 DOM 보존, 완료 상태 복원, 기존 명령의 누락된 결과/폴더 버튼 연결과 Final Upgrade 참조/새 Task 갱신을 기존 F2 범위에서 보완했다. 디자인·탐색 구조·Decision 권한·모델 자동 호출 정책은 유지한다.
+- **16:19 환경 문제 및 재개:** Mac IDE 셸은 Node26.4.0을 사용하고 생성 앱의 pnpm이 상위 backend workspace14개를 탐색했다. 생성 앱 자체 lock/node_modules가 없어 독립 앱 검사로 인정하지 않는다. active Run0/Task BLOCKED(실제 Decision 대기)는 보존했다. 별도 프로필·재로그인이 필수라는 근거는 없어 처음 제안을 철회하고, 사용자가 기존 프로필 유지·최소 환경 수정을 승인했다. 저장소 밖의 검증 전용 Core와 생성 폴더에 한정한 Node24 터미널 설정을 모델0으로 먼저 검증한다. 새 폴더 Trust는 정확한 경로로 별도 확인한다. 기본 native 경로의 상위 package 설정 상속은7건 FAIL 후 실행 전에 거절하도록 보강했고 Windows launcher는 바꾸지 않았다. 상위 gate와 T20 이후는 아직 완료하지 않는다.
+
+#### [x] T19-F3. 프론트 메시지 입력 경계 검증과 제출 준비 대조
+
+- **선행 조건:** F1 완료, 실제 frontend 소비 경로와 F2 모델0 검사. native/Trust 승인은 이 정적·회귀 작업의 선행 조건이 아니다.
+- **근거:** flow message parser는 type만 확인하고 payload를 그대로 controller로 전달한다. 누락·잘못된 타입·과대 입력이 예외나 불필요한 요청을 만드는지 검사해야 한다.
+- **범위:** 현행 input/ref/message 계약과 UI를 유지하면서 malformed payload를 실패 차단한다. read-only History와 정상 입력은 보존한다. 공식 대회 공개 요건과 실제 검증 근거를 대조하되 별도 제출 형식·참가자 결과를 가정하지 않는다.
+- **산출물·완료 조건:** 실패 재현·경계/회귀 검사, 실제 provider에서 잘못된 메시지의 Core 호출0, frontend typecheck/test/build 및 actual consumer PASS; 확인 가능한 제출 요건과 외부 확인 필요 항목을 분리한 문서. T20/T21/최종 제출 완료로 대체하지 않는다.
+- **검증:** parser32건과 혼합 protocol wiring1건의 FAIL 재현 후 수정. 배열 빈 슬롯/상한을 포함한 frontend52files/622tests·typecheck·build PASS, actual consumer에서 malformed10종의 Core 요청0과 정상 메시지/History PASS. Mac 개발 번들도 재빌드했다(모델0). [제출 준비 대조](SUBMISSION_READINESS_20260928.md)에 공식 공개 요건과 아직 필요한 참가자 안내·native·pilot·baseline 근거를 구분했다.
+
+#### [x] T19-F4. 프로젝트 전환 중 남은 Agent 동작 경합
+
+- **선행 조건:** F2의 프로젝트 바인딩/History 복원과 F3 입력 경계 완료. native 실행 승인은 모델0 race 검사의 선행 조건이 아니다.
+- **근거:** Builder/Helper stream은 바인딩 버전을 검사하지만 Decision/native 답변, workspace/result 열기, Evidence/Final Upgrade에는 await 이후 같은 검사가 없다. History 전환 뒤 이전 응답이 새 화면을 덮거나 이전 workspace를 열 수 있다.
+- **범위:** 기존 명시적 action의 바인딩만 유지하며 전환/폐기 뒤 늦은 콜백·후속 요청을 무효화한다. 이미 Core에 수락된 요청은 자동 취소/재실행하지 않는다. UI 디자인·프로토콜·도메인 정책은 바꾸지 않는다.
+- **완료 조건:** 지연된 읽기/명령 응답의 회귀를 FAIL로 재현 후 수정, 정상 Decision/Helper/Evidence/Final Upgrade 회귀 유지, frontend 전체 검사와 actual consumer PASS. 상위 제출 gate를 대체하지 않는다.
+- **검증:** 전환/원래 Project 복귀/폐기 race24건과 이전 Evidence·초안 잔존1건 FAIL 재현 후 수정. 후속 await 단계·폐기 후 무동작·dispatcher 마지막 전송 검사까지 포함해 frontend52files/656tests·typecheck·build PASS. 실제 인증 HTTP Evidence 응답을 지연시킨 상태에서 History를 전환해 옛 응답을 보내지 않음을 actual consumer로 확인했다. 최신 Mac 번들 reload·한글 초안/History/Trust 차단 재확인, 모델0. F2 native는 Trust 승인 대기다.
+
+#### [x] T19-F5. Mac 개발 검증 실행부의 모델 요청 예산 회귀
+
+- **선행 조건:** F1/F3/F4 모델0 검사. 유료 native/Trust 승인은 이 독립 회귀의 선행 조건이 아니다.
+- **근거:** 새 개발 host의 credit guard는 startDiscovery/startRun만 감싸며 UI_RETRY_ANALYSIS는 직접 execute된다. 관측당2회 제한도 host별 Promise queue와 log 읽기/append여서 서로 다른 host가 겹칠 때 원자성이 증명되지 않았다. 아직 이 경로의 전용 테스트가 없다.
+- **범위:** 개발 harness에만 적용한다. fresh observation·누적900/중단880·overage 금지 조건과 read-only 허용을 유지하며, 명시적 Analysis 재시도와 중복 host admission 경계를 회귀로 검증한다. 자동 후속 Analyst를 포함한 실제 사용량은 운영자가 별도 관찰해야 하며 billing hard cap으로 주장하지 않는다. 제품 quota/프롬프트/DB/지원 버전은 변경하지 않는다.
+- **완료 조건:** 누락/오염/오래됨/미승인/한도 초과 관측·동시/재로드·실패 후 재시도의 fail-closed 검사, 가짜 모델 dispatch0 및 정상 read-only 검사, 개발 번들 빌드·기존 consumer PASS. 실제 승인 파일 생성이나 모델 호출은 하지 않는다.
+- **검증:** 분석 재시도 무관측 통과와 동시6host의6회 허용을 FAIL로 재현한 뒤 수정했다. 실제 개발 entry와 fake Core/native 경계·별도 Node6프로세스의34검사 PASS, frontend657·typecheck·build, actual consumer PASS. 최신 전체 backendcheck는 unit130+3SKIP/integration325+8SKIP/eval41/Campus3/smoke6/E2E12, 별도 native161+2SKIP PASS. 소유 개발 stage의 승인 관측/허용 기록0, Project0/active run0; 최신 번들 실제 제한 모드 reload와 usage815.91 갱신 확인. 실제 모델0.
+- **다음 외부 조건:** F2 재개에는 해당 backend 폴더만의 Workspace Trust 명시적 승인이 필요하다. 자동 Goal 계속 신호나 크레딧900 승인으로 Trust 승인을 대신하지 않는다. 별도 제출 양식·pilot/baseline 사람 근거도 아직 제공/검증되지 않았다. 후속 task 선행 조건을 건너뛰거나 이 작업으로 최종 제출 완료를 선언하지 않는다.
+
+#### [x] T19-F6. 분석 재시도 화면 갱신과 입력 검증 피드백
+
+- **선행 조건:** F3~F5 완료, 현행 Core/프론트 계약 유지. native 모델/Trust 없이 회귀 가능한 기능 수정이다.
+- **근거:** retryAnalysis는 새 Evidence view를 읽고 버리며 dispatcher는 갱신 view를 보내지 않는다. 선택 입력은4000자 상한을 UI에서 안내하지 않아 F3의 엄격한 parser에서 조용히 거절될 수 있다. 합치기 UI/validator도 Core의 targets 최대8개를 반영하지 않는다.
+- **범위:** 기존 Evidence 영역을 성공한 명시적 retry 뒤 갱신하고 F4 stale-binding 보호를 유지한다. 기존 입력 오류 안내와 composer 안내에 현행 계약 상한을 반영해 요청 전 설명하고 초안을 보존한다. 화면/탐색·도메인 상한·Evidence 판정·자동 모델 실행 정책은 바꾸지 않는다.
+- **완료 조건:** stale view/과대 입력을 FAIL로 재현 후 수정, 정상 경계값과 오류 후 재입력·중복 요청·프로젝트 전환 회귀, frontend 전체 검사 및 actual consumer PASS. 실제 native와 제출 완료는 별도다.
+- **검증:** 프론트13건과 실제 버튼→Core의 revision0 거절을 FAIL로 재현했다. 버튼의 sentinel0은 기존 UI_READ_ANALYSIS_JOBS로 현재 실패 job revision을 조회해 해결하며, 성공한 retry의 새 Evidence view를 dispatcher가 보낸다. 동일 job의 중복 클릭은 한 mutation이고 실패·read 오류 후 자동 retry는 없다. frontend54files/680tests·typecheck·build PASS, 실제 bootstrap/client/renderer(메모리 DOM)→인증 HTTP→SQLite consumer에서 실패→WAITING·재시도 버튼 제거 PASS. 최신 전체 backendcheck(E2E12 포함)도 PASS. Mac 실제 화면에서4001자 안내·History 후 초안 유지·4000자 교정 시 안내 제거를 확인했다. 디자인·프롬프트·Evidence 정책·Windows kit 변경과 유료 모델 호출은 없다.
+- **당시 대기 및 갱신:** F6 완료 당시 F2는 Trust 답변을 기다렸다. 이후 정확한 폴더 승인을 받아 위 F2 native 흐름과 복원을 검증했다. 과거 대기를 현재 차단 사유로 재사용하지 않는다. Windows 및 참가자 검증은 여전히 별도이며 임의 완료하지 않는다.
+
 **2026-09-28 08:50 사용자 연장:** 마감은 같은 날 **10:00 KST**로 변경했다. 최신 프론트 main0858811의 실측 인계 B2(Core 설치 경로 재사용)·B1(RPC 오류 사유) 등을 백엔드에서 수정·검증하는 데 우선 집중한다. [대조 기록](spikes/T19_FRONTEND_LATE_LIVE_TRIAGE_20260928.md). 계정누적900 상한과 프론트수정/commit/push/배포 금지, 공유Core/사용자창 보존은 유지한다. 아래08:43 종료는 1차 Mac 성능작업 기록이며 현재T19/Goal은 계속진행중이다.
 
 **09:20 후속:** B2는 설치/runtime identity 비교·불일치 lease 갱신 금지·45초 정상 owner 종료 대기·명시적 재시도 검증으로 수정했다. B1은 bounded structured 오류의 고정 코드 분류·worker/run 전파를 구현했다.09:08 시작 fullcheck unit128/integration325/eval41/E2E12 PASS이며 이후 lifecycle 재시도 guard3개·worker 오류7개·Trust1개와 실제 program 오류4종/같은 Project 명시적 retry 검증을 추가했다. B3 frontend의 옛 run 캐시 갱신 필요, durable 실패/abandon 미구현, B5 Windows 프로세스/정책 영향 미확정은 [항목별 인계](spikes/T19_FRONTEND_LATE_LIVE_TRIAGE_20260928.md)에 구분한다. Windows 신규 실측/새 kit/상위T19 완료는 아니다. 추가 모델0.
@@ -1019,7 +1076,13 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - 새 학습 목표/Personal Need 유무의 Discovery·선택·Spec→Builder/Helper·실제 Decision→테스트/결과 실행→durable History를 확인한다. Evidence 출처·분석 실패/복구·다음 context 전달은 실제 결과와 품질 한계를 분리한다.
 - 변경 범위별 unit/contract/storage/Agent eval/IDE 검증과 `pnpm check`, packaged clean install receipt·용량/RSS·지원표를 남긴다. `AC-MVP-015`와 기존 T19/T19-N 완료 기준이 모두 충족됐을 때만 상위 task 완료 여부를 재판정한다.
 
-### [ ] T20. 보안·개인정보·접근성·복구 hardening
+### [~] T20. 보안·개인정보·접근성·복구 hardening
+
+- 19:01 후속: 후보 선택 시 DOM 교체로 keyboard focus가 사라지는 결함을 수정했다. 실제 Chrome과 frontend719 회귀 PASS; OS 홈 기반의 legacy Mac 경로·receipt 철자 경계도 보완했다. private source 압축 해제본의 backend 전체/프론트 검사는 통과했지만 native fixture prompt2개 누락을 발견하여 선택기를 수정하고 재검증 중이다. source 재현이나 모델0 GUI 결과를 사람 pilot·baseline 또는 일반 제품 설치 완료로 확대하지 않는다.
+- 19:06 수정 source 후보752개의 압축 해제본에서 frozen install→backend 전체(E2E12)→frontend719→native/개발 host/receipt/source 선택기210+2SKIP→actual consumer→Mac host build를 통과했고 검사 후 hash가 일치했다. 첫 prompt 누락 후보는 보존하고 전달 대상에서 제외했다. [source 재현 보고서](SOURCE_REPRODUCIBILITY_20260928.md)와 별도 검증 receipt를 남겼으며 사용자 제출 범위 판단은 아직 대기다.
+
+- 2026-09-28 착수: T19-F2의 Mac 실제 frontend 수직 흐름 검증 후, 연결된 surface의 수집 안내·접근성·redaction·복구 회귀를 점검한다. Windows 전용 검증과 일반 설치 제품화는 이번 사용자 지정 범위에서 제외하되 미검증 한계로 유지한다.
+- 18:27 결과: 첫 안내/한국어/스크롤 영역 label과 focus, 저장 전 구조화 redaction·민감 경로 거절·분할 TEXT 마스킹을 보완했다. frontend715, backend integration365/E2E12, native161+2SKIP·개발 환경41, actual consumer, 양쪽 의존성 audit0 PASS. 실제 Kiro 재로드에서 완료 Task·Helper/Evidence 복원과 Chrome 결과 재실행을 확인했다. [NFR별 감사·제한](T20_AUDIT_20260928.md)을 남기며, 일반 설치 OPS와 모든 보조공학 검증을 완료로 확대하지 않아 상위 T20은 열린다. T21과 SPEC10.2의 사람 pilot/baseline 제한 승인도 아직 대기다.
 
 **범위**
 

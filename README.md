@@ -1,8 +1,10 @@
 # Vibe Helper
 
+2026-09-28 실제 frontend의 기능 복구와 Mac 개발 환경의 후속 Task까지 bounded native 흐름을 검증했다. [현재 구현·검증 기록](docs/FRONTEND_MAC_PROGRESS_20260928.md), [보안·접근성 감사](docs/T20_AUDIT_20260928.md), [제출 준비 대조표](docs/SUBMISSION_READINESS_20260928.md)와 [제출 Markdown 초안](docs/SUBMISSION.md)을 확인한다. 디자인/탐색 흐름은 유지했고 Windows 전용 작업은 제외했다. 일반 제품 설치, 사람 검증·baseline, 의미 품질과 공식 제출 형식은 미완료이며 Mac 개발 검증을 출하 완료로 표시하지 않는다.
+
 Vibe Helper는 코딩 초보자가 자기에게 실용적인 TypeScript 서비스를 고르고, Kiro Builder와 함께 실제로 만들며, 필요한 순간 Helper와 대화해 개념을 익히도록 돕는 build-first 개발 환경이다. 제품은 개발을 교육용 단계로 끊지 않고 실제 Decision, 작업 맥락과 사용자 행동에서 나온 Evidence를 다음 설명과 project 추천에 연결한다.
 
-현재 repository는 T00~T18과 Windows 확장 runtime의 T19-W1~W4 구현·검증 결과를 포함한다. Discovery→Learning Spec→Builder/Decision→Helper→Episode 단위 Evidence 분석→다음 개인화→사용자 선택 Final Upgrade→실행 가능한 local 결과까지 하나의 durable 수직 흐름으로 연결돼 있다. 현재 작업은 T19-W5 설치·수직 흐름 검증이며, 상위 T19 자체 Kiro IDE 패널/프론트 실제 연동과 T19-N은 미완료다. `spikes/kiro-crew/`의 코드는 외부 기능 경계를 확인하기 위한 폐기 가능한 실험물이다.
+현재 repository는 T00~T18과 Windows 확장 runtime의 T19-W1~W4 구현·검증 결과를 포함한다. Discovery→Learning Spec→Builder/Decision→Helper→Episode 단위 Evidence 분석→다음 개인화→사용자 선택 Final Upgrade→실행 가능한 local 결과까지 하나의 durable 수직 흐름으로 연결돼 있다. 이번 작업은 Windows 전용 T19-W5를 제외하고 실제 frontend T19-F1~F6 및 T20 hardening·제출 준비를 진행했다. 상위 T19/T19-N의 일반 설치·의미 품질 등 잔여 gate는 유지한다. [비공개 source 후보의 독립 재현](docs/SOURCE_REPRODUCIBILITY_20260928.md)은 전체 검사 PASS이며 최종 제출/출시 승인은 아니다. `spikes/kiro-crew/`의 코드는 외부 기능 경계를 확인하기 위한 폐기 가능한 실험물이다.
 
 ## 문서 읽는 순서
 

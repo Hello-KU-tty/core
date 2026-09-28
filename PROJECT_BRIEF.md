@@ -7,6 +7,7 @@
 > 수직 흐름 승인: 2026-09-12 사용자는 같은 분리 worktree에서 native Discovery부터 Builder 파일·Decision, Helper, 사용자 Evidence·Episode·Analyst와 다음 개인화까지 실제 Core 상태로 검증하도록 승인했다. 사람의 선택·발언은 명시적 합성 UI 입력으로만 대체하고 Agent 작성물로 이해 상태를 올리지 않는다. 기존 CLI/Crew 기본 경로와 Windows gate는 유지한다.
 > 4시간 전환 판단 승인: 2026-09-15 사용자는 09:58~13:58 UTC 동안 득실 중심의 최소 실제 검증을 끝낸 뒤 IDE-only frontend 개발 전환·인계를 판단하도록 승인했다. 안전·데이터·provenance 경계는 유지하고 기존 CLI 코드는 즉시 삭제하지 않는다. 미실행 Windows·장기 안정성·정밀 CLI 비교는 미지원/미검증으로 분리하며, 실제 안전 또는 동작 실패는 전환 판단에서 숨기지 않는다. [4시간 계획](docs/spikes/T19_NATIVE_IDE_ONLY_4H_CUTOVER_PLAN_20260915.md)을 따른다.
 > 제품 설치 요구 갱신: 2026-09-23 사용자는 Windows 중심 실사용과 Kiro 확장 설치만으로 Core backend까지 자동 작동하는 경험을 필수로 명확히 했다. 기존 런타임 재사용과 필요한 도구의 조건부 자동 준비 방향을 승인했다. 다음 개발은 native recovery 기준에서 분기한 Windows 브랜치로 이어가며, 요구 승인과 Windows 실행 검증은 구분한다. [Windows 인계](docs/WINDOWS_EXTENSION_HANDOFF_20260923.md)를 따른다.
+> 제출 준비 재개: 2026-09-28 사용자는 백엔드와 별도 `vibe-helper-frontend` checkout을 함께 수정해 최종 제출을 준비하도록 승인했다. 프론트 변경은 기능 동작·성능 보완에 필요한 최소 범위로 제한하고 기존 디자인·흐름을 유지한다. 이번 작업에서는 Windows 전용 작업과 호환성 검증을 제외하며 macOS에서 실제 프론트를 연결해 검증한다. Windows 제품 요구 자체를 삭제하거나 Mac 결과를 Windows PASS로 표시하지 않는다. 중대한 Mac 호환성 장애는 사용자에게 보고한다.
 > 출처: 사용자가 승인한 [PROJECT_SPEC.md](PROJECT_SPEC.md)와 합의된 Agent Prompt
 > 주의: 제품명은 아직 확정되지 않았으며 `Vibe Helper`, `BuildWhy`는 작업명이다.
 

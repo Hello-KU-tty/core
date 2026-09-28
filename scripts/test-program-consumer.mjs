@@ -13,6 +13,7 @@ import { createLocalServer } from '../apps/local-backend/dist/server.js'
 import { LocalCoreClient, entityId, uiMetadata } from '../packages/frontend-client/dist/index.js'
 
 const program = resolve(process.argv[2] ?? '')
+await mkdir(resolve('.data/frontend-handoff'), { recursive: true })
 const root = await mkdtemp(join(resolve('.data/frontend-handoff'), 'consumer-'))
 const require = createRequire(import.meta.url)
 for (const [entry, name] of [
@@ -21,6 +22,10 @@ for (const [entry, name] of [
   [join(program, 'src/core/flow/flow-controller.ts'), 'controller'],
   [join(program, 'src/adapter/agent/managed-agent-port.ts'), 'agent-port'],
   [join(program, 'src/core/agent/agent-controller.ts'), 'agent-controller'],
+  [join(program, 'src/agent-panel-view-provider.ts'), 'provider'],
+  [join(program, 'src/webview/main.ts'), 'webview'],
+  [join(program, 'src/webview/client-messaging.ts'), 'webview-client'],
+  [join(program, 'test/support/fake-dom.ts'), 'webview-dom'],
 ])
   await build({
     entryPoints: [entry],
@@ -29,6 +34,22 @@ for (const [entry, name] of [
     platform: 'node',
     format: 'cjs',
     target: 'node24',
+    plugins: [
+      {
+        name: 'consumer-vscode-surface',
+        setup(builder) {
+          builder.onResolve({ filter: /^vscode$/ }, () => ({
+            path: 'vscode',
+            namespace: 'consumer',
+          }))
+          builder.onLoad({ filter: /.*/, namespace: 'consumer' }, () => ({
+            contents:
+              'module.exports = { commands: { executeCommand: async () => {} }, env: { openExternal: async () => {} }, Uri: { file: fsPath => ({fsPath}), parse: value => value } }',
+            loader: 'js',
+          }))
+        },
+      },
+    ],
   })
 const { LocalCoreDiscoveryPort } = require(join(root, 'port.cjs'))
 const {
@@ -40,6 +61,10 @@ const {
 const { FlowController } = require(join(root, 'controller.cjs'))
 const { ManagedAgentPort } = require(join(root, 'agent-port.cjs'))
 const { AgentSurfaceController } = require(join(root, 'agent-controller.cjs'))
+const { wireWebviewMessaging } = require(join(root, 'provider.cjs'))
+const { bootstrap } = require(join(root, 'webview.cjs'))
+const { WebviewClient } = require(join(root, 'webview-client.cjs'))
+const { installFakeDom } = require(join(root, 'webview-dom.cjs'))
 await mkdir(join(root, 'workspaces'))
 const storage = await openSqliteStorage({ dataDirectory: join(root, 'db') })
 const application = new ApplicationService({
@@ -54,6 +79,7 @@ const metadata = () => ({
 })
 const counts = {}
 let failNext = null
+let heldPreview = null
 const instanceId = randomUUID()
 let client
 const runtime = new WorkflowRuntime({
@@ -62,6 +88,7 @@ const runtime = new WorkflowRuntime({
   agents: {
     async invoke(request) {
       counts[request.mode] = (counts[request.mode] ?? 0) + 1
+      if (request.mode === 'PREVIEW' && heldPreview) await heldPreview
       await new Promise((done, reject) => {
         const timer = setTimeout(done, 80)
         request.signal.addEventListener(
@@ -203,6 +230,7 @@ const unwrap = (result) => {
   return result.value
 }
 const port = new LocalCoreDiscoveryPort(client)
+let restoreDom
 try {
   const first = unwrap(
     await port.startDiscovery(
@@ -398,8 +426,8 @@ try {
   const failure = await port.generatePreviewRound({ discoverySessionId: failed.id }, envelope(0))
   assert.equal(failure.ok, false)
   assert.equal(failure.error.message, 'FIXTURE_AGENT_FAILED')
-  // Frontend B1/B3: inspect the real port's failure projection and its existing
-  // cached-run behavior. These are injected Agent failures, not paid RPC calls.
+  // Frontend B1/B3: actual port recovery over HTTP/SSE and SQLite, with
+  // injected Agent failures rather than paid RPC calls.
   for (const errorCode of [
     'NATIVE_QUOTA_EXCEEDED',
     'NATIVE_AUTH_REQUIRED',
@@ -427,18 +455,15 @@ try {
     assert.equal(cached.ok, false)
     assert.equal(cached.error.message, errorCode)
     assert.equal(counts.PREVIEW, countBeforeRetry, 're-reading a failed run is not a new attempt')
-    const snapshot = await client.restoreProject(failedSession.projectId)
-    const request = {
-      kind: 'DISCOVERY',
-      phase: 'PREVIEW',
-      projectId: failedSession.projectId,
-      discoverySessionId: snapshot.discoverySession.id,
-      expectedSessionRevision: snapshot.discoverySession.revision,
-      idempotencyKey: entityId('idem'),
-      enrichAfterPreview: false,
-    }
-    const retry = await client.startRun(request)
-    assert.equal((await client.startRun(request)).id, retry.id)
+    const retried = await Promise.all([
+      port.generatePreviewRound({ discoverySessionId: failedSession.id, retry: true }, envelope(0)),
+      port.generatePreviewRound({ discoverySessionId: failedSession.id, retry: true }, envelope(0)),
+    ])
+    assert.ok(retried.every((result) => result.ok && result.value.previews.length === 10))
+    const retry = (await client.listRuns(failedSession.projectId)).find(
+      (run) => run.status === 'SUCCEEDED' && run.phase === 'PREVIEW',
+    )
+    assert.ok(retry)
     const terminal = await client.watchRun(retry.id, () => {})
     assert.equal(terminal.status, 'SUCCEEDED')
     assert.equal(terminal.outcome, 'DURABLE_RESULT')
@@ -454,13 +479,13 @@ try {
       (await client.restoreProject(failedSession.projectId)).discoverySession.id,
       failedSession.id,
     )
-    // Current frontend must replace/clear this cache when wiring a retry action.
+    // The original port also sees the new durable result, never its old failure.
     const oldPort = await port.generatePreviewRound(
       { discoverySessionId: failedSession.id },
       envelope(0),
     )
-    assert.equal(oldPort.ok, false)
-    assert.equal(oldPort.error.message, errorCode)
+    assert.equal(oldPort.ok, true)
+    assert.equal(counts.PREVIEW, countBeforeRetry + 1)
   }
   const cancel = unwrap(
     await port.startDiscovery(
@@ -486,13 +511,329 @@ try {
       },
     },
   )
-  await controller.startDiscovery({ learningGoal: 'TypeScript small state machines' })
+  failNext = 'NATIVE_QUOTA_EXCEEDED'
+  const controllerInput = { learningGoal: 'TypeScript small state machines' }
+  await controller.startDiscovery(controllerInput)
+  const failedControllerProject = controller.getProject().id
+  const failedControllerSession = controller.getSession().id
+  assert.equal(controller.getPreviewRound(), null)
+  assert.match(controller.snapshot().notice.message, /사용량 한도/)
+  await controller.startDiscovery(controllerInput)
+  assert.equal(controller.getProject().id, failedControllerProject)
+  assert.equal(controller.getSession().id, failedControllerSession)
+  assert.equal(controller.getPreviewRound().previews.length, 10)
   assert.equal(controller.getProject().id, controller.getSession().projectId)
   await controller.submitFeedback({
     intent: 'SELECT',
     targets: [{ candidateId: controller.getPreviewRound().previews[0].candidateId, revision: 1 }],
   })
   assert.ok(controller.getSpec())
+  // Product wiring must bind a *new* Discovery, not rely on a test-seeded
+  // lastProjectId. Exercise the real provider against the same HTTP Core.
+  const persisted = new Map()
+  const posted = []
+  let consumerWebview = null
+  const hostClientCalls = []
+  let heldEvidence = null
+  const hostClient = new Proxy(client, {
+    get(target, key) {
+      const value = Reflect.get(target, key)
+      if (typeof value !== 'function') return value
+      return (...args) => {
+        hostClientCalls.push(String(key))
+        if (key === 'execute' && args[0]?.kind === 'UI_READ_EVIDENCE_TRACE' && heldEvidence) {
+          const held = heldEvidence
+          heldEvidence = null
+          return value.apply(target, args).then(async (result) => {
+            held.arrived()
+            await held.release
+            return result
+          })
+        }
+        return value.apply(target, args)
+      }
+    },
+  })
+  const host = {
+    client: hostClient,
+    worker: inertWorker,
+    prepare: async () => ({ client: hostClient }),
+    getStatus: () => ({ phase: 'CORE_CONNECTED', native: 'WORKER_READY' }),
+    subscribeStatus: () => () => {},
+    onDidRotate: () => () => {},
+  }
+  let receive
+  const wireProduct = () =>
+    wireWebviewMessaging(
+      {
+        postMessage: (message) => {
+          posted.push(message)
+          consumerWebview?.dispatch(message)
+        },
+        onDidReceiveMessage: (listener) => {
+          receive = listener
+          return { dispose() {} }
+        },
+      },
+      {
+        managedHost: Promise.resolve(host),
+        globalState: {
+          get: (key) => persisted.get(key),
+          update: async (key, value) => {
+            persisted.set(key, value)
+          },
+        },
+      },
+    )
+  const wired = wireProduct()
+  const liveAgent = await wired.agentReady
+  assert.ok(liveAgent)
+  await wired.ready
+  await liveAgent.controller.recover()
+  const callsBeforeMalformed = hostClientCalls.length
+  for (const malformed of [
+    { type: 'startDiscovery' },
+    { type: 'startDiscovery', input: { learningGoal: 42 } },
+    { type: 'startDiscovery', input: { learningGoal: 'x'.repeat(241) } },
+    { type: 'startDiscovery', input: { learningGoal: 'test', workspacePath: '/invalid' } },
+    { type: 'toggleBasket', ref: null },
+    { type: 'selectCandidate' },
+    { type: 'submitRefinement', action: 'show_more', targets: [] },
+    { type: 'refineSpec', message: [] },
+    { type: 'confirmSpec', kind: 'builder/start', message: 'must not run' },
+    { type: 'openHistoryProject', projectId: '../invalid' },
+  ])
+    await receive(malformed)
+  assert.equal(
+    hostClientCalls.length,
+    callsBeforeMalformed,
+    'malformed messages must call Core zero times',
+  )
+  await receive({
+    type: 'startDiscovery',
+    input: { learningGoal: 'New project binding without seeded state' },
+  })
+  const wiredProjectId = wired.flowController.getProject().id
+  assert.equal(
+    persisted.get('bhlr.lastProjectId'),
+    wiredProjectId,
+    'Discovery must persist its Core project for Builder and reload',
+  )
+  await wired.flowController.submitFeedback({
+    intent: 'SELECT',
+    targets: [
+      { candidateId: wired.flowController.getPreviewRound().previews[0].candidateId, revision: 1 },
+    ],
+  })
+  await wired.flowController.confirmSpec()
+  const wiredTask = (await client.restoreProject(wiredProjectId)).currentTask
+  assert.ok(wiredTask)
+  assert.ok(
+    !JSON.stringify(posted).includes(root),
+    'host workspace paths must not cross the webview boundary',
+  )
+  assert.ok(
+    !JSON.stringify(posted).includes('"workspacePath"'),
+    'host-only path fields must not be projected',
+  )
+  assert.ok(
+    !JSON.stringify(posted).includes(token),
+    'Core credentials must not cross the webview boundary',
+  )
+  const buildsBefore = counts.BUILDER
+  await liveAgent.controller.resumeAfterDecision()
+  assert.equal(counts.BUILDER, buildsBefore + 1)
+  assert.equal(liveAgent.controller.getViewModel().builder.taskId, wiredTask.id)
+  wired.messageSubscription.dispose()
+  const beforeReload = JSON.stringify(counts)
+  const reloaded = wireProduct()
+  const reloadedAgent = await reloaded.agentReady
+  await reloaded.ready
+  assert.equal(reloaded.flowController.snapshot().phase, 'building')
+  assert.equal(reloaded.flowController.getProject().id, wiredProjectId)
+  assert.equal(reloadedAgent.controller.getViewModel().builder.taskId, wiredTask.id)
+  assert.equal(JSON.stringify(counts), beforeReload, 'reload must be read-only')
+  // A failed synthetic job exercises the real explicit retry -> HTTP -> SQLite
+  // -> projected webview response, without launching an Analyst or model.
+  const retryExchange = await client.execute({
+    ...uiMetadata(),
+    kind: 'UI_RECORD_HELPER_EXCHANGE',
+    idempotencyKey: entityId('idem'),
+    projectId: wiredProjectId,
+    taskId: wiredTask.id,
+    userMessage: 'Synthetic model-0 retry verification, not learner Evidence.',
+    helperResponseSummary: 'Deterministic consumer fixture only.',
+    closeConversation: true,
+  })
+  let retryJob = storage.repository.readAnalysisJobForEpisode(
+    wiredProjectId,
+    retryExchange.episodeId,
+  )
+  assert.ok(retryJob)
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const claimed = await application.executeAnalysis({
+      schemaVersion: 1,
+      kind: 'ANALYSIS_CLAIM_JOB',
+      correlationId: retryExchange.correlationId,
+      actor: { kind: 'KIRO_ADAPTER' },
+      projectId: wiredProjectId,
+      analysisJobId: retryJob.id,
+      expectedJobRevision: retryJob.revision,
+      runtimeHandle: `synthetic-consumer-${attempt}`,
+    })
+    assert.equal(claimed.success, true)
+    const failed = await application.executeAnalysis({
+      schemaVersion: 1,
+      kind: 'ANALYSIS_FAIL_ATTEMPT',
+      correlationId: retryExchange.correlationId,
+      actor: { kind: 'KIRO_ADAPTER' },
+      projectId: wiredProjectId,
+      analysisJobId: retryJob.id,
+      expectedJobRevision: claimed.data.revision,
+      attempt: claimed.data.attempt,
+      failure: { code: 'ANALYST_TIMEOUT', message: 'Synthetic fixture timeout.', retryable: true },
+    })
+    assert.equal(failed.success, true)
+    retryJob = failed.data
+  }
+  assert.equal(retryJob.status, 'FAILED')
+  const dom = installFakeDom()
+  restoreDom = dom.restore
+  const webviewRoot = dom.createElement('div')
+  const buttonActions = []
+  consumerWebview = new WebviewClient({
+    postMessage: (message) => buttonActions.push(reloadedAgent.dispatcher.handle(message)),
+  })
+  bootstrap(webviewRoot, consumerWebview)
+  reloadedAgent.dispatcher.hydrate()
+  await reloadedAgent.dispatcher.handle({ kind: 'evidence/read' })
+  assert.equal(
+    posted.filter((message) => message.kind === 'agent/evidence').at(-1).view.analysis[0]
+      .displayState,
+    'ANALYSIS_FAILED',
+  )
+  const beforeRetryPosts = posted.filter((message) => message.kind === 'agent/evidence').length
+  const beforeRetryCalls = hostClientCalls.length
+  const retryButton = webviewRoot.queryAll(
+    (element) => element.className === 'agent-evidence-retry',
+  )[0]
+  assert.ok(retryButton, 'the actual renderer must provide the failed Analysis retry button')
+  retryButton.click()
+  retryButton.click()
+  await Promise.all(buttonActions)
+  const retryPosts = posted.filter((message) => message.kind === 'agent/evidence')
+  assert.equal(retryPosts.length, beforeRetryPosts + 1)
+  assert.deepEqual(hostClientCalls.slice(beforeRetryCalls), [
+    'execute',
+    'execute',
+    'execute',
+    'restoreProject',
+  ])
+  assert.equal(retryPosts.at(-1).view.analysis[0].displayState, 'WAITING')
+  assert.equal(
+    webviewRoot.queryAll((element) => element.className === 'agent-evidence-retry').length,
+    0,
+  )
+  assert.equal(
+    webviewRoot.queryAll((element) => element.className === 'agent-evidence-analysis-job')[0]
+      .dataset.displayState,
+    'WAITING',
+  )
+  assert.equal(retryPosts.at(-1).view.userUnderstandingTotal, 0)
+  assert.equal(
+    storage.repository.readAnalysisJob(wiredProjectId, retryJob.id).revision,
+    retryJob.revision + 1,
+  )
+  assert.equal(
+    JSON.stringify(counts),
+    beforeReload,
+    'synthetic Analysis retry must not invoke a model',
+  )
+  let releaseEvidence
+  let evidenceArrived
+  const readArrived = new Promise((done) => {
+    evidenceArrived = done
+  })
+  heldEvidence = {
+    arrived: evidenceArrived,
+    release: new Promise((done) => {
+      releaseEvidence = done
+    }),
+  }
+  const evidencePostsBefore = posted.filter((message) => message.kind === 'agent/evidence').length
+  const oldRead = reloadedAgent.dispatcher.handle({ kind: 'evidence/read' })
+  await readArrived
+  await receive({ type: 'openHistoryProject', projectId: second.projectId })
+  releaseEvidence()
+  await oldRead
+  assert.equal(
+    posted.filter((message) => message.kind === 'agent/evidence').length,
+    evidencePostsBefore,
+    'a delayed real HTTP Evidence response must not leak into another History project',
+  )
+  assert.equal(reloaded.flowController.snapshot().phase, 'discovery_workspace')
+  assert.equal(reloaded.flowController.getProject().id, second.projectId)
+  assert.equal(JSON.stringify(counts), beforeReload, 'History navigation must not invoke an Agent')
+  reloaded.messageSubscription.dispose()
+  // Real native workspace switches reload the frontend before PREVIEW is
+  // durable. Recreate that lifecycle with the actual provider and HTTP/SSE,
+  // keeping only the Agent computation deterministic and explicitly gated.
+  consumerWebview = null
+  let releasePreview
+  heldPreview = new Promise((done) => {
+    releasePreview = done
+  })
+  const beforeInFlightReload = { ...counts }
+  const beforeWindow = wireProduct()
+  await beforeWindow.ready
+  const startBeforeReload = receive({
+    type: 'startDiscovery',
+    input: { learningGoal: 'Read-only recovery after a native workspace window switch' },
+  })
+  const until = async (predicate) => {
+    const deadline = Date.now() + 5000
+    while (!predicate()) {
+      assert.ok(Date.now() < deadline, 'consumer lifecycle did not settle')
+      await new Promise((done) => setTimeout(done, 10))
+    }
+  }
+  await until(
+    () =>
+      beforeWindow.flowController.getSession() !== null &&
+      beforeWindow.flowController.getProject()?.id !== second.projectId,
+  )
+  const inFlightProject = beforeWindow.flowController.getProject().id
+  assert.equal(persisted.get('bhlr.lastProjectId'), inFlightProject)
+  beforeWindow.messageSubscription.dispose()
+  const afterWindow = wireProduct()
+  await afterWindow.ready
+  assert.equal(afterWindow.flowController.getProject().id, inFlightProject)
+  assert.equal(afterWindow.flowController.snapshot().discoveryInProgress, true)
+  assert.equal(afterWindow.flowController.getPreviewRound(), null)
+  releasePreview()
+  heldPreview = null
+  await until(
+    () =>
+      afterWindow.flowController.getPreviewRound()?.previews.length === 10 &&
+      !afterWindow.flowController.snapshot().discoveryInProgress,
+  )
+  await startBeforeReload
+  assert.equal(afterWindow.flowController.snapshot().phase, 'discovery_workspace')
+  assert.deepEqual(
+    counts,
+    { ...beforeInFlightReload, PREVIEW: beforeInFlightReload.PREVIEW + 1 },
+    'reload must read the existing PREVIEW, never replay or auto-start the next phase',
+  )
+  assert.ok(
+    posted.some(
+      (message) =>
+        message.type === 'hydrateFlow' &&
+        message.snapshot.project?.id === inFlightProject &&
+        message.snapshot.previewRound?.previews.length === 10,
+    ),
+    'terminal completion must automatically reach the actual webview bridge',
+  )
+  afterWindow.messageSubscription.dispose()
   const report = {
     status: 'PASS',
     boundary: 'actual program controller/port + authenticated HTTP/SSE + SQLite',
@@ -508,9 +849,16 @@ try {
       'original Agent failure',
       'classified native codes survive the actual port without automatic retry',
       'explicit same-Project PREVIEW retry succeeds exactly once and restores without model',
-      'known frontend limitation: original port retains its old failed-run cache',
+      'original port replaces failed-run cache and concurrent retries create one run',
+      'controller retry preserves Project/Session and shows safe quota guidance',
       'cancelled run is not success',
       'controller uses Core project ID',
+      'unseeded provider binds new Discovery to Builder and restores saved flow on reload',
+      'provider reload during an active PREVIEW automatically refreshes the webview from durable HTTP/SSE; no replay or extra Agent',
+      'malformed or mixed-protocol webview messages call Core zero times; valid messages still work',
+      'History selection restores the existing screen without a new Agent run',
+      'late authenticated Evidence read is detached after History project switching',
+      'actual webview retry button resolves the failed job revision and updates to WAITING; duplicate clicks mutate once',
       'selected candidate must match the requested revision',
       'actual agent controller empty-message resume reaches Core exactly once',
       'a successful Builder turn is not fabricated Task completion',
@@ -521,6 +869,7 @@ try {
   await writeFile(resolve('dist/frontend-consumer-receipt.json'), JSON.stringify(report, null, 2))
   console.log(JSON.stringify(report))
 } finally {
+  restoreDom?.()
   await runtime.close()
   server.closeAllConnections()
   await new Promise((done) => server.close(done))

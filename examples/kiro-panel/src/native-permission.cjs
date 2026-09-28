@@ -1,9 +1,31 @@
 const { lstat, readFile, realpath } = require('node:fs/promises')
-const { join, win32 } = require('node:path')
+const { dirname, join, win32 } = require('node:path')
 const { guardBuilderToolInput } = require('@vibe-helper/kiro-adapter/builder-tool-guard')
 
 const LOCKFILE_PREPARE_COMMAND =
   'pnpm install --lockfile-only --ignore-scripts --ignore-pnpmfile'
+
+// A native shell's cwd does not contain package-manager workspace discovery.
+// Legacy/non-launcher execution must not inherit an enclosing repository's
+// pnpm workspace or package hooks. Inspect names only; never read/execute them.
+// This is a fail-closed routing check, not an OS-level child-process sandbox.
+async function packageAncestorsIsolated(workspace) {
+  let parent = dirname(workspace)
+  for (let depth = 0; depth < 64; depth++) {
+    for (const name of ['pnpm-workspace.yaml', '.npmrc', '.pnpmfile.cjs', '.pnpmfile.mjs']) {
+      try {
+        await lstat(join(parent, name))
+        return false // Even a dangling symlink or non-regular config is unsafe.
+      } catch (error) {
+        if (error?.code !== 'ENOENT') return false
+      }
+    }
+    const next = dirname(parent)
+    if (next === parent) return true
+    parent = next
+  }
+  return false
+}
 
 async function lockfilePrepareReady(workspace, windowsLauncher = false) {
   const stat = async (name) => lstat(join(workspace, name)).catch((error) => {
@@ -104,6 +126,10 @@ async function chooseNativeBuilderPermission(detail, workspace, onDiagnostic, pr
       detail = { ...detail, rawInput: { ...detail.rawInput, cwd: workspace } }
     const problem = shellInputProblem(detail, workspace, diagnostic1170)
     if (problem) { onDiagnostic?.(problem); return null }
+    if (!projectCommand && /^(?:pnpm|npm)(?:\s|$)/.test(detail.rawInput.command) &&
+        !await packageAncestorsIsolated(canonicalWorkspace)) {
+      onDiagnostic?.('ANCESTOR_PACKAGE_CONFIG_DENIED'); return null
+    }
     if (projectCommand) {
       const command = await projectCommand(detail.rawInput.command).catch(() => null)
       if (!command) { onDiagnostic?.('PROJECT_TOOLCHAIN_DENIED'); return null }

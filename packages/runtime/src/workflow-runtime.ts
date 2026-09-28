@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { ApplicationService, ApplicationResult } from '@vibe-helper/application'
-import { redactSensitiveText } from '@vibe-helper/application/redaction'
+import { redactSensitiveText, SensitiveTextStream } from '@vibe-helper/application/redaction'
 import {
   LOCAL_PROTOCOL_VERSION,
   localRunRequestSchema,
@@ -329,52 +329,63 @@ export class WorkflowRuntime {
     if (entry.controller.signal.aborted) throw new WorkflowError('CANCELLED')
     const request = entry.input
     this.#state(entry, { phase: mode })
-    const response = await this.#agents.invoke({
-      mode,
-      projectId: snapshot.project.id,
-      correlationId:
-        turnCorrelationId ??
-        (request.kind === 'DISCOVERY'
-          ? (snapshot.discoverySession?.correlationId ?? snapshot.project.correlationId)
-          : (snapshot.currentTask?.correlationId ?? snapshot.project.correlationId)),
-      ...(request.kind === 'DISCOVERY'
-        ? { discoverySessionId: request.discoverySessionId }
-        : { taskId: request.taskId }),
-      ...(request.kind === 'DISCOVERY' && mode === 'ENRICH_SELECTED'
-        ? { requestedCandidateIds: request.candidateIds }
-        : {}),
-      ...(request.kind === 'HELPER'
-        ? {
-            helperQuestion: request.message,
-            ...(request.decisionId === undefined ? {} : { helperDecisionId: request.decisionId }),
-          }
-        : {}),
-      message,
-      signal: entry.controller.signal,
-      onEvent: (event) => {
-        if (entry.controller.signal.aborted) return
-        if (event.kind === 'TEXT')
-          this.#emit(entry, {
-            kind: 'TEXT',
-            text: redactSensitiveText(event.text).slice(0, 65_536),
-          })
-        else if (event.kind === 'TOOL')
-          this.#emit(entry, {
-            kind: 'TOOL',
-            update:
-              JSON.stringify(event.update).length <= 65_536
-                ? event.update
-                : {
-                    sessionUpdate: 'tool_call_update',
-                    status: 'truncated',
-                    summary: 'TOOL_OUTPUT_TOO_LARGE',
-                  },
-          })
-        else this.#emit(entry, { kind: 'PERMISSION_DENIED' })
-      },
-    })
-    if (entry.controller.signal.aborted) throw new WorkflowError('CANCELLED')
-    if (response.stopReason !== 'end_turn') throw new WorkflowError('AGENT_TURN_INCOMPLETE')
+    const textStream = new SensitiveTextStream()
+    const emitText = (text: string): void => {
+      for (let offset = 0; offset < text.length; offset += 65_536)
+        this.#emit(entry, { kind: 'TEXT', text: text.slice(offset, offset + 65_536) })
+    }
+    const response = await this.#agents
+      .invoke({
+        mode,
+        projectId: snapshot.project.id,
+        correlationId:
+          turnCorrelationId ??
+          (request.kind === 'DISCOVERY'
+            ? (snapshot.discoverySession?.correlationId ?? snapshot.project.correlationId)
+            : (snapshot.currentTask?.correlationId ?? snapshot.project.correlationId)),
+        ...(request.kind === 'DISCOVERY'
+          ? { discoverySessionId: request.discoverySessionId }
+          : { taskId: request.taskId }),
+        ...(request.kind === 'DISCOVERY' && mode === 'ENRICH_SELECTED'
+          ? { requestedCandidateIds: request.candidateIds }
+          : {}),
+        ...(request.kind === 'HELPER'
+          ? {
+              helperQuestion: request.message,
+              ...(request.decisionId === undefined ? {} : { helperDecisionId: request.decisionId }),
+            }
+          : {}),
+        message,
+        signal: entry.controller.signal,
+        onEvent: (event) => {
+          if (entry.controller.signal.aborted) return
+          if (event.kind === 'TEXT') emitText(textStream.push(event.text))
+          else if (event.kind === 'TOOL')
+            this.#emit(entry, {
+              kind: 'TOOL',
+              update:
+                JSON.stringify(event.update).length <= 65_536
+                  ? event.update
+                  : {
+                      sessionUpdate: 'tool_call_update',
+                      status: 'truncated',
+                      summary: 'TOOL_OUTPUT_TOO_LARGE',
+                    },
+            })
+          else this.#emit(entry, { kind: 'PERMISSION_DENIED' })
+        },
+      })
+      .catch((error: unknown) => {
+        textStream.discard()
+        throw error
+      })
+    if (entry.controller.signal.aborted || response.stopReason !== 'end_turn') {
+      textStream.discard()
+      throw new WorkflowError(
+        entry.controller.signal.aborted ? 'CANCELLED' : 'AGENT_TURN_INCOMPLETE',
+      )
+    }
+    emitText(textStream.finish())
     return redactSensitiveText(response.text)
   }
   async #execute(entry: Entry): Promise<void> {

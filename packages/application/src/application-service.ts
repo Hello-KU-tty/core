@@ -99,6 +99,7 @@ import {
 } from '@vibe-helper/domain'
 
 import { ApplicationError, type ApplicationResult, createOperationError } from './errors.js'
+import { redactContractText, SensitiveReferencePathError } from './redaction.js'
 import {
   canonicalJson,
   MAX_APPLICATION_PAYLOAD_BYTES,
@@ -284,6 +285,9 @@ export class ApplicationService {
   readonly #now: () => Date
   readonly #generateId: (prefix: IdPrefix) => string
   readonly #maxPayloadBytes: number
+  // Retain only a hash, never the original credential-bearing payload. Redacted
+  // requests still conflict when a caller reuses a key with different raw text.
+  readonly #originalRequestHashes = new WeakMap<object, string>()
 
   constructor(options: ApplicationServiceOptions) {
     this.#storage = options.storage
@@ -303,7 +307,13 @@ export class ApplicationService {
     if (!validated.success) return validated
 
     try {
-      return { success: true, data: await this.#dispatchAgent(validated.data as AgentRequest) }
+      const redacted = redactContractText(validated.data)
+      const safe =
+        redacted === validated.data ? validated : validateAgentRequest(authenticatedRole, redacted)
+      if (!safe.success) return safe
+      if (redacted !== validated.data)
+        this.#originalRequestHashes.set(safe.data, sha256(canonicalJson(validated.data)))
+      return { success: true, data: await this.#dispatchAgent(safe.data as AgentRequest) }
     } catch (error) {
       return { success: false, error: this.#mapError(error, validated.data.correlationId) }
     }
@@ -316,7 +326,13 @@ export class ApplicationService {
     if (!validated.success) return validated
 
     try {
-      return { success: true, data: await this.#dispatchUi(validated.data) }
+      const redacted = redactContractText(validated.data)
+      const safe =
+        redacted === validated.data ? validated : validateContract(uiRequestSchema, redacted)
+      if (!safe.success) return safe
+      if (redacted !== validated.data)
+        this.#originalRequestHashes.set(safe.data, sha256(canonicalJson(validated.data)))
+      return { success: true, data: await this.#dispatchUi(safe.data) }
     } catch (error) {
       return { success: false, error: this.#mapError(error, validated.data.correlationId) }
     }
@@ -329,7 +345,15 @@ export class ApplicationService {
     if (!validated.success) return validated
 
     try {
-      return { success: true, data: await this.#dispatchAnalysis(validated.data) }
+      const redacted = redactContractText(validated.data)
+      const safe =
+        redacted === validated.data
+          ? validated
+          : validateContract(analysisRuntimeRequestSchema, redacted)
+      if (!safe.success) return safe
+      if (redacted !== validated.data)
+        this.#originalRequestHashes.set(safe.data, sha256(canonicalJson(validated.data)))
+      return { success: true, data: await this.#dispatchAnalysis(safe.data) }
     } catch (error) {
       return { success: false, error: this.#mapError(error, validated.data.correlationId) }
     }
@@ -823,7 +847,9 @@ export class ApplicationService {
           createdAt,
           updatedAt: createdAt,
           source: { kind: 'USER' },
-          redactionStatus: 'NOT_REQUIRED',
+          redactionStatus: this.#originalRequestHashes.has(request)
+            ? 'VERIFIED_REDACTED'
+            : 'NOT_REQUIRED',
         }
         const session = {
           schemaVersion: 1 as const,
@@ -836,7 +862,9 @@ export class ApplicationService {
           openedAt: createdAt,
           updatedAt: createdAt,
           source: { kind: 'USER' as const },
-          redactionStatus: 'NOT_REQUIRED' as const,
+          redactionStatus: this.#originalRequestHashes.has(request)
+            ? ('VERIFIED_REDACTED' as const)
+            : ('NOT_REQUIRED' as const),
         }
         repository.appendProject(project)
         repository.appendDiscoverySession(session)
@@ -2028,7 +2056,9 @@ export class ApplicationService {
           openedAt: returnedAt,
           updatedAt: returnedAt,
           source: { kind: 'USER' as const },
-          redactionStatus: scoped.session.redactionStatus,
+          redactionStatus: this.#originalRequestHashes.has(request)
+            ? ('VERIFIED_REDACTED' as const)
+            : scoped.session.redactionStatus,
         }
         repository.appendDiscoverySession(newSession)
         repository.appendProject({
@@ -2036,6 +2066,7 @@ export class ApplicationService {
           revision: scoped.project.revision + 1,
           title: nextInput.learningGoal.slice(0, 120),
           learningGoal: nextInput.learningGoal,
+          redactionStatus: newSession.redactionStatus,
           status: 'DISCOVERY',
           updatedAt: returnedAt,
           source: { kind: 'USER' },
@@ -5056,7 +5087,7 @@ export class ApplicationService {
     responseSchema: ResponseSchema<T>,
     work: () => IdempotentWorkResult<T>,
   ): T {
-    const requestHash = sha256(canonicalJson(request))
+    const requestHash = this.#originalRequestHashes.get(request) ?? sha256(canonicalJson(request))
     const existing = repository.readIdempotencyReceipt(request.idempotencyKey)
     if (existing !== null) {
       if (
@@ -5211,6 +5242,14 @@ export class ApplicationService {
 
   #mapError(error: unknown, correlationId: string): OperationError {
     if (error instanceof ApplicationError) return error.operationError
+    if (error instanceof SensitiveReferencePathError)
+      return createOperationError({
+        category: 'VALIDATION',
+        code: 'SENSITIVE_REFERENCE_PATH',
+        disposition: 'USER_ACTION_REQUIRED',
+        message: 'A file reference contains sensitive text. Remove it before retrying.',
+        correlationId,
+      })
     if (error instanceof PersistenceError) {
       const stale = error.code === 'REVISION_CONFLICT'
       return createOperationError({

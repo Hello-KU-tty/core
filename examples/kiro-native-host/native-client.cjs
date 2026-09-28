@@ -631,8 +631,8 @@ function fixedBuiltinHelperScope() {
   if (typeof __VIBE_PORTABLE_HOST__ !== 'undefined' && __VIBE_PORTABLE_HOST__)
     throw new NativeGateError('NATIVE_LEGACY_HELPER_SCOPE_NOT_PACKAGED')
   const projectId = D_WORKSPACE_NAME
-  const runtimeWorkspaces = '/Users/hurdoo/Library/Application Support/VibeHelper/' +
-    'NativeExperiment-20260913/runtime/workspaces'
+  const runtimeWorkspaces = join(homedir(),
+    'Library/Application Support/VibeHelper/NativeExperiment-20260913/runtime/workspaces')
   const workspace = join(runtimeWorkspaces, 'projects', projectId)
   const helper = join(runtimeWorkspaces,
     `__vibe-native-helper-${createHash('sha256').update(projectId).digest('hex').slice(0, 24)}`)
@@ -659,8 +659,8 @@ function currentApprovedProductWorkspace(vscode) {
   const workspace = realpathSync(folder)
   const projectId = basename(workspace)
   const generatedRoot = dirname(dirname(workspace))
-  const approvedRoot = '/Users/hurdoo/Library/Application Support/VibeHelper/' +
-    'NativeExperiment-20260913/runtime/workspaces'
+  const approvedRoot = join(homedir(),
+    'Library/Application Support/VibeHelper/NativeExperiment-20260913/runtime/workspaces')
   if (generatedRoot !== realpathSync(approvedRoot))
     throw new NativeGateError('NATIVE_H_PREFLIGHT_SCOPE_INVALID')
   if (!/^project_[0-9a-f-]{36}$/.test(projectId) ||

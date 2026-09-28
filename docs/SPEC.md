@@ -2,6 +2,7 @@
 
 ## 1. 상태
 
+- 2026-09-28 제출 준비 재개는 백엔드와 실제 프론트의 기능·성능 보완 및 macOS 검증을 포함한다. 프론트 디자인·흐름은 유지하며 Windows 전용 검사·패키징은 이번 실행에서 제외한다. 기존 Windows·실제 사용자 연구 acceptance는 별도 근거가 필요한 항목으로 남긴다.
 - 상태: T00~T18 구현 완료, T19 자체 IDE 패널 연동 구현·검증 사용자 승인(2026-09-07), 진행 중. frontend 대상은 Windows이며 push는 별도 승인 대기다.
 - 2026-09-23 사용자는 Windows 중심의 확장 단독 설치 경험과 런타임 재사용 방향을 승인했다. T19-W의 Core 자동 기동·패키징은 MVP 필수이며 실제 Windows 지원은 아직 미검증이다. [Windows 인계](WINDOWS_EXTENSION_HANDOFF_20260923.md)를 따른다.
 - 2026-09-15의 마지막 4시간은 pin한 macOS Kiro 일반 profile에서 P3 Builder/late Helper 반복·확인된 Helper 취소 재사용·새 실제 Decision 해결/Builder 적용을 최소 실측한 뒤 IDE-only frontend 착수 가능 범위를 판정한다. 기존 CLI 구현은 삭제하지 않고 Windows·장기 안정성·정밀 CLI 비교를 완료로 간주하지 않는다. [판정 계획](spikes/T19_NATIVE_IDE_ONLY_4H_CUTOVER_PLAN_20260915.md)을 따른다.

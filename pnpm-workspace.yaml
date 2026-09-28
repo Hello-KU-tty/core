@@ -3,6 +3,9 @@ packages:
   - packages/*
   - tests/*
 
+overrides:
+  '@esbuild-kit/core-utils@3.3.2>esbuild': 0.28.2
+
 allowBuilds:
   better-sqlite3: false
   esbuild: true

@@ -599,6 +599,8 @@ describe('native IDE Agent relay', { timeout: 60_000 }, () => {
       kind: 'TEXT',
       text: `Project path ${workspace}; Helper path ${helperWorkspace}.`,
     })
+    for (const text of ' password=synthetic-split-native-secret done.')
+      relay.event(helperJob.id, { kind: 'TEXT', text })
     relay.event(helperJob.id, {
       kind: 'TOOL',
       update: {
@@ -641,6 +643,12 @@ describe('native IDE Agent relay', { timeout: 60_000 }, () => {
       stopReason: 'end_turn',
     })
     const helperResult = await helper
+    const streamedText = (helperEvents as { kind: string; text?: string }[])
+      .filter((event) => event.kind === 'TEXT')
+      .map((event) => event.text)
+      .join('')
+    expect(streamedText).toContain('password=[REDACTED]')
+    expect(streamedText).not.toContain('synthetic-split-native-secret')
     expect(helperResult.text).not.toContain(workspace)
     expect(helperResult.text).not.toContain(helperWorkspace)
     let analystJob = relay.claim(helperWorkspace)

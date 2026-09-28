@@ -3,6 +3,7 @@
 const { lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } = require('node:fs')
 const { join, dirname, basename } = require('node:path')
 const { randomBytes } = require('node:crypto')
+const { homedir } = require('node:os')
 const { D_WORKSPACE_NAME, probeServerScript, waitForProbeServers } =
   require('./single-host-subagent-probe.cjs')
 
@@ -13,7 +14,7 @@ const SERVERS = Object.freeze({ a: 'vibe-single-invoke-probe-a',
 const NODE = '/opt/homebrew/opt/node@24/bin/node'
 const SERVER_SCRIPT = probeServerScript(__dirname)
 const MARKER_NAME = /^single-host-invoke-probe-[0-9a-f]{16}$/
-const APPROVED_WORKSPACE = join('/Users/hurdoo/Library/Application Support/VibeHelper',
+const APPROVED_WORKSPACE = join(homedir(), 'Library/Application Support/VibeHelper',
   'NativeExperiment-20260913', 'runtime', 'workspaces', 'projects', D_WORKSPACE_NAME)
 
 function assertPrivateDirectory(path) {

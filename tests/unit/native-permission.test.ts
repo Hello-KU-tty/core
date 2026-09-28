@@ -1,7 +1,7 @@
 import { linkSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { lstat, readFile, realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, win32 } from 'node:path'
+import { dirname, join, win32 } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { guardBuilderToolInput } from '../../packages/kiro-adapter/src/builder-tool-guard.js'
 
@@ -28,7 +28,7 @@ const nativeModule = {
 }
 new Function('require', 'module', source)((name: string) => {
   if (name === 'node:fs/promises') return { lstat, readFile, realpath }
-  if (name === 'node:path') return { join, win32 }
+  if (name === 'node:path') return { dirname, join, win32 }
   if (name !== '@vibe-helper/kiro-adapter/builder-tool-guard') throw new Error('UNEXPECTED_REQUIRE')
   return { guardBuilderToolInput }
 }, nativeModule)
@@ -43,6 +43,48 @@ function workspace(): string {
 }
 
 describe('native Builder permission gate', () => {
+  it.each([
+    'pnpm install --lockfile-only --ignore-scripts --ignore-pnpmfile',
+    'pnpm install --frozen-lockfile',
+    'pnpm run build',
+    'pnpm test',
+  ])('denies inherited pnpm workspace commands before native execution: %s', async (command) => {
+    const parent = workspace()
+    writeFileSync(join(parent, 'pnpm-workspace.yaml'), 'packages:\n  - "**"\n')
+    const project = join(parent, 'nested', 'generated')
+    mkdirSync(project, { recursive: true })
+    writeFileSync(join(project, 'package.json'), '{"name":"synthetic","private":true}')
+    const diagnostics: string[] = []
+    expect(
+      await chooseNativeBuilderPermission(
+        {
+          toolName: 'shell',
+          rawInput: { command, cwd: '.', run_in_background: false },
+          options: option,
+        },
+        project,
+        (code) => diagnostics.push(code),
+      ),
+    ).toBeNull()
+    expect(diagnostics).toContain('ANCESTOR_PACKAGE_CONFIG_DENIED')
+    expect(readFileSync(join(parent, 'pnpm-workspace.yaml'), 'utf8')).toBe('packages:\n  - "**"\n')
+  })
+
+  it.each(['.npmrc', '.pnpmfile.cjs', '.pnpmfile.mjs'])(
+    'denies inherited package config without reading or executing it: %s',
+    async (name) => {
+      const parent = workspace()
+      writeFileSync(join(parent, name), 'synthetic configuration must never be executed')
+      const project = join(parent, 'generated')
+      mkdirSync(project)
+      expect(
+        await chooseNativeBuilderPermission(
+          { toolName: 'shell', rawInput: { command: 'pnpm run build', cwd: '.' }, options: option },
+          project,
+        ),
+      ).toBeNull()
+    },
+  )
   it.skipIf(process.platform !== 'win32')(
     'accepts Windows cwd spelling differences only for the same real directory and guarded command',
     async () => {

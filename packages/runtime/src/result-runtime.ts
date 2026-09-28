@@ -1,6 +1,8 @@
 import type { ChildProcess } from 'node:child_process'
 import { spawn } from 'node:child_process'
-import { lstat, readFile, realpath } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { constants } from 'node:fs'
+import { lstat, open, opendir, readFile, realpath } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { dirname, isAbsolute, resolve, sep } from 'node:path'
 
@@ -16,12 +18,15 @@ import { type ProjectToolchain, projectEnvironment } from './project-toolchain.j
 
 const MAX_MANIFEST_BYTES = 32_768
 const MAX_DIAGNOSTIC_CHARACTERS = 1_000
+const MAX_RESULT_ENTRIES = 4_096
+const MAX_RESULT_BYTES = 64 * 1_024 * 1_024
 
 interface RunningResult {
   readonly child: ChildProcess
   readonly healthUrl: string
   readonly url: string
   readonly workspacePath: string
+  readonly fingerprint: string
 }
 
 export class ResultRuntimeError extends Error {
@@ -86,26 +91,6 @@ export class ResultRuntimeSupervisor {
 
   async #launch(descriptor: GeneratedResultDescriptor): Promise<GeneratedResultDescriptor> {
     if (descriptor.status !== 'READY') return descriptor
-    const existing = this.#running.get(descriptor.projectId)
-    if (existing !== undefined && existing.child.exitCode === null) {
-      try {
-        const health = await fetch(existing.healthUrl, { signal: AbortSignal.timeout(500) })
-        if (health.ok) {
-          return generatedResultDescriptorSchema.parse({
-            ...descriptor,
-            status: 'RUNNING',
-            url: existing.url,
-            reused: true,
-          })
-        }
-      } catch {
-        // Replace an alive but unhealthy result process below.
-      }
-      await stopOwnedProcessTree(existing.child)
-      this.#running.delete(descriptor.projectId)
-    }
-    if (existing !== undefined) this.#running.delete(descriptor.projectId)
-
     const workspace = await this.#resolveWorkspace(descriptor.workspacePath)
     const manifestPath = resolve(workspace, GENERATED_RESULT_MANIFEST_PATH)
     const manifestFile = await lstat(manifestPath).catch(() => null)
@@ -140,6 +125,33 @@ export class ResultRuntimeSupervisor {
     }
     const canonicalEntry = await realpath(entryPath)
     this.#assertContained(workspace, canonicalEntry)
+
+    // A healthy process can still contain stale ESM/CommonJS imports after a
+    // Builder upgrade. Revalidate paths and bounded compiled content BEFORE
+    // reuse. Include sibling modules (dist/domain beside dist/web), not only
+    // the entry file. This is freshness checking, not an OS sandbox.
+    const fingerprint = await this.#fingerprint(workspace, parsedManifest.data)
+    const existing = this.#running.get(descriptor.projectId)
+    if (existing !== undefined && existing.child.exitCode === null) {
+      if (existing.fingerprint === fingerprint) {
+        try {
+          const health = await fetch(existing.healthUrl, { signal: AbortSignal.timeout(500) })
+          if (health.ok) {
+            return generatedResultDescriptorSchema.parse({
+              ...descriptor,
+              status: 'RUNNING',
+              url: existing.url,
+              reused: true,
+            })
+          }
+        } catch {
+          // Replace only this supervisor's unhealthy child below.
+        }
+      }
+      await stopOwnedProcessTree(existing.child)
+      this.#running.delete(descriptor.projectId)
+    }
+    if (existing !== undefined) this.#running.delete(descriptor.projectId)
 
     const port = await this.#availablePort()
     const origin = `http://127.0.0.1:${String(port)}`
@@ -191,6 +203,7 @@ export class ResultRuntimeSupervisor {
       healthUrl,
       url,
       workspacePath: descriptor.workspacePath,
+      fingerprint,
     })
     child.once('exit', () => {
       const current = this.#running.get(descriptor.projectId)
@@ -214,6 +227,70 @@ export class ResultRuntimeSupervisor {
     this.#running.clear()
     await Promise.all(children.map(stopOwnedProcessTree))
     await Promise.allSettled(this.#cleanups)
+  }
+
+  async #fingerprint(workspace: string, manifest: { readonly entry: string }): Promise<string> {
+    const hash = createHash('sha256').update(JSON.stringify([workspace, manifest]))
+    const first = manifest.entry.split('/')[0]
+    const compiledRoot = manifest.entry.includes('/') ? resolve(workspace, first ?? '') : workspace
+    const files: string[] = []
+    let entries = 0
+    let bytes = 0
+    const invalid = () =>
+      new ResultRuntimeError(
+        'RESULT_CONTENT_INVALID',
+        'Compiled result exceeds the bounded regular-file contract.',
+      )
+    const visit = async (path: string): Promise<void> => {
+      if (++entries > MAX_RESULT_ENTRIES) throw invalid()
+      const stat = await lstat(path)
+      if (stat.isSymbolicLink()) throw invalid()
+      this.#assertContained(workspace, await realpath(path))
+      if (stat.isDirectory()) {
+        for await (const entry of await opendir(path)) {
+          if (['node_modules', '.git', '.kiro', '.vibe-helper'].includes(entry.name)) continue
+          await visit(resolve(path, entry.name))
+        }
+      } else if (stat.isFile()) files.push(path)
+      else throw invalid()
+    }
+    await visit(compiledRoot)
+    // Dependency changes must invalidate an otherwise unchanged compiled tree.
+    if (compiledRoot !== workspace) {
+      for (const name of ['package.json', 'pnpm-lock.yaml', 'package-lock.json']) {
+        const path = resolve(workspace, name)
+        if (
+          await lstat(path).catch((error) => {
+            if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
+            throw error
+          })
+        )
+          await visit(path)
+      }
+    }
+    const buffer = Buffer.alloc(64 * 1_024)
+    for (const path of files.sort()) {
+      const fileHash = createHash('sha256')
+      const handle = await open(
+        path,
+        constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+      )
+      try {
+        const stat = await handle.stat()
+        if (!stat.isFile() || stat.size > MAX_RESULT_BYTES - bytes) throw invalid()
+        while (true) {
+          const { bytesRead } = await handle.read(buffer, 0, buffer.length, null)
+          if (bytesRead === 0) break
+          bytes += bytesRead
+          if (bytes > MAX_RESULT_BYTES) throw invalid()
+          fileHash.update(buffer.subarray(0, bytesRead))
+        }
+        hash.update(JSON.stringify([path.slice(workspace.length), fileHash.digest('hex')]))
+      } finally {
+        await handle.close()
+      }
+    }
+    return hash.digest('hex')
   }
 
   async #resolveWorkspace(workspacePath: string): Promise<string> {

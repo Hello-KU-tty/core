@@ -213,6 +213,32 @@ describe('Crew-independent loopback backend and real client', () => {
       await h.close()
     }
   })
+  it('redacts credential text split across one-character Agent deltas before authenticated SSE replay', async () => {
+    const raw = `${'Ordinary progress. '.repeat(8)}token=synthetic-split-stream-secret done.`
+    const h = await harness({
+      invoke: async (request) => {
+        for (const text of raw) request.onEvent({ kind: 'TEXT', text })
+        return {
+          text: 'No durable result submitted by this negative fixture.',
+          stopReason: 'end_turn',
+        }
+      },
+    })
+    try {
+      const { run } = await h.client.startDiscovery(
+        { learningGoal: 'Synthetic redaction fixture' },
+        { enrichAfterPreview: false },
+      )
+      const events: LocalRunEvent[] = []
+      const result = await h.client.watchRun(run.id, (event) => events.push(event))
+      expect(result.status).toBe('FAILED')
+      const text = events.flatMap((event) => (event.kind === 'TEXT' ? [event.text] : [])).join('')
+      expect(text).toBe(raw.replace('token=synthetic-split-stream-secret', 'token=[REDACTED]'))
+      expect(text).not.toContain('synthetic-split-stream-secret')
+    } finally {
+      await h.close()
+    }
+  })
   it('cancels owned runs, closes streams and rejects simultaneous duplicate role dispatch', async () => {
     const invoke = vi.fn<WorkflowAgentPort['invoke']>(
       (request) =>
