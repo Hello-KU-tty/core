@@ -477,17 +477,21 @@ function isProductResourceUpgrade(previous: string, current: string): boolean {
     dirname(dirname(previous)) !== dirname(dirname(current))
   )
     return false
-  const version = (path: string) =>
-    basename(dirname(path))
-      .match(
-        /^vibe-helper\.vibe-helper-portable-core-(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/,
-      )
-      ?.slice(1)
-      .map(Number)
-  const before = version(previous),
-    after = version(current)
-  if (!before || !after || [...before, ...after].some((value) => !Number.isSafeInteger(value)))
+  // Installed product folders: the reference panel and the frontend product VSIX.
+  // An upgrade must stay within the same product; switching products is refused.
+  const installed = (path: string) => {
+    const match = basename(dirname(path)).match(
+      /^vibe-helper\.(vibe-helper-portable-core|builder-helper-agent-panel)-(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/,
+    )
+    return match ? { product: match[1], version: match.slice(2).map(Number) } : undefined
+  }
+  const beforeInstall = installed(previous),
+    afterInstall = installed(current)
+  if (!beforeInstall || !afterInstall || beforeInstall.product !== afterInstall.product)
     return false
+  const before = beforeInstall.version,
+    after = afterInstall.version
+  if ([...before, ...after].some((value) => !Number.isSafeInteger(value))) return false
   for (let i = 0; i < 3; i++) {
     if (after[i] !== before[i]) return (after[i] ?? 0) > (before[i] ?? 0)
   }

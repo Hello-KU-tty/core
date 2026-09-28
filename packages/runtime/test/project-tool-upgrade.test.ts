@@ -184,6 +184,31 @@ describe('Core-owned project launcher installation upgrade', () => {
     )
   })
 
+  it('upgrades the frontend product VSIX install and refuses switching products', async () => {
+    const program = (version: string) =>
+      ({
+        root: join(
+          root,
+          'extensions',
+          'vibe-helper.builder-helper-agent-panel-' + version,
+          'portable',
+        ),
+      }) as CoreResources
+    await prepareProjectTools(workspace, tools, program('0.0.6'))
+    await prepareProjectTools(workspace, tools, program('0.0.8'))
+    const verified = await verifyProjectTools(workspace, program('0.0.8'))
+    expect(verified.toolchain).toEqual(tools)
+    expect(await readFile(join(workspace, '.kiro/vibe-tools.cmd'), 'utf8')).toContain(
+      'vibe-helper.builder-helper-agent-panel-0.0.8',
+    )
+    for (const candidate of [program('0.0.7'), resources('9.9.9')]) {
+      await expect(prepareProjectTools(workspace, tools, candidate)).rejects.toThrow(
+        'PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED',
+      )
+    }
+    await verifyProjectTools(workspace, program('0.0.8'))
+  })
+
   it('refuses downgrade, another publisher or another installation directory', async () => {
     await prepareProjectTools(workspace, tools, resources('0.3.2'))
     for (const candidate of [
