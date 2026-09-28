@@ -5,9 +5,11 @@ import { promisify } from 'node:util'
 import { archive, inventory, sha256 } from '../examples/frontend-handoff/archive.mjs'
 import { loadCoreResources } from '../packages/runtime/dist/portable-core.js'
 
-// Update kit for a program checkout that already consumed the 20260926 kit. It replaces only
+// Update kit for a program checkout that already consumed the 20260927 kit. It replaces only
 // kit-managed directories; frontend UI sources are wired by the frontend developer.
-const KIT = 'frontend-handoff-20260927'
+const KIT = 'frontend-handoff-20260929'
+const KIT_VERSION = '2026.09.29.1'
+const PREVIOUS = 'examples/frontend-handoff/program-managed-20260927.json'
 const REFERENCE_VSIX = 'vibe-helper-portable-core-0.3.17-win32-x64.vsix'
 const root = resolve('.')
 const output = join(root, 'dist')
@@ -29,17 +31,15 @@ await writeFile(
     "'../frontend-client'",
   ),
 )
-await cp('docs/FRONTEND_HANDOFF_20260927.md', join(kit, 'README.md'))
+await cp('docs/FRONTEND_HANDOFF_20260929.md', join(kit, 'README.md'))
 await mkdir(join(kit, 'verification'))
 await cp(
-  'docs/spikes/T19_FRONTEND_HANDOFF_UPDATE_20260927.json',
+  'docs/spikes/T19_FRONTEND_HANDOFF_UPDATE_20260929.json',
   join(kit, 'verification/update.json'),
 )
 await mkdir(join(kit, 'reference'))
 await cp(join('dist/portable-win32-x64', REFERENCE_VSIX), join(kit, 'reference', REFERENCE_VSIX))
-const previous = JSON.parse(
-  await readFile('examples/frontend-handoff/program-managed-20260926.json', 'utf8'),
-)
+const previous = JSON.parse(await readFile(PREVIOUS, 'utf8'))
 const { stdout } = await promisify(execFile)('git', ['rev-parse', 'HEAD'], { windowsHide: true })
 const dirty = await promisify(execFile)('git', ['status', '--porcelain'], { windowsHide: true })
 const files = await inventory(kit)
@@ -52,7 +52,7 @@ for (const file of files) {
 }
 const manifest = {
   schemaVersion: 2,
-  kitVersion: '2026.09.27.1',
+  kitVersion: KIT_VERSION,
   kind: 'UPDATE',
   target: 'win32-x64',
   backendHead: stdout.trim(),
