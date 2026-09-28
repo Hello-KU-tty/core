@@ -13,6 +13,8 @@ const { createProtectedHelperCapture } = require('./protected-helper-capture.cjs
 const { HAIKU_ID, SONNET_ID, createNativeAnalystModelVariant } =
   require('./native-analyst-model-variant.cjs')
 const { materializePackagedRoleRuntime } = require('./native-runtime.cjs')
+const { extensionWindowId, matchingWorkspaceEndpoints, validWorkspaceEndpoint } =
+  require('../../kiro-native-host/native-window.cjs')
 
 let worker
 function startNativeWorker(context, connectionFile, runtime) {
@@ -26,6 +28,7 @@ function startNativeWorker(context, connectionFile, runtime) {
     return worker
   }
   const controller = new AbortController()
+  const expectedWindowId = extensionWindowId(context)
   const active = new Map()
   const sessionTags = new Map()
   const userInput = createNativeUserInputQueue(redactSensitiveText)
@@ -165,9 +168,11 @@ function startNativeWorker(context, connectionFile, runtime) {
       let analystSession
       try {
         helperSession = await openProtectedBuiltinH(vscode, {
-          projectId: job.projectId, workspace, helper, redactText: redactSensitiveText })
+          projectId: job.projectId, workspace, helper, expectedWindowId,
+          redactText: redactSensitiveText })
         analystSession = await openProtectedBuiltinH(vscode, {
-          projectId: job.projectId, workspace, helper, redactText: redactSensitiveText,
+          projectId: job.projectId, workspace, helper, expectedWindowId,
+          redactText: redactSensitiveText,
           ...(analystModelId === HAIKU_ID ? { analystHaiku: true } :
             { analystModelId: SONNET_ID }) })
         if (analystSession.modelId !== analystModelId)
@@ -175,7 +180,7 @@ function startNativeWorker(context, connectionFile, runtime) {
         if (helperSession.windowId !== analystSession.windowId)
           throw gate('NATIVE_H_WINDOW_ID_MISMATCH')
         const barrier = await openProtectedHLogBarrier(vscode,
-          { projectId: job.projectId, workspace, helper })
+          { projectId: job.projectId, workspace, helper, expectedWindowId })
         if (barrier.windowId !== helperSession.windowId)
           throw gate('NATIVE_H_BARRIER_WINDOW_ID_MISMATCH')
         await helperSession.attestAfterBarrier(barrier.sessionIdForBarrier)
@@ -284,7 +289,7 @@ function startNativeWorker(context, connectionFile, runtime) {
         return
       }
       const roleOptions = {
-        workspace: job.workspace, role: job.roleName,
+        workspace: job.workspace, role: job.roleName, expectedWindowId,
         requireMcp: Boolean(binding), binding, bindingFile: job.bindingFile,
         discoveryHaiku: job.role === 'DISCOVERY',
         productBuilder: job.role === 'BUILDER', productMode: true,
@@ -555,6 +560,19 @@ function startNativeWorker(context, connectionFile, runtime) {
         if (helperHost) return
         const target = await realpath(next.pendingWorkspace)
         if (!isWithin(generatedRoot, target)) return
+        const endpoints = await vscode.commands.executeCommand('kiro.agentRegistry.getAgentEndpoints')
+          .catch(() => null)
+        if (controller.signal.aborted) return
+        if (!Array.isArray(endpoints)) {
+          record(file, 'WORKSPACE_ENDPOINTS_UNAVAILABLE')
+          return
+        }
+        if (matchingWorkspaceEndpoints(endpoints, target).some(validWorkspaceEndpoint)) {
+          // The existing window's worker can claim this Core job. Do not turn
+          // another window into the same folder or silently connect across hosts.
+          record(file, 'WORKSPACE_WINDOW_AVAILABLE')
+          return
+        }
         if (unconfirmedSwitchTarget === target) return
         record(file, 'WORKSPACE_SWITCHING')
         // The IDE may focus another window that already has this folder open.

@@ -16,6 +16,7 @@ const { assertCloudConfigAbsent, waitForOwnedCloudPull } =
 const { waitForOwnedSilentCloudPull } = require('./native-cloud-silent-attestation.cjs')
 const { withScopedCloudDebug } = require('./native-cloud-debug-scope.cjs')
 const { classifyNativeRpcError } = require('./native-rpc-error.cjs')
+const { matchingWorkspaceEndpoints, validWorkspaceEndpoint } = require('./native-window.cjs')
 
 const EXPECTED = Object.freeze({ vscode: '1.109.5', kiroExtensions: ['1.0.653', '1.0.794'] })
 const D_WORKSPACE_NAME = 'project_efc36445-7551-495f-bf4e-c66b82c871a8'
@@ -177,21 +178,20 @@ function assertNoProtectedCommandHooks(helper) {
   }
 }
 
-function uniqueWorkspaceEndpoint(endpoints, workspace) {
+function uniqueWorkspaceEndpoint(endpoints, workspace, expectedWindowId = null) {
   if (!Array.isArray(endpoints)) throw new NativeGateError('NATIVE_ENDPOINTS_UNAVAILABLE')
-  const canonical = realpathSync(workspace)
-  const matching = endpoints.filter((endpoint) => {
-    if (!Array.isArray(endpoint?.folders) || endpoint.folders.length !== 1) return false
-    const folder = endpoint.folders[0]?.path
-    if (typeof folder !== 'string') return false
-    try { return relative(realpathSync(folder), canonical) === '' } catch { return false }
-  })
+  if (expectedWindowId !== null &&
+      (!Number.isSafeInteger(expectedWindowId) || expectedWindowId <= 0))
+    throw new NativeGateError('NATIVE_WINDOW_ID_INVALID')
+  const workspaceMatches = matchingWorkspaceEndpoints(endpoints, workspace)
+  const matching = expectedWindowId === null ? workspaceMatches :
+    workspaceMatches.filter(endpoint => endpoint.windowId === expectedWindowId)
+  // A known owner is mandatory even when another window is the sole match.
+  // Missing own endpoints are retried only within connectObserver's startup budget.
   if (matching.length === 0) throw new NativeGateError('NATIVE_ENDPOINT_MISSING')
   if (matching.length > 1) throw new NativeGateError('NATIVE_ENDPOINT_AMBIGUOUS')
   const endpoint = matching[0]
-  if (!Number.isInteger(endpoint.port) || endpoint.port < 1 || endpoint.port > 65535 ||
-      !Number.isInteger(endpoint.windowId) || typeof endpoint.token !== 'string' ||
-      endpoint.token.length < 16) throw new NativeGateError('NATIVE_ENDPOINT_INVALID')
+  if (!validWorkspaceEndpoint(endpoint)) throw new NativeGateError('NATIVE_ENDPOINT_INVALID')
   // The mux is loopback-only in the pinned Kiro build. The token is used in memory.
   return { port: endpoint.port, token: endpoint.token, windowId: endpoint.windowId }
 }
@@ -252,7 +252,7 @@ async function diagnose(vscode, expectedWorkspace, options = {}) {
 }
 
 async function connectObserver(vscode, workspace, onPermissionRequest, onPermissionTelemetry,
-  onProtocolTelemetry, onUserInputRequest, waitForHostStartup = false) {
+  onProtocolTelemetry, onUserInputRequest, waitForHostStartup = false, expectedWindowId = null) {
   const permissionTelemetry = (phase, toolName) => {
     try { onPermissionTelemetry?.(phase, toolName) }
     catch { /* Diagnostics must never prevent a permission response. */ }
@@ -267,7 +267,7 @@ async function connectObserver(vscode, workspace, onPermissionRequest, onPermiss
       if (attempt === attempts - 1) throw new NativeGateError('NATIVE_ENDPOINT_NOT_READY')
       await new Promise(resolve => setTimeout(resolve, 500)); continue
     }
-    try { endpoint = uniqueWorkspaceEndpoint(endpoints, workspace); break }
+    try { endpoint = uniqueWorkspaceEndpoint(endpoints, workspace, expectedWindowId); break }
     catch (error) {
       if (error?.code !== 'NATIVE_ENDPOINT_MISSING' || attempt === attempts - 1) throw error
       await new Promise((resolve) => setTimeout(resolve, 500))
@@ -970,7 +970,7 @@ async function openProtectedBuiltinH(vscode, options) {
     unexpectedInteraction = true
     unexpectedInteractionKind ??= 'USER_INPUT'
     return { action: 'dismissed' }
-  })
+  }, false, options.expectedWindowId)
   const close = () => {
     if (closed) return
     closed = true
@@ -1213,7 +1213,8 @@ async function openProtectedHLogBarrier(vscode, options) {
   const diagnostic = await diagnose(vscode, workspace, { productSource: true })
   if (!diagnostic.trusted || diagnostic.extensionVersion !== '1.0.794')
     throw new NativeGateError('NATIVE_H_BARRIER_IDE_UNVERIFIED')
-  const client = await connectObserver(vscode, workspace)
+  const client = await connectObserver(vscode, workspace, undefined, undefined,
+    undefined, undefined, false, options.expectedWindowId)
   let sessionId
   try {
     const bootstrap = builtinHelperBootstrap()
@@ -1373,7 +1374,7 @@ async function openNativeRole(vscode, options) {
       if (event.kind === 'TOOLS_DID_CHANGE') roleCatalog = event
       options.onProtocolTelemetry?.(event)
     },
-    options.onUserInputRequest, options.windowsProduct === true)
+    options.onUserInputRequest, options.windowsProduct === true, options.expectedWindowId)
   let sessionId
   let modelId = null
   try {

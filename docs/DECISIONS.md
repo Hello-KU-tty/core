@@ -1,5 +1,14 @@
 # 결정 기록
 
+## 2026-09-29: B6의 native endpoint를 현재 확장 창에 바인딩
+
+- **승인:** 사용자가 프론트 B6 검토 후 보완과 commit을 요청했다. 기존 T19의 host 라우팅 결함 수정이며 push·Windows 설치물 배포는 포함하지 않는다.
+- **근거:** `uniqueWorkspaceEndpoint`는 같은 canonical 폴더가 두 개면 연결 전에 거절한다. 설치된 Kiro 1.0.437의 workbench는 `windowLogsPath`를 `window${windowId}`, extension host 경로를 그 아래 `exthost`로 만들며 `ExtensionContext.logUri`는 여기에 확장 ID를 붙인다. Agent registry는 같은 native `windowId`로 endpoint를 등록한다. 현재 창 identity는 이 host-owned context에서만 얻고 환경변수·Agent payload·전역 활성 창을 신뢰하지 않는다.
+- **결정:** 인식 가능한 local `logUri`에서 현재 창 ID를 구하고, canonical workspace와 ID가 모두 맞는 endpoint 하나만 선택한다. 현재 창 ID가 없으면 종전의 유일한 workspace endpoint만 허용한다. ID가 있는데 다른 창만 있으면 그 창으로 fallback하지 않으며 현재 창 등록을 bounded 대기한다. 모순/중복 endpoint·잘못된 port/token은 계속 거절한다. 이 선택을 일반 role, protected Helper/Analyst와 barrier에 함께 적용한다.
+- **전환/복구:** 대상 생성 폴더의 유효한 endpoint가 이미 있으면 현재 창을 같은 폴더로 재전환하지 않고 기존 창 worker에 처리를 맡긴다. 대상 창에 worker가 없거나 Trust가 필요한 경우 사용자에게 기존 창 확인과 명시적 재시도를 안내하며 창 강제 종료·자동 유료 retry·Trust 변경을 하지 않는다. `NATIVE_ENDPOINT_AMBIGUOUS`의 run 오류 전달은 유지한다. transient run의 재시작 후 소실은 B3의 별도 저장 계약이다.
+- **검증 경계:** 합성 Windows/POSIX context, 같은 폴더의 두 창/foreign 경로/누락/중복/등록 지연, worker 라우팅과 terminal 오류 전파를 모델 없이 재현한다. 기존 private source/permission gate·prompt·Core protocol·DB는 변경하지 않는다. Windows 1.1.70의 실제 context/두 창과 새 kit/VSIX는 해당 환경에서 추가 검증한다.
+- **결과:** unit156/integration365/eval41/Campus3/smoke6, 확장CJS167, panel build와 새 bundle activation PASS. E2E는 기존 사용자 서버/브라우저 sandbox 제약을 분리한 실행에서12개 PASS. 초기 환경 실패와 Windows 미실측은 [B6 답변](FRONTEND_LIVE_TEST_RESPONSE_20260929.md)에 보존했다.
+
 ## 2026-09-28: 실제 프론트와 함께 제출 준비 재개
 
 - **T20 소스 재현/개인 경로:** 제출 후보는 두 저장소의 현재 파일을 명시적으로 선택한 private 복사본으로 검증하며, Git metadata·DB·캐시·개인 설정·미검토 실험·Windows 설치물을 포함하지 않는다. 기존 Mac 실험 코드의 개인 계정 절대 경로는 OS 홈 경로와 같은 고정 하위 폴더로 계산한다. 이는 새 폴더 Trust/일반 Mac 설치 승인이나 legacy 실험 범위 확장이 아니다. packaged 경로와 기존 소유자·canonical path·권한 검사를 유지하고 비-Mac legacy persistent receipt는 닫는다. Node 기본 fs/crypto와 OS archive를 사용하며 새 의존성·lifecycle 허용은 없다. 후보 SHA/재현 성공은 사람 pilot·모델 의미 품질·공식 제출 형식 또는 공개 승인을 대신하지 않는다.

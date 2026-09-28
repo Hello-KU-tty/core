@@ -772,6 +772,13 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 
 **2026-09-28 제출 준비 재개:** 사용자가 실제 프론트 checkout의 직접 기능·성능 수정과 Mac 연결 검증을 승인했다. Windows 전용 작업은 이번 실행에서 제외하며 아래 T19-F1부터 진행한다. 앞선 시간·프론트 수정 금지 기록은 당시 세션에 한정한다. 기존 상위 완료 gate는 검증 없이 닫지 않는다.
 
+#### [x] T19-F7. 같은 생성 폴더의 다중 Kiro 창 라우팅 복구
+
+- **승인/선행 조건:** 2026-09-29 사용자 B6 보완·검증·commit 요청. 최신 backend `d02ef61`과 프론트 보고 `031ae154`를 대조했고 같은 폴더의 서로 다른 endpoint 두 개가 `NATIVE_ENDPOINT_AMBIGUOUS`로 거절됨을 재현했다.
+- **범위:** 확장 host가 제공한 현재 창 identity와 canonical workspace를 함께 검증해 endpoint를 선택한다. 폴더 전환 전 기존 대상 창을 확인하며, 식별 불가·모순·중복은 명확한 코드로 거절한다. 기존 run 오류 전파와 명시적 PREVIEW 재시도를 유지한다.
+- **산출물/완료 조건:** source/capability 근거, 창 선택·라우팅·worker→Core 오류 회귀, `pnpm check`와 panel build, B6 프론트 인계 문서 및 검증 후 commit. 모델 호출·다른 사용자 창 조작 없이 검증한다. Windows 실제 두 창/새 kit 검증과 B3 durable 실패 History는 별도 잔여 조건이며 이번 완료로 대체하지 않는다.
+- **검증:** Node 24.19.0/pnpm 11.12.0의 전체 check 중 E2E 이전 단계(unit156+skip3/integration365+skip8/eval41/Campus3/smoke6) PASS. 기존 서버의 4173 포트 충돌과 sandbox Chromium 실행 권한 문제는 환경 원인으로 분리했고 사용자 서버를 보존한 4273 포트/허용된 브라우저 실행에서 E2E12 PASS. panel build와 CJS167+skip2, 새 번들의 저장소 밖 activation/라우팅5 PASS. [B6 답변·source 근거·Windows 후속](FRONTEND_LIVE_TEST_RESPONSE_20260929.md). 새 모델 호출0이며 상위T19/T19-N·Windows 출하 gate는 유지한다.
+
 #### [x] T19-F1. 실제 프론트 PREVIEW 재시도와 실패 복구 안내
 
 - **선행 조건:** 백엔드 `5af5eb0`, frontend `0858811`, 양쪽 인계/명세 확인 및 사용자 직접 수정 승인.

@@ -1079,6 +1079,108 @@ describe('private Kiro native connection gate', () => {
     )
   })
 
+  it('selects only the owning window when two windows open the same folder', async () => {
+    const root = workspace()
+    const own = {
+      port: 49731,
+      token: 'synthetic-endpoint-token',
+      windowId: 7,
+      folders: [{ path: root }],
+    }
+    const other = { ...own, port: 49732, windowId: 8 }
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    for (const endpoints of [
+      [other, own],
+      [own, other],
+    ]) {
+      const session = await openNativeRole(fakeVscode(root, { endpoints }), {
+        workspace: root,
+        role,
+        requireMcp: false,
+        expectedWindowId: 7,
+      })
+      expect(session.windowId).toBe(7)
+      session.close()
+    }
+    expect(
+      FakeWebSocket.sent.filter((message) => message.method === 'session/prompt'),
+    ).toHaveLength(0)
+  })
+
+  it('never falls back to another window when the owner is missing or malformed', () => {
+    const root = workspace()
+    const own = {
+      port: 49731,
+      token: 'synthetic-endpoint-token',
+      windowId: 7,
+      folders: [{ path: root }],
+    }
+    const other = { ...own, port: 49732, windowId: 8 }
+    expect(() => uniqueWorkspaceEndpoint([other], root, 7)).toThrow('NATIVE_ENDPOINT_MISSING')
+    expect(() =>
+      uniqueWorkspaceEndpoint([other, { ...own, folders: [{ path: workspace() }] }], root, 7),
+    ).toThrow('NATIVE_ENDPOINT_MISSING')
+    expect(() => uniqueWorkspaceEndpoint([other, own, { ...own, port: 49733 }], root, 7)).toThrow(
+      'NATIVE_ENDPOINT_AMBIGUOUS',
+    )
+    for (const change of [{ port: 0 }, { port: 65536 }, { token: '' }])
+      expect(() => uniqueWorkspaceEndpoint([other, { ...own, ...change }], root, 7)).toThrow(
+        'NATIVE_ENDPOINT_INVALID',
+      )
+    for (const id of [0, -1, 1.2, '7', NaN, Number.MAX_SAFE_INTEGER + 1])
+      expect(() => uniqueWorkspaceEndpoint([own], root, id)).toThrow('NATIVE_WINDOW_ID_INVALID')
+  })
+
+  it('waits for the owning endpoint to register without connecting to the other window', async () => {
+    const root = workspace()
+    const own = {
+      port: 49731,
+      token: 'synthetic-endpoint-token',
+      windowId: 7,
+      folders: [{ path: root }],
+    }
+    const other = { ...own, port: 49732, windowId: 8 }
+    const vscode = fakeVscode(root)
+    const execute = vscode.commands.executeCommand
+    let polls = 0
+    vscode.commands.executeCommand = async (name) => {
+      if (name !== 'kiro.agentRegistry.getAgentEndpoints') return execute(name)
+      polls++
+      expect(FakeWebSocket.created).toBe(0)
+      return polls === 1 ? [other] : [other, own]
+    }
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    const session = await openNativeRole(vscode, {
+      workspace: root,
+      role,
+      requireMcp: false,
+      expectedWindowId: 7,
+    })
+    expect(polls).toBe(2)
+    expect(session.windowId).toBe(7)
+    session.close()
+  })
+
+  it('rejects duplicate endpoints before opening any native connection', async () => {
+    const root = workspace()
+    const own = {
+      port: 49731,
+      token: 'synthetic-endpoint-token',
+      windowId: 7,
+      folders: [{ path: root }],
+    }
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    await expect(
+      openNativeRole(fakeVscode(root, { endpoints: [own, { ...own, port: 49732 }] }), {
+        workspace: root,
+        role,
+        requireMcp: false,
+        expectedWindowId: 7,
+      }),
+    ).rejects.toMatchObject({ code: 'NATIVE_ENDPOINT_AMBIGUOUS' })
+    expect(FakeWebSocket.created).toBe(0)
+  })
+
   it.skipIf(process.platform !== 'win32')(
     'binds the same Windows folder when Kiro lowercases its drive letter',
     async () => {
