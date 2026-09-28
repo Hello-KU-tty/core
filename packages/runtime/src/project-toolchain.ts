@@ -468,6 +468,47 @@ function launcherText(node: string, runner: string, descriptor: string, legacy =
 
 const projectPreparation = new Map<string, Promise<void>>()
 
+/**
+ * The recorded pnpm was chosen by an older product pin: same kind of choice,
+ * a strictly older exact version, and for the Core-managed copy the exact cache
+ * path that pin would have produced. User-selected Node is never covered here.
+ */
+function isOlderPinnedPnpm(previous: unknown, toolchain: ProjectToolchain): boolean {
+  if (typeof previous !== 'object' || previous === null) return false
+  const old = previous as Record<string, unknown>
+  const keys = Object.keys(old).sort().join(',')
+  if (keys !== 'executable,kind,source,version') return false
+  const parse = (value: unknown) =>
+    typeof value === 'string'
+      ? value
+          .match(/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/)
+          ?.slice(1)
+          .map(Number)
+      : undefined
+  const before = parse(old.version),
+    after = parse(toolchain.pnpm.version)
+  if (!before || !after || typeof old.executable !== 'string') return false
+  let older = false
+  for (let i = 0; i < 3; i++) {
+    if (before[i] !== after[i]) {
+      older = (before[i] ?? 0) < (after[i] ?? 0)
+      break
+    }
+  }
+  if (!older) return false
+  if (old.source === 'MANAGED_PNPM')
+    return (
+      old.kind === 'JS' &&
+      old.executable ===
+        join(toolchain.privateRoot, 'pnpm-cache', `pnpm-${old.version}`, 'bin/pnpm.cjs')
+    )
+  return (
+    old.source === 'EXISTING_PNPM' &&
+    ['JS', 'CMD', 'EXE'].includes(String(old.kind)) &&
+    isAbsolute(old.executable)
+  )
+}
+
 /** Only a newer version of this installed product in the same extension directory. */
 function isProductResourceUpgrade(previous: string, current: string): boolean {
   if (
@@ -568,16 +609,32 @@ async function prepareProjectToolsOnce(
     else if (oldLauncher !== launcher) fail('PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED')
     return
   }
-  let oldRoot: unknown
+  let oldRoot: unknown, oldPnpm: unknown
   try {
-    oldRoot = (JSON.parse(oldContent) as { resourceRoot?: unknown }).resourceRoot
+    const parsed = JSON.parse(oldContent) as {
+      resourceRoot?: unknown
+      toolchain?: { pnpm?: unknown }
+    }
+    oldRoot = parsed.resourceRoot
+    oldPnpm = parsed.toolchain?.pnpm
   } catch {
     fail('PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED')
   }
+  // Besides the install root, a product upgrade may only replace a pnpm that
+  // an older product pin selected (e.g. 11.12.0 -> 11.13.1). Node and every
+  // other descriptor field must stay identical.
+  const sameExceptRoot = JSON.stringify({ ...descriptor, resourceRoot: oldRoot })
+  const sameExceptRootAndPnpm = isOlderPinnedPnpm(oldPnpm, toolchain)
+    ? JSON.stringify({
+        ...descriptor,
+        toolchain: { ...toolchain, pnpm: oldPnpm },
+        resourceRoot: oldRoot,
+      })
+    : null
   if (
     typeof oldRoot !== 'string' ||
     !isProductResourceUpgrade(oldRoot, resources.root) ||
-    oldContent !== JSON.stringify({ ...descriptor, resourceRoot: oldRoot })
+    (oldContent !== sameExceptRoot && oldContent !== sameExceptRootAndPnpm)
   )
     fail('PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED')
   const expectedOldLauncher = launcherText(
