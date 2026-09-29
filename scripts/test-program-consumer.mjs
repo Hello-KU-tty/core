@@ -690,7 +690,13 @@ try {
       { candidateId: wired.flowController.getPreviewRound().previews[0].candidateId, revision: 1 },
     ],
   })
-  await wired.flowController.confirmSpec()
+  const buildsBeforeConfirm = counts.BUILDER
+  await Promise.all([receive({ type: 'confirmSpec' }), receive({ type: 'confirmSpec' })])
+  assert.equal(
+    counts.BUILDER,
+    buildsBeforeConfirm + 1,
+    'one explicit confirm gesture starts Builder exactly once, even with duplicate clicks',
+  )
   const wiredTask = (await client.restoreProject(wiredProjectId)).currentTask
   assert.ok(wiredTask)
   assert.ok(
@@ -977,6 +983,7 @@ try {
     boundary: 'actual program controller/port + authenticated HTTP/SSE + SQLite',
     agent: 'DELAYED_DETERMINISTIC_FIXTURE',
     checks: [
+      'explicit confirm through the real provider prepares and starts Builder once; duplicate clicks do not start a second run and reload remains read-only',
       'fresh MERGE and REGENERATE display durable candidate titles immediately through the actual webview bridge; exact revisions, input/basket preserved, no extra enrichment',
       'two project/session mappings',
       'wait for durable preview/JIT/spec',

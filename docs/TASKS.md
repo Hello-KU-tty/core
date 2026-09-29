@@ -770,6 +770,13 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 
 ### [~] T19. 자체 Kiro IDE 패널과 프론트 실제 연동
 
+#### [x] T19-F14. 명시적 스펙 시작과 Builder 최초 실행 연결
+
+- **근거:** 사용자 실측에서 `이걸로 시작` 후 CONFIRMED Spec/PENDING Task만 저장되고 Builder run은0이다. 화면에는 학습 목표를 작업 제목으로, 이전 DISCOVERY 종료를 현재 작업 상태처럼 표시한다.
+- **범위:** 명시적 스펙 시작 버튼이 준비 완료된 같은 Project/Task의 Builder를 한 번 실행하도록 연결한다. History/재시작/Decision 해결에는 자동 실행을 추가하지 않는다. 이미 준비된 작업은 명시적 시작으로 재개 가능하게 하고 프로젝트 제목·대기/탐색 종료 안내를 정확히 표시한다.
+- **완료 조건:** 실제 provider/Core 소비에서 준비→시작1회 및 실패·중복·화면전환·복원0 회귀, frontend 전체 검사, 설치·기존 PENDING 작업의 실제 시작 확인. 생성 workspace/권한/완료 gate를 유지한다.
+- **검증:**0.0.12 설치, frontend767/typecheck/build와 실제 Core 소비 PASS. 업데이트 전후 저장hash 동일·복원 새run0. 실제 버튼1회→Builder RUNNING→native 작업 시작 성공, 기존 Task ACTIVE/revision2 확인. [수정·설치·실측 범위](FRONTEND_BUILDER_START_FIX_20260929.md). 앱 완성·후속 Decision과 전체 수직 흐름은 별도다.
+
 #### [x] T19-F13. 새 Discovery 라운드의 저장된 후보 상세 표시 복구
 
 - **근거:** 사용자 실측에서 MERGE는 SUCCEEDED, 새 후보 상세도 Core에 저장되어 있지만 화면은 후보 ID/로딩 안내에 머문다. feedback 성공 콜백이 round 참조만 반영하고 candidate 상세를 갱신하지 않는다.
