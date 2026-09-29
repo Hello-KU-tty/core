@@ -1,6 +1,6 @@
-# Vibe Helper 다운로드·설치 가이드
+# Hello Vibe 다운로드·설치 가이드
 
-Vibe Helper는 Kiro IDE 안에서 사용하는 확장입니다. 먼저 운영체제에 맞는 VSIX를 설치하세요. 개발자용 ZIP과 소스 빌드는 VSIX가 작동하지 않을 때 사용하는 개발자용 대안입니다.
+Hello Vibe는 Kiro IDE 안에서 사용하는 확장입니다. 먼저 운영체제에 맞는 VSIX를 설치하세요. 개발자용 ZIP과 소스 빌드는 VSIX가 작동하지 않을 때 사용하는 개발자용 대안입니다.
 
 ## 1. 설치 전 확인
 
@@ -11,11 +11,11 @@ Vibe Helper는 Kiro IDE 안에서 사용하는 확장입니다. 먼저 운영체
 | 계정 | Kiro에 로그인할 본인 계정과 사용 가능한 모델 사용량이 필요합니다. |
 | 네트워크 | 로그인·Agent 호출과 첫 실행의 도구·의존성 다운로드에 필요합니다. |
 
-다른 Kiro 버전은 호환 검사를 통과하지 못할 수 있습니다. Kiro 자체의 OS 지원과 Vibe Helper의 지원 범위는 다릅니다. Apple Silicon Mac 설치 후보와 검증 한계는 [Mac 설치 안내](MAC_VSIX.md)를 확인하세요.
+다른 Kiro 버전은 호환 검사를 통과하지 못할 수 있습니다. Kiro 자체의 OS 지원과 Hello Vibe의 지원 범위는 다릅니다. Apple Silicon Mac 설치 후보와 검증 한계는 [Mac 설치 안내](MAC_VSIX.md)를 확인하세요.
 
 Windows x64 설치 후보와 검증 한계는 [Windows 설치 안내](WINDOWS_VSIX.md)를 확인하세요.
 
-별도 Vibe Helper 계정이나 API Key는 필요하지 않습니다. 모델 사용량은 본인의 Kiro 계정에서 소비됩니다. 프로젝트 상태는 로컬 SQLite에 저장되며, Agent 요청에는 Kiro의 모델 서비스가 사용됩니다.
+별도 Hello Vibe 계정이나 API Key는 필요하지 않습니다. 모델 사용량은 본인의 Kiro 계정에서 소비됩니다. 프로젝트 상태는 로컬 SQLite에 저장되며, Agent 요청에는 Kiro의 모델 서비스가 사용됩니다.
 
 ## 2. Kiro IDE 다운로드
 
@@ -24,7 +24,7 @@ Windows x64 설치 후보와 검증 한계는 [Windows 설치 안내](WINDOWS_VS
 3. 설치 파일을 실행하고 Kiro를 엽니다.
 4. 화면 안내에 따라 본인 계정으로 로그인합니다.
 
-Vibe Helper는 IDE 확장이므로 다운로드 페이지의 CLI·Crew가 아닌 **IDE**를 선택하세요.
+Hello Vibe는 IDE 확장이므로 다운로드 페이지의 CLI·Crew가 아닌 **IDE**를 선택하세요.
 
 ## 3. VSIX 다운로드
 
@@ -38,7 +38,9 @@ GitHub 파일 화면이 열리면 **Download raw file**을 누릅니다. Windows
 
 ### Mac (Apple Silicon)
 
-**[Mac용 VSIX 0.1.0 다운로드](../releases/macos/0.1.0/builder-helper-agent-panel-0.1.0-darwin-arm64.vsix?raw=true)**
+**[Mac용 VSIX 0.1.1 다운로드](../releases/macos/0.1.0/builder-helper-agent-panel-0.1.0-darwin-arm64.vsix?raw=true)**
+
+2026-09-30 공개 frontend 0.0.18 기준으로 갱신했습니다. 기존 주소·파일명은 유지하며 설치되는 내부 확장 버전은 **0.1.1**입니다. 완료 뒤 지속 대화, 도구 재사용과 중복 Helper 요약 제거를 포함합니다.
 
 GitHub 파일 화면이 열리면 **Download raw file**을 누릅니다. Apple Silicon(M1 이상)용이며 Intel Mac용 파일은 아닙니다. Kiro는 `/Applications/Kiro.app`에 설치합니다. 파일 무결성 확인과 자세한 설치·복구 방법은 [Mac 설치 안내](MAC_VSIX.md)를 따르세요.
 
@@ -89,24 +91,27 @@ Helper·분석 작업에 필요한 보조 Kiro 창이 열릴 수 있습니다. �
 
 ### Mac: 소스에서 VSIX 재빌드
 
-[Mac 설치 안내의 재현 절차](MAC_VSIX.md#재현)에 따라 Core와 프론트 소스, Node.js 24.19.0·pnpm 11.13.1을 준비하고 `pnpm panel:pack:macos`로 새 VSIX를 만듭니다. 생성된 `darwin-arm64.vsix`를 **Install from VSIX…**로 설치합니다. 아래 Windows ZIP은 Mac runtime을 포함하지 않아 Mac용 대안으로 사용할 수 없습니다.
+[Mac 설치 안내의 재현 절차](MAC_VSIX.md#재현)에 따라 Core와 프론트 소스, Node.js 24.19.0·pnpm 11.13.1을 준비하고 `pnpm panel:pack:macos <frontend 경로>`로 새 VSIX를 만듭니다. 아래 개발자 ZIP에도 두 저장소 소스가 포함됩니다. 생성된 `darwin-arm64.vsix`를 **Install from VSIX…**로 설치합니다.
 
-### Windows: 개발자용 ZIP
+### Mac·Windows: 개발자용 소스 ZIP
 
-**[개발자용 update kit ZIP 다운로드](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/frontend-handoff/20260927/frontend-handoff-20260927.zip)** · [저장소 파일 위치](../releases/frontend-handoff/20260927/frontend-handoff-20260927.zip)
+**[개발자용 소스 ZIP 다운로드](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/frontend-handoff/20260927/frontend-handoff-20260927.zip)** · [파일·SHA-256·검증 기록](../releases/frontend-handoff/20260927/README.md)
 
-이 파일은 **20260927 업데이트 kit**으로, 이미 20260926 kit이 적용된 `Hello-KU-tty/program`의 `048bce383a774f429f8868949d4ba2f95a63c66a` 소스가 대상입니다. 최신 제품 설치본이 아니므로 다른 revision에 그대로 덮어쓰지 마세요. [적용 대상](../releases/frontend-handoff/20260927/README.md)을 먼저 확인합니다.
+기존 주소·파일명은 유지하지만 내용은 **2026-09-30 전체 실행 소스 snapshot**으로 교체했습니다. `backend/`와 `frontend/`(0.0.18), 파일별 hash를 기록한 `SOURCE_MANIFEST.json`을 포함합니다. 과거 update kit이나 이전 checkout에 덮어쓰지 말고 **새 폴더**에 압축을 푸세요. 20260926 kit 선행 적용은 필요하지 않습니다.
 
-1. ZIP을 내려받고 아래 SHA-256을 [receipt](../releases/frontend-handoff/20260927/frontend-handoff-receipt.json)와 비교합니다.
-2. 원하는 개발 폴더에 압축을 풉니다. 최초 적용이라면 [20260926 최초 kit](../releases/frontend-handoff/20260926/frontend-handoff-20260926.zip)과 [최초 적용 안내](FRONTEND_WINDOWS_QUICKSTART.md)를 먼저 따릅니다.
-3. 개발용 Node.js·npm·Git을 준비하고 [20260927 적용·빌드·VSIX 패키징 안내](FRONTEND_HANDOFF_20260927.md)에 따라 대상 프론트 소스에 적용합니다.
-4. 생성된 제품 `.vsix`를 Kiro에 설치합니다. ZIP 자체를 **Install from VSIX…**에 넣지 않습니다.
+1. ZIP을 내려받고 SHA-256을 [현재 receipt](../releases/frontend-handoff/20260927/frontend-handoff-receipt.json)와 비교합니다.
+2. 새 개발 폴더에 풀고 ZIP 최상위 `README.md`를 읽습니다. Git clone 없이 빌드할 수 있습니다.
+3. `frontend/`에서 `npm ci --ignore-scripts`, `npm run typecheck`, `npm test`, `npm run build`를 실행합니다.
+4. `backend/`에서 `pnpm install --frozen-lockfile`을 실행합니다. Mac은 `pnpm panel:pack:macos ../frontend`로 빌드합니다. Windows는 `frontend/`에서 `node ../backend/examples/frontend-handoff/package-program.mjs .`를 실행합니다.
+5. 생성된 운영체제별 `.vsix`를 Kiro에 설치합니다. ZIP 자체를 **Install from VSIX…**에 넣지 않습니다.
+
+포함된 Windows portable은 공개 frontend의 kit `2026.09.30.1` 원본이며 runtime dependencies와 라이선스를 포함합니다. Mac에서는 실행하지 않으며 별도 arm64 portable을 빌드합니다. 계정·DB·대화·개발 node_modules는 포함하지 않습니다. 빌드 도구와 의존성을 받으려면 네트워크가 필요합니다.
 
 ```powershell
 Get-FileHash "$env:USERPROFILE\Downloads\frontend-handoff-20260927.zip" -Algorithm SHA256
 ```
 
-기대 SHA-256: `4c9b338bcdc24f72afa0eaf61c70c5c54d13a780fabf7fb5440df5cce378f0d9`.
+Mac에서는 `shasum -a 256 <다운로드한 ZIP>`으로 확인합니다. 같은 URL의 갱신 파일은 [현재 receipt](../releases/frontend-handoff/20260927/frontend-handoff-receipt.json)의 SHA-256으로 구분합니다.
 
 ### 개발 환경과 검증
 

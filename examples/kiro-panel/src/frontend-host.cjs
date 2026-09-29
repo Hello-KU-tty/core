@@ -9,6 +9,8 @@ const { startNativeWorker } = require('./native-worker.cjs')
 const { createNativeWorkerHandle } = require('./native-worker-handle.cjs')
 const { prepareWindowsProjectTerminal } = require('./windows-terminal-environment.cjs')
 const { attestWindowsKiroInstallation } = require('../../kiro-native-host/native-installation-source.cjs')
+const { attestMacKiro1170Installation } = require('../../program-macos-dev/kiro-1170-source.cjs')
+const { prepareMacProjectTerminal } = require('./mac-terminal-environment.cjs')
 
 const safeCode = error => /^[A-Z][A-Z0-9_]{0,99}$/.test(error?.code ?? error?.message ?? '')
   ? error.code ?? error.message : 'FRONTEND_HOST_FAILED'
@@ -57,11 +59,14 @@ async function createFrontendHost(context) {
       const ready = await lifecycle.start()
       if (stopped) throw new Error('FRONTEND_HOST_STOPPED')
       try {
-        const installation = attestWindowsKiroInstallation(vscode)
+        const installation = process.platform === 'darwin'
+          ? attestMacKiro1170Installation(vscode) : attestWindowsKiroInstallation(vscode)
         if (!vscode.workspace.isTrusted) throw new Error('NATIVE_WORKSPACE_TRUST_REQUIRED')
         if (!nativeWorker) {
           const windows1170Diagnostic = installation.appVersion === '1.1.70'
-          if (windows1170Diagnostic) await prepareWindowsProjectTerminal(vscode, context, ready.connectionFile)
+          if (process.platform === 'darwin')
+            await prepareMacProjectTerminal(vscode, context, ready, api)
+          else if (windows1170Diagnostic) await prepareWindowsProjectTerminal(vscode, context, ready.connectionFile)
           if (stopped) throw new Error('FRONTEND_HOST_STOPPED')
           const prompts = {}
           for (const [role, name] of Object.entries({ DISCOVERY: 'discovery', BUILDER: 'builder',
@@ -71,7 +76,7 @@ async function createFrontendHost(context) {
           }
           if (stopped) throw new Error('FRONTEND_HOST_STOPPED')
           nativeWorker = startNativeWorker(context, ready.connectionFile, {
-            source: `KIRO_IDE_${installation.appVersion}_AGENT_${installation.agentExtensionVersion}_WINDOWS_X64`,
+            source: `KIRO_IDE_${installation.appVersion}_AGENT_${installation.agentExtensionVersion}_${process.platform === 'darwin' ? 'MACOS_ARM64' : 'WINDOWS_X64'}`,
             windowsProduct: true, windows1170Diagnostic,
             nodePath: ready.runtime.executable, runtimeDescriptor: ready.runtime,
             bridgeScriptPath: ready.resources.bridge, prompts, projectTools: { api, resources: ready.resources },

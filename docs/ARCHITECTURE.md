@@ -2,6 +2,10 @@
 
 ## 1. 상태
 
+- 2026-09-30 배포 갱신은 명시적으로 지정한 frontend checkout에서 Mac 확장을 빌드하고 Core와 frontend 출처를 receipt에 남긴다. 개발자 ZIP은 오래된 부분 덮어쓰기 kit 대신 두 저장소 소스와 프론트의 검증된 기존 Windows portable 자산을 포함한 재현용 snapshot이다. Mac portable은 공식 arm64 Node를 포함해 별도로 빌드한다. 기존 URL은 호환 진입점이며 불변 artifact 식별자는 버전·SHA-256으로 구분한다.
+
+- 2026-09-29 Mac VSIX는 기존 frontend provider·Core lease lifecycle·native worker를 재사용한다. darwin-arm64 자산 검증과 Mac 도구 경로를 추가하며 Node 공식 배포본과 라이선스를 포함해 Homebrew/source checkout 의존을 없앤다. SQLite·prompt·권한 계약은 유지한다.
+
 - 2026-09-28 통합 개선은 별도 `vibe-helper-frontend` checkout의 기존 port/controller/webview를 그대로 사용한다. Mac 검증에서는 현재 Windows portable 자산을 실행·변조하지 않고 검증된 Mac source runtime과 동일 HTTP/SSE 계약을 사용할 수 있는지 먼저 확인한다. 개발 검증용 연결과 Windows 제품 설치 지원은 구분한다.
 - 상태: 사용자 승인 완료, T18 Campus Drop Golden Path 구현 및 검증 완료
 - 기준 입력: [PROJECT_BRIEF.md](../PROJECT_BRIEF.md), [SPEC.md](SPEC.md)

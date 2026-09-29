@@ -16,6 +16,24 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 
 ## 2. MVP 이전: 핵심 수직 흐름 완성
 
+### [x] T19-M1. Mac 배포용 VSIX
+
+- **승인/선행:** 2026-09-29 Mac 배포용 사용자 요청, 기존 Mac source attestation 및 실제 frontend.
+- **산출물:** darwin-arm64 VSIX, source 독립 Core 자동 기동·도구 준비, 설치 안내와 hash receipt.
+- **완료 조건:** 패키지 inventory/누출 검사, 실제 SQLite/Core lifecycle·생성 앱 도구와 설치 parser 검증. 유료 Agent 완주·Intel Mac·Windows 지원은 별도 기록한다.
+- **검증:** 0.1.0 darwin-arm64 VSIX 72항목/41,564,663 bytes, Kiro 격리 설치 PASS. 설치된 자산을 한국어·공백 경로로 옮겨 실제 Core 공유·reload·최종 lease 종료/재시작과 durable Project, bundled Node/managed pnpm 실행·launcher 변조 거절 5개 PASS(모델0). unit177+3SKIP, integration384+8SKIP, eval42, Campus3, smoke6, E2E12, 패널169+2SKIP 및 Mac terminal scope1 PASS. 전체 check의 기존 중첩 Biome 설정 충돌과 최초 E2E 포트 충돌은 [Mac 안내](MAC_VSIX.md)에 보존한다.
+
+### [~] T19-M3. 최신 원격 소스·Mac 설치물·개발자 ZIP·README 게시
+
+- **승인/선행:** 2026-09-30 사용자 요청, 원격 최신 core/program 통합과 기존 Mac 변경 보존.
+- **산출물:** frontend a61d408(0.0.18) 기준 Mac 0.1.1, 동일 URL의 최신 개발자 소스 ZIP, 실제 사용 인터뷰와 검증 한계를 구분한 README, 출처·무결성·설치 안내, commit/push.
+- **완료 조건:** 양쪽 소스 검사, ZIP 추출 재현, VSIX 격리 설치와 모델0 Core/도구 재사용 검사, 다운로드 주소 및 게시 hash 확인. 0.0.18 동기화로 이전 frontend 미공개 조건을 해소한다. 영상은 수정하지 않는다.
+
+### [ ] T19-M2. Mac 설치본의 실제 native 수직 흐름 검증
+
+- **선행:** T19-M1, 설치된 Kiro 본인 계정과 사용량 확인. 현재 패키징 세션에서는 유료 호출을 하지 않았다.
+- **산출물/완료 조건:** 새 학습 목표의 Discovery→Spec→Builder·Helper·Decision→결과 실행/History를 설치본에서 실측하고 terminal 도구 환경·별도 Helper 창·취소와 실패를 기록한다. Windows/Intel/장기 사용으로 확대하지 않는다.
+
 ### [x] T00. 문서 승인과 착수 차단 결정 해소
 
 **승인 기록**

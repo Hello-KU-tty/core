@@ -11,11 +11,11 @@ import {
   type CoreResources,
   coreInstallationIdentity,
   currentCoreRuntime,
+  isLockOwnerAlive,
   loadCoreResources,
   ownedPrivateDirectory,
   type ProjectToolchain,
   prepareProjectTools,
-  isLockOwnerAlive,
   ResultRuntimeSupervisor,
   selectProjectToolchain,
   verifyProjectTools,
@@ -33,6 +33,12 @@ import { createLocalServer } from './server.js'
 const execute = promisify(execFile)
 declare const __VIBE_PACKAGED_CORE__: boolean
 const packaged = typeof __VIBE_PACKAGED_CORE__ !== 'undefined' && __VIBE_PACKAGED_CORE__
+// Mac verification host only: the source Core writes the packaged product's role
+// policy so the IDE 1.1.x product protocol can be exercised without a Windows
+// portable runtime. It adds no project launcher and is ignored when packaged.
+const macProductProtocol =
+  !packaged && process.platform === 'darwin' && process.env.VIBE_NATIVE_MAC_PRODUCT_PROTOCOL === '1'
+const MAC_DEVELOPMENT_NODE = '/opt/homebrew/opt/node@24/bin/node'
 let resources: CoreResources | undefined
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const args = process.argv.slice(2).filter((value) => value !== '--')
@@ -200,6 +206,13 @@ async function recover(): Promise<void> {
 async function start(coreOnly = false, nativeMode = false, managed = false): Promise<void> {
   if (!managed) await initialized()
   if (!coreOnly && !nativeMode) await kiroVersion()
+  if (
+    macProductProtocol &&
+    (!nativeMode ||
+      process.versions.node !== '24.19.0' ||
+      process.env.VIBE_NATIVE_SINGLE_WINDOW_BUILTIN_H === '1')
+  )
+    throw new Error('MAC_PRODUCT_PROTOCOL_CONFIGURATION_INVALID')
   const port = Number(option('--port', '47831'))
   if (!Number.isInteger(port) || port < 0 || port > 65_535) throw new Error('PORT_INVALID')
   await mkdir(lockPath, { mode: 0o700 }).catch(() => {
@@ -329,6 +342,9 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
             projectTools = selectProjectToolchain({
               resources: assets,
               privateRoot: join(root, 'project-tools'),
+              ...(assets.manifest.target === 'darwin-arm64'
+                ? { nodeExecutables: [join(assets.root, 'bin/node')], pnpmExecutables: [] }
+                : {}),
               ...(signal ? { signal } : {}),
             })
             void projectTools.catch(() => {
@@ -363,6 +379,15 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
           policy,
           root,
           repository,
+          ...(macProductProtocol
+            ? {
+                portable: {
+                  promptDirectory: join(repository, 'docs/agent-prompts'),
+                  bridgeScriptPath: join(repository, 'scripts/native-core-stdio-bridge.mjs'),
+                  runtime: { executable: MAC_DEVELOPMENT_NODE, args: [], env: {} },
+                },
+              }
+            : {}),
           ...(resources
             ? {
                 portable: {

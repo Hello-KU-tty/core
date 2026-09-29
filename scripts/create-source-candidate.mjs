@@ -48,6 +48,9 @@ const backendDocuments = new Set([
   'docs/SUBMISSION_READINESS_20260928.md',
   'docs/SUBMISSION_READINESS_20260929.md',
   'docs/FRONTEND_HANDOFF.md',
+  'docs/DOWNLOAD_GUIDE.md',
+  'docs/MAC_VSIX.md',
+  'docs/WINDOWS_VSIX.md',
   'docs/spikes/T19_FRONTEND_HANDOFF_UPDATE_20260929_2.json',
   'docs/T20_AUDIT_20260928.md',
   'docs/FRONTEND_MAC_PROGRESS_20260928.md',
@@ -120,7 +123,7 @@ export function selectedSource(side, name) {
       backendRoots.has(name) ||
       backendDocuments.has(name) ||
       /^(?:apps|packages|tests|scripts|docs\/agent-prompts)\//.test(name) ||
-      /^examples\/(?:kiro-panel|kiro-native-host|frontend-handoff)\//.test(name)
+      /^examples\/(?:kiro-panel|kiro-native-host|frontend-handoff|program-macos-dev)\//.test(name)
     )
   if (side === 'frontend')
     return frontendRoots.has(name) || /^(?:src|test|media|vendor)\//.test(name)

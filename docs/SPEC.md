@@ -2,6 +2,10 @@
 
 ## 1. 상태
 
+- 2026-09-30 승인 범위는 원격 동기화, 공개 frontend 0.0.18 기준 Mac 설치물과 재현 가능한 개발자 소스 ZIP, 실제 사용 인터뷰를 반영한 README 및 commit/push다. 링크 주소는 유지하고 내용의 버전·출처를 명시한다. 새 모델 호출·새 사용자 연구·영상 제작은 포함하지 않는다.
+
+- 2026-09-29 사용자 요청으로 Mac 배포용 VSIX를 추가한다. 첫 대상은 darwin-arm64/Kiro 1.1.70이며 source checkout 없이 Core 자동 기동, 분리된 사용자 데이터와 생성 프로젝트 도구를 제공한다. Windows 설치물은 별도 Windows 작업으로 유지한다. 실제 Agent 완주는 패키징/모델0 검증과 구분한다.
+
 - 2026-09-29 최신 프론트 인계 후속은 기존 Windows 제품 범위의 kit·pnpm 업그레이드·0.0.10 설치 후보와 실제 frontend 자동 검사를 포함한다. Spec 복귀는 기존 FR-DIS-013대로 저장 후보/입력을 보존하는 화면 이동이며, 새 Session 생성은 명시적 새 후보 요청으로 미룬다. [현재 제출 gate](SUBMISSION_READINESS_20260929.md).
 
 - 2026-09-29 B7~B11 유지보수는 pnpm 11.13.1 exact pin, MCP 시작 진단, shell 실패 계약, 도구 표시 분류와 Builder 사용자 언어 정책을 포함한다. 실제 Windows/Kiro 재실측과 모델 응답 품질은 자동 fixture만으로 완료 판정하지 않는다.

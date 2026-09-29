@@ -82,6 +82,8 @@ const PERSISTENT_NATIVE_RUNTIME =
     ? ''
     : join(homedir(), 'Library/Application Support/VibeHelper/NativeExperiment-20260913/runtime')
 const HELPER_HOST_PREFIX = '__vibe-native-helper-'
+/** Only the fields written into a role's bridge command. */
+type BridgeRuntime = Pick<CoreRuntimeDescriptor, 'executable' | 'args' | 'env'>
 function redactJobText(text: string, job: NativeJob): string {
   return redactSensitiveText(redactSensitiveText(text, job.workspace), job.projectWorkspace)
 }
@@ -94,7 +96,7 @@ export class NativeAgentRelay implements WorkflowAgentPort {
   readonly #root: string
   readonly #repository: string
   readonly #portable:
-    | { promptDirectory: string; bridgeScriptPath: string; runtime: CoreRuntimeDescriptor }
+    | { promptDirectory: string; bridgeScriptPath: string; runtime: BridgeRuntime }
     | undefined
   readonly #singleWindowBuiltinH: boolean
   readonly #prepareBuilderTools:
@@ -107,7 +109,7 @@ export class NativeAgentRelay implements WorkflowAgentPort {
     policy: WorkspacePathPolicy
     root: string
     repository: string
-    portable?: { promptDirectory: string; bridgeScriptPath: string; runtime: CoreRuntimeDescriptor }
+    portable?: { promptDirectory: string; bridgeScriptPath: string; runtime: BridgeRuntime }
     singleWindowBuiltinH?: boolean
     prepareBuilderTools?: (workspace: string, signal: AbortSignal) => Promise<void>
   }) {

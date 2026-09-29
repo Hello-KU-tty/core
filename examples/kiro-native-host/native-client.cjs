@@ -10,6 +10,7 @@ const { selectDiscoveryHaikuModel, selectBuiltinAnalystHaikuModel,
 const { attestSessionMemoryDisabled } = require('./native-memory-attestation.cjs')
 const { inspectProtectedBuiltinFlags } = require('./native-protected-tools.cjs')
 const { attestPinnedKiroInstallation, attestWindowsKiroInstallation } = require('./native-installation-source.cjs')
+const { attestMacKiro1170Installation } = require('../program-macos-dev/kiro-1170-source.cjs')
 const { privateNativeDirectory } = require('./native-private-directory.cjs')
 const { assertCloudConfigAbsent, waitForOwnedCloudPull } =
   require('./native-cloud-pull-attestation.cjs')
@@ -208,7 +209,8 @@ async function diagnose(vscode, expectedWorkspace, options = {}) {
   if (options.productSource === true) {
     try {
       const installation = (options.windowsProduct === true
-        ? attestWindowsKiroInstallation(vscode, undefined, undefined,
+        ? process.platform === 'darwin' ? attestMacKiro1170Installation(vscode)
+        : attestWindowsKiroInstallation(vscode, undefined, undefined,
           { diagnostic1170: options.windows1170Diagnostic === true })
         : attestPinnedKiroInstallation(vscode, options.filesystem,
           options.pinnedAppRoot))

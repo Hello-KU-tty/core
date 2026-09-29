@@ -59,7 +59,7 @@ describe('portable Core runtime boundaries', () => {
     })
     expect(inherited.NODE_OPTIONS).toBe('--require unsafe.cjs')
   })
-  it('keeps runtime compatibility and downloads restricted to the measured Windows combination', () => {
+  it('keeps runtime compatibility restricted to Windows x64 and Mac arm64', () => {
     expect(CORE_NODE_VERSIONS).toEqual(['24.18.0', '24.19.0'])
     expect(MANAGED_NODE.url).toBe('https://nodejs.org/dist/v24.19.0/win-x64/node.exe')
     if (process.platform === 'win32' && process.arch === 'x64') {
@@ -70,6 +70,8 @@ describe('portable Core runtime boundaries', () => {
         arch: 'x64',
         napi: 10,
       })
+    } else if (process.platform === 'darwin' && process.arch === 'arm64') {
+      expect(currentCoreRuntime()).toMatchObject({ platform: 'darwin', arch: 'arm64', napi: 10 })
     } else expect(() => currentCoreRuntime()).toThrow('CORE_RUNTIME_UNSUPPORTED')
   })
 })

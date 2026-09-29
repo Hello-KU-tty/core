@@ -18,20 +18,28 @@ import {
   loadCoreResources,
   MANAGED_NODE,
 } from '../packages/runtime/dist/portable-core.js'
+import { macNodeDistribution } from './mac-node-distribution.mjs'
 import { verifyPortableBuildSource } from './portable-build-preflight.mjs'
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const target = process.argv[2] ?? `${process.platform}-${process.arch}`
-if (target !== 'win32-x64') throw new Error('PORTABLE_TARGET_UNVERIFIED')
+if (
+  !['win32-x64', 'darwin-arm64'].includes(target) ||
+  target !== `${process.platform}-${process.arch}`
+)
+  throw new Error('PORTABLE_TARGET_UNVERIFIED')
+const mac = target === 'darwin-arm64' ? await macNodeDistribution() : null
 const output = join(repository, 'dist', `portable-core-${target}`)
 if (!output.startsWith(`${join(repository, 'dist')}${sep}`)) throw new Error('OUTPUT_PATH_UNSAFE')
 // Reject an unsupported build executable or license before replacing any existing
 // generated package. In particular, a Mac Node is not the verified Windows source.
-const nodeLicensePath = await verifyPortableBuildSource(
-  process.execPath,
-  MANAGED_NODE.sha256,
-  process.env.VIBE_NODE_DISTRIBUTION_LICENSE,
-)
+const nodeLicensePath =
+  mac?.license ??
+  (await verifyPortableBuildSource(
+    process.execPath,
+    MANAGED_NODE.sha256,
+    process.env.VIBE_NODE_DISTRIBUTION_LICENSE,
+  ))
 await mkdir(join(repository, 'dist'), { recursive: true })
 if ((await realpath(join(repository, 'dist'))) !== join(repository, 'dist'))
   throw new Error('OUTPUT_PARENT_UNSAFE')
@@ -144,8 +152,8 @@ async function sqliteLibrary(directory) {
 }
 await sqliteLibrary(join(sqliteRoot, 'lib'))
 await copy(
-  join(sqliteRoot, 'prebuilds/win32-x64.node'),
-  'node_modules/better-sqlite3/prebuilds/win32-x64.node',
+  join(sqliteRoot, `prebuilds/${target}.node`),
+  `node_modules/better-sqlite3/prebuilds/${target}.node`,
 )
 await writeFile(
   join(output, 'node_modules/better-sqlite3/package.json'),
@@ -190,6 +198,7 @@ for (const name of ['discovery', 'builder', 'helper', 'evidence-analyst']) {
   await writeFile(join(output, 'agent-prompts', `${name}.md`), data)
 }
 await copy(nodeLicensePath, 'licenses/node-LICENSE')
+if (mac) await copy(mac.node, 'bin/node')
 const licenses = new Map()
 for (const input of inputs) {
   if (!input.includes(`${sep}node_modules${sep}`)) continue
@@ -241,10 +250,11 @@ async function inventory(directory) {
       if (
         /\.(map|ts|sqlite|db|log)$|(^|\/)(src|test|tests|\.git|\.env)(\/|$)/.test(name) ||
         (name.endsWith('.node') &&
-          name !== 'node_modules/better-sqlite3/prebuilds/win32-x64.node') ||
+          name !== `node_modules/better-sqlite3/prebuilds/${target}.node`) ||
         content.includes(Buffer.from(repository)) ||
         content.includes(Buffer.from(repository.replaceAll('\\', '\\\\'))) ||
-        /(?:\/Users\/|[A-Za-z]:\\\\Users\\\\)[A-Za-z0-9_-]+/.test(content.toString('utf8'))
+        (name !== 'bin/node' &&
+          /(?:\/Users\/|[A-Za-z]:\\\\Users\\\\)[A-Za-z0-9_-]+/.test(content.toString('utf8')))
       )
         throw new Error('PORTABLE_ASSET_LEAK')
       files[name] = { sha256: sha256(content), bytes: content.length }

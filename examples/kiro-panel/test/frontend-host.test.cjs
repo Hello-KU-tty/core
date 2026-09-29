@@ -4,7 +4,7 @@ const { join } = require('node:path')
 const { runInNewContext } = require('node:vm')
 const { test } = require('node:test')
 
-function harness({ trusted = true, supported = true, fail = false } = {}) {
+function harness({ trusted = true, supported = true, fail = false, platform = 'win32' } = {}) {
   let listener, trustListener, stopped = 0, workers = 0, starts = 0, mutations = 0
   const code = readFileSync(join(__dirname, '../src/frontend-host.cjs'), 'utf8')
   const rawClient = { health: async () => ({}), listProjects: async () => ({ projects: [] }),
@@ -29,13 +29,18 @@ function harness({ trusted = true, supported = true, fail = false } = {}) {
     './native-worker.cjs': { startNativeWorker() { workers++; return { stop() {},
       getStatus: () => 'READY', subscribeStatus: () => () => {}, subscribeUserInputs: () => () => {} } } },
     './windows-terminal-environment.cjs': { prepareWindowsProjectTerminal: async () => {} },
+    './mac-terminal-environment.cjs': { prepareMacProjectTerminal: async () => {} },
+    '../../program-macos-dev/kiro-1170-source.cjs': { attestMacKiro1170Installation() {
+      if (!supported) throw new Error('NATIVE_INSTALLATION_UNSUPPORTED')
+      return { appVersion: '1.1.70', agentExtensionVersion: '1.1.158' }
+    } },
     '../../kiro-native-host/native-installation-source.cjs': { attestWindowsKiroInstallation() {
       if (!supported) throw new Error('NATIVE_INSTALLATION_UNSUPPORTED')
       return { appVersion: '1.1.70', agentExtensionVersion: '1.1.158' }
     } },
   }
   const module = { exports: {} }
-  runInNewContext(code, { module, require: name => modules[name] ?? {}, process })
+  runInNewContext(code, { module, require: name => modules[name] ?? {}, process: { ...process, platform } })
   return { create: () => module.exports.createFrontendHost({ extensionPath: '/extension', globalStorageUri: { fsPath: '/private' } }),
     grantTrust() { modules.vscode.workspace.isTrusted = true; trustListener?.() },
     counters: () => ({ stopped, workers, starts, mutations }) }
@@ -54,7 +59,8 @@ test('host deduplicates preparation, guards early mutation and disposes once', a
   await assert.rejects(host.prepare(), /FRONTEND_HOST_STOPPED/)
   await assert.rejects(host.client.startRun({}), /FRONTEND_HOST_STOPPED/)
 })
-for (const options of [{ trusted: false }, { supported: false }]) test(`unsupported native leaves History readable ${JSON.stringify(options)}`, async () => {
+for (const options of [{ trusted: false }, { supported: false },
+  { platform: 'darwin', trusted: false }, { platform: 'darwin', supported: false }]) test(`unsupported native leaves History readable ${JSON.stringify(options)}`, async () => {
   const h = harness(options), host = await h.create()
   await host.prepare()
   assert.equal(host.getStatus().native, 'UNAVAILABLE')

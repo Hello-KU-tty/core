@@ -76,7 +76,7 @@ describe('portable build source preflight', () => {
       new URL('../../scripts/build-portable-core.mjs', import.meta.url),
       'utf8',
     )
-    const preflight = source.indexOf('const nodeLicensePath = await verifyPortableBuildSource(')
+    const preflight = source.indexOf('await verifyPortableBuildSource(')
     const firstOutputMutation = source.indexOf("await mkdir(join(repository, 'dist')")
     const replacement = source.indexOf('await rm(output,')
     expect(preflight).toBeGreaterThan(-1)

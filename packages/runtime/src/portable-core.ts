@@ -20,8 +20,8 @@ export interface CoreRuntimeDescriptor {
   readonly args: readonly string[]
   readonly env: Readonly<Record<string, string>>
   readonly nodeVersion: string
-  readonly platform: 'win32'
-  readonly arch: 'x64'
+  readonly platform: 'win32' | 'darwin'
+  readonly arch: 'x64' | 'arm64'
   readonly napi: number
 }
 export interface CoreResources {
@@ -36,7 +36,7 @@ export interface CoreResources {
 }
 export interface CoreResourceManifest {
   readonly schemaVersion: 1
-  readonly target: 'win32-x64'
+  readonly target: 'win32-x64' | 'darwin-arm64'
   readonly nodeVersions: readonly string[]
   readonly promptVersions: Readonly<Record<string, string>>
   readonly files: Readonly<Record<string, { readonly sha256: string; readonly bytes: number }>>
@@ -96,7 +96,7 @@ export async function loadCoreResources(resourceRoot: string): Promise<CoreResou
   ) as CoreResourceManifest
   if (
     manifest.schemaVersion !== 1 ||
-    manifest.target !== 'win32-x64' ||
+    !['win32-x64', 'darwin-arm64'].includes(manifest.target) ||
     JSON.stringify(manifest.nodeVersions) !== JSON.stringify(CORE_NODE_VERSIONS) ||
     !manifest.files ||
     !manifest.promptVersions
@@ -114,7 +114,7 @@ export async function loadCoreResources(resourceRoot: string): Promise<CoreResou
       !/^[a-f0-9]{64}$/.test(asset.sha256) ||
       !Number.isSafeInteger(asset.bytes) ||
       asset.bytes < 1 ||
-      asset.bytes > 32 * 1024 * 1024
+      asset.bytes > (name === 'bin/node' ? 150 : 32) * 1024 * 1024
     )
       fail('CORE_RESOURCE_MANIFEST_INVALID')
     const content = await plainFile(join(root, name), asset.bytes)
@@ -145,7 +145,8 @@ export async function loadCoreResources(resourceRoot: string): Promise<CoreResou
     'bin/runtime.cjs',
     'bin/project-tools.mjs',
     'drizzle/meta/_journal.json',
-    'node_modules/better-sqlite3/prebuilds/win32-x64.node',
+    `node_modules/better-sqlite3/prebuilds/${manifest.target}.node`,
+    ...(manifest.target === 'darwin-arm64' ? ['bin/node', 'licenses/node-LICENSE'] : []),
   ]
   if (required.some((name) => !manifest.files[name])) fail('CORE_RESOURCE_REQUIRED_ASSET_MISSING')
   for (const name of ['discovery', 'builder', 'helper', 'evidence-analyst']) {
@@ -189,8 +190,10 @@ export function runtimeEnvironment(
 
 export function currentCoreRuntime(): CoreRuntimeDescriptor {
   if (
-    process.platform !== 'win32' ||
-    process.arch !== 'x64' ||
+    !(
+      (process.platform === 'win32' && process.arch === 'x64') ||
+      (process.platform === 'darwin' && process.arch === 'arm64')
+    ) ||
     !CORE_NODE_VERSIONS.some((v) => v === process.versions.node) ||
     Number(process.versions.napi) < 10 ||
     typeof fetch !== 'function' ||
@@ -204,8 +207,8 @@ export function currentCoreRuntime(): CoreRuntimeDescriptor {
     args: [],
     env: process.versions.electron ? { ELECTRON_RUN_AS_NODE: '1' } : {},
     nodeVersion: process.versions.node,
-    platform: 'win32',
-    arch: 'x64',
+    platform: process.platform as 'win32' | 'darwin',
+    arch: process.arch as 'x64' | 'arm64',
     napi: Number(process.versions.napi),
   })
 }
@@ -274,8 +277,7 @@ export async function probeCoreRuntime(
   }
   if (
     result.stderr.trim() ||
-    value.platform !== 'win32' ||
-    value.arch !== 'x64' ||
+    `${value.platform}-${value.arch}` !== resources.manifest.target ||
     !CORE_NODE_VERSIONS.some((v) => v === value.node) ||
     value.napi < 10 ||
     value.sqlite !== 'ok' ||
@@ -290,8 +292,8 @@ export async function probeCoreRuntime(
     args: [],
     env,
     nodeVersion: value.node,
-    platform: 'win32',
-    arch: 'x64',
+    platform: value.platform as 'win32' | 'darwin',
+    arch: value.arch as 'x64' | 'arm64',
     napi: value.napi,
   })
 }
@@ -349,6 +351,17 @@ export async function acquireCoreNode(
   resources: CoreResources,
   options: { signal?: AbortSignal; download?: typeof fetch; offline?: boolean } = {},
 ): Promise<string> {
+  if (
+    process.platform === 'darwin' &&
+    process.arch === 'arm64' &&
+    resources.manifest.target === 'darwin-arm64'
+  ) {
+    const path = join(resources.root, 'bin/node')
+    const asset = resources.manifest.files['bin/node']
+    if (!asset || sha256(await plainFile(path, asset.bytes)) !== asset.sha256)
+      fail('RUNTIME_CACHE_CORRUPT')
+    return path
+  }
   if (process.platform !== 'win32' || process.arch !== 'x64') fail('RUNTIME_TARGET_UNSUPPORTED')
   await ownedPrivateDirectory(cacheRoot)
   const destination = join(cacheRoot, `node-${MANAGED_NODE.version}-win32-x64`)
@@ -451,7 +464,7 @@ export async function selectCoreRuntime(options: {
     (process.env.PATH ?? process.env.Path ?? '')
       .split(delimiter)
       .filter((p) => isAbsolute(p))
-      .map((p) => join(p, 'node.exe'))
+      .map((p) => join(p, process.platform === 'darwin' ? 'node' : 'node.exe'))
   for (const executable of new Set(paths)) candidates.push({ source: 'EXISTING_NODE', executable })
   const rejected: { source: string; code: string }[] = []
   for (const candidate of candidates) {

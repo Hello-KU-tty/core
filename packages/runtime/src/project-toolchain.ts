@@ -1,6 +1,16 @@
 import { execFile } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
-import { lstat, mkdir, open, readdir, realpath, rename, unlink, writeFile } from 'node:fs/promises'
+import {
+  chmod,
+  lstat,
+  mkdir,
+  open,
+  readdir,
+  realpath,
+  rename,
+  unlink,
+  writeFile,
+} from 'node:fs/promises'
 import { basename, delimiter, dirname, isAbsolute, join, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
 import { gunzipSync } from 'node:zlib'
@@ -23,7 +33,7 @@ export const PROJECT_PNPM = Object.freeze({
     'svx2g7imUlQU59E+G6KMqt3elr9m7FQL+ut+cCuB8+C+TR8pXt9/n+A5Z0Co3ORQnFgt33mJH0VD/qMtN2RfJQ==',
   maxBytes: 12 * 1024 * 1024,
 })
-export const PROJECT_TOOL_COMMAND = '.\\.kiro\\vibe-tools.cmd '
+export const PROJECT_TOOL_COMMAND = process.platform === 'darwin' ? '' : '.\\.kiro\\vibe-tools.cmd '
 export interface ProjectToolchain {
   readonly schemaVersion: 1
   readonly node: CoreRuntimeDescriptor
@@ -258,7 +268,9 @@ export function projectEnvironment(
   env.PATH = [
     dirname(toolchain.node.executable),
     join(toolchain.privateRoot, 'bin'),
-    join(env.SystemRoot ?? 'C:\\Windows', 'System32'),
+    ...(toolchain.node.platform === 'darwin'
+      ? ['/usr/bin', '/bin', '/usr/sbin', '/sbin']
+      : [join(env.SystemRoot ?? 'C:\\Windows', 'System32')]),
   ].join(delimiter)
   env.USERPROFILE = join(toolchain.privateRoot, 'home')
   env.HOME = env.USERPROFILE
@@ -318,7 +330,15 @@ export async function selectProjectToolchain(options: {
   offline?: boolean
   download?: typeof fetch
 }): Promise<ProjectToolchain> {
-  if (process.platform !== 'win32' || process.arch !== 'x64') fail('PROJECT_TOOLCHAIN_UNSUPPORTED')
+  if (
+    !(
+      (process.platform === 'win32' && process.arch === 'x64') ||
+      (process.platform === 'darwin' &&
+        process.arch === 'arm64' &&
+        options.resources.manifest.target === 'darwin-arm64')
+    )
+  )
+    fail('PROJECT_TOOLCHAIN_UNSUPPORTED')
   const root = await ownedPrivateDirectory(options.privateRoot)
   for (const name of ['home', 'config', 'cache', 'data', 'state', 'bin'])
     await ownedPrivateDirectory(join(root, name))
@@ -352,7 +372,8 @@ export async function selectProjectToolchain(options: {
   }
   for (const executable of node
     ? []
-    : (options.nodeExecutables ?? paths.map((path) => join(path, 'node.exe')))) {
+    : (options.nodeExecutables ??
+      paths.map((path) => join(path, process.platform === 'darwin' ? 'node' : 'node.exe')))) {
     try {
       node = await probeCoreRuntime(
         { executable, source: 'EXISTING_NODE' },
@@ -396,7 +417,11 @@ export async function selectProjectToolchain(options: {
   for (const path of result
     ? []
     : (options.pnpmExecutables ??
-      paths.flatMap((path) => [join(path, 'pnpm.cmd'), join(path, 'pnpm.exe')]))) {
+      paths.flatMap((path) =>
+        process.platform === 'darwin'
+          ? [join(path, 'pnpm')]
+          : [join(path, 'pnpm.cmd'), join(path, 'pnpm.exe')],
+      ))) {
     try {
       const executable = await realpath(path)
       if (!isAbsolute(path) || !(await lstat(executable)).isFile()) continue
@@ -452,7 +477,9 @@ async function recordedProjectToolchain(
   if (names.length > 4096) fail('PROJECT_RECORDED_TOOLCHAIN_INVALID')
   const files = names.filter((name) => /^[a-f0-9]{64}\.json$/.test(name))
   if (!files.length) return undefined
-  const sharedShim = await optionalProjectFile(join(root, 'bin/pnpm.cmd'))
+  const sharedShim = await optionalProjectFile(
+    join(root, process.platform === 'darwin' ? 'bin/pnpm' : 'bin/pnpm.cmd'),
+  )
   const candidates: ProjectToolchain[] = []
   for (const name of files) {
     try {
@@ -516,6 +543,7 @@ async function recordedProjectToolchain(
                 join(resourceRoot, 'bin/project-tools.mjs'),
                 file,
                 legacy,
+                tc.node.platform,
               ),
           ),
         )
@@ -556,6 +584,10 @@ async function recordedProjectToolchain(
 function pnpmShim(toolchain: ProjectToolchain, legacy = false): string {
   const { pnpm, node } = toolchain
   const pnpmPath = pnpm.executable
+  if (node.platform === 'darwin') {
+    if (pnpm.kind !== 'JS') fail('PROJECT_PNPM_KIND_UNSUPPORTED')
+    return `#!/bin/sh\nunset NODE_OPTIONS NODE_PATH ELECTRON_RUN_AS_NODE\nexec ${shellQuote(node.executable)} ${shellQuote(pnpmPath)} "$@"\n`
+  }
   if (
     !isAbsolute(pnpmPath) ||
     /["%\r\n!&|<>^]/.test(pnpmPath) ||
@@ -575,7 +607,7 @@ export async function preparePnpmShim(
   await ownedPrivateDirectory(join(root, 'bin'))
   const shim = pnpmShim(result)
   const legacyShim = pnpmShim(result, true)
-  const shimPath = join(root, 'bin/pnpm.cmd')
+  const shimPath = join(root, result.node.platform === 'darwin' ? 'bin/pnpm' : 'bin/pnpm.cmd')
   try {
     await writeFile(shimPath, shim, { flag: 'wx', mode: 0o600 })
   } catch (error) {
@@ -592,6 +624,7 @@ export async function preparePnpmShim(
       await replaceProjectFile(shimPath, shim)
     else if (previous !== shim) fail('PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED')
   }
+  if (result.node.platform === 'darwin') await chmod(shimPath, 0o700)
 }
 
 async function hasRecordedPnpmShim(
@@ -642,6 +675,7 @@ async function hasRecordedPnpmShim(
               join(old.resourceRoot, 'bin/project-tools.mjs'),
               file,
               legacy,
+              toolchain.node.platform,
             ),
         ) ||
         launcher ===
@@ -649,6 +683,8 @@ async function hasRecordedPnpmShim(
             toolchain.node.executable,
             join(resources.root, 'bin/project-tools.mjs'),
             file,
+            false,
+            toolchain.node.platform,
           )
       )
         return true
@@ -735,7 +771,20 @@ function utf8Batch(commands: readonly string[]): string {
   ].join('\r\n')
 }
 
-function launcherText(node: string, runner: string, descriptor: string, legacy = false): string {
+function shellQuote(value: string): string {
+  if (!isAbsolute(value) || /[\r\n\0]/.test(value)) fail('PROJECT_LAUNCHER_PATH_UNSAFE')
+  return `'${value.replaceAll("'", "'\\''")}'`
+}
+
+function launcherText(
+  node: string,
+  runner: string,
+  descriptor: string,
+  legacy = false,
+  platform: string = 'win32',
+): string {
+  if (platform === 'darwin')
+    return `#!/bin/sh\n# VIBE_DESCRIPTOR ${JSON.stringify(descriptor)}\nunset NODE_OPTIONS NODE_PATH ELECTRON_RUN_AS_NODE\nexec ${shellQuote(node)} ${shellQuote(runner)} ${shellQuote(descriptor)} "$@"\n`
   if ([node, runner, descriptor].some((path) => !isAbsolute(path) || /["%\r\n!&|<>^]/.test(path)))
     fail('PROJECT_LAUNCHER_PATH_UNSAFE')
   const commands = [
@@ -868,6 +917,8 @@ async function prepareProjectToolsOnce(
     toolchain.node.executable,
     join(resources.root, 'bin/project-tools.mjs'),
     descriptorFile,
+    false,
+    toolchain.node.platform,
   )
   const oldContent = await optionalProjectFile(descriptorFile)
   const oldLauncher = await optionalProjectFile(launcherFile)
@@ -914,12 +965,15 @@ async function prepareProjectToolsOnce(
     toolchain.node.executable,
     join(oldRoot, 'bin/project-tools.mjs'),
     descriptorFile,
+    false,
+    toolchain.node.platform,
   )
   const legacyOldLauncher = launcherText(
     toolchain.node.executable,
     join(oldRoot, 'bin/project-tools.mjs'),
     descriptorFile,
     true,
+    toolchain.node.platform,
   )
   if (
     oldLauncher !== expectedOldLauncher &&
@@ -946,8 +1000,12 @@ export async function verifyProjectTools(
     .map((line) => line.match(/^"([^"]+)" "([^"]+)" "([^"]+)" %\*$/))
     .filter((line) => line !== null)
   const match = lines.length === 1 ? lines[0] : null
-  if (!match?.[3]) fail('PROJECT_LAUNCHER_INVALID')
-  const descriptorFile = match[3]
+  const macDescriptor =
+    process.platform === 'darwin' ? launcher.match(/^# VIBE_DESCRIPTOR (.+)$/m)?.[1] : undefined
+  if (!match?.[3] && !macDescriptor) fail('PROJECT_LAUNCHER_INVALID')
+  const descriptorFile: unknown = macDescriptor ? JSON.parse(macDescriptor) : match?.[3]
+  if (typeof descriptorFile !== 'string' || !isAbsolute(descriptorFile))
+    fail('PROJECT_DESCRIPTOR_INVALID')
   if (!(await isPrivateDirectory(dirname(descriptorFile)))) fail('PROJECT_DESCRIPTOR_UNSAFE')
   const data = JSON.parse((await plainFile(descriptorFile, 32768)).toString()) as {
     schemaVersion: number
@@ -974,7 +1032,13 @@ export async function verifyProjectTools(
     fail('PROJECT_DESCRIPTOR_INVALID')
   if (
     launcher !==
-    launcherText(tc.node.executable, join(resources.root, 'bin/project-tools.mjs'), descriptorFile)
+    launcherText(
+      tc.node.executable,
+      join(resources.root, 'bin/project-tools.mjs'),
+      descriptorFile,
+      false,
+      tc.node.platform,
+    )
   )
     fail('PROJECT_LAUNCHER_CHANGED')
   return { toolchain: tc, descriptorFile }

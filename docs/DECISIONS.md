@@ -15,6 +15,20 @@
 - **Helper 표시:** 응답 일부를 다시 붙인 `도우미 답변 요약` 영역을 제거한다. 실제 답변 stream, 사용자 질문과 대화 상태는 유지한다. 내부 Helper 기록·Evidence provenance·저장 계약 및 Agent prompt는 변경하지 않는다.
 - **검증:** 새 PC에서의 무결함을 주장하지 않는다. 변경된 실행 환경과 packaged Node/pnpm의 재사용을 모델 없이 재현하고 frontend 회귀와 새 VSIX의 구성·hash를 확인한다. commit/push는 이번 요청에 포함하지 않는다.
 
+## 2026-09-30: 최신 공개 소스 기반 Mac·개발자 ZIP 게시
+
+- **승인:** 사용자 요청으로 원격 최신 상태를 먼저 통합하고 Mac VSIX, 개발자 ZIP, 양쪽 README를 수정한 뒤 commit/push한다. 기존 승인된 `@hurdooagent` collaborator 경로를 사용하며 force push하지 않는다. 영상은 다른 담당자의 변경을 보존한다.
+- **출처:** 처음 선택한 frontend `e1cffdd`(0.0.16) 빌드는 게시하지 않는다. 사용자 후속 지시에 따라 공개 frontend `a61d408`(0.0.18), Core `7b35217`과 기존 Mac 변경을 통합한다. 도구 재사용·Helper 요약 제거 및 완료 뒤 지속 대화 소스가 포함되므로 이전 소스 미공개 재빌드 조건은 해소됐다.
+- **주소/버전:** 기존 Mac 0.1.0 경로를 호환 다운로드 주소로 유지하되 내부 확장 버전은 0.1.1로 올린다. 개발자 ZIP의 기존 20260927 경로에는 최신 전체 소스 snapshot을 게시한다. 교체 사실·SHA-256·검증 범위를 안내하고 과거 검증을 새 artifact의 검증으로 대체하지 않는다.
+- **검증:** 정확한 도구 pin, frozen install, 양쪽 자동 검사, 실제 Core consumer, 패키지 inventory와 누출 검사, Kiro 격리 설치 및 설치 자산의 모델0 lifecycle 검사를 사용한다. 실제 사용 인터뷰는 사용자 확인에 근거한 정성 관찰이며 baseline 대비 효과·새 Mac 설치본 native 완주를 뜻하지 않는다.
+
+## 2026-09-29: Mac 배포용 VSIX
+
+- **승인:** 사용자가 Mac 배포용을 요청하고 Windows VSIX는 Windows에서 별도 제작한다고 명시했다.
+- **결정:** 우선 darwin-arm64/Kiro IDE 1.1.70/Agent 1.1.158 exact source를 대상으로 독립 VSIX를 만든다. 기존 frontend와 managed Core lease를 재사용하고 별도 사용자 데이터 root를 사용한다. Windows artifact와 개발 harness를 교체하지 않는다.
+- **실행 도구:** Homebrew 동적 라이브러리에 의존하지 않는 공식 Node 24.19.0 Mac arm64 배포본을 SHA-256 검증 후 license와 함께 포함한다. Core는 호환 Kiro/기존 Node를 우선 탐색하고 bundled Node를 fallback으로 사용한다. 생성 앱은 bundled Node와 기존 무결성 검증 pnpm 11.13.1 acquisition을 사용한다. 시스템 PATH/설정 대신 생성 workspace 범위의 비영구 terminal 환경을 사용한다.
+- **검증:** source attestation, 패키지 inventory/개인 경로 누출, 설치 parser, 빈 private root Core 시작·재연결·종료 및 도구 실행을 확인한다. Intel Mac, 유료 native 완주, 공개 게시와 Windows PASS는 이 검사로 주장하지 않는다.
+
 ## 2026-09-29: 결정 선택 후 명시적 계속 실행
 
 - **사용자 피드백:** 결정 선택 뒤 바로 다음 작업으로 이어질 것을 기대하지만 기존 프론트는 저장만 하고 별도 Builder 재개를 요구했다.

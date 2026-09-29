@@ -78,7 +78,7 @@ Kiro IDE
 
 **[Windows용 VSIX 0.0.18 다운로드](releases/windows/0.0.18/builder-helper-agent-panel-0.0.18-win32-x64-74208fffa5c0.vsix?raw=true)** · Windows x64용. Kiro IDE 1.1.70 / 내장 Agent 1.1.158 기준이며 [Windows 설치 안내·검증 범위](docs/WINDOWS_VSIX.md)를 확인한다.
 
-**[Mac용 VSIX 0.1.0 다운로드](releases/macos/0.1.0/builder-helper-agent-panel-0.1.0-darwin-arm64.vsix?raw=true)** · Apple Silicon(M1 이상)용. GitHub 파일 화면이 열리면 **Download raw file**을 누른다. Intel Mac은 지원 대상이 아니다. [Mac 설치 안내·검증 범위](docs/MAC_VSIX.md)를 확인한다.
+**[Mac용 VSIX 0.1.1 다운로드](releases/macos/0.1.0/builder-helper-agent-panel-0.1.0-darwin-arm64.vsix?raw=true)** · Apple Silicon(M1 이상)용. 기존 다운로드 주소와 파일명은 유지하며 내부 확장 버전은 **0.1.1**이다. Intel Mac은 지원 대상이 아니다. [Mac 설치 안내·검증 범위](docs/MAC_VSIX.md)를 확인한다.
 
 1. [Kiro IDE](https://kiro.dev/downloads/)를 설치하고 본인 계정으로 로그인한다.
 2. Windows x64에서는 위 `win32-x64.vsix`를 받는다. Mac에서는 Kiro를 `/Applications/Kiro.app`에 설치하고 위 `darwin-arm64.vsix`를 받는다.
@@ -87,7 +87,9 @@ Kiro IDE
 
 별도 서비스 로그인이나 API Key는 없다. 모델 사용량은 사용자 본인의 Kiro 계정에서 차감된다. 첫 실행 때 생성 앱의 도구·의존성 준비를 위해 network가 필요할 수 있다. VSIX 사용에는 Node·pnpm 수동 설치나 백엔드 수동 실행이 필요하지 않다. Mac 설치 후보의 검증 기준은 Kiro IDE 1.1.70 / Agent 1.1.158이다. 설치·Core 자동 검사는 통과했으며 이 설치물의 실제 모델 전체 흐름은 별도 검증 대상이다.
 
-VSIX가 작동하지 않으면 먼저 [연결 오류 해결](docs/DOWNLOAD_GUIDE.md#6-업데이트와-문제-해결)을 확인하고, 개발 환경에서는 [소스 재빌드·개발자용 ZIP 대안](docs/DOWNLOAD_GUIDE.md#7-vsix가-작동하지-않을-때-개발자용-대안)을 사용할 수 있다. ZIP은 Windows용 과거 update kit이므로 Mac에 직접 설치하지 않는다.
+VSIX가 작동하지 않으면 먼저 [연결 오류 해결](docs/DOWNLOAD_GUIDE.md#6-업데이트와-문제-해결)을 확인한다. [개발자용 ZIP](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/frontend-handoff/20260927/frontend-handoff-20260927.zip)은 2026-09-30 백엔드·프론트 전체 실행 소스로 갱신했다. 새 폴더에 풀어 [소스 재빌드 안내](docs/DOWNLOAD_GUIDE.md#7-vsix가-작동하지-않을-때-개발자용-대안)를 따른다. ZIP 자체는 확장 설치 파일이 아니다.
+
+Mac 0.1.1과 개발자 ZIP은 공개 frontend `a61d408`(0.0.18)과 대응 Core를 기준으로 한다. 완료 뒤 Builder·Helper 대화 유지, 기록된 Node·pnpm 재사용, 중복 Helper 요약 제거를 포함한다. Mac 패키지 버전과 Windows 패키지 버전은 별도로 관리한다.
 
 ## 개발 환경과 검증
 
@@ -112,22 +114,30 @@ node scripts/test-program-consumer.mjs <program checkout 경로>
 
 실제 모델을 쓰는 live probe(`pnpm test:eval:live-*`)는 Kiro 로그인 환경에서 본인 계정 사용량을 소비한다. 평가 실행법은 [tests/eval/README.md](tests/eval/README.md)에 있다.
 
-### 최근 검증 결과 (macOS arm64, Node 24.19.0)
+### 최근 검증 결과 (2026-09-30, macOS arm64, Node 24.19.0)
 
 | 검사 | 결과 |
 | --- | --- |
-| backend `pnpm check` | unit 137, integration 365, eval 41, Campus Drop 3, smoke 6, E2E 12 PASS (Windows 전용 등 11 SKIP) |
-| Kiro native 연동 회귀 | 161 PASS, 2 SKIP |
-| frontend (`program`) | typecheck, 719 tests, build PASS |
+| ZIP 압축 해제본 backend `pnpm check` | unit 177, integration 404, eval 43, Campus Drop 3, smoke 6, E2E 12 PASS (Windows 전용 등 11 SKIP) |
+| 패널·개발 host·source 회귀 | 220 PASS, 2 SKIP |
+| frontend 0.0.18 (`program`) | typecheck, 807 tests, build PASS |
 | 실제 frontend → HTTP/SSE → SQLite consumer | PASS (모델 경계는 deterministic fixture) |
+| 완료 뒤 후속 Builder·Helper | 각 3회, 중복 방지·재접속·기존 완료 보고/파일 보존 PASS (합성 Agent) |
+| Mac 0.1.1 설치·Core·도구 | 격리 Kiro 설치, 설치 자산 lifecycle·도구 재사용 등 6개 PASS; [재현·항목별 hash](docs/MAC_VSIX.md) |
 | 의존성 감사 | backend pnpm audit, frontend npm audit 모두 0건 |
-| 실제 모델 수직 흐름 | 학습 목표 입력 → 후보 10개 → Spec 확정 → Builder Decision → Task 완료 → Helper → 후속 Task로 결과 수정 → 재시작 후 복원 |
+| 이전 9/28 개발 환경 실제 모델 수직 흐름 | 학습 목표 입력 → 후보 10개 → Spec 확정 → Builder Decision → Task 완료 → Helper → 후속 Task로 결과 수정 → 재시작 후 복원 (새 설치물의 모델 완주 검증은 아님) |
 
 실제 흐름 기록은 [docs/FRONTEND_MAC_PROGRESS_20260928.md](docs/FRONTEND_MAC_PROGRESS_20260928.md), 보안·접근성 감사는 [docs/T20_AUDIT_20260928.md](docs/T20_AUDIT_20260928.md), 독립 소스 재현은 [docs/SOURCE_REPRODUCIBILITY_20260928.md](docs/SOURCE_REPRODUCIBILITY_20260928.md)에 있다.
 
+## 사용자 검증
+
+실제 초보 사용자 사용과 후속 인터뷰를 진행했다. 제출한 서비스 소개서에는 프로젝트를 고르는 데 도움을 받았고, 개발 중 필요한 개념 설명과 이후 회상에 도움이 됐다는 정성 피드백을 담았다. 이는 사용자 확인과 인터뷰에 근거한 관찰이며, 아래 자동 테스트나 합성 입력 검증과는 별개다.
+
+일반 Kiro 대비 통제된 비교·정량 학습 효과 검증은 아직 수행하지 않았다. 인터뷰의 긍정적 반응을 인과적인 학습 효과나 모든 사용자의 결과로 확대하지 않는다.
+
 ## 알려진 한계
 
-- 실제 초보 사용자 대상 검증과 일반 Kiro와의 비교는 아직 진행하지 않았다. 학습 효과를 수치로 주장하지 않는다.
+- 실제 사용 인터뷰는 정성 검증이며 일반 Kiro 대비 비교·정량 효과는 미검증이다. 새 Mac 0.1.1 설치본의 실제 모델 전체 완주와도 구분한다.
 - Evidence Analyst가 미래 계획을 실제 수행으로 잘못 분류할 수 있다. Core는 구조·출처·권한을 검증하지만 자연어 의미의 정확성까지 보장하지 않는다.
 - 생성 프로젝트는 새 TypeScript 프로젝트로 한정한다. 기존 프로젝트 import, 다른 coding agent, cloud sync는 범위 밖이다.
 - redaction은 알려진 형태 중심이며 모든 개인정보를 탐지하지 않는다. 생성 코드 실행은 OS 수준 sandbox가 아니다.
