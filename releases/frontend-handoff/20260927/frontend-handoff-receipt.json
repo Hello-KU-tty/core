@@ -1,11 +1,12 @@
 {
   "file": "frontend-handoff-20260927.zip",
   "status": "DEVELOPER_SOURCE_SNAPSHOT",
+  "publicationStatus": "LOCAL_COMMIT_CANDIDATE_NOT_PUSHED",
   "updatedAt": "2026-09-30",
-  "bytes": 4837102,
-  "sha256": "97bd37eee0df6b91bf798eb23843b2422d07a7010e4dcb54ac5d19a29e3c21b6",
-  "files": 872,
-  "backendHead": "b7beeb33a140c0a88643a424a7b6b65e1d04e0fa",
+  "bytes": 4849742,
+  "sha256": "7ebc6b8a5443d1a1da109b91cc5e5ed06a452a9faa41b43d8bde86df6ee1c0ef",
+  "files": 876,
+  "backendHead": "7bf1c3389cba086cdcfb2a4942c0dd0def981d4f",
   "frontendRevision": "e65cd7ff341e34bd6b160c468225819b0ab02254",
   "frontendFeatureRevision": "a61d408b8ad19ed4baf3ead72701821885b3b768",
   "frontendVersion": "0.0.18",
@@ -19,8 +20,19 @@
   "requiresPreviousKit": false,
   "validationScope": "MACOS_ARM64_EXTRACTED_SOURCE_MODEL_0",
   "backendCheck": "PASS",
+  "backendChecks": {
+    "unitPassed": 177,
+    "integrationPassed": 418,
+    "evalPassed": 43,
+    "campusDropPassed": 3,
+    "smokePassed": 6,
+    "e2ePassed": 12,
+    "skipped": 11
+  },
+  "sourceFileHashesMatchedAfterChecks": 874,
   "frontendTests": 807,
   "macVsixRebuildFileHashesMatched": 72,
+  "macVsixVersion": "0.1.2",
   "windowsPortable": "Unmodified public frontend kit assets; not newly built on Mac",
   "nativeModelCalls": 0
 }

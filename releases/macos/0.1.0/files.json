@@ -7,7 +7,7 @@
   {
     "name": "extension.vsixmanifest",
     "bytes": 820,
-    "sha256": "acf508332c4752a8a39c71212995792c1defa5816506d3f755aaa9801ad3899e"
+    "sha256": "d26eefd5a5d319ffa4068a214506f8db0bfbb08c0a59361b88b142717f5e8619"
   },
   {
     "name": "extension/dist/extension.js",
@@ -27,7 +27,7 @@
   {
     "name": "extension/package.json",
     "bytes": 1426,
-    "sha256": "eb52ee360cb382fa40b94f4da992b6549063d0265b240ab162fdc0ab3e18d52f"
+    "sha256": "11942ac9a1d633e07ee0236069399f20062c2b9b610ab45ca630633dda4af6e2"
   },
   {
     "name": "extension/portable/agent-prompts/builder.md",
@@ -61,18 +61,18 @@
   },
   {
     "name": "extension/portable/bin/core.mjs",
-    "bytes": 1044499,
-    "sha256": "0dc825731fa25894cab2600bde03e0e4c8845d4cc64942d95c498e61d38bb347"
+    "bytes": 1046622,
+    "sha256": "a9b3597e267e4d07ed8e974700a426ccc2336829fb54a1cacd483d449f259ece"
   },
   {
     "name": "extension/portable/bin/extension.cjs",
-    "bytes": 575912,
-    "sha256": "18313ee02c69f9597b5e83a02e38a88b30b8476f2e0e2e39fb737a1f63f6904b"
+    "bytes": 575881,
+    "sha256": "97a3aa243cb012fc25468b574b15156b3fc581612751fba6b4a2e4625ae271be"
   },
   {
     "name": "extension/portable/bin/frontend-host.cjs",
-    "bytes": 536770,
-    "sha256": "48ec0b1b58dc443c1fce1f14ff585238c3feb3b75a84784ebd1b9b5c0088f693"
+    "bytes": 536739,
+    "sha256": "aa6e62adaa058f9489178e07110b95e86ac947cf5c6500191f9c129db209dc3c"
   },
   {
     "name": "extension/portable/bin/guard.mjs",
@@ -102,12 +102,12 @@
   {
     "name": "extension/portable/bin/project-tools.mjs",
     "bytes": 401324,
-    "sha256": "816eac88e8cef416f3d87c53d78f87ee27c961c16d681d23fd5b2720b58b14bc"
+    "sha256": "9aed8d158bc2fb0e054c4d8dcce21ff05359ae945bc3a24808bf8374c7f0c806"
   },
   {
     "name": "extension/portable/bin/runtime.cjs",
-    "bytes": 450384,
-    "sha256": "6820ff2ccee1a28ad7ce46a77c9bd783dc1751f96ba9ce61d226395ac7d95fd3"
+    "bytes": 452756,
+    "sha256": "c1af200b9ea6b49df8db6aa7eb22fe9a569b56f6be4436f507428167c72c4cc7"
   },
   {
     "name": "extension/portable/drizzle/0000_daily_moira_mactaggert.sql",
@@ -217,7 +217,7 @@
   {
     "name": "extension/portable/manifest.json",
     "bytes": 10442,
-    "sha256": "19b8edd722b481db5a1391abffd2eebf505f9c83797fed7ac700f5c0c5ac56c2"
+    "sha256": "df57cc37ad78e349e1ad6b802edf112234df2a590e331845741aa588b2e5ce28"
   },
   {
     "name": "extension/portable/node_modules/better-sqlite3/lib/binding.js",

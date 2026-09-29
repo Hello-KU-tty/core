@@ -30,12 +30,13 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - **완료 조건:** 양쪽 소스 검사, ZIP 추출 재현, VSIX 격리 설치와 모델0 Core/도구 재사용 검사, 다운로드 주소 및 게시 hash 확인. 0.0.18 동기화로 이전 frontend 미공개 조건을 해소한다. 영상은 수정하지 않는다.
 - **검증/게시:** frontend 0.0.18의 807 tests·typecheck·build, 최종 ZIP 추출본의 frozen install→`pnpm check`(unit177/integration404/eval43/Campus3/smoke6/E2E12, 11 SKIP), 패널·개발 host·source 회귀220+2 SKIP, 실제 frontend HTTP/SSE/SQLite consumer와 완료 뒤 Builder3/Helper3 PASS. 격리 Kiro 설치와 설치 자산 lifecycle/도구6개 PASS, 최종 ZIP 재빌드 VSIX72항목 hash 일치. Mac41,582,063 bytes 및 ZIP4,837,102 bytes를 기존 주소에 게시하고 두 URL에서 다시 받은 SHA-256 일치를 확인했다. Core `b7beeb3`·`a0ce3a8`, program `e65cd7f`를 기존 main에 push했다. [Mac receipt](../releases/macos/0.1.0/macos-vsix-receipt.json)·[ZIP receipt](../releases/frontend-handoff/20260927/frontend-handoff-receipt.json). 모델0이며 새 설치본 native 완주는 T19-M2로 남긴다. 사용자 원본·영상·기존 실험과 보존 stash는 유지했다.
 
-### [~] T19-M4. 후속 감사 복구·문서·로컬 후보
+### [x] T19-M4. 후속 감사 복구·문서·로컬 후보
 
 - **승인/선행:** 2026-09-30 사용자 전체 보완 승인, commit까지만 수행.
 - **산출물:** Mac persistent Node/업그레이드·사라진 workspace 회귀, 역사 문서 정합성, 로컬 조직 소개 초안, 같은 경로의 Mac 0.1.2/개발자 ZIP 후보.
 - **완료 조건:** 관련 보안·복구 회귀, 최신 설치 자산 검사, 소스 ZIP clean 전체 check와 출처/hash 기록. 실제 모델 검증은 T19-M2에서 별도 판정하며 push하지 않는다.
-- **소스 검증:** 집중38PASS+1SKIP, 추출본 전체check(unit177/integration418/eval43/Campus3/smoke6/E2E12, 11SKIP), frontend807, 패널 등219+2SKIP, 실제 consumer/완료 후속 요청 PASS. 실제 패키지 자산8개·격리 설치69개 hash·추출 소스 재빌드72항목 일치. Chromium sandbox의 최초 실행 차단을 기록하고 허용된 테스트 전용 환경에서 전체 재실행했다. 최종 ZIP/receipt 로컬 묶음을 준비 중이며 공개/유료 모델 호출은 하지 않았다.
+- **소스 검증:** 집중38PASS+1SKIP, 추출본 전체check(unit177/integration418/eval43/Campus3/smoke6/E2E12, 11SKIP), frontend807, 패널 등219+2SKIP, 실제 consumer/완료 후속 요청 PASS. 실제 패키지 자산8개·격리 설치69개 hash·추출 소스 재빌드72항목 일치. Chromium sandbox의 최초 실행 차단을 기록하고 허용된 테스트 전용 환경에서 전체 재실행했다. 공개/유료 모델 호출은 하지 않았다.
+- **최종 로컬 묶음:** 소스 commit `7bf1c33` 기준 ZIP876항목/4,849,742 bytes를 새 폴더에서 frozen install→전체check(E2E12 포함), frontend807/타입/build로 재검증했다. 소스874개 hash가 불변이며 Mac0.1.2 VSIX41,583,212 bytes와 같은 기존 경로에 로컬 보관한다. 실제 설치된 자산 검사8개도 PASS다. 제출 문서 상대 링크71개 확인, 조직 profile/metadata는 로컬 초안만 준비했다. 사용자 원본·영상·실험·stash를 보존했고 push/GitHub 변경/유료 모델 호출은0이다. T19-M2는 승인 대기이며 상위 MVP 완료를 선언하지 않는다. 다음 착수는 Trust·최신 사용량 확인 뒤 T19-M2다.
 
 ### [-] T19-M2. Mac 설치본의 실제 native 수직 흐름 검증
 
