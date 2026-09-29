@@ -1,0 +1,51 @@
+# Mac VSIX 설치
+
+현재 설치 후보는 Apple Silicon Mac(`darwin-arm64`)용 Vibe Helper 0.1.0이다. Kiro IDE 1.1.70 / 내장 Agent 1.1.158 / API 1.131.0의 source hash를 확인한다. Kiro는 `/Applications/Kiro.app`에 설치하고 본인 계정으로 로그인한다. Intel Mac은 이 파일의 지원 대상이 아니다.
+
+[Mac용 VSIX 다운로드](../releases/macos/0.1.0/builder-helper-agent-panel-0.1.0-darwin-arm64.vsix?raw=true) · 41,564,663 bytes · SHA-256 `ebbc501c51d82d9b48e3a7c8482110fcd9c4a4cc5adf4e6307eea5f08ff7aacf`
+
+GitHub 파일 화면이 열리면 **Download raw file**을 누른다. 다운로드 후 터미널에서 아래 값이 위 SHA-256과 같은지 확인할 수 있다.
+
+```sh
+shasum -a 256 ~/Downloads/builder-helper-agent-panel-0.1.0-darwin-arm64.vsix
+```
+
+2026-09-29 최종 파일은 Kiro 격리 프로필 설치와 설치 자산의 실제 Core/SQLite lifecycle·도구 5개 검사 PASS다. unit177, integration384, eval42, Campus3, smoke6, E2E12, 기존 패널169 및 Mac terminal scope1 검사를 통과했다(각 플랫폼별 skip은 별도). 모델 호출은 0회다.
+
+## 설치와 사용
+
+1. [Kiro 공식 다운로드](https://kiro.dev/downloads/)에서 호환 버전의 **macOS (Apple Silicon)** IDE를 받아 `/Applications/Kiro.app`에 설치하고 로그인한다.
+2. 위 VSIX를 받은 뒤 Kiro Extensions(`Cmd+Shift+X`)의 `…` → **Install from VSIX…**에서 파일을 선택한다.
+3. 다시 로드한 뒤 **Agent Panel**을 연다.
+4. 사용할 작업 폴더를 신뢰하고 학습 목표를 입력한다. 생성 프로젝트나 Helper용 보조 창이 열리면 해당 폴더의 신뢰 여부를 확인한다.
+
+개발 저장소, Homebrew, Node/pnpm 수동 설치나 별도 서버 기동은 필요하지 않다. Core는 호환 런타임을 확인하고 필요하면 VSIX에 포함된 공식 Node 24.19.0을 사용한다. 생성 앱용 Node는 배포본을 사용하며 pnpm 11.13.1은 첫 실행 때 무결성을 확인해 전용 저장소에 준비한다. pnpm 및 생성 앱 의존성 다운로드, Kiro 로그인과 모델 사용에는 네트워크가 필요하다.
+
+Core/SQLite는 확장 전용 global storage 아래 `core-data`, 생성 프로젝트는 그 안의 `workspaces`에 저장한다. 설치 폴더와 사용자 데이터를 분리한다. 생성 폴더의 새 터미널에만 필요한 환경을 적용하며 전역 PATH나 셸 설정은 수정하지 않는다. Helper와 Analyst는 기존 읽기 전용 권한을 유지한다.
+
+연결 실패 시 명령 팔레트의 **Vibe Helper: Retry Core Connection**을 실행한다. 지원 버전 오류는 Kiro/Agent 버전을 확인한다. 작업 중 업데이트는 피하고, 종료 후 모든 Vibe Helper 창을 닫아 이전 Core lease가 해제된 뒤 재시작한다. 데이터 삭제로 연결 문제를 해결하지 않는다.
+
+## 검증 범위
+
+- VSIX 항목별 SHA-256/파일 수/개발 경로 누출 검사 및 Kiro 설치 parser.
+- 별도 한국어·공백 설치 경로에서 bundled Node와 실제 SQLite/Core 시작, 두 host의 Core 공유, History 보존, lease 종료·재시작.
+- 개발 도구 없는 선택 조건에서 Node/pnpm 준비, 실제 생성 프로젝트 명령, launcher 변조 거절.
+- Core unit/integration, Agent fixture, 패널 host·권한·runtime 회귀.
+
+유료 Kiro Agent의 새 Discovery→Builder→Helper 전체 완주, Intel Mac, 장기 사용과 다음 버전 업그레이드는 이 패키징 검사로 검증됐다고 주장하지 않는다. Windows 설치물은 Windows에서 별도로 만든다. 공개 Marketplace 게시나 사용자 일반 프로필 설치는 수행하지 않는다.
+
+## 재현
+
+아래 명령은 Mac 패키징 구현이 포함된 개발 checkout을 기준으로 한다. `panel:pack:macos`와 관련 스크립트가 없는 소스 버전에서는 실행할 수 없으며, 설치용 VSIX 배포와 패키징 소스 반영은 별도다.
+
+고정 Node 24.19.0·pnpm 11.13.1 환경과 `../vibe-helper-frontend` checkout에서:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm panel:pack:macos
+node scripts/test-macos-package.mjs
+```
+
+패키징은 매번 `dist/macos-vsix-*`에 VSIX와 항목별 hash·receipt를 만든다. 공식 Node archive 검증용 임시 폴더와 테스트 데이터는 보존한다. `scripts/package-macos-program.mjs <frontend 경로>`로 다른 frontend checkout을 명시할 수 있다.
+
+전체 `pnpm check`는 현재 기존 `.local-experiments/kiro-native-recovery/biome.json`의 중첩 root 설정으로 format 단계에서 실패했다. 기존 실험 폴더는 보존했으며 변경 파일 정적 검사와 나머지 검증을 개별 실행했다. 처음 E2E는 사용 중인 4173 포트 때문에 중단되어 `VIBE_E2E_FRONTEND_PORT`로 별도 포트를 사용한다. 이 최초 실패를 전체 check 성공으로 표시하지 않는다.

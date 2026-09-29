@@ -66,16 +66,20 @@ Kiro IDE
           └─ 생성 workspace와 결과 앱 실행 supervisor
 ```
 
-## 설치 (사용자)
+## 다운로드·설치
 
 다운로드 파일 선택부터 첫 실행·업데이트·오류 해결까지는 **[다운로드·설치 가이드](docs/DOWNLOAD_GUIDE.md)**를 참고한다.
 
+**[Mac용 VSIX 0.1.0 다운로드](releases/macos/0.1.0/builder-helper-agent-panel-0.1.0-darwin-arm64.vsix?raw=true)** · Apple Silicon(M1 이상)용. GitHub 파일 화면이 열리면 **Download raw file**을 누른다. Intel Mac은 지원 대상이 아니다. [Mac 설치 안내·검증 범위](docs/MAC_VSIX.md)를 확인한다.
+
 1. [Kiro IDE](https://kiro.dev/downloads/)를 설치하고 본인 계정으로 로그인한다.
-2. [Hello-KU-tty/program Releases](https://github.com/Hello-KU-tty/program/releases)에서 호환 버전을 확인하고 Windows x64용 제품 `.vsix`를 받는다. Release가 보이지 않으면 담당자에게 제품 VSIX를 요청한다.
-3. Kiro에서 Extensions → `Install from VSIX…`로 설치한다.
+2. Mac에서는 Kiro를 `/Applications/Kiro.app`에 설치하고 위 `darwin-arm64.vsix`를 받는다.
+3. Kiro에서 Extensions → `…` → `Install from VSIX…`로 설치한 뒤 다시 로드한다.
 4. Agent Panel을 열고 배우고 싶은 기술을 입력한다.
 
-별도 서비스 로그인이나 API Key는 없다. 모델 사용량은 사용자 본인의 Kiro 계정에서 차감된다. 첫 실행 때 생성 앱의 도구·의존성 준비를 위해 network가 필요할 수 있다. 일반 사용자는 Node·pnpm 설치나 백엔드 수동 실행이 필요하지 않다. 설치 검증 기준은 Windows x64·Kiro IDE 1.1.70 / Agent 1.1.158이며, 실제 호환 범위는 Release 노트를 따른다. macOS는 현재 개발 검증용이다.
+별도 서비스 로그인이나 API Key는 없다. 모델 사용량은 사용자 본인의 Kiro 계정에서 차감된다. 첫 실행 때 생성 앱의 도구·의존성 준비를 위해 network가 필요할 수 있다. VSIX 사용에는 Node·pnpm 수동 설치나 백엔드 수동 실행이 필요하지 않다. Mac 설치 후보의 검증 기준은 Kiro IDE 1.1.70 / Agent 1.1.158이다. 설치·Core 자동 검사는 통과했으며 이 설치물의 실제 모델 전체 흐름은 별도 검증 대상이다.
+
+VSIX가 작동하지 않으면 먼저 [연결 오류 해결](docs/DOWNLOAD_GUIDE.md#6-업데이트와-문제-해결)을 확인하고, 개발 환경에서는 [소스 재빌드·개발자용 ZIP 대안](docs/DOWNLOAD_GUIDE.md#7-vsix가-작동하지-않을-때-개발자용-대안)을 사용할 수 있다. ZIP은 Windows용 과거 update kit이므로 Mac에 직접 설치하지 않는다.
 
 ## 개발 환경과 검증
 
