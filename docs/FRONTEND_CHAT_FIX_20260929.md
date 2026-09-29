@@ -4,6 +4,8 @@
 
 **즉시 인계 완료:** `Hello-KU-tty/program`의 기존 `ca586f4`/`5519b18`을 merge로 보존하고 로컬0.0.10~0.0.13 변경과 함께 `main`에 push했다. 원격 HEAD는 `950f83fd064804611d697bd79613235f16976258`, 최종 소스 버전은 **0.0.14**다. 병합 후 typecheck·57 files / **780 tests**·build PASS. 개발자는 이 main을 pull하면 된다. 다음 확장 버전은0.0.15 이상, 다음 backend kit은2026.09.29.3 이상이다. 아래0.0.13은 병합 전 설치 후보의 정확한 기록이다.
 
+**최종 설치 후속:** 기존 실행은 모두 terminal임을 확인하고 두 Kiro 창을 정상 종료했다. 병합된0.0.14를 설치하고 같은 생성 workspace를 다시 열었다. Core 연결 성공·기존2개 Project/Spec/Task/Decision hash 동일·추가 run0 및 CLI 설치 버전0.0.14를 확인했다. UPDATE_WAITING은 해소됐다. 새 실제 Agent 응답의 화면 관찰은 프론트 즉시 인계 우선 요청으로 남겨 두었다. 최종 VSIX는 `dist/submission-chat-merged-20260929/builder-helper-agent-panel-0.0.14-win32-x64-0d9112d4f280.vsix`, SHA256 `dd4c351a68f4b9836ab0c1f7401b0a6483f8bdf5571f00465d2d1edca9f48745`다.
+
 - TEXT 조각을 문단으로 만들던 renderer를 수정했다. 조각을 정확히 연결하고 문단·제목·목록·강조·인라인/블록 코드를 안전한 DOM/textContent로 표시한다. HTML·이미지·활성 링크와 신규 dependency는 추가하지 않는다.
 - Builder/Helper 응답에 역할 표시와 대화 영역 스타일을 적용했다. Helper 스크롤을 보존하고, 내용이 그대로인 상태 갱신에는 transcript DOM을 재생성하지 않는다. 저장된 사용자 발췌와 답변 요약은 별도 표시한다.
 - W 창의 HELPER_WINDOW_OPENING이 H 창의 완료 뒤에도 남는 문제를 수정했다. Helper run의 TEXT/TOOL/거절 및 terminal에서 해제하고, 늦은 로컬 상태가 다시 켜지 못하게 했다. 무한 blink와 중복 worker 준비 표시는 제거했다.
