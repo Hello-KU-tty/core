@@ -770,6 +770,13 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 
 ### [~] T19. 자체 Kiro IDE 패널과 프론트 실제 연동
 
+#### [x] T19-F16. 명시적 결정 선택과 Builder 계속 실행 연결
+
+- **근거:** 사용자가 결정을 저장했지만 다음 작업이 실행되지 않는 실제 UX를 보고했다. 기존 resolve-only 동작과 별도 resume 버튼이 분리되어 있다.
+- **범위:** 선택 버튼을 명시적 ‘정하고 계속하기’ 동작으로 연결한다. resolve-only 계약, History/Helper의 자동 실행 금지, 동일 Project/Task·저장 성공·미해결 결정 없음·중복 시작 방지를 유지한다. 현재 저장된 선택은 별도 재제출 없이 명시적으로 재개한다.
+- **완료 조건:** 성공1회/실패0/중복/화면전환/여러 결정/실행 중 회귀, 최신 frontend 전체 검사·실제 Core 소비·현재 Builder 재개 관찰과 인계.
+- **결과:** 최신 frontend 인계와 kit3을 보존한0.0.16, 타입·57파일/794테스트·build·실제 Core 소비 PASS. 기존 선택의 native 재개와 적용을 확인했으며 이후 budget timeout은 별도로 기록했다. program `e1cffdd`로 push했고 새 확장 CLI 설치를 확인했다. [상세 검증과 제한](FRONTEND_DECISION_CONTINUE_FIX_20260929.md). 앱 완성·전체 수직 흐름 판정은 아니다.
+
 #### [~] T19-F15. 채팅 스트림 표시와 Helper 창 준비 상태 복구
 
 - **근거:** 사용자 실측에서 TEXT 조각마다 문단이 생기고 Markdown이 그대로 보인다. Helper RECORDED 뒤에도 로컬 worker의 HELPER_WINDOW_OPENING이 남는다.

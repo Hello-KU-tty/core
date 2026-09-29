@@ -6,11 +6,11 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 import { build } from 'esbuild'
-import { ApplicationService, WorkspacePathPolicy } from '../packages/application/dist/index.js'
-import { openSqliteStorage } from '../packages/storage-sqlite/dist/index.js'
-import { WorkflowRuntime } from '../packages/runtime/dist/workflow-runtime.js'
 import { createLocalServer } from '../apps/local-backend/dist/server.js'
-import { LocalCoreClient, entityId, uiMetadata } from '../packages/frontend-client/dist/index.js'
+import { ApplicationService, WorkspacePathPolicy } from '../packages/application/dist/index.js'
+import { entityId, LocalCoreClient, uiMetadata } from '../packages/frontend-client/dist/index.js'
+import { WorkflowRuntime } from '../packages/runtime/dist/workflow-runtime.js'
+import { openSqliteStorage } from '../packages/storage-sqlite/dist/index.js'
 
 const program = resolve(process.argv[2] ?? '')
 await mkdir(resolve('.data/frontend-handoff'), { recursive: true })
@@ -22,6 +22,7 @@ for (const [entry, name] of [
   [join(program, 'src/core/flow/flow-controller.ts'), 'controller'],
   [join(program, 'src/adapter/agent/managed-agent-port.ts'), 'agent-port'],
   [join(program, 'src/core/agent/agent-controller.ts'), 'agent-controller'],
+  [join(program, 'src/webview/agent/agent-dispatcher.ts'), 'agent-dispatcher'],
   [join(program, 'src/agent-panel-view-provider.ts'), 'provider'],
   [join(program, 'src/webview/main.ts'), 'webview'],
   [join(program, 'src/webview/client-messaging.ts'), 'webview-client'],
@@ -62,6 +63,7 @@ const {
 const { FlowController } = require(join(root, 'controller.cjs'))
 const { ManagedAgentPort } = require(join(root, 'agent-port.cjs'))
 const { AgentSurfaceController } = require(join(root, 'agent-controller.cjs'))
+const { AgentDispatcher } = require(join(root, 'agent-dispatcher.cjs'))
 const { wireWebviewMessaging } = require(join(root, 'provider.cjs'))
 const { bootstrap } = require(join(root, 'webview.cjs'))
 const { WebviewClient } = require(join(root, 'webview-client.cjs'))
@@ -978,11 +980,114 @@ try {
     const persisted = await client.restoreProject(snapshot.project.id)
     assert.ok(persisted.discoveryContext.candidates.some((c) => c.title === expectedTitle))
   }
+  // A real Core-issued blocking Decision, resolved through the actual frontend
+  // action. Synthetic fixture only: no native model or user data participates.
+  const decisionTask = (await client.restoreProject(first.projectId)).currentTask
+  const builderMetadata = {
+    schemaVersion: 1,
+    correlationId: decisionTask.correlationId,
+    actor: { kind: 'AGENT', role: 'BUILDER' },
+  }
+  const startedTask = await application.executeAgent('BUILDER', {
+    ...builderMetadata,
+    kind: 'BUILDER_START_TASK',
+    idempotencyKey: entityId('idem'),
+    projectId: first.projectId,
+    taskId: decisionTask.id,
+    expectedTaskRevision: decisionTask.revision,
+  })
+  assert.equal(startedTask.success, true, JSON.stringify(startedTask))
+  const activeTask = (await client.restoreProject(first.projectId)).currentTask
+  const context = await application.executeAgent('BUILDER', {
+    ...builderMetadata,
+    kind: 'BUILDER_UPDATE_LIVE_CONTEXT',
+    idempotencyKey: entityId('idem'),
+    context: {
+      schemaVersion: 1,
+      id: entityId('context'),
+      projectId: first.projectId,
+      taskId: activeTask.id,
+      correlationId: activeTask.correlationId,
+      contextVersion: 1,
+      expectedPreviousVersion: 0,
+      checkpoint: 'TASK_STARTED',
+      stage: 'Synthetic choice',
+      currentGoal: 'Check explicit choice continuation.',
+      recentChanges: [],
+      activeDecisionIds: [],
+      activeConceptNames: [],
+      relatedFiles: [],
+      nextActions: ['Choose behavior.'],
+      updatedAt: new Date().toISOString(),
+      source: { kind: 'AGENT', role: 'BUILDER' },
+      redactionStatus: 'NOT_REQUIRED',
+    },
+  })
+  assert.equal(context.success, true, JSON.stringify(context))
+  const requested = await application.executeAgent('BUILDER', {
+    ...builderMetadata,
+    kind: 'BUILDER_REQUEST_DECISION',
+    idempotencyKey: entityId('idem'),
+    projectId: first.projectId,
+    taskId: activeTask.id,
+    expectedTaskRevision: activeTask.revision,
+    expectedContextVersion: 1,
+    decision: {
+      category: 'PRODUCT_BEHAVIOR',
+      question: 'Which synthetic behavior?',
+      reasonRequiredNow: 'The next implementation depends on this choice.',
+      options: ['first', 'second'].map((key) => ({
+        key,
+        label: key,
+        description: key,
+        impacts: ['Synthetic behavior changes.'],
+        tradeoffs: [],
+      })),
+      recommendedOptionKey: 'first',
+      recommendationRationale: 'Synthetic recommendation.',
+      relatedConceptNames: [],
+      sourceReferences: [],
+      independentWorkCanContinue: false,
+    },
+    context: {
+      stage: 'Synthetic choice',
+      currentGoal: 'Wait for the choice.',
+      recentChanges: [],
+      activeConceptNames: [],
+      relatedFiles: [],
+      nextActions: ['Apply choice.'],
+      blockingReason: 'Needs explicit user choice.',
+    },
+  })
+  assert.equal(requested.success, true, JSON.stringify(requested))
+  const continuation = new AgentSurfaceController({
+    port: agentPort,
+    globalState: { get: () => first.projectId, update: async () => {} },
+    onChange: () => {},
+    openFolder: async () => {},
+    openExternal: async () => {},
+  })
+  const continuationDispatcher = new AgentDispatcher(continuation, () => {})
+  const choose = {
+    kind: 'decision/resolveAndContinue',
+    decisionId: requested.data.decisionId,
+    selection: { kind: 'RECOMMENDATION' },
+    helperUsed: false,
+  }
+  const beforeChoice = counts.BUILDER
+  await Promise.all([continuationDispatcher.handle(choose), continuationDispatcher.handle(choose)])
+  assert.equal(counts.BUILDER, beforeChoice + 1, 'save success starts exactly one Builder')
+  const afterChoice = await client.restoreProject(first.projectId)
+  assert.equal(afterChoice.currentTask.status, 'ACTIVE')
+  assert.ok(afterChoice.decisions.find((d) => d.request.id === choose.decisionId)?.resolution)
+  assert.equal(afterChoice.pendingDecisions.length, 0)
+  continuation.dispose()
   const report = {
     status: 'PASS',
     boundary: 'actual program controller/port + authenticated HTTP/SSE + SQLite',
     agent: 'DELAYED_DETERMINISTIC_FIXTURE',
     checks: [
+      'explicit choose-and-continue persists a real blocking Core Decision and starts Builder once through the actual dispatcher; duplicate clicks coalesce',
       'explicit confirm through the real provider prepares and starts Builder once; duplicate clicks do not start a second run and reload remains read-only',
       'fresh MERGE and REGENERATE display durable candidate titles immediately through the actual webview bridge; exact revisions, input/basket preserved, no extra enrichment',
       'two project/session mappings',
