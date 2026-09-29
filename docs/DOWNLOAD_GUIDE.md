@@ -13,6 +13,8 @@ Vibe Helper는 Kiro IDE 안에서 사용하는 확장입니다. 먼저 운영체
 
 다른 Kiro 버전은 호환 검사를 통과하지 못할 수 있습니다. Kiro 자체의 OS 지원과 Vibe Helper의 지원 범위는 다릅니다. Apple Silicon Mac 설치 후보와 검증 한계는 [Mac 설치 안내](MAC_VSIX.md)를 확인하세요.
 
+Windows x64 설치 후보와 검증 한계는 [Windows 설치 안내](WINDOWS_VSIX.md)를 확인하세요.
+
 별도 Vibe Helper 계정이나 API Key는 필요하지 않습니다. 모델 사용량은 본인의 Kiro 계정에서 소비됩니다. 프로젝트 상태는 로컬 SQLite에 저장되며, Agent 요청에는 Kiro의 모델 서비스가 사용됩니다.
 
 ## 2. Kiro IDE 다운로드
@@ -25,6 +27,14 @@ Vibe Helper는 Kiro IDE 안에서 사용하는 확장입니다. 먼저 운영체
 Vibe Helper는 IDE 확장이므로 다운로드 페이지의 CLI·Crew가 아닌 **IDE**를 선택하세요.
 
 ## 3. VSIX 다운로드
+
+### Windows (x64)
+
+**[Windows용 VSIX 0.0.17 다운로드](../releases/windows/0.0.17/builder-helper-agent-panel-0.0.17-win32-x64-828aca63a3be.vsix?raw=true)**
+
+GitHub 파일 화면이 열리면 **Download raw file**을 누릅니다. Windows x64용이며, Kiro IDE **1.1.70** / 내장 Agent **1.1.158**을 기준으로 합니다. 파일 무결성 확인과 설치·복구 방법은 [Windows 설치 안내](WINDOWS_VSIX.md)를 따르세요.
+
+0.0.17은 Kiro 실행 환경의 PATH가 달라져도 기존 Node·pnpm을 재검증해 재사용하며, 답변 끝부분을 반복하던 도우미 요약 영역을 제거했습니다. Core 전체 검사, 프론트 800개 테스트와 배포 런타임의 도구 재사용·앱 실행 검사를 통과했습니다. 이 VSIX를 설치한 후 실제 모델로 전체 흐름을 완주하거나 다른 PC에서 검증한 것은 아닙니다.
 
 ### Mac (Apple Silicon)
 
