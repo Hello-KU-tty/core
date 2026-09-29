@@ -13,7 +13,7 @@ Vibe Helper는 코딩 초보자가 배우고 싶은 기술 하나로 시작해 �
 
 ## 시연 영상
 
-[▶ 시연 영상 보기 (MP4, 약 3분)](docs/assets/vibe-helper-demo.mp4)
+[▶ 15초 소개 영상 (MP4)](docs/assets/vibe-helper-ad-15s.mp4) · [▶ 시연 영상 보기 (MP4, 약 3분)](docs/assets/vibe-helper-demo.mp4)
 
 Kiro IDE에서 학습 목표를 입력해 프로젝트 후보를 만나고, 후보를 골라 Learning Spec을 확인한 뒤 Builder가 실제 개발을 시작하는 흐름이다. 대기 구간은 줄였고 Builder 구간은 2배속이다.
 
