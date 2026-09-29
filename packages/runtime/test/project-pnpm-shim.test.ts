@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { olderPinnedPnpmShims } from '../src/project-toolchain.js'
 
 let root: string
-const node = 'C:\tools\node.exe'
+const node = 'C:\\tools\\node.exe'
 beforeEach(async () => {
   root = await realpath(await mkdtemp(join(tmpdir(), 'vibe-pnpm-shim-')))
   for (const version of ['11.12.0', '11.13.1', '11.14.0', 'not-a-version'])
@@ -27,7 +27,7 @@ describe('shared pnpm shim after a pin change', () => {
   })
 
   it('never covers another Node or an invalid current version', async () => {
-    const shims = await olderPinnedPnpmShims(root, 'C:\other\node.exe', '11.13.1')
+    const shims = await olderPinnedPnpmShims(root, 'C:\\other\\node.exe', '11.13.1')
     expect(shims.some((shim) => shim.includes(node))).toBe(false)
     expect(await olderPinnedPnpmShims(root, node, 'latest')).toEqual([])
   })

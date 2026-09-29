@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { link, mkdir, mkdtemp, readFile, symlink, writeFile } from 'node:fs/promises'
+import { link, mkdir, mkdtemp, readFile, realpath, symlink, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import {
@@ -41,6 +42,7 @@ test('source selection excludes private state, old packages and unreviewed exper
     )
   assert.equal(selectedSource('backend', 'examples/windows-capability/core-probe.cjs'), false)
   assert.equal(selectedSource('backend', 'CONVERSATION_RECORD.md'), false)
+  assert.equal(selectedSource('backend', 'examples/frontend-handoff/archive.mjs'), true)
   assert.equal(selectedSource('frontend', 'vendor/frontend-client/index.js'), true)
   assert.equal(selectedSource('frontend', 'BACKEND_TAKEOVER_PROGRESS_20260928.md'), false)
   assert.equal(selectedSource('other', 'package.json'), false)
@@ -78,6 +80,16 @@ test('privacy checks fail closed for a known home path and literal credentials',
   )
 })
 
+test('Windows home spellings are screened and only document copies are generalized', () => {
+  const home = 'C:\\Users\\Source Reviewer'
+  for (const prefix of [home, home.replaceAll('\\', '/'), home.replaceAll('\\', '\\\\')]) {
+    const data = Buffer.from(`${prefix}/private`)
+    assert.throws(() => inspectContent('src/a.ts', data, home), /SOURCE_LOCAL_PATH/)
+    assert.equal(documentCopy('docs/a.md', data, home).toString(), '<LOCAL_HOME>/private')
+    assert.equal(documentCopy('src/a.ts', data, home), data)
+  }
+})
+
 test('only two explicitly reviewed synthetic tokens at the exact fixture path are permitted', () => {
   const name = 'packages/application/test/redaction-stream.test.ts'
   const fixture = Buffer.from(['ghp_', 'abcdefghijklmnopqrstuvwxyz123456789'].join(''))
@@ -87,7 +99,7 @@ test('only two explicitly reviewed synthetic tokens at the exact fixture path ar
 })
 
 test('snapshot copies current bytes and rejects overwrite, symlink and hardlink inputs', async () => {
-  const parent = await mkdtemp('/private/tmp/vibe-helper-source-test-')
+  const parent = await realpath(await mkdtemp(join(tmpdir(), 'vibe-helper-source-test-')))
   const root = join(parent, 'source')
   const target = join(parent, 'candidate')
   await mkdir(root, { mode: 0o700 })
@@ -98,7 +110,11 @@ test('snapshot copies current bytes and rejects overwrite, symlink and hardlink 
   assert.equal(result.sha256, result.sourceSha256)
   assert.equal(result.documentPathsGeneralized, false)
   await assert.rejects(copySourceFile(root, target, 'package.json'), /EEXIST/)
-  await symlink(join(root, 'package.json'), join(root, 'alias.json'))
+  await symlink(
+    process.platform === 'win32' ? root : join(root, 'package.json'),
+    join(root, 'alias.json'),
+    process.platform === 'win32' ? 'junction' : 'file',
+  )
   await assert.rejects(copySourceFile(root, target, 'alias.json'), /SOURCE_FILE_DENIED/)
   await link(join(root, 'package.json'), join(root, 'hard.json'))
   await assert.rejects(copySourceFile(root, target, 'hard.json'), /SOURCE_FILE_DENIED/)

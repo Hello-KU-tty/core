@@ -528,6 +528,30 @@ try {
     targets: [{ candidateId: controller.getPreviewRound().previews[0].candidateId, revision: 1 }],
   })
   assert.ok(controller.getSpec())
+  const savedSpec = controller.getSpec()
+  const selectedReference = controller.getSelectedCandidate()
+  const savedBeforeReturn = await client.restoreProject(controller.getProject().id)
+  const countsBeforeReturn = JSON.stringify(counts)
+  await controller.returnToDiscovery()
+  assert.equal(controller.snapshot().reviewingDiscovery, true)
+  assert.equal(controller.getPreviewRound().previews.length, 10)
+  const savedAfterReturn = await client.restoreProject(controller.getProject().id)
+  // Read-request envelopes have fresh correlation IDs; durable records must not change.
+  savedAfterReturn.correlationId = savedBeforeReturn.correlationId
+  savedAfterReturn.discoveryContext.correlationId = savedBeforeReturn.discoveryContext.correlationId
+  assert.deepEqual(savedAfterReturn, savedBeforeReturn)
+  assert.equal(JSON.stringify(counts), countsBeforeReturn)
+  await controller.submitFeedback({ intent: 'SELECT', targets: [selectedReference] })
+  assert.equal(controller.snapshot().phase, 'spec_review')
+  assert.deepEqual(controller.getSpec(), savedSpec)
+  assert.equal(JSON.stringify(counts), countsBeforeReturn)
+  await controller.returnToDiscovery()
+  const previewsBeforeRegeneration = counts.PREVIEW
+  await controller.startDiscovery({ learningGoal: 'TypeScript saved candidate navigation' })
+  assert.equal(controller.getProject().id, failedControllerProject)
+  assert.notEqual(controller.getSession().id, failedControllerSession)
+  assert.equal(controller.getPreviewRound().previews.length, 10)
+  assert.equal(counts.PREVIEW, previewsBeforeRegeneration + 1)
   // Product wiring must bind a *new* Discovery, not rely on a test-seeded
   // lastProjectId. Exercise the real provider against the same HTTP Core.
   const persisted = new Map()
@@ -853,6 +877,7 @@ try {
       'controller retry preserves Project/Session and shows safe quota guidance',
       'cancelled run is not success',
       'controller uses Core project ID',
+      'Spec back navigation preserves durable candidates and Spec with zero Agent calls; explicit regeneration creates one new Session/preview',
       'unseeded provider binds new Discovery to Builder and restores saved flow on reload',
       'provider reload during an active PREVIEW automatically refreshes the webview from durable HTTP/SSE; no replay or extra Agent',
       'malformed or mixed-protocol webview messages call Core zero times; valid messages still work',

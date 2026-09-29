@@ -4,14 +4,17 @@ import { join, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
 import { archive, inventory, sha256 } from '../examples/frontend-handoff/archive.mjs'
 import { loadCoreResources } from '../packages/runtime/dist/portable-core.js'
+import { handoffConfig } from './frontend-handoff-config.mjs'
 
 // Update kit for a program checkout that already consumed the 20260927 kit. It replaces only
 // kit-managed directories; frontend UI sources are wired by the frontend developer.
-const KIT = 'frontend-handoff-20260929'
-const KIT_VERSION = '2026.09.29.1'
-const PREVIOUS = 'examples/frontend-handoff/program-managed-20260927.json'
 const REFERENCE_VSIX = 'vibe-helper-portable-core-0.3.17-win32-x64.vsix'
 const root = resolve('.')
+const config = await handoffConfig(
+  process.argv.slice(2).filter((arg) => arg !== '--'),
+  root,
+)
+const { kit: KIT, kitVersion: KIT_VERSION, previous } = config
 const output = join(root, 'dist')
 await mkdir(output, { recursive: true })
 if ((await realpath(output)) !== output) throw new Error('HANDOFF_OUTPUT_PARENT_UNSAFE')
@@ -31,15 +34,11 @@ await writeFile(
     "'../frontend-client'",
   ),
 )
-await cp('docs/FRONTEND_HANDOFF_20260929.md', join(kit, 'README.md'))
+await cp(config.readme, join(kit, 'README.md'))
 await mkdir(join(kit, 'verification'))
-await cp(
-  'docs/spikes/T19_FRONTEND_HANDOFF_UPDATE_20260929.json',
-  join(kit, 'verification/update.json'),
-)
+await cp(config.verification, join(kit, 'verification/update.json'))
 await mkdir(join(kit, 'reference'))
 await cp(join('dist/portable-win32-x64', REFERENCE_VSIX), join(kit, 'reference', REFERENCE_VSIX))
-const previous = JSON.parse(await readFile(PREVIOUS, 'utf8'))
 const { stdout } = await promisify(execFile)('git', ['rev-parse', 'HEAD'], { windowsHide: true })
 const dirty = await promisify(execFile)('git', ['status', '--porcelain'], { windowsHide: true })
 const files = await inventory(kit)

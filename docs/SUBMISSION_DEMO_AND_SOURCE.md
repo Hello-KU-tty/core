@@ -33,7 +33,7 @@
 | frontend | 실제 src/test/media/build config/package.json/package-lock.json. 별도 소스 버전/manifest를 backend와 함께 고정 |
 | 문서 | README, 승인된 명세/설계/결정, 제출 초안, NFR/검증 보고서의 정제 사본 |
 | 실행 가능한 예제 | Campus Drop fixture와 정제된 생성 앱 소스/package/lock/테스트. 합성 예제임을 명시 |
-| Windows kit | 이번에 갱신·검증하지 않았음. 최신 제품 설치물처럼 포함/홍보하지 않음. 원본은 사용자 workspace에 보존 |
+| Windows kit | 9/29 kit2026.09.29.2·VSIX0.0.10 자동 검증/CLI 설치 완료. 실제 native 업그레이드는 별도 미검증. [최신 hash/범위](SUBMISSION_READINESS_20260929.md) |
 
 제외: `.git`, `.data`, `.local-experiments`, `node_modules`, package cache, 생성 DB/WAL/SHM/backup, connection/token/credit/admission 파일, `.env`, raw 대화/terminal/로그, 실제 사용자 경로가 포함된 private receipt, Kiro profile/설정/로그인 자료, 임시 폴더 전체. LICENSE/제3자 notice는 실제 포함 dependency/asset에 맞춰 보존한다.
 

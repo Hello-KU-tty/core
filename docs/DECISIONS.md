@@ -1,5 +1,20 @@
 # 결정 기록
 
+## 2026-09-29: 현재 확장 제출 후보와 프론트 직접 실측 준비
+
+- **사용자 승인:** 이쪽 작업 환경에서 프론트 실측을 진행할 예정임을 인계 문서에 명시한다. 기존 검증된 변경을 commit/push하며 대상은 `hurdoo` 계정의 기존 `Hello-KU-tty/core`, `Hello-KU-tty/program` 원격이다. 확장 설치, Kiro 창 열기와 실측 대상 Workspace Trust도 사용자가 명시적으로 승인했다.
+- **진행:** 현재0.0.10 소스·kit·VSIX hash를 대조하고 Kiro의 실제 Core 연결과 직접 사용 시작 화면을 준비한다. 이전 자동 검증과 이후 실제 native 관측을 구분하며, 과금 설정을 바꾸지 않고 누적900/신규중단880 제한을 유지한다. 사용자 기존 프로젝트·세션과 데이터는 보존한다.
+
+## 2026-09-29: 최신 프론트 인계의 업그레이드와 kit 재현
+
+- **근거/범위:** 사용자가 최신 프론트 인계 확인과 제출 전 잔여 작업 수행을 요청했다. `program`의 `82f55ff` 인계에 따라 T19-F9에서 기존 도구 업그레이드·kit·프론트 소비 회귀를 진행한다. 새 제품 범위·의존성·Agent 도구는 추가하지 않는다.
+- **도구 교체:** 기존 외부 pnpm의 공용 shim은 private descriptor와 생성 workspace의 launcher가 정확히 일치하고, 같은 확장 제품의 상위 버전이며 Node와 나머지 필드가 같을 때만 교체한다. 오래된 외부 실행 파일을 실행하거나 수정하지 않는다. 변조·다른 제품·downgrade·Node 교체는 계속 거절한다. 기존 관리 pnpm cache의 정확한 shim 복구는 유지한다.
+- **kit 기준:** `--program`의 적용 receipt 또는 명시적 이전 manifest를 실제 관리 파일 hash와 대조한다. receipt가 없는 과거 checkout만 저장소의 고정 baseline과 정확히 대조한다. 이름/버전은 기준에서 계산하거나 명시 인자로 받고, 적용 후 다음 갱신에 쓸 receipt를 기록한다. 날짜별 스크립트 수정과 사용자 관리 파일의 무조건 덮어쓰기는 피한다.
+- **검증/승인 경계:** 자동 검사·VSIX 후보 준비는 이번 요청 범위다. commit/push·외부 제출·Trust 변경·사용자 창 종료는 별도 실행하지 않는다. 최종 제출의 사람 pilot·baseline·live demo 요건을 완화하지 않는다. 미커밋 후보는 manifest의 dirty 상태를 그대로 기록한다.
+- **Spec 복귀:** frontend가 기존 Core mutation을 화면 이동에 잘못 호출하고 있었다. 돌아가기는 저장 후보·입력·Spec을 보존하고, 새 후보 받기에서만 기존 command와 새 preview를 실행한다. 선택 완료 Session 재개나 새 API는 추가하지 않는다.
+- **제출 소스:** Mac 전용 임시 경로 대신 OS 임시 경로를 사용하고 Windows home 표기 검사·문서 사본 일반화, 이번 kit helper/fixture 포함을 보완한다. 원본 runtime/test를 정제해서 바꾸지 않으며 신규 파일은 명시적 allowlist만 포함한다. 사본과 archive는 로컬 검토 후보이며 공개나 독립 clean 재현 PASS를 자동 선언하지 않는다.
+- **소스 재현 결과:** 고정 ZIP을 별도 폴더에 풀고 각 저장소 의존성을 lockfile로 새 설치했다. backend 전체 check, frontend753개/타입/build, panel build 뒤 native169+selector6, 실제 consumer PASS 및 source781개 hash 불변을 확인했다. OS·Node·pnpm·package store·Edge는 같은 PC의 검증된 자원을 사용하므로 새 PC/오프라인 재현이나 실제 모델 품질을 증명하지 않는다. ZIP 안 문서는 동결 시점 그대로 두고 후속 결과는 외부 receipt와 [재현 보고서](SOURCE_REPRODUCIBILITY_20260929.md)에 연결한다.
+
 ## 2026-09-29: B7~B11 보완과 broken pnpm pin 교체
 
 - **승인:** 사용자 B7~B11 검토 후 구현·검증·커밋·답변 문서·push 진행 승인. 기존 pnpm 11.12.0 exact pin의 변경을 포함한다.

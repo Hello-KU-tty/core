@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CoreResources } from '../src/portable-core.js'
 import {
   type ProjectToolchain,
+  preparePnpmShim,
   prepareProjectTools,
   verifyProjectTools,
 } from '../src/project-toolchain.js'
@@ -57,6 +58,77 @@ afterEach(async () => {
 })
 
 describe('Core-owned project launcher installation upgrade', () => {
+  it.each(['JS', 'CMD', 'EXE'] as const)(
+    'upgrades the complete product tool files from external pnpm (%s)',
+    async (kind) => {
+      const product = (version: string) =>
+        ({
+          root: join(
+            root,
+            'extensions',
+            `vibe-helper.builder-helper-agent-panel-${version}`,
+            'portable',
+          ),
+        }) as CoreResources
+      const old: ProjectToolchain = {
+        ...tools,
+        pnpm: {
+          source: 'EXISTING_PNPM',
+          kind,
+          executable: join(root, `user-pnpm.${kind === 'JS' ? 'cjs' : kind.toLowerCase()}`),
+          version: '11.12.0',
+        },
+      }
+      await writeFile(old.pnpm.executable, 'user-owned old tool')
+      await writeFile(join(workspace, 'user.ts'), 'user source')
+      await preparePnpmShim(old, product('0.0.9'))
+      await prepareProjectTools(workspace, old, product('0.0.9'))
+      const shimPath = join(tools.privateRoot, 'bin/pnpm.cmd')
+      const oldShim = await readFile(shimPath, 'utf8')
+      await expect(preparePnpmShim(tools, product('0.0.9'))).rejects.toThrow(
+        'PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED',
+      )
+      await expect(
+        preparePnpmShim(
+          { ...tools, node: { ...tools.node, executable: join(root, 'changed-node.exe') } },
+          product('0.0.10'),
+        ),
+      ).rejects.toThrow('PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED')
+      await writeFile(shimPath, oldShim + 'echo changed\r\n')
+      await expect(preparePnpmShim(tools, product('0.0.10'))).rejects.toThrow(
+        'PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED',
+      )
+      await writeFile(shimPath, oldShim)
+      await preparePnpmShim(tools, product('0.0.10'))
+      // An interruption after the shim write is safe to retry before migrating the pair.
+      await preparePnpmShim(tools, product('0.0.10'))
+      await prepareProjectTools(workspace, tools, product('0.0.10'))
+      expect((await verifyProjectTools(workspace, product('0.0.10'))).toolchain).toEqual(tools)
+      expect(await readFile(shimPath, 'utf8')).toContain(tools.pnpm.executable)
+      expect(await readFile(join(workspace, '.kiro/vibe-tools.cmd'), 'utf8')).toContain(
+        'builder-helper-agent-panel-0.0.10',
+      )
+      expect(await readFile(old.pnpm.executable, 'utf8')).toBe('user-owned old tool')
+      expect(await readFile(join(workspace, 'user.ts'), 'utf8')).toBe('user source')
+    },
+  )
+
+  it('refuses an external shim with no intact product descriptor and launcher', async () => {
+    const old = {
+      ...tools,
+      pnpm: { ...tools.pnpm, source: 'EXISTING_PNPM' as const, version: '11.12.0' },
+    }
+    await preparePnpmShim(old, resources('0.3.16'))
+    await prepareProjectTools(workspace, old, resources('0.3.16'))
+    const launcher = join(workspace, '.kiro/vibe-tools.cmd')
+    await writeFile(launcher, (await readFile(launcher, 'utf8')) + 'echo edited')
+    await expect(
+      preparePnpmShim(
+        { ...tools, pnpm: { ...tools.pnpm, executable: join(root, 'new-pnpm.cjs') } },
+        resources('0.3.17'),
+      ),
+    ).rejects.toThrow('PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED')
+  })
   it('migrates only the exact legacy launcher during a verified product upgrade', async () => {
     await prepareProjectTools(workspace, tools, resources('0.3.10'))
     const { descriptorFile } = await verifyProjectTools(workspace, resources('0.3.10'))

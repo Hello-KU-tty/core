@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "kitVersion": "2026.09.29.2",
+  "previousKitVersion": "2026.09.29.1",
+  "scope": "Windows source and deterministic consumer validation. Local uncommitted review candidate; no native model-call claim.",
+  "environment": {
+    "os": "Windows x64",
+    "shell": "PowerShell",
+    "node": "24.19.0",
+    "pnpm": "11.13.1",
+    "e2eBrowser": "installed Edge, temporary profile",
+    "modelCalls": 0
+  },
+  "backendChangesIncluded": [
+    "e3532b7 Core-managed pnpm shared shim upgrade",
+    "T19-F9 external pnpm shim upgrade with intact private descriptor and launcher",
+    "T19-F9 applied kit hash selection and next-update receipt"
+  ],
+  "baseline": {
+    "source": "clean frontend 82f55ffa821d8e3f5d4ab071e543278e4fbb04e6 tracked bytes and portable manifest",
+    "managedFiles": 118,
+    "outerManifestAvailable": false,
+    "portableManifestSha256": "2eda7232990ebc2af0013681b08d4ce2b326fe1880633ccc7b42936cf935b423"
+  },
+  "pnpmCheck": {
+    "result": "PASS",
+    "unit": { "passed": 178, "skipped": 1 },
+    "integration": { "passed": 391, "skipped": 1 },
+    "eval": { "passed": 42 },
+    "campusDrop": { "passed": 3 },
+    "smoke": { "passed": 6 },
+    "e2e": { "passed": 12 },
+    "nativeCjs": { "passed": 169 }
+  },
+  "frontendSourceCandidate": {
+    "typecheck": "PASS",
+    "tests": { "files": 56, "passed": 753 },
+    "build": "PASS",
+    "actualConsumer": "PASS: provider/controller + authenticated HTTP/SSE + SQLite; delayed deterministic Agent fixture",
+    "candidateNavigation": "Spec back and reopen preserve durable state with zero calls; explicit regeneration makes one new session and preview"
+  },
+  "initialFailures": [
+    "Sandbox denied registry and Windows user/directory inspection; repeated authorized checks outside sandbox",
+    "File symlink creation unavailable; Windows test uses a real junction and verifies the same production reparse-point rejection",
+    "Unchanged Helper prompt checkout had CRLF; restored repository-required LF bytes without changing content/version",
+    "Playwright Chromium missing; existing supported Edge channel passed all E2E tests"
+  ],
+  "notVerified": [
+    "Installed 0.0.9 to 0.0.10 Kiro native upgrade and existing/new Builder runs",
+    "B7 real empty Helper catalog root cause and B11 model narration quality",
+    "Native full-flow checks and backup recording on this candidate",
+    "Human pilot, consented testimonials and general Kiro baseline"
+  ]
+}

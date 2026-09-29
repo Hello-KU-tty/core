@@ -395,12 +395,32 @@ export async function selectProjectToolchain(options: {
     }
     await probePnpm(result)
   }
-  const pnpmPath = result.pnpm.executable
-  if (/["%\r\n!&|<>^]/.test(pnpmPath) || /["%\r\n!&|<>^]/.test(node.executable))
+  await preparePnpmShim(result, options.resources)
+  return Object.freeze(result)
+}
+
+function pnpmShim(toolchain: ProjectToolchain, legacy = false): string {
+  const { pnpm, node } = toolchain
+  const pnpmPath = pnpm.executable
+  if (
+    !isAbsolute(pnpmPath) ||
+    /["%\r\n!&|<>^]/.test(pnpmPath) ||
+    /["%\r\n!&|<>^]/.test(node.executable)
+  )
     fail('PROJECT_LAUNCHER_PATH_UNSAFE')
-  const shimCommand = `${result.pnpm.kind === 'JS' ? `"${node.executable}" "${pnpmPath}"` : result.pnpm.kind === 'CMD' ? `call "${pnpmPath}"` : `"${pnpmPath}"`} %*`
-  const shim = utf8Batch([shimCommand])
-  const legacyShim = `@echo off\r\n${shimCommand}\r\nexit /b %errorlevel%\r\n`
+  const command = `${pnpm.kind === 'JS' ? `"${node.executable}" "${pnpmPath}"` : pnpm.kind === 'CMD' ? `call "${pnpmPath}"` : `"${pnpmPath}"`} %*`
+  return legacy ? `@echo off\r\n${command}\r\nexit /b %errorlevel%\r\n` : utf8Batch([command])
+}
+
+/** Only Core-owned shim bytes; never modify or execute the previous external pnpm. */
+export async function preparePnpmShim(
+  result: ProjectToolchain,
+  resources: CoreResources,
+): Promise<void> {
+  const root = result.privateRoot
+  await ownedPrivateDirectory(join(root, 'bin'))
+  const shim = pnpmShim(result)
+  const legacyShim = pnpmShim(result, true)
   const shimPath = join(root, 'bin/pnpm.cmd')
   try {
     await writeFile(shimPath, shim, { flag: 'wx', mode: 0o600 })
@@ -410,12 +430,79 @@ export async function selectProjectToolchain(options: {
     if (
       previous === legacyShim ||
       (previous !== shim &&
-        (await olderPinnedPnpmShims(root, node.executable, result.pnpm.version)).includes(previous))
+        ((await olderPinnedPnpmShims(root, result.node.executable, result.pnpm.version)).includes(
+          previous,
+        ) ||
+          (await hasRecordedPnpmShim(previous, result, resources))))
     )
       await replaceProjectFile(shimPath, shim)
     else if (previous !== shim) fail('PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED')
   }
-  return Object.freeze(result)
+}
+
+async function hasRecordedPnpmShim(
+  shim: string,
+  toolchain: ProjectToolchain,
+  resources: CoreResources,
+): Promise<boolean> {
+  const directory = join(toolchain.privateRoot, 'projects')
+  if (!(await isPrivateDirectory(directory))) return false
+  const names = await readdir(directory)
+  if (names.length > 4096) return false
+  for (const name of names) {
+    if (!/^[a-f0-9]{64}\.json$/.test(name)) continue
+    try {
+      const file = join(directory, name)
+      const text = (await plainFile(file, 32768)).toString()
+      const old = JSON.parse(text) as {
+        workspace: string
+        resourceRoot: string
+        toolchain: ProjectToolchain
+      }
+      if (
+        typeof old.workspace !== 'string' ||
+        !isAbsolute(old.workspace) ||
+        name !== sha256(Buffer.from(old.workspace)) + '.json' ||
+        typeof old.resourceRoot !== 'string' ||
+        !isProductResourceUpgrade(old.resourceRoot, resources.root) ||
+        !isOlderPinnedPnpm(old.toolchain?.pnpm, toolchain) ||
+        text !==
+          JSON.stringify({
+            schemaVersion: 1,
+            workspace: old.workspace,
+            toolchain: { ...toolchain, pnpm: old.toolchain.pnpm },
+            resourceRoot: old.resourceRoot,
+          }) ||
+        (shim !== pnpmShim(old.toolchain) && shim !== pnpmShim(old.toolchain, true)) ||
+        (await realpath(old.workspace)) !== old.workspace ||
+        !(await isPrivateDirectory(old.workspace))
+      )
+        continue
+      const launcher = await optionalProjectFile(join(old.workspace, '.kiro/vibe-tools.cmd'))
+      if (
+        [false, true].some(
+          (legacy) =>
+            launcher ===
+            launcherText(
+              toolchain.node.executable,
+              join(old.resourceRoot, 'bin/project-tools.mjs'),
+              file,
+              legacy,
+            ),
+        ) ||
+        launcher ===
+          launcherText(
+            toolchain.node.executable,
+            join(resources.root, 'bin/project-tools.mjs'),
+            file,
+          )
+      )
+        return true
+    } catch {
+      // Missing, edited, linked or malformed records never authorize a shim replacement.
+    }
+  }
+  return false
 }
 
 /**

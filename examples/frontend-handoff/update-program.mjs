@@ -2,7 +2,7 @@
 //   node update-program.mjs <program> --check   read-only preflight
 //   node update-program.mjs <program>           replace portable/ and vendor/frontend-{client,host}/
 //   node update-program.mjs <program> --verify  read-only integrity check of the current state
-import { appendFile, cp, lstat, readFile, realpath, rm } from 'node:fs/promises'
+import { appendFile, cp, lstat, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { inventory, sha256 } from './archive.mjs'
@@ -61,6 +61,15 @@ for (const [name, expected] of Object.entries(manifest.files)) {
 }
 const packageJson = JSON.parse(await readFile(join(program, 'package.json'), 'utf8'))
 if (!packageJson.extensionDependencies?.includes('kiro.kiroAgent')) fail('PROGRAM_NOT_KIT_BASED: apply the 20260926 kit first')
+for (const directory of MANAGED) {
+  const target = resolve(program, directory)
+  if (!target.startsWith(program + sep) || (await exists(target) && await realpath(target) !== target)) fail('PROGRAM_MANAGED_PATH_UNSAFE')
+}
+const appliedReceipt = join(program, '.vibe-helper-kit.json')
+if (await exists(appliedReceipt)) {
+  const stat = await lstat(appliedReceipt)
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) fail('PROGRAM_RECEIPT_UNSAFE')
+}
 
 if (mode === 'verify') {
   // Exact bytes: the runtime rejects any portable file whose SHA-256 differs from its manifest.
@@ -91,9 +100,16 @@ if (mode === 'check') {
 
 // 3. Mutation. Preflight above is complete; no network, install scripts or credential access.
 for (const directory of MANAGED) {
-  await rm(join(program, directory), { recursive: true, force: true })
-  await cp(join(kit, directory), join(program, directory), { recursive: true })
+  const target = resolve(program, directory)
+  if (!target.startsWith(program + sep) || (await exists(target) && await realpath(target) !== target)) fail('PROGRAM_MANAGED_PATH_UNSAFE')
+  await rm(target, { recursive: true, force: true })
+  await cp(join(kit, directory), target, { recursive: true })
 }
+await writeFile(appliedReceipt, JSON.stringify({
+  schemaVersion: 1, kitVersion: manifest.kitVersion, backendHead: manifest.backendHead,
+  backendWorkingTreeDirty: manifest.backendWorkingTreeDirty, frontendRevision: manifest.frontendRevision,
+  managedFiles: Object.fromEntries(Object.entries(manifest.files).filter(([name]) => MANAGED.some(directory => name.startsWith(directory + '/'))).map(([name, value]) => [name, value.sha256])),
+}, null, 2) + '\n')
 for (const [file, rule] of rules) {
   const path = join(program, file)
   const text = (await exists(path)) ? await readFile(path, 'utf8') : ''

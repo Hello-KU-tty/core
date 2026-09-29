@@ -680,6 +680,8 @@ T18 package는 app manifest, phase별 Discovery Agent, Builder·Helper, hidden n
 
 ### 11.4 Windows 제품 확장과 런타임 선택 — W2/W3/W4 검증, clean 출하는 W5
 
+- 2026-09-29 후속은 pnpm pin 변경 때 공유 shim·프로젝트 launcher·private descriptor를 함께 검증한다. 외부 pnpm 선택도 같은 제품 상위 설치·동일 Node와 나머지 필드·정확한 기존 파일이 모두 맞을 때만 Core 소유 shim을 교체하며 사용자 도구는 수정/실행하지 않는다. frontend update kit은 적용 receipt/이전 manifest의 전체 관리 hash로 기준을 선택하고 적용 후 다음 baseline receipt를 기록한다. [절차](FRONTEND_HANDOFF.md).
+
 - 2026-09-24 W2는 win32-x64 portable Core/bridge와 runtime 선택·획득을, W3는 자동 lifecycle·native worker·통합 패널을, W4는 생성 앱 도구 선택·획득과 실제 native shell/result HTTP를 검증했다. [W2 package 계약](T19_W2_PORTABLE_CORE_HANDOFF.md), [W3 lifecycle 인계](T19_W3_LIFECYCLE_HANDOFF.md), [W4 toolchain 인계](T19_W4_TOOLCHAIN_HANDOFF.md)를 따른다. 검증된 Node 24.18.0/24.19.0 및 NAPI 10/SQLite probe만 허용하며 개발 pin은 유지한다. clean 전체 흐름은 W5 목표다.
 
 - reference 구현은 [Windows 인계](WINDOWS_EXTENSION_HANDOFF_20260923.md)의 ESLint·Microsoft .NET·Java extension 사례를 따른다. 별도 Core process와 현재 loopback HTTP/SSE SDK 계약을 유지하며 실행 주체를 extension host의 lifecycle manager로 옮긴다. 언어 서버 구현 패턴을 참고하되 Core API를 LSP로 바꾸지는 않는다.

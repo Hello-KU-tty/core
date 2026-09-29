@@ -2,7 +2,7 @@
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { lstat, mkdir, mkdtemp, readFile, realpath, writeFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
@@ -46,6 +46,9 @@ const backendDocuments = new Set([
   'docs/SUBMISSION.md',
   'docs/SUBMISSION_DEMO_AND_SOURCE.md',
   'docs/SUBMISSION_READINESS_20260928.md',
+  'docs/SUBMISSION_READINESS_20260929.md',
+  'docs/FRONTEND_HANDOFF.md',
+  'docs/spikes/T19_FRONTEND_HANDOFF_UPDATE_20260929_2.json',
   'docs/T20_AUDIT_20260928.md',
   'docs/FRONTEND_MAC_PROGRESS_20260928.md',
   'docs/spikes/t19-discovery-quality-rejected/discovery-v1.3.7.md',
@@ -70,6 +73,10 @@ const backendAdditions = [
   'scripts/preview-program-accessibility.mjs',
   'scripts/create-source-candidate.mjs',
   'scripts/create-source-candidate.test.mjs',
+  'scripts/frontend-handoff-config.mjs',
+  'tests/unit/frontend-handoff-config.test.ts',
+  'tests/unit/frontend-handoff-update.test.ts',
+  'examples/frontend-handoff/program-managed-20260929.json',
 ]
 const frontendAdditions = [
   'src/core/flow/flow-limits.ts',
@@ -113,7 +120,7 @@ export function selectedSource(side, name) {
       backendRoots.has(name) ||
       backendDocuments.has(name) ||
       /^(?:apps|packages|tests|scripts|docs\/agent-prompts)\//.test(name) ||
-      /^examples\/(?:kiro-panel|kiro-native-host)\//.test(name)
+      /^examples\/(?:kiro-panel|kiro-native-host|frontend-handoff)\//.test(name)
     )
   if (side === 'frontend')
     return frontendRoots.has(name) || /^(?:src|test|media|vendor)\//.test(name)
@@ -122,11 +129,16 @@ export function selectedSource(side, name) {
 
 export function documentCopy(name, data, localHome = homedir()) {
   if (!name.endsWith('.md')) return data
+  let value = data.toString('utf8')
+  for (const home of new Set([
+    localHome,
+    localHome.replaceAll('\\', '/'),
+    localHome.replaceAll('\\', '\\\\'),
+  ]))
+    value = value.split(home).join('<LOCAL_HOME>')
   return Buffer.from(
-    data
-      .toString('utf8')
-      .split(localHome)
-      .join('<LOCAL_HOME>')
+    value
+      .replace(/\/Users\/[^/\r\n`]+(?=\/)/g, '<LOCAL_HOME>')
       .replace(
         /\/private\/tmp\/vibe-helper-macos-core-([A-Za-z0-9]{8})(?=\/|[`\s]|$)/g,
         (value, suffix) => (suffix === 'XXXXXXXX' ? value : '<PRIVATE_VERIFICATION_ROOT>'),
@@ -136,7 +148,13 @@ export function documentCopy(name, data, localHome = homedir()) {
 
 export function inspectContent(name, data, localHome = homedir()) {
   const value = data.toString('utf8')
-  if (value.includes(`${localHome}/`)) throw new Error(`SOURCE_LOCAL_PATH:${name}`)
+  for (const home of new Set([
+    localHome,
+    localHome.replaceAll('\\', '/'),
+    localHome.replaceAll('\\', '\\\\'),
+  ]))
+    if (value.includes(`${home}/`) || value.includes(`${home}\\`))
+      throw new Error(`SOURCE_LOCAL_PATH:${name}`)
   // Exactly two reviewed alphabet-sequence fixtures, never all tokens in tests.
   const reviewed =
     name === 'packages/application/test/redaction-stream.test.ts'
@@ -191,7 +209,11 @@ export async function copySourceFile(root, target, name) {
 
 async function repositorySnapshot(side, source, destination) {
   const root = await realpath(source)
-  const git = (args) => execute('git', ['-C', root, ...args], { maxBuffer: 4 * 1024 * 1024 })
+  const git = (args) =>
+    execute('git', ['-c', `safe.directory=${root.replaceAll('\\', '/')}`, '-C', root, ...args], {
+      maxBuffer: 4 * 1024 * 1024,
+      windowsHide: true,
+    })
   const tracked = (await git(['ls-files', '-z'])).stdout.split('\0').filter(Boolean)
   const additions = side === 'backend' ? backendAdditions : frontendAdditions
   const names = [
@@ -215,7 +237,7 @@ async function repositorySnapshot(side, source, destination) {
 
 export async function createSourceCandidate(backend, frontend) {
   if (process.version !== 'v24.19.0') throw new Error('PINNED_NODE_REQUIRED')
-  const parent = await mkdtemp('/private/tmp/vibe-helper-source-candidate-')
+  const parent = await realpath(await mkdtemp(join(tmpdir(), 'vibe-helper-source-candidate-')))
   const root = join(parent, 'source')
   await mkdir(root, { mode: 0o700 })
   const repositories = {}

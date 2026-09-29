@@ -1,6 +1,6 @@
 # Vibe Helper — 만들면서 이해의 근거를 남기는 AI 개발 도우미
 
-제출 Markdown 초안 · 2026-09-28 · 아직 외부 제출하지 않음.
+제출 Markdown 초안 · 2026-09-29 갱신 · 아직 외부 제출하지 않음.
 
 실제 초보 사용자 pilot·동의된 증언과 일반 Kiro baseline은 미확보다. 아래 내용은 구현, 자동 검사, 합성 사용자 입력을 사용한 실제 Kiro 모델 검증 결과이며 학습 효과나 일반적 우월성의 증명이 아니다. 공식 양식과 이 제한에 대한 사용자 판단 후 최종본을 고정한다.
 
@@ -39,9 +39,9 @@ Mac의 고정된 Kiro 개발 환경에서 실제 프론트와 native 모델로 �
 
 | 검사 | 결과 |
 | --- | --- |
-| 실제 frontend | 고정 설치/typecheck/55 files·719 tests/build PASS |
-| backend `pnpm check` | unit137, integration365, eval41, Campus3, smoke6, E2E12 PASS; 별도11 SKIP |
-| native/개발 host | native161 PASS·2 SKIP, 격리 환경/예산41 PASS |
+| 실제 frontend (9/29 Windows) | 고정 설치/typecheck/56 files·753 tests/build PASS; 0.0.10 kit 적용 후 실제 checkout 재검증 |
+| backend `pnpm check` (9/29 Windows) | unit178, integration391, eval42, Campus3, smoke6, E2E12 PASS; 별도2 SKIP |
+| native 소스 회귀 / Mac 개발 host | 9/29 CJS169 PASS. 이전 Mac 격리 환경/예산41 PASS는 당시 결과 |
 | 실제 provider→HTTP/SSE→SQLite | PASS. 모델 경계는 deterministic fixture이며 native 검사와 분리 |
 | 의존성 감사 | frontend npm/backend pnpm 공개 audit 각각0건(2026-09-28 관측) |
 | 독립 소스 재현 |752개 파일의 고정 archive를 새 폴더에서 설치·검사·빌드하고 검사 후 SHA 일치 PASS. [후보 hash·검사 보고서](SOURCE_REPRODUCIBILITY_20260928.md) |
@@ -50,7 +50,7 @@ Mac의 고정된 Kiro 개발 환경에서 실제 프론트와 native 모델로 �
 
 ## 실행과 재현
 
-backend와 frontend는 별도 저장소다. Node24.19.0/pnpm11.12.0을 선택하고 backend에서 실행한다.
+backend와 frontend는 별도 저장소다. 현재 개발 pin인 Node24.19.0/pnpm11.13.1을 선택하고 backend에서 실행한다.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -76,8 +76,8 @@ npm run build
 - 실제 초보 사용자 pilot와 일반 Kiro 비교는 아직 없다. 학습 향상·완주율·비용 우월성을 주장하지 않는다.
 - Analyst는 미래 계획을 실제 수행으로 잘못 분류할 수 있다. Core의 구조·출처 검증이 자연어 의미까지 보장하지 않는다. [기존 전표본 결과](spikes/t19-analyst-prompt-experiments/README.md)를 보존하며, 모델 품질 전체 PASS로 표시하지 않는다.
 - Helper의 실제 설명에서 평점 동률 책 순서 오류가 있었다. 실행 결과와 설명을 각각 검증해야 한다.
-- Windows 전용 검증/패키징은 이번 사용자 지정 제외 범위다. 기존 Windows kit에는 최신 backend 변경이 아직 반영되지 않았으므로 이번 제출 후보의 새 설치물처럼 배포하지 않는다.
+- 9/29 Windows kit2026.09.29.2와 제품 VSIX0.0.10을 생성·자동 검증·Kiro CLI 설치했다. 이전0.0.9와 기존 프로젝트의 실제 native 업그레이드 및 새 후보 전체 모델 흐름은 미검증이다. [최신 검사와 로컬 artifact](SUBMISSION_READINESS_20260929.md)를 따른다.
 - 일반 Mac 제품 설치, 모든 키보드/보조공학 조합, 장기 안정성과 모든 Kiro 버전의 호환성은 인증하지 않았다. 생성 코드는 OS 수준 sandbox가 아니다.
 - redaction은 알려진 형태 중심이며 모든 개인정보를 탐지하지 못한다. 비밀정보를 입력하지 않아야 한다. local reset/export/자동 삭제는 아직 제공하지 않는다.
 
-공식 파일 형식·마감 시각·제출 채널과 fallback 영상은 미확정이다. [준비 대조표](SUBMISSION_READINESS_20260928.md) 및 [데모·소스 범위](SUBMISSION_DEMO_AND_SOURCE.md)에 남은 작업을 분리했다.
+공식 파일 형식·마감 시각·제출 채널과 fallback 영상은 미확정이다. [최신 준비 대조표](SUBMISSION_READINESS_20260929.md) 및 [데모·소스 범위](SUBMISSION_DEMO_AND_SOURCE.md)에 남은 작업을 분리했다.

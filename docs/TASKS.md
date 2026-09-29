@@ -770,6 +770,32 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 
 ### [~] T19. 자체 Kiro IDE 패널과 프론트 실제 연동
 
+#### [~] T19-F12. 실측 예정 인계·승인된 commit/push와 직접 사용 환경 준비
+
+- **승인:** 2026-09-29 사용자가 이쪽에서 프론트 실측 예정 문구 추가, commit/push, 제출 후보 확장 제작·Kiro 실행·설치·Workspace Trust와 직접 사용 준비를 요청했다. push는 `hurdoo` 계정으로 기존 `Hello-KU-tty/core`, `Hello-KU-tty/program`에 수행한다.
+- **산출물:** 양쪽 인계/검증 변경 commit, 원격 HEAD 확인, 현재 VSIX와 hash, 실제 설치물의 Core 연결·Trust·로그인·화면 준비 기록.
+- **완료 조건:** 사용자용 Kiro 창이 현재 확장으로 실제 Core에 연결되고 직접 입력 가능한 상태다. 모델 실측은 최신 사용량/Overages를 확인하고 기존 누적900·신규중단880 제한 안에서 별도로 판정한다. 사람의 사용을 합성 fixture로 완료 처리하지 않는다.
+
+#### [x] T19-F9. 최신 프론트 인계의 제출 전 업그레이드·kit 회귀
+
+- **착수 근거:** 2026-09-29 사용자 요청과 프론트 `82f55ff`의 `NEXT_STEPS_20260929.md`. backend `8265e9d`는 `e3532b7`을 이미 포함한다.
+- **범위:** 기존/관리 pnpm의 공유 shim·프로젝트 descriptor·launcher 업그레이드 경계, 직전 적용 kit hash를 기준으로 한 재현 가능한 kit 생성, 실제 frontend 적용·검사·VSIX 후보 준비. Node24.19.0/pnpm11.13.1과 기존 데이터·UI를 보존한다.
+- **완료 조건:** 변경 경계의 실패/복구 회귀, backend `pnpm check`, frontend typecheck/test/build, kit hash 검증과 VSIX 후보 receipt. 실제 Kiro 실측·사람 pilot·baseline·외부 제출은 독립 gate이며 자동 검사로 완료 처리하지 않는다.
+- **다음 판단:** Discovery 복귀 요구 불일치와 durable 실패/abandon 요청을 현재 계약과 대조한다. 데이터 삭제·권한 확대·공개/commit/push는 이 작업에 포함하지 않는다.
+- **검증:** Node24.19.0/pnpm11.13.1 전체 check(unit178+skip1/integration391+skip1/eval42/Campus3/smoke6/E2E12), CJS169 PASS. kit2026.09.29.2 실제 program 적용/118 hashes/753 tests/typecheck/build 및 0.0.10 VSIX 조립·Kiro CLI 설치 확인. 현재 profile에 이전0.0.9가 없어 설치 성공을 업그레이드 실측으로 확대하지 않는다. [최신 제출 대조](SUBMISSION_READINESS_20260929.md).
+
+#### [x] T19-F10. Spec에서 이전 후보로 읽기 전용 복귀
+
+- **근거:** 최신 프론트 인계와 BRIEF §8/FR-DIS-013. 현재 돌아가기 버튼이 새 Session을 만들고 Spec을 SUPERSEDED로 바꿔 기존 후보를 지운다.
+- **범위:** 돌아가기는 저장된 후보·입력·현재 Spec을 보존하는 화면 이동으로 만든다. 기존 선택의 Spec은 모델 호출 없이 다시 열며, 명시적 새 후보 요청 때만 기존 `UI_RETURN_TO_DISCOVERY`를 호출한다. 선택 완료 Session을 재개하거나 새 Core API를 만들지 않는다.
+- **완료 조건:** 돌아가기·Spec 재열기에서 mutation/모델 0, 명시적 재생성에서 현재 Project의 새 Session과 1회 실행, 실패·중복 클릭·History 전환 회귀 및 실제 frontend 검사. 기존 디자인을 유지한다.
+- **검증:** frontend753개·타입·build PASS. 실제 provider/controller→인증 HTTP/SSE→SQLite 소비에서 저장 상태 불변/모델0 복귀·Spec 재열기와 명시적 새 Session/preview1회를 확인했다. 실패 시 이전 후보/Spec 유지, 입력 변경 전달, 중복 요청과 화면 이탈 후 늦은 응답 회귀 PASS. 현재 선택 완료 후보는 읽기 전용이며 다른 후보 재생성은 명시적 입력을 사용한다.
+
+#### [-] T19-F11. 0.0.10 실제 Kiro Agent·기존 프로젝트 업그레이드 실측
+
+- **외부 조건:** 최신 계정 사용량/Overages 관측이 아직 없고 현재 Kiro 기본 profile에는 기존0.0.9 설치가 없었다. 기존 프로젝트와 정확한 Workspace Trust·로그인 상태를 확인해야 한다. 누적900/신규880 제한을 과거 관측으로 우회하지 않는다.
+- **준비 완료:** 0.0.10 VSIX 생성·설치, kit/프론트/Core 자동 검증과 native 회귀. B6 다중 창·B7 Helper catalog·B11 한국어·기존/신규 Builder·결과 실행·History/개인화·fallback 녹화는 실제 실행 receipt로 판정한다.
+
 **2026-09-28 제출 준비 재개:** 사용자가 실제 프론트 checkout의 직접 기능·성능 수정과 Mac 연결 검증을 승인했다. Windows 전용 작업은 이번 실행에서 제외하며 아래 T19-F1부터 진행한다. 앞선 시간·프론트 수정 금지 기록은 당시 세션에 한정한다. 기존 상위 완료 gate는 검증 없이 닫지 않는다.
 
 #### [x] T19-F8. 프론트 B7~B11 런타임·도구·언어 보완
@@ -1091,6 +1117,12 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - 변경 범위별 unit/contract/storage/Agent eval/IDE 검증과 `pnpm check`, packaged clean install receipt·용량/RSS·지원표를 남긴다. `AC-MVP-015`와 기존 T19/T19-N 완료 기준이 모두 충족됐을 때만 상위 task 완료 여부를 재판정한다.
 
 ### [~] T20. 보안·개인정보·접근성·복구 hardening
+
+#### [x] T20-F1. 최신 제출 소스 후보와 Windows 재현 자료 고정
+
+- **선행 조건:** T19-F9/F10 자동 검증 완료. 이전 Mac 전용 source 선택기를 Windows에서도 실행하고 새 kit 구성 모듈·회귀 파일을 빠뜨리지 않는다.
+- **완료 조건:** source selector/privacy 회귀, allowlist 소스 사본·파일별 SHA manifest, 압축 후 hash 확인과 제출 문서 갱신. Native·사람 pilot·baseline·외부 제출은 별도 gate로 남긴다.
+- **검증:** source781개/ZIP783개를 고정하고 별도 압축 해제본에서 frozen install→backend 전체check→frontend753/typecheck/build→panel build/native169+selector6→actual consumer PASS. 검사 후 source781개 hash 일치. 첫 panel build 누락 실패를 보존했으며 재현 명령에 선행 빌드를 명시한다. [소스 재현 보고서](SOURCE_REPRODUCIBILITY_20260929.md). 실제 모델0, 외부 공개/제출0이다.
 
 - 19:01 후속: 후보 선택 시 DOM 교체로 keyboard focus가 사라지는 결함을 수정했다. 실제 Chrome과 frontend719 회귀 PASS; OS 홈 기반의 legacy Mac 경로·receipt 철자 경계도 보완했다. private source 압축 해제본의 backend 전체/프론트 검사는 통과했지만 native fixture prompt2개 누락을 발견하여 선택기를 수정하고 재검증 중이다. source 재현이나 모델0 GUI 결과를 사람 pilot·baseline 또는 일반 제품 설치 완료로 확대하지 않는다.
 - 19:06 수정 source 후보752개의 압축 해제본에서 frozen install→backend 전체(E2E12)→frontend719→native/개발 host/receipt/source 선택기210+2SKIP→actual consumer→Mac host build를 통과했고 검사 후 hash가 일치했다. 첫 prompt 누락 후보는 보존하고 전달 대상에서 제외했다. [source 재현 보고서](SOURCE_REPRODUCIBILITY_20260928.md)와 별도 검증 receipt를 남겼으며 사용자 제출 범위 판단은 아직 대기다.

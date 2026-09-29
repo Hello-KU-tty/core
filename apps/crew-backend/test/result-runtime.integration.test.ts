@@ -167,7 +167,7 @@ describe('generated result runtime supervisor', () => {
     })
   })
 
-  it.each(['symlink', 'oversized'] as const)(
+  it.each([process.platform === 'win32' ? 'junction' : 'symlink', 'oversized'] as const)(
     'rejects %s compiled content before starting it',
     async (kind) => {
       const { workspace, supervisor } = await workspaceFixture()
@@ -181,7 +181,16 @@ describe('generated result runtime supervisor', () => {
         }),
       )
       await writeFile(join(workspace, 'dist', 'server.mjs'), "throw new Error('must not run')")
-      if (kind === 'symlink')
+      if (kind === 'junction') {
+        // Directory junctions exercise the real Windows reparse-point rejection
+        // without requiring Developer Mode or changing machine security policy.
+        await mkdir(join(workspace, 'linked-content'))
+        await symlink(
+          join(workspace, 'linked-content'),
+          join(workspace, 'dist', 'alias'),
+          'junction',
+        )
+      } else if (kind === 'symlink')
         await symlink(join(workspace, 'dist', 'server.mjs'), join(workspace, 'dist', 'alias.mjs'))
       else {
         const file = await open(join(workspace, 'dist', 'too-large.bin'), 'wx')
