@@ -927,7 +927,7 @@ try {
     .snapshot()
     .previewRound.previews.slice(0, 2)
     .map((p) => ({ candidateId: p.candidateId, revision: 1 }))
-  feedbackTargets.forEach((target) => feedbackController.toggleBasket(target))
+  for (const target of feedbackTargets) feedbackController.toggleBasket(target)
   const feedbackInput = feedbackController.snapshot().input
   const feedbackBasket = feedbackController.snapshot().basket
   const feedbackRoot = dom.createElement('div')

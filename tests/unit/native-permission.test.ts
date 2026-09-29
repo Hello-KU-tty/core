@@ -819,7 +819,7 @@ function outsidePath(root: string): string {
 }
 
 describe('denied project command classification (content-free)', () => {
-  const prefix = '.\.kiro\vibe-tools.cmd '
+  const prefix = '.\\.kiro\\vibe-tools.cmd '
   it('names only the command family, never the text', () => {
     expect(projectCommandDenialKind(`${prefix}pnpm add left-pad`, prefix)).toBe(
       'PROJECT_COMMAND_PNPM_ADD',
@@ -832,7 +832,7 @@ describe('denied project command classification (content-free)', () => {
     expect(projectCommandDenialKind('pnpm install --frozen-lockfile', prefix)).toBe(
       'PROJECT_COMMAND_UNPREFIXED_PNPM_INSTALL',
     )
-    expect(projectCommandDenialKind('C:\evil\tool.exe --token abc', prefix)).toBe(
+    expect(projectCommandDenialKind('C:\\evil\\tool.exe --token abc', prefix)).toBe(
       'PROJECT_COMMAND_UNPREFIXED_OTHER',
     )
     expect(projectCommandDenialKind(42, prefix)).toBe('PROJECT_COMMAND_INVALID')
