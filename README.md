@@ -68,12 +68,14 @@ Kiro IDE
 
 ## 설치 (사용자)
 
-1. Kiro IDE를 설치하고 본인 계정으로 로그인한다.
-2. [Hello-KU-tty/program Releases](https://github.com/Hello-KU-tty/program/releases)에서 최신 VSIX를 받는다.
+다운로드 파일 선택부터 첫 실행·업데이트·오류 해결까지는 **[다운로드·설치 가이드](docs/DOWNLOAD_GUIDE.md)**를 참고한다.
+
+1. [Kiro IDE](https://kiro.dev/downloads/)를 설치하고 본인 계정으로 로그인한다.
+2. [Hello-KU-tty/program Releases](https://github.com/Hello-KU-tty/program/releases)에서 호환 버전을 확인하고 Windows x64용 제품 `.vsix`를 받는다. Release가 보이지 않으면 담당자에게 제품 VSIX를 요청한다.
 3. Kiro에서 Extensions → `Install from VSIX…`로 설치한다.
 4. Agent Panel을 열고 배우고 싶은 기술을 입력한다.
 
-별도 서비스 로그인이나 API Key는 없다. 모델 사용량은 사용자 본인의 Kiro 계정에서 차감된다. 첫 실행 때 생성 앱의 도구·의존성 준비를 위해 network가 필요할 수 있다. 지원 OS·버전은 Release 노트를 따른다.
+별도 서비스 로그인이나 API Key는 없다. 모델 사용량은 사용자 본인의 Kiro 계정에서 차감된다. 첫 실행 때 생성 앱의 도구·의존성 준비를 위해 network가 필요할 수 있다. 일반 사용자는 Node·pnpm 설치나 백엔드 수동 실행이 필요하지 않다. 설치 검증 기준은 Windows x64·Kiro IDE 1.1.70 / Agent 1.1.158이며, 실제 호환 범위는 Release 노트를 따른다. macOS는 현재 개발 검증용이다.
 
 ## 개발 환경과 검증
 
