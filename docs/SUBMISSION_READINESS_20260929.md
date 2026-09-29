@@ -2,6 +2,8 @@
 
 **후속 실측 예정:** 사용자 요청에 따라 **이쪽(core 작업 환경)에서 현재 제출 후보 확장을 Kiro에 적용하고 프론트 실측을 진행할 예정**이다. 사용자가 직접 입력·사용할 창도 준비한다. 확장 설치와 실측 대상 Workspace Trust는 승인되었으며, 양쪽 변경은 `hurdoo` 계정으로 `Hello-KU-tty`의 기존 원격 저장소에 commit/push한다. 아래 자동 검증 기록과 이후 실제 관측은 구분한다.
 
+**실측 준비 후속:**0.0.10 재조립·설치, 제품 workspace Trust, 실제 PREVIEW1회/10후보(32.812초), Kiro 재시작·History 복원과 저장 hash 불변을 확인했다. 직접 입력 가능한 창을 열어 두었다. 최신 사용량836.18/2000, Overages Disabled. core 소스 commit `bc8570b` push 완료, program `deef685`는 HURDOO의 Write 권한 대기다. 현재 설치 VSIX와 정확한 관측 범위는 [실측 준비 기록](FRONTEND_LIVE_READY_20260929.md)을 기준으로 한다. 아래 내용은 그 이전 자동 검증 시점이다.
+
 **판정: 자동 검증·설치 후보 준비 완료, 최종 제출 gate는 열려 있음.** 최신 프론트 인계 `program@82f55ff`의 `NEXT_STEPS_20260929.md`를 기준으로 실제 Windows checkout에서 작업했다. 9월 28일 Mac 결과는 당시 실측으로 보존한다.
 
 ## 이번에 처리한 항목

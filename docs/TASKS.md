@@ -770,11 +770,13 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 
 ### [~] T19. 자체 Kiro IDE 패널과 프론트 실제 연동
 
-#### [~] T19-F12. 실측 예정 인계·승인된 commit/push와 직접 사용 환경 준비
+#### [-] T19-F12. 실측 예정 인계·승인된 commit/push와 직접 사용 환경 준비
 
 - **승인:** 2026-09-29 사용자가 이쪽에서 프론트 실측 예정 문구 추가, commit/push, 제출 후보 확장 제작·Kiro 실행·설치·Workspace Trust와 직접 사용 준비를 요청했다. push는 `hurdoo` 계정으로 기존 `Hello-KU-tty/core`, `Hello-KU-tty/program`에 수행한다.
 - **산출물:** 양쪽 인계/검증 변경 commit, 원격 HEAD 확인, 현재 VSIX와 hash, 실제 설치물의 Core 연결·Trust·로그인·화면 준비 기록.
 - **완료 조건:** 사용자용 Kiro 창이 현재 확장으로 실제 Core에 연결되고 직접 입력 가능한 상태다. 모델 실측은 최신 사용량/Overages를 확인하고 기존 누적900·신규중단880 제한 안에서 별도로 판정한다. 사람의 사용을 합성 fixture로 완료 처리하지 않는다.
+- **준비·실측 완료:**0.0.10 재빌드/118관리hash/VSIX 설치, 전용 workspace Trust, 실제 PREVIEW1회/10후보/32.812초, 정상 재시작·History 복원/저장hash불변/새run0. 사용량835.96→836.18/2000, Overages Disabled. 사용자용 빈 입력 화면을 열어 두었다. [실측 기록](FRONTEND_LIVE_READY_20260929.md).
+- **외부 대기:** core `bc8570b` push 완료. program `deef685` commit 완료, HURDOO의 해당 repository `permissions.push=false`로 Write 권한 요청 중이다. 권한 부여 전 program push를 재시도하지 않는다.
 
 #### [x] T19-F9. 최신 프론트 인계의 제출 전 업그레이드·kit 회귀
 
@@ -793,7 +795,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 
 #### [-] T19-F11. 0.0.10 실제 Kiro Agent·기존 프로젝트 업그레이드 실측
 
-- **외부 조건:** 최신 계정 사용량/Overages 관측이 아직 없고 현재 Kiro 기본 profile에는 기존0.0.9 설치가 없었다. 기존 프로젝트와 정확한 Workspace Trust·로그인 상태를 확인해야 한다. 누적900/신규880 제한을 과거 관측으로 우회하지 않는다.
+- **외부 조건:** 기존0.0.9 프로젝트 업그레이드 표본과 사용자의 Builder/Helper 이후 직접 실측을 기다린다. T19-F12에서 최신 usage/Overages·로그인·제품 workspace Trust, PREVIEW1회와 재시작 History는 확인했지만 전체 gate를 완료하지 않았다. 누적900/신규880 제한을 유지한다.
 - **준비 완료:** 0.0.10 VSIX 생성·설치, kit/프론트/Core 자동 검증과 native 회귀. B6 다중 창·B7 Helper catalog·B11 한국어·기존/신규 Builder·결과 실행·History/개인화·fallback 녹화는 실제 실행 receipt로 판정한다.
 
 **2026-09-28 제출 준비 재개:** 사용자가 실제 프론트 checkout의 직접 기능·성능 수정과 Mac 연결 검증을 승인했다. Windows 전용 작업은 이번 실행에서 제외하며 아래 T19-F1부터 진행한다. 앞선 시간·프론트 수정 금지 기록은 당시 세션에 한정한다. 기존 상위 완료 gate는 검증 없이 닫지 않는다.
