@@ -80,12 +80,16 @@ it('preserves classified native errors over HTTP and retries only the same expli
       { code: -32000, data: { errorType: 'ModelRegistryUnauthenticatedError' } },
       { code: -32000, data: { errorType: 'ModelRegistryUnavailableError' } },
       { code: -32603, data: { name: 'UnknownProviderError', message: 'token=synthetic-secret' } },
+      'NATIVE_ENDPOINT_AMBIGUOUS',
+      'NATIVE_ENDPOINT_MISSING',
     ]
     const expected = [
       'NATIVE_QUOTA_EXCEEDED',
       'NATIVE_AUTH_REQUIRED',
       'NATIVE_MODEL_UNAVAILABLE',
       'NATIVE_RPC_REJECTED',
+      'NATIVE_ENDPOINT_AMBIGUOUS',
+      'NATIVE_ENDPOINT_MISSING',
     ]
     const nativeIds = new Set<string>()
     for (const [index, payload] of payloads.entries()) {
@@ -131,7 +135,7 @@ it('preserves classified native errors over HTTP and retries only the same expli
       expect(oldHandler).toBeDefined()
       expect(nativeIds.has(nativeId)).toBe(false)
       nativeIds.add(nativeId)
-      const errorCode = classifyNativeRpcError(payload)
+      const errorCode = typeof payload === 'string' ? payload : classifyNativeRpcError(payload)
       expect(errorCode).toBe(expected[index])
       const complete = await fetch(`${baseUrl}/api/native/jobs/${nativeId}/complete`, {
         method: 'POST',
@@ -177,7 +181,7 @@ it('preserves classified native errors over HTTP and retries only the same expli
       )
       expect(((await idle.json()) as { job: unknown }).job).toBeNull()
     }
-    expect(nativeIds.size).toBe(4)
+    expect(nativeIds.size).toBe(payloads.length)
   } finally {
     await runtime.close()
     await relay.close()

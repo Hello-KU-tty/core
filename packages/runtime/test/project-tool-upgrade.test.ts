@@ -48,7 +48,7 @@ beforeEach(async () => {
       source: 'MANAGED_PNPM',
       executable: join(root, 'pnpm.mjs'),
       kind: 'JS',
-      version: '11.12.0',
+      version: '11.13.1',
     },
   }
 })
@@ -182,6 +182,71 @@ describe('Core-owned project launcher installation upgrade', () => {
     await expect(prepareProjectTools(workspace, tools, resources('0.3.4'))).rejects.toThrow(
       'PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED',
     )
+  })
+
+  it('upgrades the frontend product VSIX install and refuses switching products', async () => {
+    const program = (version: string) =>
+      ({
+        root: join(
+          root,
+          'extensions',
+          'vibe-helper.builder-helper-agent-panel-' + version,
+          'portable',
+        ),
+      }) as CoreResources
+    await prepareProjectTools(workspace, tools, program('0.0.6'))
+    await prepareProjectTools(workspace, tools, program('0.0.8'))
+    const verified = await verifyProjectTools(workspace, program('0.0.8'))
+    expect(verified.toolchain).toEqual(tools)
+    expect(await readFile(join(workspace, '.kiro/vibe-tools.cmd'), 'utf8')).toContain(
+      'vibe-helper.builder-helper-agent-panel-0.0.8',
+    )
+    for (const candidate of [program('0.0.7'), resources('9.9.9')]) {
+      await expect(prepareProjectTools(workspace, tools, candidate)).rejects.toThrow(
+        'PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED',
+      )
+    }
+    await verifyProjectTools(workspace, program('0.0.8'))
+  })
+
+  it('replaces a pnpm chosen by an older product pin only during a product upgrade', async () => {
+    const program = (version: string) =>
+      ({
+        root: join(
+          root,
+          'extensions',
+          'vibe-helper.builder-helper-agent-panel-' + version,
+          'portable',
+        ),
+      }) as CoreResources
+    const olderPin = (version: string): ProjectToolchain => ({
+      ...tools,
+      pnpm: {
+        source: 'MANAGED_PNPM',
+        executable: join(tools.privateRoot, 'pnpm-cache', `pnpm-${version}`, 'bin/pnpm.cjs'),
+        kind: 'JS',
+        version,
+      },
+    })
+    await prepareProjectTools(workspace, olderPin('11.12.0'), program('0.0.6'))
+    // Same install root: a changed pnpm alone is not an upgrade.
+    await expect(prepareProjectTools(workspace, tools, program('0.0.6'))).rejects.toThrow(
+      'PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED',
+    )
+    // A changed Node is never covered by the pnpm pin allowance.
+    await expect(
+      prepareProjectTools(
+        workspace,
+        { ...tools, node: { ...tools.node, executable: join(root, 'other-node.exe') } },
+        program('0.0.8'),
+      ),
+    ).rejects.toThrow('PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED')
+    await prepareProjectTools(workspace, tools, program('0.0.8'))
+    expect((await verifyProjectTools(workspace, program('0.0.8'))).toolchain).toEqual(tools)
+    // An older pin can never come back.
+    await expect(
+      prepareProjectTools(workspace, olderPin('11.12.0'), program('0.0.9')),
+    ).rejects.toThrow('PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED')
   })
 
   it('refuses downgrade, another publisher or another installation directory', async () => {

@@ -56,6 +56,12 @@ function validateCompletion(task: BuilderTask, report: TaskCompletionReport): st
   if (report.validationResults.some((result) => result.status === 'FAILED')) {
     return 'TASK_VALIDATION_FAILED'
   }
+  if (
+    report.validationResults.length === 0 ||
+    report.validationResults.some((result) => result.status === 'NOT_RUN')
+  ) {
+    return 'TASK_VALIDATION_NOT_RUN'
+  }
   if (!uniqueStrings(report.appliedDecisionIds)) return 'TASK_APPLIED_DECISIONS_DUPLICATED'
   return undefined
 }

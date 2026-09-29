@@ -12,7 +12,7 @@ export async function writeToolchainFixture(workspace) {
       version: '1.0.0',
       private: true,
       type: 'module',
-      packageManager: 'pnpm@11.12.0',
+      packageManager: 'pnpm@11.13.1',
       scripts: { build: 'tsc', test: 'node --test dist/test.js', smoke: 'node dist/smoke.js' },
       devDependencies: { typescript: '7.0.2', '@types/node': '24.13.3' },
     }),

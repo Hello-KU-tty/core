@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "kitVersion": "2026.09.29.1",
+  "previousKitVersion": "2026.09.27.1",
+  "scope": "Backend source validation on the frontend Windows PC before building this kit. Not a native model-call vertical flow result.",
+  "environment": {
+    "os": "Windows x64",
+    "shell": "PowerShell (Git Bash resolves whoami.exe to a non-Windows binary and is not a valid runner)",
+    "node": "24.19.0",
+    "pnpm": "11.13.1",
+    "modelCalls": 0
+  },
+  "backendChangesIncluded": [
+    "B6 a4a6632 endpoint bound to the owning Kiro window",
+    "B7-B11 936788a diagnostics, guard details, tool categories, Builder prompt 1.3.11, pnpm 11.13.1 pin",
+    "B12 7deefa3 frontend product VSIX upgrade accepted for project launchers",
+    "B12 365ce2a older pinned pnpm replaceable during a product upgrade"
+  ],
+  "pnpmCheck": {
+    "result": "PASS",
+    "formatAndLint": "PASS (lint warnings 2 / infos 18 unchanged)",
+    "unit": "173 passed, 1 skipped",
+    "integration": "384 passed, 1 skipped",
+    "eval": "42 passed",
+    "campusDrop": "PASS",
+    "smoke": "6 passed",
+    "e2e": "12 passed"
+  },
+  "notVerified": [
+    "Native Discovery/Builder/Helper vertical flow with this kit",
+    "B6 two-window selection on real Kiro windows",
+    "B7 root cause of the empty Helper tool catalog",
+    "B11 Korean narration quality on real model output"
+  ]
+}

@@ -11,6 +11,7 @@ import { StdioServerTransport } from '../apps/mcp-server/node_modules/@modelcont
 import { candidateIdSchema } from '../packages/contracts/dist/primitives.js'
 import { restoreCoreProvenEmptyActiveDecisions } from './native-builder-transport.mjs'
 import { describeCompletionInput } from './native-completion-diagnostic.mjs'
+import { createBridgeLifecycle } from './native-bridge-lifecycle.mjs'
 import { describeNativeCoreError } from './native-core-error-diagnostic.mjs'
 import { previewInputFailure } from './native-discovery-preview-validation.mjs'
 import {
@@ -64,6 +65,8 @@ const DISCOVERY_MODES = new Set([
 const descriptorPath = process.argv[2]
 const expectedWorkspace = process.argv[3]
 const receiptPath = process.env.VIBE_NATIVE_BRIDGE_RECEIPT_FILE
+const lifecycle = createBridgeLifecycle()
+lifecycle.stage('PROCESS_STARTED')
 
 async function receipt(event) {
   if (!receiptPath) return
@@ -138,12 +141,16 @@ async function loadBinding() {
 
 async function start() {
   const { binding, file, endpoint } = await loadBinding()
+  lifecycle.stage('BINDING_VALIDATED')
   const client = new Client({ name: 'vibe-helper-native-core-bridge', version: '0.1.0' })
   const transport = new StreamableHTTPClientTransport(endpoint, {
     requestInit: { headers: { Authorization: binding.authorization } },
   })
+  lifecycle.stage('CORE_CONNECTING')
   await client.connect(transport)
+  lifecycle.stage('CORE_CONNECTED')
   const listed = await client.listTools()
+  lifecycle.stage('CORE_TOOLS_LISTED')
   const actualNames = listed.tools.map((tool) => tool.name)
   if (
     actualNames.length !== binding.toolNames.length ||
@@ -153,6 +160,7 @@ async function start() {
     throw new Error('BRIDGE_CORE_CATALOG_MISMATCH')
   }
   await receipt({ event: 'CORE_CATALOG_VERIFIED', role: binding.role, toolNames: actualNames })
+  lifecycle.stage('CORE_CATALOG_VERIFIED')
   const server = new Server(
     { name: `vibe-native-${binding.role.toLowerCase()}-bridge`, version: '0.1.0' },
     { capabilities: { tools: {} } },
@@ -160,11 +168,15 @@ async function start() {
   // Selected mutation tools use scalar envelopes because the pinned IDE parser
   // drops empty JSON containers. Original schemas stay in descriptions and
   // Core still validates each decoded Agent-authored object unchanged.
-  server.setRequestHandler('tools/list', async () => ({
-    tools: listed.tools.map((tool) =>
-      advertiseNativeEnrichment(binding.role, advertiseJsonEnvelope(binding.role, tool)),
-    ),
-  }))
+  server.oninitialized = () => lifecycle.stage('STDIO_INITIALIZED')
+  server.setRequestHandler('tools/list', async () => {
+    lifecycle.stage('STDIO_TOOLS_LISTED')
+    return {
+      tools: listed.tools.map((tool) =>
+        advertiseNativeEnrichment(binding.role, advertiseJsonEnvelope(binding.role, tool)),
+      ),
+    }
+  })
   server.setRequestHandler('tools/call', async (request) => {
     const name = request.params?.name
     if (typeof name !== 'string' || !binding.toolNames.includes(name))
@@ -363,6 +375,7 @@ async function start() {
     closing = true
     await server.close().catch(() => undefined)
     await client.close().catch(() => undefined)
+    lifecycle.stage('CLOSED')
   }
   process.once('SIGTERM', () => {
     void close()
@@ -374,10 +387,12 @@ async function start() {
     void close()
   })
   await server.connect(new StdioServerTransport())
+  lifecycle.stage('STDIO_READY')
   await receipt({ event: 'STDIO_BRIDGE_READY', role: binding.role })
 }
 
 await start().catch((error) => {
+  lifecycle.failed()
   const code =
     error instanceof Error && /^[A-Z0-9_]{1,100}$/.test(error.message)
       ? error.message

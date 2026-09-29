@@ -77,7 +77,8 @@ if (
   bridgeStartup.error ||
   bridgeStartup.status !== 1 ||
   bridgeStartup.stdout !== '' ||
-  bridgeStartup.stderr.trim() !== 'BRIDGE_SCOPE_REQUIRED'
+  bridgeStartup.stderr.trim() !==
+    'BRIDGE_STAGE_PROCESS_STARTED\nBRIDGE_FAILED_AFTER_PROCESS_STARTED\nBRIDGE_SCOPE_REQUIRED'
 )
   throw new Error('NATIVE_PACKAGED_BRIDGE_STARTUP_UNVERIFIED')
 const runtimeConfig = JSON.parse(await readFile(resolve(panelRoot, 'runtime-config.json'), 'utf8'))

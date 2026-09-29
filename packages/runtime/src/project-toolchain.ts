@@ -17,10 +17,10 @@ import { isPrivateDirectory } from './private-directory.js'
 
 const execute = promisify(execFile)
 export const PROJECT_PNPM = Object.freeze({
-  version: '11.12.0',
-  url: 'https://registry.npmjs.org/pnpm/-/pnpm-11.12.0.tgz',
+  version: '11.13.1',
+  url: 'https://registry.npmjs.org/pnpm/-/pnpm-11.13.1.tgz',
   integrity:
-    'ggpvvQ2fBMImY4ACrq0eRTQKkTndXcB3wdg+9EqiSByOtmN7TJqmlqPH41uoGOSc8nIT5fK5ETjQm3o+JuiYug==',
+    'svx2g7imUlQU59E+G6KMqt3elr9m7FQL+ut+cCuB8+C+TR8pXt9/n+A5Z0Co3ORQnFgt33mJH0VD/qMtN2RfJQ==',
   maxBytes: 12 * 1024 * 1024,
 })
 export const PROJECT_TOOL_COMMAND = '.\\.kiro\\vibe-tools.cmd '
@@ -43,16 +43,17 @@ const errorCode = (error: unknown): string =>
     ? error.message
     : 'PROJECT_TOOL_REJECTED'
 
-/** Parse only the pinned npm archive's ordinary files. No links, PAX, devices or traversal. */
+/** Pinned npm regular files plus bounded GNU long names. No links, PAX, devices or traversal. */
 export function unpackPnpm(archive: Buffer): Map<string, Buffer> {
   if (
     archive.length > PROJECT_PNPM.maxBytes ||
     createHash('sha512').update(archive).digest('base64') !== PROJECT_PNPM.integrity
   )
     fail('PNPM_DOWNLOAD_HASH_MISMATCH')
-  const tar = gunzipSync(archive, { maxOutputLength: 32 * 1024 * 1024 })
+  const tar = gunzipSync(archive, { maxOutputLength: 48 * 1024 * 1024 })
   const files = new Map<string, Buffer>()
   let offset = 0
+  let longName: string | null = null
   while (offset + 512 <= tar.length) {
     const header = tar.subarray(offset, offset + 512)
     if (header.every((byte) => byte === 0)) break
@@ -72,13 +73,37 @@ export function unpackPnpm(archive: Buffer): Map<string, Buffer> {
     if (
       checksum !== actual ||
       string(345, 155) ||
-      !rawName.startsWith('package/') ||
       !Number.isSafeInteger(size) ||
       size < 0 ||
       offset + 512 + size > tar.length
     )
       fail('PNPM_ARCHIVE_INVALID')
-    const name = rawName.slice(8).replace(/\/$/, '')
+    const type = string(156, 1)
+    // npm 11.13.1 contains names longer than a TAR header's 100 bytes.
+    // L is filename metadata, not a symbolic link (type 2) or hard link (type 1).
+    if (type === 'L') {
+      const payload = tar.subarray(offset + 512, offset + 512 + size)
+      if (
+        longName !== null ||
+        rawName !== '././@LongLink' ||
+        size < 2 ||
+        size > 513 ||
+        payload.at(-1) !== 0 ||
+        payload.subarray(0, -1).includes(0)
+      )
+        fail('PNPM_ARCHIVE_INVALID')
+      longName = payload.subarray(0, -1).toString('utf8')
+      offset += 512 + Math.ceil(size / 512) * 512
+      continue
+    }
+    const fullName = longName ?? rawName
+    if (
+      !fullName.startsWith('package/') ||
+      (longName !== null && ((type !== '0' && type !== '') || fullName.slice(0, 100) !== rawName))
+    )
+      fail('PNPM_ARCHIVE_INVALID')
+    longName = null
+    const name = fullName.slice(8).replace(/\/$/, '')
     if (
       !name ||
       !/^[A-Za-z0-9_@./+-]+$/.test(name) ||
@@ -93,7 +118,6 @@ export function unpackPnpm(archive: Buffer): Map<string, Buffer> {
         )
     )
       fail('PNPM_ARCHIVE_PATH_INVALID')
-    const type = string(156, 1)
     if (type === '5' && size === 0) {
       offset += 512
       continue
@@ -103,6 +127,7 @@ export function unpackPnpm(archive: Buffer): Map<string, Buffer> {
     files.set(name, tar.subarray(offset + 512, offset + 512 + size))
     offset += 512 + Math.ceil(size / 512) * 512
   }
+  if (longName !== null) fail('PNPM_ARCHIVE_INVALID')
   const metadata = JSON.parse(files.get('package.json')?.toString() ?? '{}') as {
     name?: string
     version?: string
@@ -382,10 +407,56 @@ export async function selectProjectToolchain(options: {
   } catch (error) {
     if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) throw error
     const previous = (await plainFile(shimPath, 32768)).toString()
-    if (previous === legacyShim) await replaceProjectFile(shimPath, shim)
+    if (
+      previous === legacyShim ||
+      (previous !== shim &&
+        (await olderPinnedPnpmShims(root, node.executable, result.pnpm.version)).includes(previous))
+    )
+      await replaceProjectFile(shimPath, shim)
     else if (previous !== shim) fail('PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED')
   }
   return Object.freeze(result)
+}
+
+/**
+ * Exact shared-shim texts that an older product pin would have written: the
+ * same Node running a strictly older Core-managed pnpm from this private cache
+ * (current and legacy batch forms). Only these may be replaced after a pin
+ * change; any other shim content stays a toolchain change.
+ */
+export async function olderPinnedPnpmShims(
+  root: string,
+  nodeExecutable: string,
+  currentVersion: string,
+): Promise<string[]> {
+  const current = parseExactVersion(currentVersion)
+  if (!current) return []
+  const cache = join(root, 'pnpm-cache')
+  const names = await readdir(cache).catch(() => [] as string[])
+  const shims: string[] = []
+  for (const name of names) {
+    const version = parseExactVersion(name.startsWith('pnpm-') ? name.slice(5) : '')
+    if (!version || !isOlderVersion(version, current)) continue
+    const command = `"${nodeExecutable}" "${join(cache, name, 'bin/pnpm.cjs')}" %*`
+    shims.push(utf8Batch([command]), `@echo off\r\n${command}\r\nexit /b %errorlevel%\r\n`)
+  }
+  return shims
+}
+
+function parseExactVersion(value: unknown): number[] | undefined {
+  if (typeof value !== 'string') return undefined
+  const version = value
+    .match(/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/)
+    ?.slice(1)
+    .map(Number)
+  return version?.every(Number.isSafeInteger) ? version : undefined
+}
+
+function isOlderVersion(before: readonly number[], after: readonly number[]): boolean {
+  for (let i = 0; i < 3; i++) {
+    if (before[i] !== after[i]) return (before[i] ?? 0) < (after[i] ?? 0)
+  }
+  return false
 }
 
 /** Same finite vocabulary as native Builder, before its existing permission guard. */
@@ -443,6 +514,33 @@ function launcherText(node: string, runner: string, descriptor: string, legacy =
 
 const projectPreparation = new Map<string, Promise<void>>()
 
+/**
+ * The recorded pnpm was chosen by an older product pin: same kind of choice,
+ * a strictly older exact version, and for the Core-managed copy the exact cache
+ * path that pin would have produced. User-selected Node is never covered here.
+ */
+function isOlderPinnedPnpm(previous: unknown, toolchain: ProjectToolchain): boolean {
+  if (typeof previous !== 'object' || previous === null) return false
+  const old = previous as Record<string, unknown>
+  const keys = Object.keys(old).sort().join(',')
+  if (keys !== 'executable,kind,source,version') return false
+  const before = parseExactVersion(old.version),
+    after = parseExactVersion(toolchain.pnpm.version)
+  if (!before || !after || typeof old.executable !== 'string') return false
+  if (!isOlderVersion(before, after)) return false
+  if (old.source === 'MANAGED_PNPM')
+    return (
+      old.kind === 'JS' &&
+      old.executable ===
+        join(toolchain.privateRoot, 'pnpm-cache', `pnpm-${old.version}`, 'bin/pnpm.cjs')
+    )
+  return (
+    old.source === 'EXISTING_PNPM' &&
+    ['JS', 'CMD', 'EXE'].includes(String(old.kind)) &&
+    isAbsolute(old.executable)
+  )
+}
+
 /** Only a newer version of this installed product in the same extension directory. */
 function isProductResourceUpgrade(previous: string, current: string): boolean {
   if (
@@ -452,17 +550,21 @@ function isProductResourceUpgrade(previous: string, current: string): boolean {
     dirname(dirname(previous)) !== dirname(dirname(current))
   )
     return false
-  const version = (path: string) =>
-    basename(dirname(path))
-      .match(
-        /^vibe-helper\.vibe-helper-portable-core-(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/,
-      )
-      ?.slice(1)
-      .map(Number)
-  const before = version(previous),
-    after = version(current)
-  if (!before || !after || [...before, ...after].some((value) => !Number.isSafeInteger(value)))
+  // Installed product folders: the reference panel and the frontend product VSIX.
+  // An upgrade must stay within the same product; switching products is refused.
+  const installed = (path: string) => {
+    const match = basename(dirname(path)).match(
+      /^vibe-helper\.(vibe-helper-portable-core|builder-helper-agent-panel)-(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/,
+    )
+    return match ? { product: match[1], version: match.slice(2).map(Number) } : undefined
+  }
+  const beforeInstall = installed(previous),
+    afterInstall = installed(current)
+  if (!beforeInstall || !afterInstall || beforeInstall.product !== afterInstall.product)
     return false
+  const before = beforeInstall.version,
+    after = afterInstall.version
+  if ([...before, ...after].some((value) => !Number.isSafeInteger(value))) return false
   for (let i = 0; i < 3; i++) {
     if (after[i] !== before[i]) return (after[i] ?? 0) > (before[i] ?? 0)
   }
@@ -539,16 +641,32 @@ async function prepareProjectToolsOnce(
     else if (oldLauncher !== launcher) fail('PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED')
     return
   }
-  let oldRoot: unknown
+  let oldRoot: unknown, oldPnpm: unknown
   try {
-    oldRoot = (JSON.parse(oldContent) as { resourceRoot?: unknown }).resourceRoot
+    const parsed = JSON.parse(oldContent) as {
+      resourceRoot?: unknown
+      toolchain?: { pnpm?: unknown }
+    }
+    oldRoot = parsed.resourceRoot
+    oldPnpm = parsed.toolchain?.pnpm
   } catch {
     fail('PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED')
   }
+  // Besides the install root, a product upgrade may only replace a pnpm that
+  // an older product pin selected (e.g. 11.12.0 -> 11.13.1). Node and every
+  // other descriptor field must stay identical.
+  const sameExceptRoot = JSON.stringify({ ...descriptor, resourceRoot: oldRoot })
+  const sameExceptRootAndPnpm = isOlderPinnedPnpm(oldPnpm, toolchain)
+    ? JSON.stringify({
+        ...descriptor,
+        toolchain: { ...toolchain, pnpm: oldPnpm },
+        resourceRoot: oldRoot,
+      })
+    : null
   if (
     typeof oldRoot !== 'string' ||
     !isProductResourceUpgrade(oldRoot, resources.root) ||
-    oldContent !== JSON.stringify({ ...descriptor, resourceRoot: oldRoot })
+    (oldContent !== sameExceptRoot && oldContent !== sameExceptRootAndPnpm)
   )
     fail('PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED')
   const expectedOldLauncher = launcherText(

@@ -122,9 +122,13 @@ test('a Core-cancelled Helper occupies its native slot until owned terminal conf
       if (name.endsWith('/native-client.cjs')) return {
         openProtectedBuiltinH: async (_vscode, options) => {
           opens++
+          assert.equal(options.expectedWindowId, 7)
           return options.analystHaiku ? { ...helperSession, modelId: HAIKU_ID } : helperSession
         },
-        openProtectedHLogBarrier: async () => ({ windowId: 7, sessionIdForBarrier: 'synthetic-barrier' }),
+        openProtectedHLogBarrier: async (_vscode, options) => {
+          assert.equal(options.expectedWindowId, 7)
+          return { windowId: 7, sessionIdForBarrier: 'synthetic-barrier' }
+        },
       }
       return localRequire(name)
     },
@@ -146,7 +150,10 @@ test('a Core-cancelled Helper occupies its native slot until owned terminal conf
       return { ok: true, json: async () => value }
     },
   }, { filename: sourcePath })
-  const worker = module.exports.startNativeWorker({ subscriptions: [] }, join(root, 'connection.json'), {
+  const worker = module.exports.startNativeWorker({ subscriptions: [],
+    extension: { id: 'vibe-helper.synthetic-panel' },
+    logUri: { scheme: 'file', path: '/logs/window7/exthost/vibe-helper.synthetic-panel' },
+  }, join(root, 'connection.json'), {
     source: 'SYNTHETIC', nodePath: process.execPath, bridgeScriptPath: 'synthetic',
   })
   const until = async predicate => {

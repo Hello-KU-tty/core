@@ -59,6 +59,39 @@ const snapshot = (patch: Partial<ProjectSessionSnapshot> = {}): ProjectSessionSn
   }) as unknown as ProjectSessionSnapshot
 
 describe('run event projection', () => {
+  it.each([
+    [{ protocolKind: 'read' }, 'read'],
+    [{ protocolKind: 'edit' }, 'write'],
+    [{ protocolKind: 'execute' }, 'shell'],
+    [{ protocolKind: 'search' }, 'search'],
+    [{ nativeToolIdClass: 'USER_INPUT' }, 'user_input'],
+    [{ protocolKind: '__proto__' }, 'unknown'],
+    [{}, 'unknown'],
+  ])('retains a display classification without inferring permission: %j', (update, tool) => {
+    expect(projectRunEvent(event({ update }))).toMatchObject({ tool, status: 'UNKNOWN' })
+  })
+  it('preserves missing-file failure separately from other read errors', () => {
+    const view = projectRunEvent(
+      event({
+        update: {
+          toolName: 'read',
+          protocolKind: 'read',
+          nativeStatus: 'failed',
+          nativeErrorCode: 'NATIVE_FILE_NOT_FOUND',
+          relativePath: 'tsconfig.app.json',
+        },
+      }),
+    )
+    expect(view).toMatchObject({
+      tool: 'read',
+      status: 'FAILED',
+      errorCode: 'NATIVE_FILE_NOT_FOUND',
+      relativePath: 'tsconfig.app.json',
+    })
+    expect(
+      projectRunEvent(event({ update: { protocolKind: 'read', nativeStatus: 'failed' } })),
+    ).toMatchObject({ status: 'FAILED', errorCode: null })
+  })
   it('maps native shell activity without diagnostic fields', () => {
     const view = projectRunEvent(
       event({

@@ -77,7 +77,7 @@ Kiro IDE
 
 ## 개발 환경과 검증
 
-필수 도구는 Node.js 24.19.0과 pnpm 11.12.0이다. `.node-version`, `engines`와 preflight가 다른 runtime을 거절한다.
+필수 도구는 Node.js 24.19.0과 pnpm 11.13.1이다. `.node-version`, `engines`와 preflight가 다른 runtime을 거절한다.
 
 ```bash
 pnpm install --frozen-lockfile

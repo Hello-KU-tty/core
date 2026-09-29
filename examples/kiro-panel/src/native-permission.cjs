@@ -27,7 +27,8 @@ async function packageAncestorsIsolated(workspace) {
   return false
 }
 
-async function lockfilePrepareReady(workspace, windowsLauncher = false) {
+async function lockfilePrepareReady(workspace, windowsLauncher = false, onDiagnostic) {
+  const denied = reason => { onDiagnostic?.(`LOCKFILE_${reason}`); return null }
   const stat = async (name) => lstat(join(workspace, name)).catch((error) => {
     if (error?.code === 'ENOENT') return null
     throw error
@@ -39,13 +40,17 @@ async function lockfilePrepareReady(workspace, windowsLauncher = false) {
   // The same script-free exact command can prepare or refresh a generated-app
   // lock after the Agent changes package.json. Never follow an aliased lock or
   // run it with unverified workspace config or an executable pnpmfile present.
-  if (!manifest?.isFile() || manifest.isSymbolicLink() || manifest.nlink !== 1 ||
-      npmrc != null || pnpmfile != null || pnpmfileMjs != null) return null
+  if (!manifest) return denied('MANIFEST_MISSING')
+  if (!manifest.isFile() || manifest.isSymbolicLink() || manifest.nlink !== 1)
+    return denied('MANIFEST_UNSAFE')
+  if (npmrc != null || pnpmfile != null || pnpmfileMjs != null)
+    return denied('PACKAGE_CONFIG_PRESENT')
   if (config != null) {
     // The Windows host runner repeats this finite config check before spawning pnpm.
     // Legacy native execution still requires no workspace-local config.
-    if (!windowsLauncher || !config.isFile() || config.isSymbolicLink() ||
-        config.nlink !== 1 || config.size > 8192) return null
+    if (!windowsLauncher) return denied('WORKSPACE_CONFIG_REQUIRES_LAUNCHER')
+    if (!config.isFile() || config.isSymbolicLink() ||
+        config.nlink !== 1 || config.size > 8192) return denied('WORKSPACE_CONFIG_UNSAFE')
     const text = await readFile(join(workspace, 'pnpm-workspace.yaml'), 'utf8')
     let section = ''
     for (const line of text.split(/\r?\n/)) {
@@ -56,12 +61,12 @@ async function lockfilePrepareReady(workspace, windowsLauncher = false) {
       const valid = section === 'packages' ? /^\s+-\s+['"]?\.['"]?\s*$/ :
         section === 'allowBuilds' ? /^\s+(esbuild|better-sqlite3):\s+(true|false)\s*$/ :
         section === 'onlyBuiltDependencies' ? /^\s+-\s+(esbuild|better-sqlite3)\s*$/ : null
-      if (!valid?.test(line)) return null
+      if (!valid?.test(line)) return denied('WORKSPACE_CONFIG_DENIED')
     }
   }
   if (lockfile == null) return 'INITIAL'
   return lockfile.isFile() && !lockfile.isSymbolicLink() && lockfile.nlink === 1 ?
-    'REFRESH' : null
+    'REFRESH' : denied('FILE_UNSAFE')
 }
 
 function shellCwdMatches(cwd, workspace) {
@@ -125,7 +130,15 @@ async function chooseNativeBuilderPermission(detail, workspace, onDiagnostic, pr
         await sameWindowsShellDirectory(detail.rawInput?.cwd, workspace))
       detail = { ...detail, rawInput: { ...detail.rawInput, cwd: workspace } }
     const problem = shellInputProblem(detail, workspace, diagnostic1170)
-    if (problem) { onDiagnostic?.(problem); return null }
+    if (problem) {
+      if (problem === 'TIMEOUT_INVALID') {
+        const value = detail.rawInput.timeout
+        onDiagnostic?.(typeof value !== 'number' ? 'TIMEOUT_TYPE_INVALID' :
+          !Number.isSafeInteger(value) ? 'TIMEOUT_INTEGER_REQUIRED' :
+            value < 1 ? 'TIMEOUT_BELOW_MINIMUM' : 'TIMEOUT_ABOVE_MAXIMUM')
+      }
+      onDiagnostic?.(problem); return null
+    }
     if (!projectCommand && /^(?:pnpm|npm)(?:\s|$)/.test(detail.rawInput.command) &&
         !await packageAncestorsIsolated(canonicalWorkspace)) {
       onDiagnostic?.('ANCESTOR_PACKAGE_CONFIG_DENIED'); return null
@@ -217,7 +230,7 @@ async function chooseNativeBuilderPermission(detail, workspace, onDiagnostic, pr
     return null
   }
   if (detail.toolName === 'shell' && input.command === LOCKFILE_PREPARE_COMMAND) {
-    const mode = await lockfilePrepareReady(canonicalWorkspace, Boolean(projectCommand))
+    const mode = await lockfilePrepareReady(canonicalWorkspace, Boolean(projectCommand), onDiagnostic)
     onDiagnostic?.(mode === 'INITIAL' ? 'LOCKFILE_PREPARE_ALLOWED' :
       mode === 'REFRESH' ? 'LOCKFILE_REFRESH_ALLOWED' : 'LOCKFILE_PREPARE_DENIED')
     return mode ? option.optionId : null

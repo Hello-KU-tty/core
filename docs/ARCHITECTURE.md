@@ -31,7 +31,7 @@ T02에서 active LTS와 macOS/Windows 호환성을 검토해 세부 도구를 �
 | 영역 | 선택 | 비고 |
 |---|---|---|
 | 개발 Runtime | Node.js 24.19.0 LTS | source build의 `.node-version`과 engine preflight로 고정; 제품 runtime 범위는 T19-W에서 별도 검증 |
-| Workspace | pnpm 11.12.0 workspace | apps/packages 분리와 단일 lockfile |
+| Workspace | pnpm 11.13.1 workspace | apps/packages 분리와 단일 lockfile |
 | Language | TypeScript 7.0.2 strict ESM | project reference와 package public export 사용 |
 | Unit/integration test | Vitest 4.1.11 | TypeScript domain과 adapter test |
 | Browser test | Playwright 1.62.1 | Crew App 핵심 flow와 접근성 smoke |
@@ -639,7 +639,7 @@ Crew App의 `permissions.api`는 T01에서 host SDK의 client-side path guard로
 ### 10.1 계획
 
 - Node.js 24.19.0 LTS
-- pnpm 11.12.0 workspace
+- pnpm 11.13.1 workspace
 - local Kiro/Crew account/session
 - SQLite local file
 - TypeScript project fixture
@@ -686,6 +686,7 @@ T18 package는 app manifest, phase별 Discovery Agent, Builder·Helper, hidden n
 - backend/bridge의 runtime descriptor는 executable, 고정된 bootstrap args/env, version, architecture, capability 결과와 소유권을 함께 표현한다. Kiro host runtime → 기존 호환 Node → 확장 관리 Node 순서로 검증·선택한다. 사용자 입력을 범용 shell command로 받지 않는다. Electron `runAsNode`가 지원되지 않으면 설정/fuse를 수정하지 않고 다음 후보로 이동한다.
 - Kiro runtime으로 별도 Core를 띄우려면 Node API/Node-API와 SQLite load·transaction을 확인한다. `better-sqlite3` 13.0.3은 Node-API 10을 요청하므로 단순 `Node >=22` 판정으로 대체하지 않는다. Kiro native Agent의 version/source/mode/권한 gate는 별개로 유지한다.
 - native worker는 extension host에, deterministic Core/SQLite는 별도 local process에 둔다. stdio MCP bridge에도 검증된 runtime descriptor를 전달한다. HTTP MCP로 바꾸면 그 transport의 실제 role binding을 별도로 검증하며 stdio와 동등하다고 가정하지 않는다.
+- native endpoint 선택은 canonical workspace와 현재 확장 창 ID를 함께 사용한다. host-owned `ExtensionContext.logUri`의 검증된 `window<id>/exthost/<extension-id>` 구조만 ID source로 사용하며, 알려진 현재 창이 아직 registry에 없으면 bounded 대기 후 실패한다. ID를 얻을 수 없는 layout은 기존 workspace 유일성 검사를 유지한다. 폴더 전환 전에 이미 같은 생성 폴더를 연 유효한 endpoint가 있으면 현재 창을 보존하고 기존 창 worker의 처리를 기다린다. registry 조회/선택만으로 Agent 요청을 시작하거나 Trust를 변경하지 않는다. B6 검증·Windows 후속은 [9월 29일 답변](FRONTEND_LIVE_TEST_RESPONSE_20260929.md)을 따른다.
 - 생성 앱 실행은 W4의 별도 project runtime descriptor를 사용한다. `ResultRuntimeSupervisor`는 선택된 일반 Node와 제한 환경으로 실행한다. Kiro executable이나 `ELECTRON_RUN_AS_NODE`를 일반 Node로 전달하지 않는다. native Agent shell은 Core 발급 `.kiro/vibe-tools.cmd`와 packaged runner로 같은 Node/pnpm을 사용하며 worker의 protected file 검증·기존 명령 guard·one-time permission을 통과해야 한다. 기존/미설치 두 도구 환경의 native shell과 deterministic 실행은 검증됐으며 관측 복구와 남은 경계는 [W4 결과](spikes/T19_W4_TOOLCHAIN_RESULTS_20260924.md)를 따른다.
 - VSIX는 UI/host/SDK, Core JS와 필요한 runtime JS dependencies, worker/bridge/guard, canonical prompts, migration SQL·journal, 해당 OS/architecture SQLite binary, manifest·checksum·license를 포함한다. source checkout, devDependencies, 다른 플랫폼 binary, DB/token은 제외한다. 새 packaging 도구 선택은 spike/결정 기록을 거친다.
 - extension package는 읽기 전용 asset root로 취급하고 mutable data는 host가 제공한 사용자별 storage 위치 아래의 전용 root로 분리한다. portable runtime/cache, private connection, DB/backup과 generated workspaces를 구분하며 Windows ACL·경로/junction을 검증한다.

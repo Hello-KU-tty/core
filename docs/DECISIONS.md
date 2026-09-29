@@ -1,5 +1,23 @@
 # 결정 기록
 
+## 2026-09-29: B7~B11 보완과 broken pnpm pin 교체
+
+- **승인:** 사용자 B7~B11 검토 후 구현·검증·커밋·답변 문서·push 진행 승인. 기존 pnpm 11.12.0 exact pin의 변경을 포함한다.
+- **도구 결정:** pnpm 공식 `installPnpm.ts`는 11.12.0/11.13.0을 binary 누락 broken release로 차단하며 npm metadata는 11.13.1 이상을 안내한다. 최소 수정인 **11.13.1**을 선택해 개발 pin과 생성 앱용 검증 archive를 동기화한다. Node 24.19.0, frozen install, lifecycle allowlist와 preflight는 유지한다. 기존 도구·전역 PATH는 덮어쓰지 않고 별도 private 설치로 검증한다. archive의 SHA-512를 npm metadata에 고정하고 증가한 36.5MB unpacked 크기에 맞춰 압축 해제 상한만 48MiB로 조정한다. 과거 11.12.0 실측 기록은 재작성하지 않는다.
+- **근거:** https://github.com/pnpm/pnpm/blob/main/pnpm11/engine/pm/commands/src/self-updater/installPnpm.ts 및 https://registry.npmjs.org/pnpm/11.13.1 (2026-09-29 확인). 이는 Windows 신규 kit 실행 PASS를 뜻하지 않는다.
+- **archive 후속 검증:** 공식 11.13.1 archive의 GNU 긴 파일명(type L)을 기존 파서가 거절함을 재현했다. SHA-512 일치 후 최대513 bytes·단일 NUL 종료·다음 정규 파일 header와 prefix 일치 조건으로만 지원한다. symlink/hardlink/PAX·경로 이탈은 계속 거절한다. 실제891 files acquisition·offline cache 재사용·변조 archive 거절·무스크립트 lock 생성 PASS.
+- **런타임 경계:** B7에는 내용 없는 고정 단계 진단을 더하고 새 명시적 요청의 session 재생성을 검증한다. Kiro 내부 MCP 시작 원인은 미확정이며 catalog gate 연장·우회, 자동 유료 모델 재시도, 사용자 창 종료·shared PID kill을 하지 않는다. B8은 정확한 실패 이유와 입력 형식을 알리되 shell 허용 범위를 늘리지 않는다. B9의 표시용 fallback은 권한 판단과 분리하고 파일 없음도 실패 사실을 유지한다.
+- **언어:** B11은 canonical Builder prompt와 version/fixture를 갱신한다. 사용자에게 보이는 서술에만 사용자 언어·한국어 기본·내부 규칙 인용 방지를 적용하고 tool ID, 명령, 코드, 진단 원문을 번역하거나 숨기지 않는다. 기계적 fixture와 실제 모델 품질 검증을 명확히 구분한다.
+
+## 2026-09-29: B6의 native endpoint를 현재 확장 창에 바인딩
+
+- **승인:** 사용자가 프론트 B6 검토 후 보완과 commit을 요청했다. 기존 T19의 host 라우팅 결함 수정이며 push·Windows 설치물 배포는 포함하지 않는다.
+- **근거:** `uniqueWorkspaceEndpoint`는 같은 canonical 폴더가 두 개면 연결 전에 거절한다. 설치된 Kiro 1.0.437의 workbench는 `windowLogsPath`를 `window${windowId}`, extension host 경로를 그 아래 `exthost`로 만들며 `ExtensionContext.logUri`는 여기에 확장 ID를 붙인다. Agent registry는 같은 native `windowId`로 endpoint를 등록한다. 현재 창 identity는 이 host-owned context에서만 얻고 환경변수·Agent payload·전역 활성 창을 신뢰하지 않는다.
+- **결정:** 인식 가능한 local `logUri`에서 현재 창 ID를 구하고, canonical workspace와 ID가 모두 맞는 endpoint 하나만 선택한다. 현재 창 ID가 없으면 종전의 유일한 workspace endpoint만 허용한다. ID가 있는데 다른 창만 있으면 그 창으로 fallback하지 않으며 현재 창 등록을 bounded 대기한다. 모순/중복 endpoint·잘못된 port/token은 계속 거절한다. 이 선택을 일반 role, protected Helper/Analyst와 barrier에 함께 적용한다.
+- **전환/복구:** 대상 생성 폴더의 유효한 endpoint가 이미 있으면 현재 창을 같은 폴더로 재전환하지 않고 기존 창 worker에 처리를 맡긴다. 대상 창에 worker가 없거나 Trust가 필요한 경우 사용자에게 기존 창 확인과 명시적 재시도를 안내하며 창 강제 종료·자동 유료 retry·Trust 변경을 하지 않는다. `NATIVE_ENDPOINT_AMBIGUOUS`의 run 오류 전달은 유지한다. transient run의 재시작 후 소실은 B3의 별도 저장 계약이다.
+- **검증 경계:** 합성 Windows/POSIX context, 같은 폴더의 두 창/foreign 경로/누락/중복/등록 지연, worker 라우팅과 terminal 오류 전파를 모델 없이 재현한다. 기존 private source/permission gate·prompt·Core protocol·DB는 변경하지 않는다. Windows 1.1.70의 실제 context/두 창과 새 kit/VSIX는 해당 환경에서 추가 검증한다.
+- **결과:** unit156/integration365/eval41/Campus3/smoke6, 확장CJS167, panel build와 새 bundle activation PASS. E2E는 기존 사용자 서버/브라우저 sandbox 제약을 분리한 실행에서12개 PASS. 초기 환경 실패와 Windows 미실측은 [B6 답변](FRONTEND_LIVE_TEST_RESPONSE_20260929.md)에 보존했다.
+
 ## 2026-09-28: 실제 프론트와 함께 제출 준비 재개
 
 - **T20 소스 재현/개인 경로:** 제출 후보는 두 저장소의 현재 파일을 명시적으로 선택한 private 복사본으로 검증하며, Git metadata·DB·캐시·개인 설정·미검토 실험·Windows 설치물을 포함하지 않는다. 기존 Mac 실험 코드의 개인 계정 절대 경로는 OS 홈 경로와 같은 고정 하위 폴더로 계산한다. 이는 새 폴더 Trust/일반 Mac 설치 승인이나 legacy 실험 범위 확장이 아니다. packaged 경로와 기존 소유자·canonical path·권한 검사를 유지하고 비-Mac legacy persistent receipt는 닫는다. Node 기본 fs/crypto와 OS archive를 사용하며 새 의존성·lifecycle 허용은 없다. 후보 SHA/재현 성공은 사람 pilot·모델 의미 품질·공식 제출 형식 또는 공개 승인을 대신하지 않는다.

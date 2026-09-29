@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -2559,6 +2560,25 @@ describe('T10 Builder Task and Live Context application flow', () => {
         context: completedContext,
       }),
     ).toMatchObject({ success: true, data: { resourceRevision: 3 } })
+    for (const validationResults of [
+      [],
+      [{ name: 'build', status: 'NOT_RUN', summary: 'Blocked by the native permission guard' }],
+    ]) {
+      expect(
+        await service.executeAgent('BUILDER', {
+          schemaVersion: 1,
+          kind: 'BUILDER_COMPLETE_TASK',
+          correlationId: ids.correlation,
+          actor: { kind: 'AGENT', role: 'BUILDER' },
+          idempotencyKey: `idem_${randomUUID()}`,
+          report: { ...report, validationResults },
+        }),
+      ).toMatchObject({ success: false, error: { code: 'TASK_VALIDATION_NOT_RUN' } })
+      expect(storage.repository.readBuilderTaskAggregate(ids.project, ids.task)).toMatchObject({
+        task: { status: 'ACTIVE' },
+        completionReport: null,
+      })
+    }
     expect(
       await service.executeAgent('BUILDER', {
         schemaVersion: 1,

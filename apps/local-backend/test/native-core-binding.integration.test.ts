@@ -208,14 +208,33 @@ describe('experimental native Core binding', () => {
         { mode: 0o600 },
       )
       const stdio = new Client({ name: 'native-stdio-error-test', version: '0.1.0' })
+      const stdioTransport = new StdioClientTransport({
+        command: process.execPath,
+        args: [resolve('scripts/native-core-stdio-bridge.mjs'), descriptorFile, workspace],
+        stderr: 'pipe',
+      })
+      let bridgeDiagnostic = ''
+      stdioTransport.stderr?.on('data', (chunk: Buffer) => {
+        bridgeDiagnostic += chunk.toString()
+      })
       try {
-        await stdio.connect(
-          new StdioClientTransport({
-            command: process.execPath,
-            args: [resolve('scripts/native-core-stdio-bridge.mjs'), descriptorFile, workspace],
-            stderr: 'pipe',
-          }),
-        )
+        await stdio.connect(stdioTransport)
+        expect((await stdio.listTools()).tools.map((tool) => tool.name)).toEqual(binding.toolNames)
+        await expect.poll(() => bridgeDiagnostic).toContain('BRIDGE_STAGE_STDIO_TOOLS_LISTED')
+        for (const stage of [
+          'PROCESS_STARTED',
+          'BINDING_VALIDATED',
+          'CORE_CONNECTING',
+          'CORE_CONNECTED',
+          'CORE_TOOLS_LISTED',
+          'CORE_CATALOG_VERIFIED',
+          'STDIO_READY',
+          'STDIO_INITIALIZED',
+          'STDIO_TOOLS_LISTED',
+        ])
+          expect(bridgeDiagnostic).toContain(`BRIDGE_STAGE_${stage}\n`)
+        expect(bridgeDiagnostic).not.toContain(binding.authorization)
+        expect(bridgeDiagnostic).not.toContain(workspace)
         const invalid = await stdio.callTool({
           name: 'complete_task',
           arguments: {
@@ -233,6 +252,7 @@ describe('experimental native Core binding', () => {
         const after = await stdio.callTool({ name: 'get_builder_task', arguments: args })
         expect(after.isError).not.toBe(true)
         expect(after.structuredContent).toEqual(read.structuredContent)
+        expect(bridgeDiagnostic).not.toContain('private-fixture-value')
         await writeFile(descriptorFile, JSON.stringify({ status: 'REVOKED' }), { mode: 0o600 })
         await expect(stdio.callTool({ name: 'get_builder_task', arguments: args })).rejects.toThrow(
           'BRIDGE_BINDING_REVOKED',

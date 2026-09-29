@@ -9,8 +9,10 @@ const { runInNewContext } = require('node:vm')
 
 for (const code of ['NATIVE_QUOTA_EXCEEDED', 'NATIVE_AUTH_REQUIRED',
   'NATIVE_MODEL_UNAVAILABLE', 'NATIVE_ACCESS_DENIED', 'NATIVE_RATE_LIMITED',
-  'NATIVE_SERVICE_UNAVAILABLE', 'NATIVE_RPC_REJECTED']) {
+  'NATIVE_SERVICE_UNAVAILABLE', 'NATIVE_RPC_REJECTED', 'NATIVE_ENDPOINT_AMBIGUOUS',
+  'NATIVE_ENDPOINT_MISSING']) {
   test(`worker forwards ${code} once without provider details or automatic retry`, async () => {
+    const openingFailure = code.startsWith('NATIVE_ENDPOINT_')
     const root = await realpath(await mkdtemp(join(tmpdir(), 'vibe-worker-failure-')))
     const workspace = join(root, 'workspaces', 'projects', 'project_synthetic')
     await mkdir(workspace, { recursive: true })
@@ -35,8 +37,10 @@ for (const code of ['NATIVE_QUOTA_EXCEEDED', 'NATIVE_AUTH_REQUIRED',
         if (name === './native-permission.cjs') return { chooseNativeBuilderPermission() {
           throw new Error('FAILURE_TEST_MUST_NOT_EXECUTE_TOOLS')
         } }
-        if (name.endsWith('/native-client.cjs')) return { openNativeRole: async () => {
+        if (name.endsWith('/native-client.cjs')) return { openNativeRole: async (_vscode, options) => {
           opens++
+          assert.equal(options.expectedWindowId, 7)
+          if (openingFailure) throw Object.assign(new Error(sensitive), { code })
           return { windowId: 7, close() { closes++ }, prompt: async () => {
             prompts++
             throw Object.assign(new Error(sensitive), { code })
@@ -58,7 +62,10 @@ for (const code of ['NATIVE_QUOTA_EXCEEDED', 'NATIVE_AUTH_REQUIRED',
         return { ok: true, json: async () => value }
       },
     }, { filename: sourcePath })
-    const worker = module.exports.startNativeWorker({ subscriptions: [] }, join(root, 'connection.json'), {
+    const worker = module.exports.startNativeWorker({ subscriptions: [],
+      extension: { id: 'vibe-helper.synthetic-panel' },
+      logUri: { scheme: 'file', path: '/logs/window7/exthost/vibe-helper.synthetic-panel' },
+    }, join(root, 'connection.json'), {
       source: 'SYNTHETIC', nodePath: process.execPath, bridgeScriptPath: 'synthetic',
     })
     worker.subscribeStatus(status => statuses.push(status))
@@ -69,17 +76,20 @@ for (const code of ['NATIVE_QUOTA_EXCEEDED', 'NATIVE_AUTH_REQUIRED',
       assert.ok(await predicate(), 'Synthetic worker failure did not settle')
     }
     try {
-      await until(() => closes === 1)
+      await until(() => statuses.includes(`AGENT_FAILED_${code}`) &&
+        (openingFailure || closes === 1))
       assert.deepEqual(completions, [{ errorCode: code }])
       assert.ok(statuses.includes(`AGENT_FAILED_${code}`))
-      assert.equal(worker.getStatus(), 'AGENT_SESSION_CLOSED_DISCOVERY')
-      assert.ok(statuses.indexOf(`AGENT_FAILED_${code}`) < statuses.indexOf('AGENT_SESSION_CLOSED_DISCOVERY'))
+      assert.equal(worker.getStatus(), openingFailure ? `AGENT_FAILED_${code}` : 'AGENT_SESSION_CLOSED_DISCOVERY')
+      if (!openingFailure)
+        assert.ok(statuses.indexOf(`AGENT_FAILED_${code}`) < statuses.indexOf('AGENT_SESSION_CLOSED_DISCOVERY'))
       for (let count = 0; count < 3; count++) {
         const previousClaims = claims
         intervals[0]()
         await until(() => claims > previousClaims)
       }
-      assert.deepEqual({ opens, prompts, closes }, { opens: 1, prompts: 1, closes: 1 })
+      assert.deepEqual({ opens, prompts, closes },
+        { opens: 1, prompts: openingFailure ? 0 : 1, closes: openingFailure ? 0 : 1 })
       let log = ''
       await until(async () => {
         log = await readFile(join(root, 'native-worker-status.jsonl'), 'utf8').catch(() => '')
