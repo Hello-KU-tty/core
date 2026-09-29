@@ -770,6 +770,13 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 
 ### [~] T19. 자체 Kiro IDE 패널과 프론트 실제 연동
 
+#### [x] T19-F13. 새 Discovery 라운드의 저장된 후보 상세 표시 복구
+
+- **근거:** 사용자 실측에서 MERGE는 SUCCEEDED, 새 후보 상세도 Core에 저장되어 있지만 화면은 후보 ID/로딩 안내에 머문다. feedback 성공 콜백이 round 참조만 반영하고 candidate 상세를 갱신하지 않는다.
+- **범위:** 피드백 성공 뒤 이미 저장된 라운드/상세를 모델 재실행 없이 화면에 반영한다. 입력·바구니·현재 Project와 늦은 응답 경계를 유지한다. 실제 사용자 데이터·prompt·Core 저장 계약은 변경하지 않는다.
+- **완료 조건:** 합치기/새 방향 등 후속 라운드의 상세 표시와 실패/화면 전환 회귀, frontend 전체 검사, 실제 Core 소비 검증, 새 VSIX로 기존 저장 후보 복원 확인. 모델 재호출로 우회하지 않는다.
+- **검증:**0.0.11 설치·기존 후보 복원, frontend758/typecheck/build, 실제 Core HTTP/SSE/SQLite→renderer의 MERGE/REGENERATE 표시와 추가 enrichment0 PASS. 재시작 전후 저장hash 동일·새 모델run0. [원인·수정·설치 파일](FRONTEND_FEEDBACK_DISPLAY_FIX_20260929.md).
+
 #### [-] T19-F12. 실측 예정 인계·승인된 commit/push와 직접 사용 환경 준비
 
 - **승인:** 2026-09-29 사용자가 이쪽에서 프론트 실측 예정 문구 추가, commit/push, 제출 후보 확장 제작·Kiro 실행·설치·Workspace Trust와 직접 사용 준비를 요청했다. push는 `hurdoo` 계정으로 기존 `Hello-KU-tty/core`, `Hello-KU-tty/program`에 수행한다.

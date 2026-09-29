@@ -54,6 +54,7 @@ for (const [entry, name] of [
 const { LocalCoreDiscoveryPort } = require(join(root, 'port.cjs'))
 const {
   candidateFixture,
+  candidateRoundFixture,
   draftLearningSpecFixture,
   canonicalConceptFixture,
   conceptLedgerFixture,
@@ -177,6 +178,46 @@ const runtime = new WorkflowRuntime({
                 generationTags: p.generationTags,
               },
             })),
+        }
+      } else if (request.mode === 'MERGE' || request.mode === 'ROUND') {
+        const context = snapshot.discoveryContext
+        const previous = context.rounds.at(-1)
+        const feedback = context.feedback.filter(
+          (f) => f.roundId === previous.id && f.intent !== 'SELECT',
+        )
+        const merge = feedback.find((f) => f.intent === 'MERGE')
+        assert.ok(merge || feedback.some((f) => f.intent === 'REGENERATE'))
+        const primary =
+          merge &&
+          context.candidates.find(
+            (c) =>
+              c.id === merge.targets[0].candidateId && c.revision === merge.targets[0].revision,
+          )
+        const candidate = {
+          ...(primary || candidateFixture),
+          ...metadata(),
+          id: primary?.id ?? entityId('candidate'),
+          revision: primary ? primary.revision + 1 : 1,
+          parentRevisions: merge?.targets ?? [],
+          discoverySessionId: session.id,
+          correlationId: session.correlationId,
+          title: merge ? 'Merged synthetic candidate' : 'Regenerated synthetic candidate',
+        }
+        command = {
+          ...base,
+          kind: 'DISCOVERY_SUBMIT_CANDIDATE_ROUND',
+          round: {
+            ...candidateRoundFixture,
+            ...metadata(),
+            id: entityId('candidate_round'),
+            discoverySessionId: session.id,
+            correlationId: session.correlationId,
+            roundIndex: previous.roundIndex + 1,
+            inputSnapshot: session.input,
+            appliedFeedbackIds: feedback.map((f) => f.id),
+            candidates: [{ candidateId: candidate.id, revision: candidate.revision }],
+          },
+          candidates: [candidate],
         }
       } else if (request.mode === 'SPEC') {
         const previous = snapshot.learningSpec
@@ -858,11 +899,85 @@ try {
     'terminal completion must automatically reach the actual webview bridge',
   )
   afterWindow.messageSubscription.dispose()
+  // Exercise fresh ROUND/MERGE completion without a History reload. The real
+  // port must carry the saved details through the controller and webview bridge.
+  const feedbackPort = new LocalCoreDiscoveryPort(client)
+  const feedbackController = new FlowController(
+    {
+      discovery: feedbackPort,
+      spec: feedbackPort,
+      restore: feedbackPort,
+    },
+    {
+      ids: {
+        id: entityId,
+        correlationId: () => entityId('corr'),
+        idempotencyKey: () => entityId('idem'),
+      },
+    },
+  )
+  await feedbackController.startDiscovery({ learningGoal: 'Synthetic feedback display regression' })
+  const feedbackTargets = feedbackController
+    .snapshot()
+    .previewRound.previews.slice(0, 2)
+    .map((p) => ({ candidateId: p.candidateId, revision: 1 }))
+  feedbackTargets.forEach((target) => feedbackController.toggleBasket(target))
+  const feedbackInput = feedbackController.snapshot().input
+  const feedbackBasket = feedbackController.snapshot().basket
+  const feedbackRoot = dom.createElement('div')
+  const feedbackWebview = new WebviewClient({ postMessage: () => {} })
+  bootstrap(feedbackRoot, feedbackWebview)
+  for (const intent of ['MERGE', 'REGENERATE']) {
+    const beforeFeedback = { ...counts }
+    await feedbackController.submitFeedback({
+      intent,
+      targets: intent === 'MERGE' ? feedbackTargets : [],
+    })
+    const snapshot = feedbackController.snapshot()
+    assert.notEqual(
+      snapshot.notice?.kind,
+      'error',
+      JSON.stringify({ notice: snapshot.notice, runs: await client.listRuns(snapshot.project.id) }),
+    )
+    const latest = snapshot.rounds.at(-1)
+    assert.ok(latest)
+    const expectedTitle =
+      intent === 'MERGE' ? 'Merged synthetic candidate' : 'Regenerated synthetic candidate'
+    feedbackWebview.dispatch({ type: 'hydrateFlow', snapshot })
+    const titles = feedbackRoot
+      .queryAll((e) => e.className === 'flow-candidate-title')
+      .map((e) => e.textContent)
+    assert.equal(titles.at(-1), expectedTitle)
+    assert.equal(titles[0], 'Direction 1', 'a new revision must not replace its original preview')
+    assert.equal(
+      feedbackRoot
+        .queryAll((e) => e.className === 'flow-candidate-summary')
+        .some((e) => e.textContent === '세부 정보를 불러오는 중이에요.'),
+      false,
+    )
+    assert.deepEqual(snapshot.input, feedbackInput)
+    assert.deepEqual(snapshot.basket, feedbackBasket)
+    assert.deepEqual(
+      counts,
+      {
+        ...beforeFeedback,
+        ...(intent === 'MERGE'
+          ? { ENRICH_SELECTED: (beforeFeedback.ENRICH_SELECTED ?? 0) + 1 }
+          : {}),
+        [intent === 'MERGE' ? 'MERGE' : 'ROUND']:
+          (beforeFeedback[intent === 'MERGE' ? 'MERGE' : 'ROUND'] ?? 0) + 1,
+      },
+      'rendering saved details must not call another enrichment or model',
+    )
+    const persisted = await client.restoreProject(snapshot.project.id)
+    assert.ok(persisted.discoveryContext.candidates.some((c) => c.title === expectedTitle))
+  }
   const report = {
     status: 'PASS',
     boundary: 'actual program controller/port + authenticated HTTP/SSE + SQLite',
     agent: 'DELAYED_DETERMINISTIC_FIXTURE',
     checks: [
+      'fresh MERGE and REGENERATE display durable candidate titles immediately through the actual webview bridge; exact revisions, input/basket preserved, no extra enrichment',
       'two project/session mappings',
       'wait for durable preview/JIT/spec',
       'one SPEC run after SELECT',
