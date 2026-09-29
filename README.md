@@ -1,10 +1,10 @@
-# Vibe Helper
+# Hello Vibe
 
 **만들면서, 이해의 근거를 남기는 Kiro 기반 바이브코딩 개발 환경**
 
 고려대학교 × AWS AI Innovators Challenge 예선 제출 · 팀 Hello-KU-tty
 
-Vibe Helper는 코딩 초보자가 배우고 싶은 기술 하나로 시작해 자기에게 필요한 TypeScript 서비스를 실제로 완성하도록 돕는 Kiro IDE 확장이다. 개발 중 필요한 순간에 Helper와 대화하고, 실제로 내린 판단을 근거로 쌓아 다음 설명과 프로젝트 추천까지 개인화한다.
+Hello Vibe는 코딩 초보자가 배우고 싶은 기술 하나로 시작해 자기에게 필요한 TypeScript 서비스를 실제로 완성하도록 돕는 Kiro IDE 확장이다. 개발 중 필요한 순간에 Helper와 대화하고, 실제로 내린 판단을 근거로 쌓아 다음 설명과 프로젝트 추천까지 개인화한다.
 
 | 저장소 | 역할 |
 | --- | --- |
@@ -13,7 +13,7 @@ Vibe Helper는 코딩 초보자가 배우고 싶은 기술 하나로 시작해 �
 
 ## 시연 영상
 
-[▶ 15초 소개 영상 (MP4)](docs/assets/vibe-helper-ad-15s.mp4) · [▶ 시연 영상 보기 (MP4, 약 3분)](docs/assets/vibe-helper-demo.mp4)
+[▶ 15초 소개 영상 (MP4)](docs/assets/hello-vibe-ad-15s.mp4) · [▶ 시연 영상 보기 (MP4, 약 3분)](docs/assets/vibe-helper-demo.mp4)
 
 Kiro IDE에서 학습 목표를 입력해 프로젝트 후보를 만나고, 후보를 골라 Learning Spec을 확인한 뒤 Builder가 실제 개발을 시작하는 흐름이다. 대기 구간은 줄였고 Builder 구간은 2배속이다.
 
@@ -62,7 +62,7 @@ Concept State는 `OBSERVED → EXPLAINED → DEMONSTRATED → TRANSFERRED` 순�
 
 ```text
 Kiro IDE
- └─ Vibe Helper 확장 (Hello-KU-tty/program)
+ └─ Hello Vibe 확장 (Hello-KU-tty/program)
      ├─ Webview 패널: Discovery · Spec · Builder · Helper · History
      ├─ Kiro native Agent 실행 (Discovery / Builder / Helper / Analyst)
      └─ local Core 자동 기동·연결·복구
