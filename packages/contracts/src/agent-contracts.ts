@@ -392,6 +392,7 @@ export const builderTaskContextSchema = z.strictObject({
   project: projectSchema,
   learningSpec: learningSpecRevisionSchema,
   task: builderTaskSchema,
+  previousCompletionReport: taskCompletionReportSchema.optional(),
   liveContext: liveProjectContextSchema.nullable(),
   decisionRequests: z.array(decisionRequestSchema).max(50),
   decisionResolutions: z.array(decisionResolutionSchema).max(50),

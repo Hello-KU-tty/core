@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "kitVersion": "2026.09.29.4",
+  "previousKitVersion": "2026.09.29.3",
+  "scope": "Current Windows machine: source, packaged runtime and deterministic frontend/Core consumer. No installed native model-run or other-PC claim.",
+  "environment": {
+    "os": "Windows x64",
+    "shell": "PowerShell",
+    "node": "24.19.0",
+    "pnpm": "11.13.1",
+    "e2eBrowser": "Playwright Chromium using installed Microsoft Edge",
+    "modelCalls": 0
+  },
+  "backendChangesIncluded": [
+    "Uncommitted T19-F17: validate and reuse recorded project Node/pnpm before consulting the current launch PATH",
+    "Reprobe recorded runtimes, verify managed caches and refuse missing or altered tools with explicit error codes",
+    "Keep existing project launcher, descriptor, shared shim and product upgrade guards"
+  ],
+  "baseline": {
+    "source": "program/.vibe-helper-kit.json (2026.09.29.3) applied receipt",
+    "managedFiles": 118
+  },
+  "pnpmCheck": {
+    "result": "PASS",
+    "unit": { "passed": 179, "skipped": 1 },
+    "integration": { "passed": 402, "skipped": 1 },
+    "eval": { "passed": 42 },
+    "campusDrop": { "passed": 3 },
+    "smoke": { "passed": 6 },
+    "e2e": { "passed": 12 },
+    "nativeCjs": { "passed": 169 }
+  },
+  "targetedProjectToolTests": { "files": 3, "passed": 28 },
+  "packagedProjectTools": {
+    "result": "PASS",
+    "provenance": "SYNTHETIC_FIXTURE",
+    "cases": ["EXISTING_NODE + EXISTING_PNPM", "MANAGED_NODE + MANAGED_PNPM"],
+    "restartWithoutDeveloperPath": "PASS for both cases, fresh offline process",
+    "commands": "PASS: frozen install, build, test, smoke and supervised HTTP app with selected Node/pnpm",
+    "failures": "PASS: offline, hash mismatch, network unavailable, cancellation, launcher mutation and descriptor hardlink"
+  },
+  "frontendSourceCandidate": {
+    "revision": "e1cffdd plus uncommitted T19-F17 changes",
+    "version": "0.0.17",
+    "changes": [
+      "Remove the duplicate clipped Helper response summary; retain live full answer, user question, status and internal Evidence records",
+      "Show actionable guidance for recorded tool validation failures"
+    ],
+    "typecheck": "PASS",
+    "tests": { "files": 57, "passed": 800 },
+    "build": "PASS",
+    "actualConsumer": "PASS: actual provider/controller + authenticated HTTP/SSE + SQLite; delayed deterministic Agent fixture"
+  },
+  "notVerified": [
+    "Installed 0.0.17 Kiro Builder/Helper native model runs",
+    "A separate Windows PC or any unsupported Kiro/Agent version",
+    "Full vertical product completion, human pilot or general absence of Builder failures"
+  ]
+}

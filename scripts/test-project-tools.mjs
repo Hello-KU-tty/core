@@ -32,12 +32,41 @@ try {
     await writeToolchainFixture(workspace)
     await api.prepareProjectTools(workspace, tc, resources)
     const initial = await api.verifyProjectTools(workspace, resources)
+    // A normal desktop launch need not inherit the shell that first selected
+    // Node/pnpm. Verify reuse in a fresh process with no developer PATH.
+    const restarted = await run(
+      process.execPath,
+      [
+        '-e',
+        `const api=require(process.argv[1]);
+        (async()=>{const resources=await api.loadCoreResources(process.argv[2]);
+        const tools=await api.selectProjectToolchain({resources,privateRoot:process.argv[3],offline:true});
+        await api.prepareProjectTools(process.argv[4],tools,resources);
+        console.log(JSON.stringify((await api.verifyProjectTools(process.argv[4],resources)).toolchain));
+        })().catch(e=>{console.error(e.message);process.exitCode=1})`,
+        resolve('dist/portable-core-win32-x64/bin/runtime.cjs'),
+        resources.root,
+        tools,
+        workspace,
+      ],
+      {
+        env: {
+          ...api.projectEnvironment(tc),
+          PATH: join(process.env.SystemRoot, 'System32'),
+        },
+        windowsHide: true,
+        timeout: 120000,
+        maxBuffer: 32768,
+      },
+    )
+    assert.deepEqual(JSON.parse(restarted.stdout), tc)
     const cell = {
       mode,
       node: tc.node.nodeVersion,
       nodeSource: tc.node.source,
       pnpm: tc.pnpm.version,
       pnpmSource: tc.pnpm.source,
+      restartWithoutDeveloperPath: true,
       commands: [],
       http: false,
     }

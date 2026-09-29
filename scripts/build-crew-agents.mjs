@@ -30,8 +30,8 @@ if (version !== expectedVersion) {
     `Discovery prompt version mismatch: expected ${expectedVersion}, received ${version ?? 'none'}`,
   )
 }
-if (builderPrompt.match(/^> Prompt version: `([^`]+)`$/m)?.[1] !== '1.3.11') {
-  throw new TypeError('Builder prompt version mismatch: expected 1.3.11')
+if (builderPrompt.match(/^> Prompt version: `([^`]+)`$/m)?.[1] !== '1.3.12') {
+  throw new TypeError('Builder prompt version mismatch: expected 1.3.12')
 }
 if (helperPrompt.match(/^> Prompt version: `([^`]+)`$/m)?.[1] !== '1.2.0') {
   throw new TypeError('Helper prompt version mismatch: expected 1.2.0')

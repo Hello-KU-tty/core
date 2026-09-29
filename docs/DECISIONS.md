@@ -1,5 +1,20 @@
 # 결정 기록
 
+## 2026-09-30: 완료 뒤 지속적인 Builder·Helper 사용과 도구 거부 표시
+
+- **승인:** 사용자가 완료 뒤 입력 차단 제거, 권한 오류 수정, 새 버전 VSIX 생성·Kiro 종료/재시작 적용·기존 저장소 push를 요청했다. 기존 `@HURDOO`/`Hello-KU-tty` 게시 승인을 유지한다.
+- **원인:** frontend가 `TASK_COMPLETED`를 composer disable 조건으로 쓰고 runtime도 완료 Task의 새 Builder run을 거절했다. 일반 후속 요청을 Evidence-aware Final Upgrade에만 맡긴 것은 지속적인 바이브코딩 요구와 맞지 않는다.
+- **변경:** 명시적 후속 메시지에만 같은 workspace의 다음 Task를 만든다. 원본 완료 기록·실패 기록·사용자 Evidence를 보존하고 일반 후속 작업에 학습/Evidence 평가를 요구하지 않는다. 완료 뒤에도 두 입력창과 일반 보내기 동작을 유지한다.
+- **권한:** 실제 화면과 내용 없는 진단 코드에서 개별 shell/지원 외 도구 거부 뒤 정상 완료를 확인했다. 거부 이력이 현재 권한 상실처럼 남는 표시를 수정하고 요청별 제한을 도구 기록에 드러낸다. 경로·명령 guard를 해제하지 않는다.
+- **검증:** 반복 후속 요청, 동시/중복·stale·다른 프로젝트·재시작, 기존 Completion Report 보존과 Helper 재사용을 실제 Core 소비까지 검증한다. 새 설치물의 native 관찰과 합성 fixture를 구분하고 현재 작업·일반 profile 데이터를 보존한다.
+
+## 2026-09-29: 기록된 생성 앱 도구 재사용과 중복 Helper 요약 표시 제거
+
+- **승인/원인:** 사용자가 배포본의 재발 방지와 Helper 요약 개선 또는 제거를 요청했다. Kiro 실행 환경이 달라져 PATH의 기존 Node 대신 관리 Node를 선택하면서 저장된 실행기와 충돌했다. 로컬 PATH 복구만으로 배포본을 수정했다고 판단하지 않는다.
+- **도구 선택:** private project descriptor, 생성 workspace의 정확한 launcher와 공유 pnpm shim으로 이전 선택을 확인하고, 같은 제품의 동일/상위 설치에서 기록된 Node와 현재 pin의 pnpm을 다시 검사해 우선 재사용한다. 새로운 PATH 후보가 이전 선택을 바꾸지 않는다. 기존 pnpm pin 업그레이드 규칙은 유지한다. 변조·누락·버전 변경·다른 제품·downgrade는 실패를 표시하며 임의 도구나 모델 요청으로 우회하지 않는다.
+- **Helper 표시:** 응답 일부를 다시 붙인 `도우미 답변 요약` 영역을 제거한다. 실제 답변 stream, 사용자 질문과 대화 상태는 유지한다. 내부 Helper 기록·Evidence provenance·저장 계약 및 Agent prompt는 변경하지 않는다.
+- **검증:** 새 PC에서의 무결함을 주장하지 않는다. 변경된 실행 환경과 packaged Node/pnpm의 재사용을 모델 없이 재현하고 frontend 회귀와 새 VSIX의 구성·hash를 확인한다. commit/push는 이번 요청에 포함하지 않는다.
+
 ## 2026-09-29: 결정 선택 후 명시적 계속 실행
 
 - **사용자 피드백:** 결정 선택 뒤 바로 다음 작업으로 이어질 것을 기대하지만 기존 프론트는 저장만 하고 별도 Builder 재개를 요구했다.

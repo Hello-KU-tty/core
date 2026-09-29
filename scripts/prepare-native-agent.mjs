@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const PROMPTS = {
   DISCOVERY: ['discovery.md', '1.3.5'],
-  BUILDER: ['builder.md', '1.3.11'],
+  BUILDER: ['builder.md', '1.3.12'],
   HELPER: ['helper.md', '1.2.0'],
 }
 const ROLE_TOOLS = {

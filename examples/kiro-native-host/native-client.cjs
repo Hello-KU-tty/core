@@ -418,6 +418,7 @@ async function connectObserver(vscode, workspace, onPermissionRequest, onPermiss
           let optionId = null
           try { optionId = await onPermissionRequest(safeSummary, {
             sessionId: params.sessionId,
+            toolCallId: typeof call.toolCallId === 'string' ? call.toolCallId : null,
             rawInput: correlated?.rawInput ?? null,
             toolName: correlated?.toolName ?? null,
             nativeToolId,

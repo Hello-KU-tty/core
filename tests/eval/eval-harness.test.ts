@@ -1352,7 +1352,7 @@ describe('T19 runtime and rejected final-check candidates', () => {
       preserveVerbatim: string[]
     }
     expect(fixture).toMatchObject({
-      promptVersion: BUILDER_PROMPT_VERSION,
+      promptVersion: '1.3.11',
       kind: 'MECHANICAL_PROMPT_REGRESSION',
       containsPersonalData: false,
       liveResult: 'NOT_RUN',
@@ -1372,6 +1372,26 @@ describe('T19 runtime and rejected final-check candidates', () => {
       'src/app.ts',
       'NATIVE_FILE_NOT_FOUND',
     ])
+  })
+
+  it('keeps completed projects open for explicit run, explanation and change requests', async () => {
+    const fixture = (await loadInput(
+      'tests/eval/fixtures/prompt-regressions/builder-v1.3.12-continuous-work.json',
+    )) as {
+      requiredRules: string[]
+      reviewCases: { intent: string; personalNeed: boolean }[]
+    }
+    expect(fixture).toMatchObject({
+      promptVersion: BUILDER_PROMPT_VERSION,
+      liveResult: 'NOT_RUN',
+      automatedQualityVerdict: 'NOT_ASSERTED',
+    })
+    const prompt = await readFile(path.join(workspaceRoot, 'docs/agent-prompts/builder.md'), 'utf8')
+    for (const rule of fixture.requiredRules) expect(prompt).toContain(rule)
+    expect(fixture.reviewCases.map((item) => item.intent)).toEqual(['RUN', 'EXPLAIN', 'CHANGE'])
+    expect(new Set(fixture.reviewCases.map((item) => item.personalNeed))).toEqual(
+      new Set([true, false]),
+    )
   })
 
   it('retains the exact rejected final-check prompt without enabling it in production', async () => {

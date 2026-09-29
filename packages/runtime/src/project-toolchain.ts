@@ -330,8 +330,29 @@ export async function selectProjectToolchain(options: {
     },
   )
   const paths = (process.env.PATH ?? process.env.Path ?? '').split(delimiter).filter(isAbsolute)
+  const recorded = await recordedProjectToolchain(root, options.resources)
   let node: CoreRuntimeDescriptor | undefined
-  for (const executable of options.nodeExecutables ?? paths.map((path) => join(path, 'node.exe'))) {
+  if (recorded) {
+    try {
+      if (
+        recorded.node.source === 'MANAGED_NODE' &&
+        (await acquireCoreNode(join(root, 'node-cache'), options.resources, {
+          ...options,
+          offline: true,
+        })) !== recorded.node.executable
+      )
+        fail('PROJECT_RECORDED_NODE_UNAVAILABLE')
+      node = await probeCoreRuntime(recorded.node, options.resources, root, options.signal)
+      if (JSON.stringify(node) !== JSON.stringify(recorded.node))
+        fail('PROJECT_RECORDED_NODE_UNAVAILABLE')
+    } catch {
+      options.signal?.throwIfAborted()
+      fail('PROJECT_RECORDED_NODE_UNAVAILABLE')
+    }
+  }
+  for (const executable of node
+    ? []
+    : (options.nodeExecutables ?? paths.map((path) => join(path, 'node.exe')))) {
     try {
       node = await probeCoreRuntime(
         { executable, source: 'EXISTING_NODE' },
@@ -355,8 +376,27 @@ export async function selectProjectToolchain(options: {
       options.signal,
     )
   let result: ProjectToolchain | undefined
-  for (const path of options.pnpmExecutables ??
-    paths.flatMap((path) => [join(path, 'pnpm.cmd'), join(path, 'pnpm.exe')])) {
+  if (recorded?.pnpm.version === PROJECT_PNPM.version) {
+    result = { ...recorded, node }
+    try {
+      if (
+        recorded.pnpm.source === 'MANAGED_PNPM' &&
+        (await pnpmCache(join(root, 'pnpm-cache', `pnpm-${PROJECT_PNPM.version}`))) !==
+          recorded.pnpm.executable
+      )
+        fail('PROJECT_RECORDED_PNPM_UNAVAILABLE')
+      if ((await realpath(recorded.pnpm.executable)) !== recorded.pnpm.executable)
+        fail('PROJECT_RECORDED_PNPM_UNAVAILABLE')
+      await probePnpm(result)
+    } catch {
+      options.signal?.throwIfAborted()
+      fail('PROJECT_RECORDED_PNPM_UNAVAILABLE')
+    }
+  }
+  for (const path of result
+    ? []
+    : (options.pnpmExecutables ??
+      paths.flatMap((path) => [join(path, 'pnpm.cmd'), join(path, 'pnpm.exe')]))) {
     try {
       const executable = await realpath(path)
       if (!isAbsolute(path) || !(await lstat(executable)).isFile()) continue
@@ -397,6 +437,120 @@ export async function selectProjectToolchain(options: {
   }
   await preparePnpmShim(result, options.resources)
   return Object.freeze(result)
+}
+
+/** Reuse an intact Core-owned record before consulting a new process's PATH. */
+async function recordedProjectToolchain(
+  root: string,
+  resources: CoreResources,
+): Promise<ProjectToolchain | undefined> {
+  const directory = join(root, 'projects')
+  if (!(await lstat(directory).catch(() => null))) return undefined
+  if ((await realpath(directory)) !== directory || !(await isPrivateDirectory(directory)))
+    fail('PROJECT_RECORDED_TOOLCHAIN_INVALID')
+  const names = await readdir(directory)
+  if (names.length > 4096) fail('PROJECT_RECORDED_TOOLCHAIN_INVALID')
+  const files = names.filter((name) => /^[a-f0-9]{64}\.json$/.test(name))
+  if (!files.length) return undefined
+  const sharedShim = await optionalProjectFile(join(root, 'bin/pnpm.cmd'))
+  const candidates: ProjectToolchain[] = []
+  for (const name of files) {
+    try {
+      const file = join(directory, name)
+      const text = (await plainFile(file, 32768)).toString()
+      const data = JSON.parse(text) as {
+        schemaVersion: number
+        workspace: string
+        resourceRoot: string
+        toolchain: ProjectToolchain
+      }
+      const tc = data.toolchain
+      if (
+        data.schemaVersion !== 1 ||
+        typeof data.workspace !== 'string' ||
+        name !== sha256(Buffer.from(data.workspace)) + '.json' ||
+        (await realpath(data.workspace)) !== data.workspace ||
+        !(await isPrivateDirectory(data.workspace)) ||
+        typeof data.resourceRoot !== 'string' ||
+        (data.resourceRoot !== resources.root &&
+          !isProductResourceUpgrade(data.resourceRoot, resources.root)) ||
+        tc?.schemaVersion !== 1 ||
+        tc.privateRoot !== root ||
+        !['EXISTING_NODE', 'MANAGED_NODE'].includes(tc.node?.source) ||
+        tc.node?.args?.length !== 0 ||
+        Object.keys(tc.node?.env ?? {}).length !== 0 ||
+        !isAbsolute(tc.node.executable) ||
+        !['EXISTING_PNPM', 'MANAGED_PNPM'].includes(tc.pnpm?.source) ||
+        !['JS', 'CMD', 'EXE'].includes(tc.pnpm?.kind) ||
+        !isAbsolute(tc.pnpm.executable) ||
+        !parseExactVersion(tc.pnpm.version) ||
+        (tc.pnpm.version !== PROJECT_PNPM.version &&
+          !isOlderPinnedPnpm(tc.pnpm, {
+            ...tc,
+            pnpm: { ...tc.pnpm, version: PROJECT_PNPM.version },
+          })) ||
+        (tc.pnpm.source === 'MANAGED_PNPM' &&
+          (tc.pnpm.kind !== 'JS' ||
+            tc.pnpm.executable !==
+              join(root, 'pnpm-cache', `pnpm-${tc.pnpm.version}`, 'bin/pnpm.cjs')))
+      )
+        continue
+      if (
+        text !==
+        JSON.stringify({
+          schemaVersion: 1,
+          workspace: data.workspace,
+          toolchain: tc,
+          resourceRoot: data.resourceRoot,
+        })
+      )
+        continue
+      const launcher = await optionalProjectFile(join(data.workspace, '.kiro/vibe-tools.cmd'))
+      if (
+        ![data.resourceRoot, resources.root].some((resourceRoot) =>
+          [false, true].some(
+            (legacy) =>
+              launcher ===
+              launcherText(
+                tc.node.executable,
+                join(resourceRoot, 'bin/project-tools.mjs'),
+                file,
+                legacy,
+              ),
+          ),
+        )
+      )
+        continue
+      // A pin upgrade can be interrupted after the shared managed shim changes.
+      const upgraded: ProjectToolchain = {
+        ...tc,
+        pnpm: {
+          source: 'MANAGED_PNPM',
+          kind: 'JS',
+          version: PROJECT_PNPM.version,
+          executable: join(root, 'pnpm-cache', `pnpm-${PROJECT_PNPM.version}`, 'bin/pnpm.cjs'),
+        },
+      }
+      if (
+        sharedShim === pnpmShim(tc) ||
+        sharedShim === pnpmShim(tc, true) ||
+        (tc.pnpm.version !== PROJECT_PNPM.version && sharedShim === pnpmShim(upgraded))
+      )
+        candidates.push(tc)
+    } catch {
+      // Invalid/linked records never authorize executing their recorded tools.
+    }
+  }
+  // Older records may coexist after a pin upgrade. Prefer the current pin and
+  // require every eligible record to agree on Node; never pick by directory order.
+  const selected =
+    candidates.find((tc) => tc.pnpm.version === PROJECT_PNPM.version) ?? candidates[0]
+  if (
+    !selected ||
+    candidates.some((tc) => JSON.stringify(tc.node) !== JSON.stringify(selected.node))
+  )
+    fail('PROJECT_RECORDED_TOOLCHAIN_INVALID')
+  return selected
 }
 
 function pnpmShim(toolchain: ProjectToolchain, legacy = false): string {

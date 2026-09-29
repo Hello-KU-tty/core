@@ -770,6 +770,32 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 
 ### [~] T19. 자체 Kiro IDE 패널과 프론트 실제 연동
 
+#### [~] T19-F19. 완료 뒤 지속적인 Builder·Helper 대화와 도구 거부 표시 수정
+
+- **승인:** 2026-09-30 사용자가 권한 오류 표시와 MVP 완료 뒤 대화 차단 수정을 요청하고 새 VSIX·Kiro 재시작 적용·버전 갱신·저장소 push를 승인했다.
+- **선행 조건:** T19-F17/F18의 0.0.17 코드·배포본과 실제 완료 화면, 최신 양쪽 main.
+- **산출물:** 완료 후 반복 후속 Task/Core 계약과 입력 허용, 명확한 도구 거부 표시, 새 kit·VSIX·다운로드 링크와 설치 결과.
+- **완료 조건:** contract/domain/storage/runtime/frontend/실제 소비 검증, 전체 check, 기존 완료·프로젝트·Evidence 보존, 패키지 hash, Kiro 종료·업데이트·재시작 화면 확인과 GitHub 게시.
+- **로컬 결과:** Core 전체 check·CJS 171·프론트 57파일/807테스트·실제 HTTP/SSE/SQLite 연결과 연속 Builder 3회/Helper 3회 PASS. kit 2026.09.30.1·VSIX 0.0.18 생성, 설치 파일 hash와 Kiro 정상 재시작 후 두 입력/전송 활성 확인. GitHub 게시만 남았다. [검증 기록](CONTINUOUS_BUILDER_20260930.md).
+
+#### [x] T19-F18. Windows 0.0.17 VSIX 게시와 다운로드 가이드 연결
+
+- **승인:** 2026-09-30 사용자가 이 환경에서 만든 VSIX를 저장소에 추가해 GitHub에 올리고 최신 다운로드 가이드에 링크하도록 요청했다.
+- **선행 조건:** 0.0.17 VSIX와 SHA-256 검증 receipt, 최신 `origin/main`의 다운로드 가이드.
+- **산출물:** `releases/windows/0.0.17/`의 동일 VSIX·receipt, Windows 설치 안내, README와 다운로드 가이드 링크.
+- **완료 조건:** 기존 로컬 변경 보존, VSIX 원본/게시본 hash 일치, 문서 링크·패키지 검사, 정상 commit/push와 원격 다운로드 확인.
+- **승인 이력:** 최신 main pull, VSIX 원본/게시 후보 SHA-256·71개 패키지 항목과 문서 상대 링크 40개 검증 PASS. 게시 대상 5개 파일만 staging했다. 최초 자동 승인 검토가 AGENTS.md의 게시 계정 방식 선택 미확인을 이유로 commit/push를 차단하여 현재 로그인된 `@HURDOO`로 기존 `Hello-KU-tty/core/main`에 게시할지 사용자 확인을 요청했다.
+- **재개 승인:** 2026-09-30 사용자가 위 `@HURDOO` 계정·기존 `Hello-KU-tty/core/main` 게시 확인에 “푸시하셈”으로 승인했다.
+- **결과:** `0e4f881`을 `core/main`에 push했다. 원격 main 일치와 GitHub에서 다시 받은 VSIX의 SHA-256 `b4634b3ef9c899a7295b5317b25293ad002545bb09126fe64f0afa8c5344bcd3`, 원격 다운로드 가이드·README의 링크를 확인했다. 기존 Core·프론트 소스 수정은 보존했다.
+
+#### [x] T19-F17. 재시작 후 생성 앱 도구 재사용과 Helper 중복 요약 제거
+
+- **승인:** 2026-09-29 사용자가 Node/PATH 변경 시 재발 방지와 도우미 답변 요약 개선 또는 제거를 요청했다.
+- **선행 조건:** T19-F16 설치본과 kit 2026.09.29.3. 기존 프로젝트 descriptor·launcher와 실제 실패 원인을 확인했다.
+- **산출물:** 기록된 Node/pnpm 재검증·우선 재사용, 변조/누락 실패 안내, 실제 답변을 유지하는 중복 요약 표시 제거, 새 kit와 VSIX.
+- **완료 조건:** PATH 유무·다른 후보·재시작·확장 업그레이드·변조/누락 회귀, Helper 실제 응답 보존 UI 회귀, 전체 check와 frontend 검증, packaged 도구 재현 및 파일 hash 확인. 실제 모델·다른 PC 검증과 구분한다.
+- **결과:** Core `pnpm check`·확장 CJS 169·프론트 57파일/800테스트·타입·build·실제 HTTP/SSE/SQLite 소비 PASS. 배포 runtime의 기존/관리 도구 모두 개발 PATH 없는 새 프로세스에서 재사용·frozen install·build·test·HTTP 실행 PASS. kit 2026.09.29.4의 118개 관리 파일과 0.0.17 VSIX 71개 파일 hash 확인. 설치 후 native 모델 실행·다른 PC는 미검증이며 commit/push하지 않았다. [검증과 설치본](FRONTEND_TOOLCHAIN_REUSE_20260929.md).
+
 #### [x] T19-F16. 명시적 결정 선택과 Builder 계속 실행 연결
 
 - **근거:** 사용자가 결정을 저장했지만 다음 작업이 실행되지 않는 실제 UX를 보고했다. 기존 resolve-only 동작과 별도 resume 버튼이 분리되어 있다.

@@ -1,0 +1,20 @@
+{
+  "promptVersion": "1.3.12",
+  "kind": "MECHANICAL_PROMPT_REGRESSION",
+  "containsPersonalData": false,
+  "liveResult": "NOT_RUN",
+  "automatedQualityVerdict": "NOT_ASSERTED",
+  "requiredRules": [
+    "Task나 MVP 완료는 대화의 종료가 아니다",
+    "기존 workspace와 `previousCompletionReport`를 이전 Agent 작업의 맥락으로 읽고",
+    "Evidence 분석·Final Upgrade를 후속 요청의 조건으로 요구하지 마라",
+    "필요 없는 파일 변경이나 구현 작업을 만들어내지 마라",
+    "이번에 새로 실행한 결과처럼 쓰거나 사용자 이해의 근거로 간주하지 마라"
+  ],
+  "reviewCases": [
+    { "input": "접속할 수 있게 해줘", "personalNeed": true, "intent": "RUN" },
+    { "input": "어떻게 구현했는지 설명해줘", "personalNeed": false, "intent": "EXPLAIN" },
+    { "input": "Keep the current app and add export to CSV", "personalNeed": true, "intent": "CHANGE" }
+  ],
+  "claimBoundary": "Prompt/version wiring and synthetic review cases. Actual repeated follow-ups are checked through Core/UI fixtures; this file does not assert native model quality."
+}

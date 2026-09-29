@@ -87,6 +87,7 @@ import {
   openDecision,
   planBuilderTask,
   planFinalUpgradeTask,
+  planFollowUpTask,
   reduceCandidateRevision,
   reduceConceptState,
   updateLiveContext as reduceLiveContext,
@@ -410,6 +411,8 @@ export class ApplicationService {
         return this.#prepareBuilderTask(request)
       case 'UI_PREPARE_FINAL_UPGRADE_TASK':
         return this.#prepareFinalUpgradeTask(request)
+      case 'UI_PREPARE_FOLLOW_UP_TASK':
+        return this.#prepareFollowUpTask(request)
       case 'UI_RETURN_TO_DISCOVERY':
         return this.#returnToDiscovery(request)
       case 'UI_RESOLVE_DECISION':
@@ -1864,6 +1867,84 @@ export class ApplicationService {
             status: 'READY',
           })
           return { response, resourceId: task.id, resourceRevision: task.revision }
+        },
+      ),
+    )
+  }
+
+  async #prepareFollowUpTask(
+    request: Extract<UiRequest, { kind: 'UI_PREPARE_FOLLOW_UP_TASK' }>,
+  ): Promise<PreparedBuilderTaskDescriptor> {
+    const source = this.#storage.transaction((repository) =>
+      repository.readBuilderTaskAggregate(request.projectId, request.sourceTaskId),
+    )
+    if (source === null) throw this.#notFound(request.correlationId, 'BUILDER_TASK_NOT_FOUND')
+    await this.#workspacePolicy.resolveProjectWorkspace(source.project, request.correlationId)
+    return this.#storage.transaction((repository) =>
+      this.#idempotent(
+        repository,
+        request,
+        'ui.prepare_follow_up_task',
+        preparedBuilderTaskDescriptorSchema,
+        () => {
+          const aggregate = repository.readBuilderTaskAggregate(
+            request.projectId,
+            request.sourceTaskId,
+          )
+          if (aggregate === null)
+            throw this.#notFound(request.correlationId, 'BUILDER_TASK_NOT_FOUND')
+          this.#assertRevision(
+            request.expectedSourceTaskRevision,
+            aggregate.task.revision,
+            request.correlationId,
+            'BUILDER_TASK_STALE',
+          )
+          if (
+            repository.readLatestTaskForProject(request.projectId)?.id !== aggregate.task.id ||
+            aggregate.task.status !== 'COMPLETED' ||
+            aggregate.completionReport === null
+          )
+            throw this.#validationError(
+              request.correlationId,
+              'FOLLOW_UP_SOURCE_NOT_CURRENT',
+              'A follow-up requires the latest completed Task and its completion report.',
+            )
+          if (aggregate.project.generatedWorkspacePath === undefined)
+            throw this.#validationError(
+              request.correlationId,
+              'BUILDER_WORKSPACE_NOT_ASSIGNED',
+              'A follow-up uses the existing generated workspace.',
+            )
+          const preparedAt = this.#timestamp()
+          const planned = planFollowUpTask({
+            project: aggregate.project,
+            spec: aggregate.learningSpec,
+            sourceTask: aggregate.task,
+            userGoal: redactSensitiveText(request.userGoal),
+            taskId: this.#generateId('task'),
+            now: preparedAt,
+          })
+          if (planned.outcome === 'REJECTED')
+            throw this.#domainError(request.correlationId, planned.reasonCode)
+          repository.appendTask(planned.value)
+          this.#appendAudit(repository, {
+            correlationId: request.correlationId,
+            actor: { kind: 'USER' },
+            action: 'CREATED',
+            resource: { type: 'BUILDER_TASK', id: planned.value.id, revision: 1 },
+            summary: 'Prepared a follow-up from an explicit user request in the existing project.',
+            changedFields: ['productGoal', 'prerequisiteTaskIds', 'sequence', 'status'],
+            occurredAt: preparedAt,
+          })
+          const response = preparedBuilderTaskDescriptorSchema.parse({
+            schemaVersion: 1,
+            correlationId: request.correlationId,
+            projectId: request.projectId,
+            workspacePath: aggregate.project.generatedWorkspacePath,
+            task: planned.value,
+            status: 'READY',
+          })
+          return { response, resourceId: planned.value.id, resourceRevision: 1 }
         },
       ),
     )
@@ -4775,12 +4856,22 @@ export class ApplicationService {
   }
 
   #builderContext(aggregate: BuilderTaskAggregate, correlationId: string): BuilderTaskContext {
+    const priorId = aggregate.task.prerequisiteTaskIds.at(-1)
+    const previousCompletionReport =
+      priorId === undefined
+        ? undefined
+        : this.#storage.transaction(
+            (repository) =>
+              repository.readBuilderTaskAggregate(aggregate.project.id, priorId)
+                ?.completionReport ?? undefined,
+          )
     return builderTaskContextSchema.parse({
       schemaVersion: 1,
       correlationId,
       project: aggregate.project,
       learningSpec: aggregate.learningSpec,
       task: aggregate.task,
+      ...(previousCompletionReport === undefined ? {} : { previousCompletionReport }),
       liveContext: aggregate.liveContext,
       decisionRequests: aggregate.decisionRequests,
       decisionResolutions: aggregate.decisionResolutions,

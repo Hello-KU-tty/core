@@ -3812,3 +3812,129 @@ describe('T11 Decision gate and Builder resume application flow', () => {
     ).toMatchObject({ status: 'ANALYSIS_FAILED', revision: 4 })
   })
 })
+
+describe('continuous Builder follow-up preparation', () => {
+  async function completedHarness() {
+    const harness = await createHarness()
+    seedBuilderGraph(harness.storage)
+    const workspace = join(
+      harness.workspaceRoot,
+      ...projectFixture.generatedWorkspacePath.split('/'),
+    )
+    await mkdir(workspace, { recursive: true })
+    await writeFile(join(workspace, 'user-source.ts'), 'preserved user source')
+    harness.storage.transaction((repository) => {
+      repository.appendTask(
+        builderTaskSchema.parse({ ...builderTaskFixture, revision: 2, status: 'COMPLETED' }),
+      )
+      repository.appendCompletionReport(completionReportFixture)
+    })
+    return { ...harness, workspace }
+  }
+  const request = () => ({
+    schemaVersion: 1 as const,
+    actor: { kind: 'UI' as const },
+    kind: 'UI_PREPARE_FOLLOW_UP_TASK' as const,
+    correlationId: ids.correlation,
+    idempotencyKey: 'idem_' + randomUUID(),
+    projectId: ids.project,
+    sourceTaskId: ids.task,
+    expectedSourceTaskRevision: 2,
+    userGoal: 'Explain how the existing implementation handles retries.',
+  })
+
+  it('creates one following Task, keeps its source report/workspace, and restores without creating another', async () => {
+    const { service, storage } = await completedHarness()
+    const before = storage.repository.readBuilderTaskAggregate(ids.project, ids.task)
+    const command = request()
+    const [first, retry] = await Promise.all([
+      service.executeUi(command),
+      service.executeUi(command),
+    ])
+    expect(first.success).toBe(true)
+    expect(retry).toEqual(first)
+    if (!first.success) throw new Error(first.error.code)
+    const next = preparedBuilderTaskDescriptorSchema.parse(first.data)
+    expect(next.task).toMatchObject({
+      sequence: 2,
+      status: 'PENDING',
+      prerequisiteTaskIds: [ids.task],
+    })
+    expect(next.workspacePath).toBe(projectFixture.generatedWorkspacePath)
+    expect(storage.repository.readBuilderTaskAggregate(ids.project, ids.task)).toEqual(before)
+    const context = await service.executeAgent('BUILDER', {
+      schemaVersion: 1,
+      actor: { kind: 'AGENT', role: 'BUILDER' },
+      kind: 'BUILDER_GET_TASK',
+      correlationId: ids.correlation,
+      projectId: ids.project,
+      taskId: next.task.id,
+    })
+    expect(context, JSON.stringify(context)).toMatchObject({
+      success: true,
+      data: { previousCompletionReport: completionReportFixture },
+    })
+    for (let n = 0; n < 2; n++) {
+      expect(
+        await service.executeUi({
+          schemaVersion: 1,
+          actor: { kind: 'UI' },
+          kind: 'UI_RESTORE_PROJECT_SESSION',
+          correlationId: ids.correlation,
+          projectId: ids.project,
+          helperConversationLimit: 20,
+        }),
+      ).toMatchObject({ success: true, data: { currentTask: { id: next.task.id } } })
+    }
+    expect(await service.executeUi(request())).toMatchObject({
+      success: false,
+      error: { code: 'FOLLOW_UP_SOURCE_NOT_CURRENT' },
+    })
+    expect(
+      await service.executeAgent('BUILDER', {
+        schemaVersion: 1,
+        actor: { kind: 'AGENT', role: 'BUILDER' },
+        kind: 'BUILDER_START_TASK',
+        correlationId: ids.correlation,
+        idempotencyKey: 'idem_' + randomUUID(),
+        projectId: ids.project,
+        taskId: next.task.id,
+        expectedTaskRevision: 1,
+      }),
+    ).toMatchObject({ success: true })
+    expect(
+      storage.repository.readBuilderTaskAggregate(ids.project, ids.task)?.completionReport,
+    ).toEqual(completionReportFixture)
+    storage.close()
+  })
+
+  it('allows Helper questions on the completed Task before another Builder request', async () => {
+    const { service, storage } = await completedHarness()
+    expect(
+      await service.executeUi({
+        schemaVersion: 1,
+        actor: { kind: 'UI' },
+        kind: 'UI_OPEN_HELPER',
+        correlationId: ids.correlation,
+        projectId: ids.project,
+        taskId: ids.task,
+        question: 'Why does this implementation use a map?',
+      }),
+    ).toMatchObject({ success: true })
+    expect(storage.repository.readLatestTaskForProject(ids.project)?.id).toBe(ids.task)
+    storage.close()
+  })
+
+  it('rejects stale, empty and cross-project requests without changing completed work', async () => {
+    const { service, storage } = await completedHarness()
+    for (const change of [
+      { expectedSourceTaskRevision: 1 },
+      { userGoal: ' ' },
+      { projectId: 'project_00000000-0000-4000-8000-000000000905' },
+    ]) {
+      expect(await service.executeUi({ ...request(), ...change })).toMatchObject({ success: false })
+      expect(storage.repository.readLatestTaskForProject(ids.project)?.id).toBe(ids.task)
+    }
+    storage.close()
+  })
+})

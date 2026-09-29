@@ -80,6 +80,16 @@ export const uiPrepareFinalUpgradeTaskCommandSchema = z.strictObject({
   userGoal: nonEmptyTextSchema,
 })
 
+export const uiPrepareFollowUpTaskCommandSchema = z.strictObject({
+  ...uiRequestMetadata,
+  kind: z.literal('UI_PREPARE_FOLLOW_UP_TASK'),
+  idempotencyKey: idempotencyKeySchema,
+  projectId: projectIdSchema,
+  sourceTaskId: taskIdSchema,
+  expectedSourceTaskRevision: entityRevisionSchema,
+  userGoal: nonEmptyTextSchema,
+})
+
 export const uiUpdateLearningSpecCommandSchema = z.strictObject({
   ...uiRequestMetadata,
   kind: z.literal('UI_UPDATE_LEARNING_SPEC'),
@@ -262,6 +272,7 @@ export const uiRequestSchema = z.discriminatedUnion('kind', [
   uiConfirmLearningSpecCommandSchema,
   uiPrepareBuilderTaskCommandSchema,
   uiPrepareFinalUpgradeTaskCommandSchema,
+  uiPrepareFollowUpTaskCommandSchema,
   uiReturnToDiscoveryCommandSchema,
   uiResolveDecisionCommandSchema,
   uiListProjectsQuerySchema,

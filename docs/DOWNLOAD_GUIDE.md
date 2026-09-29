@@ -30,11 +30,11 @@ Vibe Helper는 IDE 확장이므로 다운로드 페이지의 CLI·Crew가 아닌
 
 ### Windows (x64)
 
-**[Windows용 VSIX 0.0.17 다운로드](../releases/windows/0.0.17/builder-helper-agent-panel-0.0.17-win32-x64-828aca63a3be.vsix?raw=true)**
+**[Windows용 VSIX 0.0.18 다운로드](../releases/windows/0.0.18/builder-helper-agent-panel-0.0.18-win32-x64-74208fffa5c0.vsix?raw=true)**
 
 GitHub 파일 화면이 열리면 **Download raw file**을 누릅니다. Windows x64용이며, Kiro IDE **1.1.70** / 내장 Agent **1.1.158**을 기준으로 합니다. 파일 무결성 확인과 설치·복구 방법은 [Windows 설치 안내](WINDOWS_VSIX.md)를 따르세요.
 
-0.0.17은 Kiro 실행 환경의 PATH가 달라져도 기존 Node·pnpm을 재검증해 재사용하며, 답변 끝부분을 반복하던 도우미 요약 영역을 제거했습니다. Core 전체 검사, 프론트 800개 테스트와 배포 런타임의 도구 재사용·앱 실행 검사를 통과했습니다. 이 VSIX를 설치한 후 실제 모델로 전체 흐름을 완주하거나 다른 PC에서 검증한 것은 아닙니다.
+0.0.18은 MVP 완료 후에도 빌더와 도우미를 계속 사용할 수 있습니다. 실행·설명·수정 요청은 같은 프로젝트의 후속 작업으로 이어지며 기존 완료 기록을 보존합니다. 도구 요청 제한은 해당 실행 기록에 표시하고 전체 권한 거부처럼 남겨 두지 않습니다. 0.0.17의 도구 재사용과 중복 요약 제거도 포함합니다. 검증 범위는 [Windows 설치 안내](WINDOWS_VSIX.md)를 확인하세요.
 
 ### Mac (Apple Silicon)
 

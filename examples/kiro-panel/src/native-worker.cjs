@@ -7,6 +7,7 @@ const { openNativeRole, openProtectedBuiltinH, openProtectedHLogBarrier,
   currentApprovedProductWorkspace } =
   require('../../kiro-native-host/native-client.cjs')
 const { chooseNativeBuilderPermission, projectCommandDenialKind } = require('./native-permission.cjs')
+const { permissionDenialEvent } = require('./permission-denial.cjs')
 const { createNativeUserInputQueue } = require('./native-user-input.cjs')
 const { protectedFailureDisposition, builderFailureDisposition } = require('./protected-lifecycle.cjs')
 const { createProtectedHelperCapture } = require('./protected-helper-capture.cjs')
@@ -346,6 +347,7 @@ function startNativeWorker(context, connectionFile, runtime) {
         },
         onPermissionRequest: async (_summary, detail) => {
           if (job.role !== 'BUILDER') {
+            event(permissionDenialEvent(detail))
             event({ kind: 'PERMISSION_DENIED' }); return null
           }
           if (detail.toolName === 'shell') {
@@ -361,8 +363,11 @@ function startNativeWorker(context, connectionFile, runtime) {
                 detail.nativeToolId == null ? 'ABSENT' : 'OTHER'
             record(file, `PERMISSION_INPUT_BUILDER_WRITE_TOOL_${toolIdClass}`)
           }
+          let denialReason
           const optionId = await chooseNativeBuilderPermission(detail, job.workspace,
             reason => {
+              if (reason !== 'ALLOWED' && !reason.endsWith('_ALLOWED') && !denialReason)
+                denialReason = `PERMISSION_GUARD_BUILDER_${detail.toolName === 'shell' ? 'SHELL' : 'WRITE'}_${reason}`
               if (detail.toolName === 'shell') record(file, `PERMISSION_GUARD_BUILDER_SHELL_${reason}`)
               if (detail.toolName === 'write') record(file, `PERMISSION_GUARD_BUILDER_WRITE_${reason}`)
             }, runtime.windowsProduct ? async command => {
@@ -371,7 +376,8 @@ function startNativeWorker(context, connectionFile, runtime) {
               const prefix = tools.api.PROJECT_TOOL_COMMAND
               // Detail first, then the existing PROJECT_TOOLCHAIN_DENIED. Codes only.
               const denied = () => {
-                record(file, `PERMISSION_GUARD_BUILDER_SHELL_${projectCommandDenialKind(command, prefix)}`)
+                denialReason = `PERMISSION_GUARD_BUILDER_SHELL_${projectCommandDenialKind(command, prefix)}`
+                record(file, denialReason)
                 return null
               }
               if (!command.startsWith(prefix)) return denied()
@@ -384,6 +390,7 @@ function startNativeWorker(context, connectionFile, runtime) {
               return tools.api.projectCommandArgs(logical) ? logical : denied()
             } : undefined, { windows1170Diagnostic: runtime.windows1170Diagnostic === true })
           if (!optionId) {
+            event(permissionDenialEvent(detail, denialReason))
             event({ kind: 'PERMISSION_DENIED' }); return null
           }
           return optionId

@@ -31,6 +31,59 @@ export interface PlanFinalUpgradeTaskInput {
   readonly now: string
 }
 
+export type PlanFollowUpTaskInput = Omit<PlanFinalUpgradeTaskInput, 'personalization'>
+
+/** An explicit new request continues the project without rewriting completed work. */
+export function planFollowUpTask(input: PlanFollowUpTaskInput): DomainResult<BuilderTask> {
+  const entityIds = [input.project.id, input.sourceTask.id]
+  if (
+    input.spec.status !== 'CONFIRMED' ||
+    input.spec.projectId !== input.project.id ||
+    input.spec.correlationId !== input.project.correlationId ||
+    input.sourceTask.projectId !== input.project.id ||
+    input.sourceTask.correlationId !== input.project.correlationId ||
+    input.sourceTask.learningSpecId !== input.spec.id ||
+    input.sourceTask.status !== 'COMPLETED'
+  )
+    return rejected({ operation: OPERATION, reasonCode: 'FOLLOW_UP_SOURCE_INVALID', entityIds })
+  const userGoal = input.userGoal.trim()
+  const parsed = builderTaskSchema.safeParse({
+    ...input.sourceTask,
+    id: input.taskId,
+    learningSpecRevision: input.spec.revision,
+    revision: 1,
+    title: appendBoundedTitle(input.project.title, ' 후속 작업'),
+    productGoal: userGoal,
+    requirements: [
+      userGoal,
+      'Continue in the existing workspace and preserve working behavior unless the user requests a change.',
+      'Inspect the current implementation before explaining, running or changing it.',
+    ],
+    acceptanceCriteria: [
+      { key: 'user_request', description: userGoal },
+      {
+        key: 'verified_outcome',
+        description:
+          'Verify the outcome appropriate to this request and report actual results and remaining limitations.',
+      },
+    ],
+    prerequisiteTaskIds: [input.sourceTask.id],
+    finalUpgrade: undefined,
+    sequence: input.sourceTask.sequence + 1,
+    status: 'PENDING',
+    createdAt: input.now,
+    updatedAt: input.now,
+  })
+  if (!parsed.success)
+    return rejected({ operation: OPERATION, reasonCode: 'FOLLOW_UP_PLAN_INVALID', entityIds })
+  return applied(parsed.data, {
+    operation: OPERATION,
+    reasonCode: 'FOLLOW_UP_TASK_PLANNED',
+    entityIds: [...entityIds, parsed.data.id],
+    after: parsed.data.status,
+  })
+}
+
 function uniqueNormalized(values: readonly string[]): string[] {
   const seen = new Set<string>()
   const result: string[] = []

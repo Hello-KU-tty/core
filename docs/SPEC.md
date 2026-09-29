@@ -171,6 +171,8 @@ Concept Ledger + Project History
 - `FR-BLD-005`: Builder는 예상 Concept와 실제 사용 Concept를 보고하되 사용자 이해를 판정하지 않아야 한다.
 - `FR-BLD-006`: Task 완료 시 구현, 테스트, Concept, Decision, Spec 이탈, 제한과 코드 참조를 보고해야 한다.
 - `FR-BLD-007`: Builder는 최신 사용자 메시지를 실제 작업 지시로 취급해야 한다. 명시된 새 방향이 확정 Spec의 세부사항과 다르면 확정됐다는 이유로 거절하지 않고, 되돌리기 쉬운 변경은 진행하고 의미 있는 영향은 실제 Decision으로 확인한 뒤 Context와 Completion Report에 이탈을 남겨야 한다.
+- `FR-BLD-008`: Task/MVP가 완료돼도 Builder 입력창과 보내기를 사용할 수 있어야 한다. 사용자가 명시적으로 후속 요청을 보내면 Core는 마지막 완료 Task와 보고서를 보존하고 같은 workspace의 다음 Task를 준비한다. 반복 후속 작업에 횟수 제한이나 Evidence/Final Upgrade 선행 조건을 두지 않는다. History 복원이나 빈 입력만으로 새 Task·모델 요청을 만들지 않는다.
+- `FR-BLD-009`: 개별 도구 거부를 전체 프로젝트 권한 상실이나 현재 실행 불가로 표시하지 않는다. 완료 후에도 실제 거부 기록은 도구 기록에 남기고, 현재 상태와 구분한다. 실제 경로·권한·명령 검사는 유지한다.
 
 완료 관찰:
 
@@ -213,6 +215,8 @@ Concept Ledger + Project History
 - `FR-HLP-006`: 질문형 비유도 claim 단위 대응 관계로 처리해야 한다.
 - `FR-HLP-007`: 설명 후 강제 퀴즈나 다시 말하기를 요구하지 않아야 한다.
 - `FR-HLP-008`: Helper는 Spec과 scope를 현재 기준선으로 설명하되 사용자의 결정·질문·학습 권한의 상한으로 취급하지 않아야 한다. 사용자가 대안을 제안하면 현재 기준과의 차이, tradeoff와 변경 비용을 비교하고 Builder에 전달할 다음 말을 제안해야 하며, `사용자가 결정할 범위가 아니다`라는 식으로 논의를 닫지 않아야 한다.
+- `FR-HLP-009`: 실제 답변과 중복되는 잘린 응답을 별도 `도우미 답변 요약`으로 표시하지 않는다. 사용자 질문·대화 상태와 내부 분석용 기록은 유지한다.
+- `FR-HLP-010`: Builder 완료 전후와 후속 Task에서도 Helper의 자유 질문을 계속 허용한다. 완료나 Final Upgrade 준비를 Helper 재사용의 조건으로 요구하지 않는다.
 
 완료 관찰:
 

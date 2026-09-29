@@ -121,6 +121,7 @@ export const localResponseSchemas = {
   UI_CONFIRM_LEARNING_SPEC: commandReceiptSchema,
   UI_PREPARE_BUILDER_TASK: preparedBuilderTaskDescriptorSchema,
   UI_PREPARE_FINAL_UPGRADE_TASK: preparedBuilderTaskDescriptorSchema,
+  UI_PREPARE_FOLLOW_UP_TASK: preparedBuilderTaskDescriptorSchema,
   UI_RETURN_TO_DISCOVERY: commandReceiptSchema,
   UI_RESOLVE_DECISION: commandReceiptSchema,
   UI_LIST_PROJECTS: projectHistorySchema,
