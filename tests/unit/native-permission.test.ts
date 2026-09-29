@@ -24,6 +24,7 @@ const nativeModule = {
       projectCommand?: (command: string) => Promise<string | null>,
       options?: { windows1170Diagnostic: boolean },
     ) => Promise<string | null>
+    projectCommandDenialKind: (command: unknown, prefix: unknown) => string
   },
 }
 new Function('require', 'module', source)((name: string) => {
@@ -32,7 +33,7 @@ new Function('require', 'module', source)((name: string) => {
   if (name !== '@vibe-helper/kiro-adapter/builder-tool-guard') throw new Error('UNEXPECTED_REQUIRE')
   return { guardBuilderToolInput }
 }, nativeModule)
-const { chooseNativeBuilderPermission } = nativeModule.exports
+const { chooseNativeBuilderPermission, projectCommandDenialKind } = nativeModule.exports
 
 const option = [{ kind: 'allow_once', optionId: 'allow-1' }]
 function workspace(): string {
@@ -816,3 +817,24 @@ describe('native Builder permission gate', () => {
 function outsidePath(root: string): string {
   return join(root, '..')
 }
+
+describe('denied project command classification (content-free)', () => {
+  const prefix = '.\.kiro\vibe-tools.cmd '
+  it('names only the command family, never the text', () => {
+    expect(projectCommandDenialKind(`${prefix}pnpm add left-pad`, prefix)).toBe(
+      'PROJECT_COMMAND_PNPM_ADD',
+    )
+    expect(projectCommandDenialKind(`${prefix}pnpm why secret-name`, prefix)).toBe(
+      'PROJECT_COMMAND_PNPM_OTHER',
+    )
+    expect(projectCommandDenialKind(`${prefix}npx vite`, prefix)).toBe('PROJECT_COMMAND_NPX')
+    expect(projectCommandDenialKind('npm install', prefix)).toBe('PROJECT_COMMAND_UNPREFIXED_NPM')
+    expect(projectCommandDenialKind('pnpm install --frozen-lockfile', prefix)).toBe(
+      'PROJECT_COMMAND_UNPREFIXED_PNPM_INSTALL',
+    )
+    expect(projectCommandDenialKind('C:\evil\tool.exe --token abc', prefix)).toBe(
+      'PROJECT_COMMAND_UNPREFIXED_OTHER',
+    )
+    expect(projectCommandDenialKind(42, prefix)).toBe('PROJECT_COMMAND_INVALID')
+  })
+})

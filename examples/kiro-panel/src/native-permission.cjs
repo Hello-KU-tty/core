@@ -116,6 +116,25 @@ function shellInputProblem(detail, workspace, diagnostic1170 = false) {
   return null
 }
 
+const DENIED_TOOL_KINDS = Object.freeze({ pnpm: 'PNPM', npm: 'NPM', npx: 'NPX', node: 'NODE', yarn: 'YARN' })
+const DENIED_PNPM_KINDS = new Set(['install', 'add', 'remove', 'run', 'test', 'exec', 'dlx', 'rebuild',
+  'create', 'init', 'build', 'dev', 'start'])
+
+/**
+ * Content-free class of a Builder shell command the protected project launcher
+ * refused. Only fixed vocabulary codes are returned; the command text itself is
+ * never recorded.
+ */
+function projectCommandDenialKind(command, prefix) {
+  if (typeof command !== 'string' || typeof prefix !== 'string' || !prefix) return 'PROJECT_COMMAND_INVALID'
+  const prefixed = command.startsWith(prefix)
+  const words = (prefixed ? command.slice(prefix.length) : command).trim().split(/\s+/)
+  const first = (words[0] ?? '').toLowerCase()
+  const tool = Object.hasOwn(DENIED_TOOL_KINDS, first) ? DENIED_TOOL_KINDS[first] : 'OTHER'
+  const sub = tool === 'PNPM' ? `_${DENIED_PNPM_KINDS.has(words[1]) ? words[1].toUpperCase() : 'OTHER'}` : ''
+  return `PROJECT_COMMAND_${prefixed ? '' : 'UNPREFIXED_'}${tool}${sub}`
+}
+
 /** Fail closed if the installed IDE changes a native permission request's tool shape. */
 async function chooseNativeBuilderPermission(detail, workspace, onDiagnostic, projectCommand, options = {}) {
   const diagnostic1170 = options.windows1170Diagnostic === true
@@ -249,4 +268,4 @@ async function chooseNativeBuilderPermission(detail, workspace, onDiagnostic, pr
       checked.reasonCode : 'CORE_GUARD_DENIED')
   return checked.allowed ? option.optionId : null
 }
-module.exports = { chooseNativeBuilderPermission }
+module.exports = { chooseNativeBuilderPermission, projectCommandDenialKind }

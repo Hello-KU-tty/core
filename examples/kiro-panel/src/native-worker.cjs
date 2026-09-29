@@ -6,7 +6,7 @@ const { redactSensitiveText } = require('@vibe-helper/application/redaction')
 const { openNativeRole, openProtectedBuiltinH, openProtectedHLogBarrier,
   currentApprovedProductWorkspace } =
   require('../../kiro-native-host/native-client.cjs')
-const { chooseNativeBuilderPermission } = require('./native-permission.cjs')
+const { chooseNativeBuilderPermission, projectCommandDenialKind } = require('./native-permission.cjs')
 const { createNativeUserInputQueue } = require('./native-user-input.cjs')
 const { protectedFailureDisposition, builderFailureDisposition } = require('./protected-lifecycle.cjs')
 const { createProtectedHelperCapture } = require('./protected-helper-capture.cjs')
@@ -367,10 +367,21 @@ function startNativeWorker(context, connectionFile, runtime) {
               if (detail.toolName === 'write') record(file, `PERMISSION_GUARD_BUILDER_WRITE_${reason}`)
             }, runtime.windowsProduct ? async command => {
               const tools = runtime.projectTools
-              if (!tools || !command.startsWith(tools.api.PROJECT_TOOL_COMMAND)) return null
-              await tools.api.verifyProjectTools(job.workspace, tools.resources)
-              const logical = command.slice(tools.api.PROJECT_TOOL_COMMAND.length)
-              return tools.api.projectCommandArgs(logical) ? logical : null
+              if (!tools) return null
+              const prefix = tools.api.PROJECT_TOOL_COMMAND
+              // Detail first, then the existing PROJECT_TOOLCHAIN_DENIED. Codes only.
+              const denied = () => {
+                record(file, `PERMISSION_GUARD_BUILDER_SHELL_${projectCommandDenialKind(command, prefix)}`)
+                return null
+              }
+              if (!command.startsWith(prefix)) return denied()
+              try { await tools.api.verifyProjectTools(job.workspace, tools.resources) }
+              catch (error) {
+                record(file, 'PERMISSION_GUARD_BUILDER_SHELL_PROJECT_TOOLS_UNVERIFIED')
+                throw error
+              }
+              const logical = command.slice(prefix.length)
+              return tools.api.projectCommandArgs(logical) ? logical : denied()
             } : undefined, { windows1170Diagnostic: runtime.windows1170Diagnostic === true })
           if (!optionId) {
             event({ kind: 'PERMISSION_DENIED' }); return null
