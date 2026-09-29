@@ -1,11 +1,26 @@
 {
   "file": "frontend-handoff-20260927.zip",
-  "bytes": 5031622,
-  "sha256": "4c9b338bcdc24f72afa0eaf61c70c5c54d13a780fabf7fb5440df5cce378f0d9",
-  "files": 125,
-  "directory": "frontend-handoff-20260927",
-  "backendHead": "92b9ec06207885b6ef633c16b23491c5b6709603",
-  "backendWorkingTreeDirty": false,
-  "frontendRevision": "048bce383a774f429f8868949d4ba2f95a63c66a",
-  "validationScope": "CURRENT_WINDOWS_MACHINE_ONLY"
+  "status": "DEVELOPER_SOURCE_SNAPSHOT",
+  "updatedAt": "2026-09-30",
+  "bytes": 4837102,
+  "sha256": "97bd37eee0df6b91bf798eb23843b2422d07a7010e4dcb54ac5d19a29e3c21b6",
+  "files": 872,
+  "backendHead": "b7beeb33a140c0a88643a424a7b6b65e1d04e0fa",
+  "frontendRevision": "e65cd7ff341e34bd6b160c468225819b0ab02254",
+  "frontendFeatureRevision": "a61d408b8ad19ed4baf3ead72701821885b3b768",
+  "frontendVersion": "0.0.18",
+  "frontendKitVersion": "2026.09.30.1",
+  "manifest": "SOURCE_MANIFEST.json",
+  "topLevelDirectories": [
+    "backend",
+    "frontend"
+  ],
+  "previousPartialKitReplaced": true,
+  "requiresPreviousKit": false,
+  "validationScope": "MACOS_ARM64_EXTRACTED_SOURCE_MODEL_0",
+  "backendCheck": "PASS",
+  "frontendTests": 807,
+  "macVsixRebuildFileHashesMatched": 72,
+  "windowsPortable": "Unmodified public frontend kit assets; not newly built on Mac",
+  "nativeModelCalls": 0
 }

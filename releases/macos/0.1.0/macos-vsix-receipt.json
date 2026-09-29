@@ -1,0 +1,33 @@
+{
+  "file": "builder-helper-agent-panel-0.1.0-darwin-arm64.vsix",
+  "version": "0.1.1",
+  "updatedAt": "2026-09-30",
+  "target": "darwin-arm64",
+  "bytes": 41582063,
+  "sha256": "a04c53c63f2aa1abf45d608106e6593dd0b82b2137113225403aa459e5be227e",
+  "files": 72,
+  "fileInventory": "files.json",
+  "frontendVersion": "0.0.18",
+  "frontendFeatureRevision": "a61d408b8ad19ed4baf3ead72701821885b3b768",
+  "buildBackendBase": "7b35217b90b0ff35e8b3f66ce68268242b3fee8e",
+  "buildIncludedMacWorkingTree": true,
+  "reproducedFromBackendCommit": "b7beeb33a140c0a88643a424a7b6b65e1d04e0fa",
+  "reproducedFromFrontendCommit": "e65cd7ff341e34bd6b160c468225819b0ab02254",
+  "rebuildFileHashesMatched": 72,
+  "installParser": "PASS_KIRO_1.1.70_ISOLATED_PROFILE",
+  "installedAssetHashesMatched": 69,
+  "installedPackageVersion": "0.1.1",
+  "sourceCheckoutRequired": false,
+  "model0Checks": [
+    "fresh_simultaneous_hosts_one_core",
+    "host_reload_preserves_core_and_history",
+    "recorded_tools_reused_without_developer_path",
+    "bundled_node_acquired_pnpm_korean_space_paths",
+    "project_launcher_tamper_denied",
+    "final_lease_shutdown_restart_persistence"
+  ],
+  "nativePaidCalls": 0,
+  "nativeEndToEnd": "NOT_RUN_ON_THIS_INSTALLER",
+  "intelMac": "UNSUPPORTED",
+  "downloadPathIsCompatibilityAlias": true
+}
