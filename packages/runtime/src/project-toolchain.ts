@@ -18,6 +18,7 @@ import {
   acquireCoreNode,
   type CoreResources,
   type CoreRuntimeDescriptor,
+  managedMacNodePath,
   ownedPrivateDirectory,
   plainFile,
   probeCoreRuntime,
@@ -496,8 +497,7 @@ async function recordedProjectToolchain(
         data.schemaVersion !== 1 ||
         typeof data.workspace !== 'string' ||
         name !== sha256(Buffer.from(data.workspace)) + '.json' ||
-        (await realpath(data.workspace)) !== data.workspace ||
-        !(await isPrivateDirectory(data.workspace)) ||
+        !isAbsolute(data.workspace) ||
         typeof data.resourceRoot !== 'string' ||
         (data.resourceRoot !== resources.root &&
           !isProductResourceUpgrade(data.resourceRoot, resources.root)) ||
@@ -532,8 +532,22 @@ async function recordedProjectToolchain(
         })
       )
         continue
-      const launcher = await optionalProjectFile(join(data.workspace, '.kiro/vibe-tools.cmd'))
+      const migratedNode = upgradedBundledNode(tc.node, data.resourceRoot, resources, root)
+      const current = migratedNode ? { ...tc, node: migratedNode } : tc
+      const missingWorkspace = await recordedWorkspaceMissing(data.workspace)
+      const launcher = missingWorkspace
+        ? null
+        : await optionalProjectFile(join(data.workspace, '.kiro/vibe-tools.cmd'))
       if (
+        !missingWorkspace &&
+        launcher !==
+          launcherText(
+            current.node.executable,
+            join(resources.root, 'bin/project-tools.mjs'),
+            file,
+            false,
+            current.node.platform,
+          ) &&
         ![data.resourceRoot, resources.root].some((resourceRoot) =>
           [false, true].some(
             (legacy) =>
@@ -551,7 +565,7 @@ async function recordedProjectToolchain(
         continue
       // A pin upgrade can be interrupted after the shared managed shim changes.
       const upgraded: ProjectToolchain = {
-        ...tc,
+        ...current,
         pnpm: {
           source: 'MANAGED_PNPM',
           kind: 'JS',
@@ -562,9 +576,10 @@ async function recordedProjectToolchain(
       if (
         sharedShim === pnpmShim(tc) ||
         sharedShim === pnpmShim(tc, true) ||
+        sharedShim === pnpmShim(current) ||
         (tc.pnpm.version !== PROJECT_PNPM.version && sharedShim === pnpmShim(upgraded))
       )
-        candidates.push(tc)
+        candidates.push(current)
     } catch {
       // Invalid/linked records never authorize executing their recorded tools.
     }
@@ -646,32 +661,43 @@ async function hasRecordedPnpmShim(
         resourceRoot: string
         toolchain: ProjectToolchain
       }
+      const migratedNode = upgradedBundledNode(
+        old.toolchain?.node,
+        old.resourceRoot,
+        resources,
+        toolchain.privateRoot,
+      )
+      const expectedOld = {
+        ...toolchain,
+        ...(migratedNode && JSON.stringify(migratedNode) === JSON.stringify(toolchain.node)
+          ? { node: old.toolchain.node }
+          : {}),
+        ...(isOlderPinnedPnpm(old.toolchain?.pnpm, toolchain) ? { pnpm: old.toolchain.pnpm } : {}),
+      }
       if (
         typeof old.workspace !== 'string' ||
         !isAbsolute(old.workspace) ||
         name !== sha256(Buffer.from(old.workspace)) + '.json' ||
         typeof old.resourceRoot !== 'string' ||
         !isProductResourceUpgrade(old.resourceRoot, resources.root) ||
-        !isOlderPinnedPnpm(old.toolchain?.pnpm, toolchain) ||
         text !==
           JSON.stringify({
             schemaVersion: 1,
             workspace: old.workspace,
-            toolchain: { ...toolchain, pnpm: old.toolchain.pnpm },
+            toolchain: expectedOld,
             resourceRoot: old.resourceRoot,
           }) ||
-        (shim !== pnpmShim(old.toolchain) && shim !== pnpmShim(old.toolchain, true)) ||
-        (await realpath(old.workspace)) !== old.workspace ||
-        !(await isPrivateDirectory(old.workspace))
+        (shim !== pnpmShim(old.toolchain) && shim !== pnpmShim(old.toolchain, true))
       )
         continue
+      if (await recordedWorkspaceMissing(old.workspace)) return true
       const launcher = await optionalProjectFile(join(old.workspace, '.kiro/vibe-tools.cmd'))
       if (
         [false, true].some(
           (legacy) =>
             launcher ===
             launcherText(
-              toolchain.node.executable,
+              old.toolchain.node.executable,
               join(old.resourceRoot, 'bin/project-tools.mjs'),
               file,
               legacy,
@@ -869,6 +895,69 @@ async function optionalProjectFile(path: string): Promise<string | null> {
     throw error
   }
 }
+
+/** A missing old project is not a new authority to create, search for, or relocate it. */
+async function recordedWorkspaceMissing(workspace: string): Promise<boolean> {
+  if (!isAbsolute(workspace) || resolve(workspace) !== workspace)
+    fail('PROJECT_RECORDED_TOOLCHAIN_INVALID')
+  const stat = await lstat(workspace).catch((error) => {
+    if (error.code === 'ENOENT') return null
+    throw error
+  })
+  if (stat) {
+    if (
+      !stat.isDirectory() ||
+      stat.isSymbolicLink() ||
+      (await realpath(workspace)) !== workspace ||
+      !(await isPrivateDirectory(workspace))
+    )
+      fail('PROJECT_RECORDED_TOOLCHAIN_INVALID')
+    return false
+  }
+  let parent = dirname(workspace)
+  while (true) {
+    const info = await lstat(parent).catch((error) => {
+      if (error.code === 'ENOENT') return null
+      throw error
+    })
+    if (info) {
+      if (!info.isDirectory() || info.isSymbolicLink() || (await realpath(parent)) !== parent)
+        fail('PROJECT_RECORDED_TOOLCHAIN_INVALID')
+      return true
+    }
+    const next = dirname(parent)
+    if (next === parent) fail('PROJECT_RECORDED_TOOLCHAIN_INVALID')
+    parent = next
+  }
+}
+
+/** Only the previous product's bundled Mac Node may move into the persistent cache. */
+function upgradedBundledNode(
+  node: CoreRuntimeDescriptor | undefined,
+  previous: unknown,
+  resources: CoreResources,
+  privateRoot: string,
+): CoreRuntimeDescriptor | undefined {
+  if (
+    typeof previous !== 'string' ||
+    !node ||
+    node.platform !== 'darwin' ||
+    node.arch !== 'arm64' ||
+    !['EXISTING_NODE', 'MANAGED_NODE'].includes(node.source) ||
+    node.nodeVersion !== '24.19.0' ||
+    node.args?.length !== 0 ||
+    Object.keys(node.env ?? {}).length !== 0 ||
+    node.executable !== join(previous, 'bin/node') ||
+    !isProductResourceUpgrade(previous, resources.root)
+  )
+    return undefined
+  return {
+    ...node,
+    source: 'MANAGED_NODE',
+    executable: managedMacNodePath(join(privateRoot, 'node-cache'), resources),
+  }
+}
+
 async function replaceProjectFile(path: string, content: string): Promise<void> {
   const pending = path + '.' + randomUUID() + '.tmp'
   try {
@@ -933,43 +1022,46 @@ async function prepareProjectToolsOnce(
     else if (oldLauncher !== launcher) fail('PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED')
     return
   }
-  let oldRoot: unknown, oldPnpm: unknown
+  let oldRoot: unknown, oldPnpm: unknown, oldNode: CoreRuntimeDescriptor | undefined
   try {
     const parsed = JSON.parse(oldContent) as {
       resourceRoot?: unknown
-      toolchain?: { pnpm?: unknown }
+      toolchain?: { pnpm?: unknown; node?: CoreRuntimeDescriptor }
     }
     oldRoot = parsed.resourceRoot
     oldPnpm = parsed.toolchain?.pnpm
+    oldNode = parsed.toolchain?.node
   } catch {
     fail('PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED')
   }
-  // Besides the install root, a product upgrade may only replace a pnpm that
-  // an older product pin selected (e.g. 11.12.0 -> 11.13.1). Node and every
-  // other descriptor field must stay identical.
-  const sameExceptRoot = JSON.stringify({ ...descriptor, resourceRoot: oldRoot })
-  const sameExceptRootAndPnpm = isOlderPinnedPnpm(oldPnpm, toolchain)
-    ? JSON.stringify({
-        ...descriptor,
-        toolchain: { ...toolchain, pnpm: oldPnpm },
-        resourceRoot: oldRoot,
-      })
-    : null
+  const migratedNode = upgradedBundledNode(oldNode, oldRoot, resources, toolchain.privateRoot)
+  const expectedOldTools = {
+    ...toolchain,
+    ...(migratedNode && JSON.stringify(migratedNode) === JSON.stringify(toolchain.node)
+      ? { node: oldNode ?? toolchain.node }
+      : {}),
+    ...(isOlderPinnedPnpm(oldPnpm, toolchain) ? { pnpm: oldPnpm } : {}),
+  }
+  const expectedOld = JSON.stringify({
+    ...descriptor,
+    toolchain: expectedOldTools,
+    resourceRoot: oldRoot,
+  })
   if (
     typeof oldRoot !== 'string' ||
     !isProductResourceUpgrade(oldRoot, resources.root) ||
-    (oldContent !== sameExceptRoot && oldContent !== sameExceptRootAndPnpm)
+    oldContent !== expectedOld
   )
     fail('PROJECT_TOOLCHAIN_CHANGED_RESTART_REQUIRED')
   const expectedOldLauncher = launcherText(
-    toolchain.node.executable,
+    expectedOldTools.node.executable,
     join(oldRoot, 'bin/project-tools.mjs'),
     descriptorFile,
     false,
     toolchain.node.platform,
   )
   const legacyOldLauncher = launcherText(
-    toolchain.node.executable,
+    expectedOldTools.node.executable,
     join(oldRoot, 'bin/project-tools.mjs'),
     descriptorFile,
     true,

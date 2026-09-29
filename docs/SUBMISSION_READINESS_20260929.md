@@ -1,5 +1,7 @@
 # 제출 전 작업 결과 — 2026-09-29
 
+> **역사 기록:** 아래 상태·승인·미완료 항목은 9월29일 당시 기록이다. 현재 사용자 인터뷰·제출 화면·게시본과 새 로컬 후보는 [9월30일 상태](VALIDATION_STATUS_20260930.md)를 따른다. 아래 `dist/` 산출물은 공개 저장소에 없는 과거 로컬 파일이므로 다운로드 링크가 아니다. 현재 파일은 [다운로드 가이드](DOWNLOAD_GUIDE.md)에서 선택하고 해당 파일의 receipt와 hash를 대조한다.
+
 **후속 실측 예정:** 사용자 요청에 따라 **이쪽(core 작업 환경)에서 현재 제출 후보 확장을 Kiro에 적용하고 프론트 실측을 진행할 예정**이다. 사용자가 직접 입력·사용할 창도 준비한다. 확장 설치와 실측 대상 Workspace Trust는 승인되었으며, 양쪽 변경은 `hurdoo` 계정으로 `Hello-KU-tty`의 기존 원격 저장소에 commit/push한다. 아래 자동 검증 기록과 이후 실제 관측은 구분한다.
 
 **실측 준비 후속:**0.0.10 재조립·설치, 제품 workspace Trust, 실제 PREVIEW1회/10후보(32.812초), Kiro 재시작·History 복원과 저장 hash 불변을 확인했다. 직접 입력 가능한 창을 열어 두었다. 최신 사용량836.18/2000, Overages Disabled. core 소스 commit `bc8570b` push 완료, program `deef685`는 HURDOO의 Write 권한 대기다. 현재 설치 VSIX와 정확한 관측 범위는 [실측 준비 기록](FRONTEND_LIVE_READY_20260929.md)을 기준으로 한다. 아래 내용은 그 이전 자동 검증 시점이다.
@@ -39,11 +41,11 @@
 
 | 파일 | SHA-256 |
 | --- | --- |
-| [update kit](../dist/frontend-handoff-20260929-2.zip) | `4fee043ea0470623e986f374fb247e27611197a2c47a3ac94cee28b1d3658be1` |
-| [제품 VSIX 0.0.10](../dist/submission-20260929/builder-helper-agent-panel-0.0.10-win32-x64-272221b7adbf.vsix) | `cbe71c2afe0f99fd25ca5e9d96e77e3cdc4486e12262ba52465a7d4b0ccbe6ce` |
-| [소스 ZIP](../dist/submission-20260929/vibe-helper-source-20260929.zip) | `26b9261887fc41f180e9177ceba968d71ba65f40527649781c43a3fc685a512b` |
+| 당시 `dist/frontend-handoff-20260929-2.zip` | `4fee043ea0470623e986f374fb247e27611197a2c47a3ac94cee28b1d3658be1` |
+| 당시 `dist/submission-20260929/builder-helper-agent-panel-0.0.10-win32-x64-272221b7adbf.vsix` | `cbe71c2afe0f99fd25ca5e9d96e77e3cdc4486e12262ba52465a7d4b0ccbe6ce` |
+| 당시 `dist/submission-20260929/vibe-helper-source-20260929.zip` | `26b9261887fc41f180e9177ceba968d71ba65f40527649781c43a3fc685a512b` |
 
-kit **125 files / 5,061,731 bytes**, VSIX **71 files / 2,560,126 bytes**, source ZIP **783 files / 2,427,105 bytes**. kit manifest는 `backendHead=8265e9d...`, `backendWorkingTreeDirty=true`를 명시한다. 미커밋 수정이 있으므로 HEAD만으로 재현된다고 주장하지 않는다. source781개의 파일별 hash manifest를 동봉했으며 ZIP·VSIX·소스는 모두 로컬 검토본이다. ZIP 내부 문서의 동결 후 재현 결과는 외부 receipt에 기록했다. [kit 절차](FRONTEND_HANDOFF.md), [kit 검증 receipt](spikes/T19_FRONTEND_HANDOFF_UPDATE_20260929_2.json), [소스 receipt](../dist/submission-20260929/source-receipt.json).
+kit **125 files / 5,061,731 bytes**, VSIX **71 files / 2,560,126 bytes**, source ZIP **783 files / 2,427,105 bytes**. kit manifest는 `backendHead=8265e9d...`, `backendWorkingTreeDirty=true`를 명시한다. 미커밋 수정이 있으므로 HEAD만으로 재현된다고 주장하지 않는다. source781개의 파일별 hash manifest를 동봉했으며 ZIP·VSIX·소스는 모두 로컬 검토본이다. ZIP 내부 문서의 동결 후 재현 결과는 외부 receipt에 기록했다. [kit 절차](FRONTEND_HANDOFF.md), [kit 검증 receipt](spikes/T19_FRONTEND_HANDOFF_UPDATE_20260929_2.json), 당시 로컬 `dist/submission-20260929/source-receipt.json`.
 
 ## 아직 필요한 작업
 

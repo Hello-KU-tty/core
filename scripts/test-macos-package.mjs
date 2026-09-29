@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { cp, mkdtemp, readFile, realpath, writeFile } from 'node:fs/promises'
+import { cp, mkdtemp, readFile, realpath, rename, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -25,7 +25,8 @@ const selected = await api.selectCoreRuntime({
   nodeExecutables: [],
   offline: true,
 })
-assert.equal(selected.runtime.executable, join(installed, 'bin/node'))
+assert.ok(selected.runtime.executable.startsWith(join(root, 'core-tools/runtime-cache') + '/'))
+assert.equal(selected.runtime.source, 'MANAGED_NODE')
 const managers = []
 const create = () => {
   const manager = createCoreLifecycle({
@@ -83,7 +84,10 @@ try {
   })
   await api.prepareProjectTools(workspace, tc, resources)
   const verified = await api.verifyProjectTools(workspace, resources)
-  assert.equal(verified.toolchain.node.executable, join(installed, 'bin/node'))
+  assert.ok(
+    verified.toolchain.node.executable.startsWith(join(root, 'project-tools/node-cache') + '/'),
+  )
+  assert.equal(verified.toolchain.node.source, 'MANAGED_NODE')
   const reused = await api.selectProjectToolchain({
     resources,
     privateRoot: join(root, 'project-tools'),
@@ -149,6 +153,52 @@ try {
   )
   await writeFile(launcher, original)
   pass('project_launcher_tamper_denied')
+  // Actual packaged Node, SQLite and tool runner, not a synthetic probe.
+  const oldRoot = join(root, 'extensions/vibe-helper.builder-helper-agent-panel-0.1.1/portable')
+  const nextRoot = join(root, 'extensions/vibe-helper.builder-helper-agent-panel-0.1.2/portable')
+  await cp(installed, oldRoot, { recursive: true })
+  await cp(installed, nextRoot, { recursive: true })
+  const oldResources = await api.loadCoreResources(oldRoot)
+  const nextResources = await api.loadCoreResources(nextRoot)
+  const upgradeRoot = await api.ownedPrivateDirectory(join(root, 'upgrade-tools'))
+  const upgradeWorkspace = await api.ownedPrivateDirectory(join(root, 'upgrade-project'))
+  const oldTools = {
+    ...tc,
+    privateRoot: upgradeRoot,
+    node: { ...tc.node, source: 'EXISTING_NODE', executable: join(oldRoot, 'bin/node') },
+    pnpm: { ...tc.pnpm, source: 'EXISTING_PNPM' },
+  }
+  await api.preparePnpmShim(oldTools, oldResources)
+  await api.prepareProjectTools(upgradeWorkspace, oldTools, oldResources)
+  await writeFile(join(upgradeWorkspace, 'user.txt'), 'preserved source')
+  await rename(oldRoot, oldRoot + '-preserved')
+  const nextTools = await api.selectProjectToolchain({
+    resources: nextResources,
+    privateRoot: upgradeRoot,
+    nodeExecutables: [],
+    pnpmExecutables: [],
+    offline: true,
+  })
+  await api.prepareProjectTools(upgradeWorkspace, nextTools, nextResources)
+  assert.deepEqual(
+    (await api.verifyProjectTools(upgradeWorkspace, nextResources)).toolchain,
+    nextTools,
+  )
+  assert.equal((await execute(nextTools.node.executable, ['--version'])).stdout.trim(), 'v24.19.0')
+  assert.equal(await readFile(join(upgradeWorkspace, 'user.txt'), 'utf8'), 'preserved source')
+  pass('upgrade_after_old_install_removed')
+  await rename(upgradeWorkspace, upgradeWorkspace + '-moved')
+  const restoredTools = await api.selectProjectToolchain({
+    resources: nextResources,
+    privateRoot: upgradeRoot,
+    offline: true,
+  })
+  assert.deepEqual(restoredTools, nextTools)
+  const newWorkspace = await api.ownedPrivateDirectory(join(root, 'new-after-move'))
+  await api.prepareProjectTools(newWorkspace, restoredTools, nextResources)
+  await api.verifyProjectTools(newWorkspace, nextResources)
+  await assert.rejects(realpath(upgradeWorkspace), { code: 'ENOENT' })
+  pass('moved_only_workspace_does_not_block_new_project')
   await b.dispose()
   await c.dispose()
   await waitUntil(async () => {

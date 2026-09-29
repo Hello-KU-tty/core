@@ -1,5 +1,13 @@
 # 결정 기록
 
+## 2026-09-30: 후속 감사 복구와 로컬 commit
+
+- **승인:** 사용자가 감사 보완 전부를 요청하고 push 없이 commit까지만 지시했다. 기존 원본·영상·실험·stash는 보존한다.
+- **재현:** 설치 경로를 Node 실행 경로로 기록하면 구 확장 제거 뒤 도구 선택이 실패한다. 유일한 생성 workspace 이동도 전체 도구 선택을 막는다. 모델0 격리 재현을 근거로 cache 수명과 workspace 수명을 분리한다.
+- **선택:** manifest hash로 고정한 Mac Node private cache, 동일 제품 상위 버전에 한정한 bundled Node 이관, 정확한 private 기록/shared shim에 근거한 absent-workspace 도구 재사용을 구현한다. 새 dependency·도구 권한·DB migration은 없다. Windows 경로는 회귀 검증하되 Mac 결과를 Windows 실측으로 확대하지 않는다.
+- **문서/게시:** 옛 산출물 hash는 당시 기록으로 남기고 현재 다운로드 경로와 정성 인터뷰 한계를 연결한다. 조직 profile/description 초안은 core에 준비하며 GitHub에는 쓰지 않는다. Mac 후보 0.1.2와 개발자 ZIP은 기존 파일 경로로 로컬 갱신하고 공개본 0.1.1과 구분한다.
+- **실제 모델:** 새 합성 폴더 Trust와 최신 사용량이 확인되면 누적900/신규중단880·초과과금 비활성 조건으로 진행한다. 미확인·차단 시 PASS를 만들지 않고 T19-M2를 대기로 기록한다.
+
 ## 2026-09-30: 완료 뒤 지속적인 Builder·Helper 사용과 도구 거부 표시
 
 - **승인:** 사용자가 완료 뒤 입력 차단 제거, 권한 오류 수정, 새 버전 VSIX 생성·Kiro 종료/재시작 적용·기존 저장소 push를 요청했다. 기존 `@HURDOO`/`Hello-KU-tty` 게시 승인을 유지한다.

@@ -22,7 +22,7 @@ test('Mac tool environment is limited to canonical trusted generated folders',
       projectEnvironment() { return { PATH: '/product/portable/bin:/private/tools/bin:/usr/bin' } } }
     await prepareMacProjectTerminal(vscode, { environmentVariableCollection: collection }, ready, api)
     assert.equal(collection.persistent, false)
-    assert.deepEqual(calls[0].nodeExecutables, ['/product/portable/bin/node'])
+    assert.deepEqual(calls[0].nodeExecutables, [])
     assert.deepEqual(calls[0].pnpmExecutables, [])
     assert.equal(changes.find(([key]) => key === 'NODE_OPTIONS')[1], '')
     assert.deepEqual(changes.find(([key]) => key === 'PATH')[2],

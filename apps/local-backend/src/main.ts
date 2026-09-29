@@ -343,7 +343,7 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
               resources: assets,
               privateRoot: join(root, 'project-tools'),
               ...(assets.manifest.target === 'darwin-arm64'
-                ? { nodeExecutables: [join(assets.root, 'bin/node')], pnpmExecutables: [] }
+                ? { nodeExecutables: [], pnpmExecutables: [] }
                 : {}),
               ...(signal ? { signal } : {}),
             })

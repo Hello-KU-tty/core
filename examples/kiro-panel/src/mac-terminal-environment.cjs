@@ -20,7 +20,7 @@ async function prepareMacProjectTerminal(vscode, context, ready, api) {
     throw new Error('MAC_PROJECT_WORKSPACE_UNSAFE')
   const toolchain = await api.selectProjectToolchain({
     resources: ready.resources, privateRoot: join(dirname(ready.connectionFile), 'project-tools'),
-    nodeExecutables: [join(ready.resources.root, 'bin/node')], pnpmExecutables: [],
+    nodeExecutables: [], pnpmExecutables: [],
   })
   const scoped = collection.getScoped({ workspaceFolder: folders[0] })
   for (const name of ['NODE_OPTIONS', 'NODE_PATH', 'NODE_REPL_EXTERNAL_MODULE', 'ELECTRON_RUN_AS_NODE'])

@@ -346,6 +346,60 @@ export async function recoverCoreAcquisition(cacheRoot: string): Promise<void> {
   await rename(lock, join(cacheRoot, `acquisition.abandoned-${randomUUID()}.json`))
 }
 
+export function managedMacNodePath(cacheRoot: string, resources: CoreResources): string {
+  const asset = resources.manifest.files['bin/node']
+  if (
+    resources.manifest.target !== 'darwin-arm64' ||
+    !asset ||
+    !/^[a-f0-9]{64}$/.test(asset.sha256)
+  )
+    fail('RUNTIME_CACHE_CORRUPT')
+  return join(cacheRoot, `node-darwin-arm64-${asset.sha256}`, 'node')
+}
+
+/** Install files have a shorter lifetime than generated projects. Never record their Node path. */
+async function acquireMacNode(cacheRoot: string, resources: CoreResources): Promise<string> {
+  await ownedPrivateDirectory(cacheRoot)
+  const executable = managedMacNodePath(cacheRoot, resources)
+  const destination = join(executable, '..')
+  const assets = [
+    ['bin/node', 'node'],
+    ['licenses/node-LICENSE', 'LICENSE'],
+  ] as const
+  const validate = async () => {
+    if (!(await isPrivateDirectory(destination))) fail('RUNTIME_CACHE_UNSAFE')
+    for (const [source, name] of assets) {
+      const asset = resources.manifest.files[source]
+      if (!asset) fail('RUNTIME_CACHE_CORRUPT')
+      const bytes = await plainFile(join(destination, name), asset.bytes)
+      if (bytes.length !== asset.bytes || sha256(bytes) !== asset.sha256)
+        fail('RUNTIME_CACHE_CORRUPT')
+    }
+    return executable
+  }
+  if (
+    await lstat(destination).catch((error) => {
+      if (error.code === 'ENOENT') return null
+      throw error
+    })
+  )
+    return validate()
+  const stage = await ownedPrivateDirectory(join(cacheRoot, `copy-${randomUUID()}`))
+  for (const [source, name] of assets) {
+    const asset = resources.manifest.files[source]
+    if (!asset) fail('RUNTIME_CACHE_CORRUPT')
+    const bytes = await plainFile(join(resources.root, source), asset.bytes)
+    if (bytes.length !== asset.bytes || sha256(bytes) !== asset.sha256)
+      fail('RUNTIME_CACHE_CORRUPT')
+    await writeFile(join(stage, name), bytes, { flag: 'wx', mode: name === 'node' ? 0o700 : 0o600 })
+  }
+  // A concurrent caller may have committed an identical complete directory. Never overwrite it.
+  await rename(stage, destination).catch((error) => {
+    if (!['EEXIST', 'ENOTEMPTY'].includes(error.code)) throw error
+  })
+  return validate()
+}
+
 export async function acquireCoreNode(
   cacheRoot: string,
   resources: CoreResources,
@@ -356,11 +410,8 @@ export async function acquireCoreNode(
     process.arch === 'arm64' &&
     resources.manifest.target === 'darwin-arm64'
   ) {
-    const path = join(resources.root, 'bin/node')
-    const asset = resources.manifest.files['bin/node']
-    if (!asset || sha256(await plainFile(path, asset.bytes)) !== asset.sha256)
-      fail('RUNTIME_CACHE_CORRUPT')
-    return path
+    options.signal?.throwIfAborted()
+    return acquireMacNode(cacheRoot, resources)
   }
   if (process.platform !== 'win32' || process.arch !== 'x64') fail('RUNTIME_TARGET_UNSUPPORTED')
   await ownedPrivateDirectory(cacheRoot)

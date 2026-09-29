@@ -1,5 +1,11 @@
 # Vibe Helper 기술 아키텍처
 
+## 2026-09-30 Mac 도구 복구 경계
+
+- `acquireCoreNode`는 검증된 Mac 설치 Node/라이선스를 private hash-addressed cache에 원자적으로 복사한다. 모든 재사용에서 byte hash를 검사하고 실행 probe를 유지한다.
+- 이전 bundled Node 기록은 같은 확장의 단조 증가 버전과 정확한 이전 `portable/bin/node` 경로에 한해 새 cache descriptor로 정규화한다. shared shim·workspace launcher·descriptor의 중간 상태는 정확한 이전/새 바이트만 허용한다.
+- 사라진 workspace는 canonical한 가장 가까운 부모와 ENOENT를 확인한 뒤 도구 선택에만 기록을 재사용한다. 임의 경로 검색·프로젝트 이동·source 수정·기록 삭제는 하지 않는다. 존재하는 링크/비공개 권한 위반·변조는 복구 근거가 아니다.
+
 ## 1. 상태
 
 - 2026-09-30 배포 갱신은 명시적으로 지정한 frontend checkout에서 Mac 확장을 빌드하고 Core와 frontend 출처를 receipt에 남긴다. 개발자 ZIP은 오래된 부분 덮어쓰기 kit 대신 두 저장소 소스와 프론트의 검증된 기존 Windows portable 자산을 포함한 재현용 snapshot이다. Mac portable은 공식 arm64 Node를 포함해 별도로 빌드한다. 기존 URL은 호환 진입점이며 불변 artifact 식별자는 버전·SHA-256으로 구분한다.

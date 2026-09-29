@@ -1,10 +1,12 @@
 # Windows 소스 후보 재현 — 2026-09-29
 
+> **역사 기록:** 아래 hash·수치는 당시 비공개 로컬 후보의 값이며 현재 ZIP의 값이 아니다. `dist/` 파일은 공개 다운로드 대상이 아니므로 이름만 보존한다. 현재 [개발자 ZIP과 receipt](../releases/frontend-handoff/20260927/README.md), [제출·검증 상태](VALIDATION_STATUS_20260930.md)를 별도로 확인한다.
+
 **판정: 별도 압축 해제본의 자동 재현 PASS.** 실제 모델 호출·사람 pilot·기존 프로젝트 업그레이드 검증과 외부 제출은 이 판정에 포함하지 않는다.
 
 ## 고정한 후보
 
-- [소스 ZIP](../dist/submission-20260929/vibe-helper-source-20260929.zip): 2,427,105 bytes / 783 files. SHA-256 `26b9261887fc41f180e9177ceba968d71ba65f40527649781c43a3fc685a512b`.
+- 당시 로컬 `dist/submission-20260929/vibe-helper-source-20260929.zip`: 2,427,105 bytes / 783 files. SHA-256 `26b9261887fc41f180e9177ceba968d71ba65f40527649781c43a3fc685a512b`.
 - `SOURCE_MANIFEST.json`: 소스781개의 크기와 SHA-256, 원본 hash와 문서 경로 일반화 여부. manifest SHA-256 `5b0f6dd8e4501298b55335dc5c8b6f7e31275f01a93b6d62e4ccfc61874d8126`.
 - backend base `8265e9da79d40964a0a2c794121887f06e89da7f`, frontend base `82f55ffa821d8e3f5d4ab071e543278e4fbb04e6`. 이번 미커밋 수정은 각 파일 hash로 고정했다. 제품 버전0.0.10.
 - `.git`, local DB, 사용자 생성 workspace, 로그, 환경 변수 파일, 의존성 설치 폴더와 Windows 바이너리 설치물은 포함하지 않는다. Windows VSIX는 [별도 후보](SUBMISSION_READINESS_20260929.md)다.
@@ -34,6 +36,6 @@ Consumer의 PREVIEW17/ENRICH_SELECTED3/SPEC4/BUILDER2는 지연된 deterministic
 
 ## 전달과 한계
 
-[외부 receipt](../dist/submission-20260929/source-receipt.json)는 고정 ZIP hash에 위 후속 결과를 연결한다. ZIP 안 문서와 manifest의 `Independent source verification` 대기는 동결 당시 상태이며 archive를 사후 수정하지 않았다. 이 보고서는 ZIP 동결 후 작성되었다.
+당시 로컬 `dist/submission-20260929/source-receipt.json`은 고정 ZIP hash에 위 후속 결과를 연결한다. ZIP 안 문서와 manifest의 `Independent source verification` 대기는 동결 당시 상태이며 archive를 사후 수정하지 않았다. 이 보고서는 ZIP 동결 후 작성되었다.
 
 새 PC·오프라인 설치·실제 Kiro activation/모델 품질의 재현 결과는 아니다. 설치된0.0.10의 live 흐름과 기존0.0.9 프로젝트 업그레이드, 사람 근거·baseline·fallback 영상, 제출 형식은 [잔여 작업](SUBMISSION_READINESS_20260929.md)에 남아 있다. commit/push/공개/외부 전송은 수행하지 않았다.

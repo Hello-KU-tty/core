@@ -74,11 +74,13 @@ Kiro IDE
 
 ## 다운로드·설치
 
+이 checkout의 후속 변경은 로컬 commit 후보이며 아직 push하지 않았다. [현재 제출·검증 상태](docs/VALIDATION_STATUS_20260930.md)에서 공개본, 새 후보, 사람 인터뷰와 미검증 범위를 구분한다.
+
 다운로드 파일 선택부터 첫 실행·업데이트·오류 해결까지는 **[다운로드·설치 가이드](docs/DOWNLOAD_GUIDE.md)**를 참고한다.
 
 **[Windows용 VSIX 0.0.18 다운로드](releases/windows/0.0.18/builder-helper-agent-panel-0.0.18-win32-x64-74208fffa5c0.vsix?raw=true)** · Windows x64용. Kiro IDE 1.1.70 / 내장 Agent 1.1.158 기준이며 [Windows 설치 안내·검증 범위](docs/WINDOWS_VSIX.md)를 확인한다.
 
-**[Mac용 VSIX 0.1.1 다운로드](releases/macos/0.1.0/builder-helper-agent-panel-0.1.0-darwin-arm64.vsix?raw=true)** · Apple Silicon(M1 이상)용. 기존 다운로드 주소와 파일명은 유지하며 내부 확장 버전은 **0.1.1**이다. Intel Mac은 지원 대상이 아니다. [Mac 설치 안내·검증 범위](docs/MAC_VSIX.md)를 확인한다.
+**[Mac용 VSIX 고정 다운로드 경로](releases/macos/0.1.0/builder-helper-agent-panel-0.1.0-darwin-arm64.vsix?raw=true)** · Apple Silicon(M1 이상)용. 공개본은 **0.1.1**, 이 checkout의 로컬 후보는 **0.1.2**이며 push 전까지 공개 링크는 이전 파일이다. 기존 주소·파일명은 유지하고 내부 버전·hash로 구분한다. Intel Mac은 지원 대상이 아니다. [Mac 설치 안내·검증 범위](docs/MAC_VSIX.md)를 확인한다.
 
 1. [Kiro IDE](https://kiro.dev/downloads/)를 설치하고 본인 계정으로 로그인한다.
 2. Windows x64에서는 위 `win32-x64.vsix`를 받는다. Mac에서는 Kiro를 `/Applications/Kiro.app`에 설치하고 위 `darwin-arm64.vsix`를 받는다.
@@ -89,7 +91,7 @@ Kiro IDE
 
 VSIX가 작동하지 않으면 먼저 [연결 오류 해결](docs/DOWNLOAD_GUIDE.md#6-업데이트와-문제-해결)을 확인한다. [개발자용 ZIP](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/frontend-handoff/20260927/frontend-handoff-20260927.zip)은 2026-09-30 백엔드·프론트 전체 실행 소스로 갱신했다. 새 폴더에 풀어 [소스 재빌드 안내](docs/DOWNLOAD_GUIDE.md#7-vsix가-작동하지-않을-때-개발자용-대안)를 따른다. ZIP 자체는 확장 설치 파일이 아니다.
 
-Mac 0.1.1과 개발자 ZIP은 공개 frontend `a61d408`(0.0.18)과 대응 Core를 기준으로 한다. 완료 뒤 Builder·Helper 대화 유지, 기록된 Node·pnpm 재사용, 중복 Helper 요약 제거를 포함한다. Mac 패키지 버전과 Windows 패키지 버전은 별도로 관리한다.
+Mac과 개발자 ZIP은 공개 frontend `a61d408`(0.0.18)과 대응 Core를 기준으로 한다. 완료 뒤 Builder·Helper 대화 유지, 기록된 Node·pnpm 재사용, 중복 Helper 요약 제거를 포함한다. 로컬 0.1.2 후보에는 구 설치 제거·프로젝트 이동 뒤 도구 복구를 추가했다. Mac 패키지 버전과 Windows 패키지 버전은 별도로 관리한다.
 
 ## 개발 환경과 검증
 
