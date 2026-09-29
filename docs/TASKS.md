@@ -770,6 +770,13 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 
 ### [~] T19. 자체 Kiro IDE 패널과 프론트 실제 연동
 
+#### [~] T19-F15. 채팅 스트림 표시와 Helper 창 준비 상태 복구
+
+- **근거:** 사용자 실측에서 TEXT 조각마다 문단이 생기고 Markdown이 그대로 보인다. Helper RECORDED 뒤에도 로컬 worker의 HELPER_WINDOW_OPENING이 남는다.
+- **범위:** 기존 Core-redacted 스트림을 연속된 대화로 표시하고 안전한 서식을 적용한다. Helper 실행 이벤트·종료 기준으로 준비 표시를 해제한다. Windows 별도 H 권한 격리는 유지하며 한 창 제약과 남은 UX 한계를 기록한다.
+- **완료 조건:** 조각·Markdown·HTML 안전성·스크롤·별도 host 진행/종료 회귀, frontend 검사, 설치 후 실제 화면 확인. 사용자 데이터와 모델 실행을 보존한다.
+- **즉시 인계:** 사용자 요청으로 프론트 개발자가 바로 착수할 수 있게 원격 기존 변경을 병합해0.0.14 `950f83f`를 program/main에 push했다. 최종780 tests/typecheck/build PASS. 0.0.13 설치는 확인했으며 실제 새 화면 검증은 남아 있어 이 항목은 진행 중이다. [현재 인계](FRONTEND_CHAT_FIX_20260929.md).
+
 #### [x] T19-F14. 명시적 스펙 시작과 Builder 최초 실행 연결
 
 - **근거:** 사용자 실측에서 `이걸로 시작` 후 CONFIRMED Spec/PENDING Task만 저장되고 Builder run은0이다. 화면에는 학습 목표를 작업 제목으로, 이전 DISCOVERY 종료를 현재 작업 상태처럼 표시한다.
@@ -784,9 +791,10 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - **완료 조건:** 합치기/새 방향 등 후속 라운드의 상세 표시와 실패/화면 전환 회귀, frontend 전체 검사, 실제 Core 소비 검증, 새 VSIX로 기존 저장 후보 복원 확인. 모델 재호출로 우회하지 않는다.
 - **검증:**0.0.11 설치·기존 후보 복원, frontend758/typecheck/build, 실제 Core HTTP/SSE/SQLite→renderer의 MERGE/REGENERATE 표시와 추가 enrichment0 PASS. 재시작 전후 저장hash 동일·새 모델run0. [원인·수정·설치 파일](FRONTEND_FEEDBACK_DISPLAY_FIX_20260929.md).
 
-#### [-] T19-F12. 실측 예정 인계·승인된 commit/push와 직접 사용 환경 준비
+#### [x] T19-F12. 실측 예정 인계·승인된 commit/push와 직접 사용 환경 준비
 
 - **승인:** 2026-09-29 사용자가 이쪽에서 프론트 실측 예정 문구 추가, commit/push, 제출 후보 확장 제작·Kiro 실행·설치·Workspace Trust와 직접 사용 준비를 요청했다. push는 `hurdoo` 계정으로 기존 `Hello-KU-tty/core`, `Hello-KU-tty/program`에 수행한다.
+- **권한 대기 해소:** F15 즉시 인계에서 HURDOO의 program push 권한을 API로 확인하고 원격 변경을 보존한0.0.14 `950f83f`를 main에 push·원격 SHA 대조했다. 아래 권한 대기 기록은 이전 시점이다. 설치/Trust/직접 사용 준비는 F12 및 후속 F14 실측으로 확인했고, 전체 제품 실측은 F11/F15에 남긴다.
 - **산출물:** 양쪽 인계/검증 변경 commit, 원격 HEAD 확인, 현재 VSIX와 hash, 실제 설치물의 Core 연결·Trust·로그인·화면 준비 기록.
 - **완료 조건:** 사용자용 Kiro 창이 현재 확장으로 실제 Core에 연결되고 직접 입력 가능한 상태다. 모델 실측은 최신 사용량/Overages를 확인하고 기존 누적900·신규중단880 제한 안에서 별도로 판정한다. 사람의 사용을 합성 fixture로 완료 처리하지 않는다.
 - **준비·실측 완료:**0.0.10 재빌드/118관리hash/VSIX 설치, 전용 workspace Trust, 실제 PREVIEW1회/10후보/32.812초, 정상 재시작·History 복원/저장hash불변/새run0. 사용량835.96→836.18/2000, Overages Disabled. 사용자용 빈 입력 화면을 열어 두었다. [실측 기록](FRONTEND_LIVE_READY_20260929.md).

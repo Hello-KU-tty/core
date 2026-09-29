@@ -1,5 +1,12 @@
 # 결정 기록
 
+## 2026-09-29: 실제 채팅 표시와 Helper 준비 상태
+
+- **근거:** 사용자 요청 T19-F15. TEXT 이벤트는 메시지가 아닌 스트리밍 조각이다. 현재 renderer가 조각을 각각 문단으로 만들고, W host의 HELPER_WINDOW_OPENING을 H 완료 뒤에도 남겼다.
+- **표시:** Core-redacted 조각을 정확히 연결한 뒤 문단·제목·목록·강조·코드만 허용 DOM 노드와 textContent로 표현한다. HTML 해석, 외부 이미지/링크 실행, 새 dependency는 추가하지 않는다. 저장된 Helper 요약은 전체 응답과 구분하고 사용자 발췌의 provenance를 유지한다.
+- **상태:** Helper run의 TEXT/TOOL/거절 또는 terminal을 준비 해제 근거로 사용한다. 다른 창의 로컬 worker 종료 알림에 의존하지 않는다. 깜박임은 제거한다.
+- **창 제약:** Windows separate-H gate는 유지한다. 과거 Mac protected built-in 한 창 실측과 Windows custom Agent queue/catalog 격리 결과는 다른 capability다. 공식 Agent Focus의 병렬 세션 지원만으로 본 확장의 세션별 권한 격리를 주장하지 않는다. 창 완전 제거·백그라운드 개설은 이번 표시 수정의 완료 조건이 아니다.
+
 ## 2026-09-29: 현재 확장 제출 후보와 프론트 직접 실측 준비
 
 - **사용자 승인:** 이쪽 작업 환경에서 프론트 실측을 진행할 예정임을 인계 문서에 명시한다. 기존 검증된 변경을 commit/push하며 대상은 `hurdoo` 계정의 기존 `Hello-KU-tty/core`, `Hello-KU-tty/program` 원격이다. 확장 설치, Kiro 창 열기와 실측 대상 Workspace Trust도 사용자가 명시적으로 승인했다.
