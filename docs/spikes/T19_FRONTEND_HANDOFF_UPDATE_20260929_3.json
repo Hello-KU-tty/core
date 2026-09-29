@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "kitVersion": "2026.09.29.3",
+  "previousKitVersion": "2026.09.29.2",
+  "scope": "Windows source and deterministic consumer validation on the frontend PC. No native model-call claim.",
+  "environment": {
+    "os": "Windows x64",
+    "shell": "PowerShell",
+    "node": "24.19.0",
+    "pnpm": "11.13.1",
+    "e2eBrowser": "Playwright Chromium",
+    "modelCalls": 0
+  },
+  "backendChangesIncluded": [
+    "eb215ef B13 content-free classification of refused Builder project commands",
+    "082bbd9 B13 test uses the real launcher prefix; pnpm lint restored on main"
+  ],
+  "baseline": {
+    "source": "program/.vibe-helper-kit.json (2026.09.29.2) applied receipt",
+    "managedFiles": 118
+  },
+  "pnpmCheck": {
+    "result": "PASS",
+    "unit": { "passed": 179, "skipped": 1 },
+    "integration": { "passed": 391, "skipped": 1 },
+    "eval": { "passed": 42 },
+    "campusDrop": { "passed": 3 },
+    "smoke": { "passed": 6 },
+    "e2e": { "passed": 12 },
+    "nativeCjs": { "passed": 169 }
+  },
+  "frontendSourceCandidate": {
+    "revision": "af5db1f",
+    "typecheck": "PASS",
+    "tests": { "files": 57, "passed": 784 },
+    "build": "PASS",
+    "actualConsumer": "PASS: provider/controller + authenticated HTTP/SSE + SQLite; delayed deterministic Agent fixture"
+  },
+  "initialFailures": [
+    "pnpm lint failed on main at scripts/test-program-consumer.mjs:930 (useIterableCallbackReturn); fixed in 082bbd9",
+    "Git Bash resolves whoami.exe to coreutils; all checks were run from PowerShell"
+  ],
+  "notVerified": [
+    "Installed 0.0.14 to 0.0.15 Kiro upgrade with native Builder/Helper runs",
+    "B7 real empty Helper catalog root cause and B11 model narration quality",
+    "Human pilot, consented testimonials and general Kiro baseline"
+  ]
+}
