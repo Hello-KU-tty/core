@@ -39,3 +39,7 @@ Builder는 `previousCompletionReport`를 이전 Agent 작업 맥락으로 받고
 - [패키지 receipt](../releases/windows/0.0.18/program-vsix-receipt.json), [kit 생성 시점 검증](spikes/T19_FRONTEND_HANDOFF_UPDATE_20260930_1.json). kit 생성 시점의 프론트 전체 검증 대기 상태는 위 최종 결과로 해소됐다.
 - 로컬 생성 receipt: `dist/frontend-consumer-receipt.json`, `dist/builder-follow-up-receipt.json`, `dist/project-tools-receipt.json`. 개인 데이터나 설치 프로필을 저장소에 추가하지 않았다.
 - 자동화 Agent는 합성 fixture이며 모델 호출 0회다. 설치 후 UI·파일 검증은 완료했지만 0.0.18의 실제 native 모델 전체 수직 흐름과 다른 PC는 검증하지 않았다. 권한 제한을 모두 제거하거나 모든 모델·도구 실패가 없어졌다고 주장하지 않는다.
+
+## 게시 결과
+
+Core 소스·VSIX·다운로드 문서는 [`8ce42db`](https://github.com/Hello-KU-tty/core/commit/8ce42db58f4bda761d29d9315d31d907b427c05d), 프론트 0.0.18은 [`a61d408`](https://github.com/Hello-KU-tty/program/commit/a61d408b8ad19ed4baf3ead72701821885b3b768)로 각 기존 main에 push했다. 작업 중 추가된 upstream README의 Hello Vibe 이름과 15초 소개 영상 커밋을 먼저 통합했다. GitHub에서 실제 VSIX를 다시 내려받아 위 SHA-256과 일치함을 확인했고 원격 다운로드 가이드의 새 링크도 확인했다. T19-F17의 소스 수정도 이 게시에 포함됐다.

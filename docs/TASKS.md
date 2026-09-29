@@ -770,13 +770,13 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 
 ### [~] T19. 자체 Kiro IDE 패널과 프론트 실제 연동
 
-#### [~] T19-F19. 완료 뒤 지속적인 Builder·Helper 대화와 도구 거부 표시 수정
+#### [x] T19-F19. 완료 뒤 지속적인 Builder·Helper 대화와 도구 거부 표시 수정
 
 - **승인:** 2026-09-30 사용자가 권한 오류 표시와 MVP 완료 뒤 대화 차단 수정을 요청하고 새 VSIX·Kiro 재시작 적용·버전 갱신·저장소 push를 승인했다.
 - **선행 조건:** T19-F17/F18의 0.0.17 코드·배포본과 실제 완료 화면, 최신 양쪽 main.
 - **산출물:** 완료 후 반복 후속 Task/Core 계약과 입력 허용, 명확한 도구 거부 표시, 새 kit·VSIX·다운로드 링크와 설치 결과.
 - **완료 조건:** contract/domain/storage/runtime/frontend/실제 소비 검증, 전체 check, 기존 완료·프로젝트·Evidence 보존, 패키지 hash, Kiro 종료·업데이트·재시작 화면 확인과 GitHub 게시.
-- **로컬 결과:** Core 전체 check·CJS 171·프론트 57파일/807테스트·실제 HTTP/SSE/SQLite 연결과 연속 Builder 3회/Helper 3회 PASS. kit 2026.09.30.1·VSIX 0.0.18 생성, 설치 파일 hash와 Kiro 정상 재시작 후 두 입력/전송 활성 확인. GitHub 게시만 남았다. [검증 기록](CONTINUOUS_BUILDER_20260930.md).
+- **로컬 결과:** Core 전체 check·CJS 171·프론트 57파일/807테스트·실제 HTTP/SSE/SQLite 연결과 연속 Builder 3회/Helper 3회 PASS. kit 2026.09.30.1·VSIX 0.0.18 생성, 설치 파일 hash와 Kiro 정상 재시작 후 두 입력/전송 활성 확인. core `8ce42db`, program `a61d408`로 기존 main에 push했고 원격 SHA 일치와 GitHub VSIX 재다운로드 hash·가이드 링크를 확인했다. 작업 중 추가된 upstream Hello Vibe README·소개 영상 변경도 보존했다. [검증 기록](CONTINUOUS_BUILDER_20260930.md).
 
 #### [x] T19-F18. Windows 0.0.17 VSIX 게시와 다운로드 가이드 연결
 
