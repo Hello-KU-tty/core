@@ -31,7 +31,8 @@
     "moved_only_workspace_does_not_block_new_project",
     "final_lease_shutdown_restart_persistence"
   ],
-  "nativeEndToEnd": "PARTIAL_DECISION_APPLICATION_AND_CANCELLATION_PENDING_APPROVAL",
+  "nativeEndToEnd": "PASS_BOUNDED_DISCOVERY_SPEC_BUILD_DECISION_HELPER_CANCEL_RESUME",
+  "nativeLimitations": "Recovered Core tool failures; next personalization, full MVP, Windows, Intel and long-term use not established",
   "nativeReport": "../../../docs/MAC_NATIVE_VERIFICATION_20260930.md",
   "intelMac": "UNSUPPORTED",
   "downloadPathIsCompatibilityAlias": true

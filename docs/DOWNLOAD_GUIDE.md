@@ -44,7 +44,7 @@ GitHub 파일 화면이 열리면 **Download raw file**을 누릅니다. Windows
 
 GitHub 파일 화면이 열리면 **Download raw file**을 누릅니다. Apple Silicon(M1 이상)용이며 Intel Mac용 파일은 아닙니다. Kiro는 `/Applications/Kiro.app`에 설치합니다. 파일 무결성 확인과 자세한 설치·복구 방법은 [Mac 설치 안내](MAC_VSIX.md)를 따르세요.
 
-이 후보는 격리 프로필 설치와 실제 Core/SQLite·도구·구 설치 제거/이동 복구 자동 검사를 통과했습니다. 실제 모델로 Discovery/Spec→앱 생성·실행, 후속 Decision 생성·Helper·재시작 복원을 확인했습니다. Decision 선택·적용/취소 등 남은 단계는 [실제 설치본 검증 보고](MAC_NATIVE_VERIFICATION_20260930.md)를 보세요. 실제 IDE 자동 업데이트 전체와 장기 사용까지 검증한 것은 아닙니다.
+이 후보는 격리 프로필 설치와 실제 Core/SQLite·도구·구 설치 제거/이동 복구 자동 검사를 통과했습니다. 실제 모델로 Discovery/Spec→앱 생성·실행, Decision 선택·반영, 별도 Helper, 재시작 복원과 실행 중 취소·재개를 확인했습니다. 실패 후 복구와 검증 한계는 [실제 설치본 검증 보고](MAC_NATIVE_VERIFICATION_20260930.md)를 보세요. 다음 개인화·MVP 전체, 실제 IDE 자동 업데이트 전체와 장기 사용까지 검증한 것은 아닙니다.
 
 ## 4. Kiro에 확장 설치
 

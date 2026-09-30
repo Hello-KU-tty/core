@@ -87,7 +87,7 @@ Kiro IDE
 3. Kiro에서 Extensions → `…` → `Install from VSIX…`로 설치한 뒤 다시 로드한다.
 4. Agent Panel을 열고 배우고 싶은 기술을 입력한다.
 
-별도 서비스 로그인이나 API Key는 없다. 모델 사용량은 사용자 본인의 Kiro 계정에서 차감된다. 첫 실행 때 생성 앱의 도구·의존성 준비를 위해 network가 필요할 수 있다. VSIX 사용에는 Node·pnpm 수동 설치나 백엔드 수동 실행이 필요하지 않다. Mac 설치 후보의 검증 기준은 Kiro IDE 1.1.70 / Agent 1.1.158이다. 설치·Core 자동 검사와 실제 앱 생성·실행, 후속 Decision 생성·Helper·재시작 복원을 확인했다. Decision 적용·취소 등 남은 단계는 [실제 설치본 검증 보고](docs/MAC_NATIVE_VERIFICATION_20260930.md)에 구분한다.
+별도 서비스 로그인이나 API Key는 없다. 모델 사용량은 사용자 본인의 Kiro 계정에서 차감된다. 첫 실행 때 생성 앱의 도구·의존성 준비를 위해 network가 필요할 수 있다. VSIX 사용에는 Node·pnpm 수동 설치나 백엔드 수동 실행이 필요하지 않다. Mac 설치 후보의 검증 기준은 Kiro IDE 1.1.70 / Agent 1.1.158이다. 설치·Core 자동 검사와 실제 앱 생성·실행, Decision 선택·반영, 별도 Helper, 재시작 복원·취소 후 재개를 확인했다. 검증 범위와 복구 과정의 실패는 [실제 설치본 검증 보고](docs/MAC_NATIVE_VERIFICATION_20260930.md)에 구분한다.
 
 VSIX가 작동하지 않으면 먼저 [연결 오류 해결](docs/DOWNLOAD_GUIDE.md#6-업데이트와-문제-해결)을 확인한다. [개발자용 ZIP](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/frontend-handoff/20260927/frontend-handoff-20260927.zip)은 2026-09-30 백엔드·프론트 전체 실행 소스로 갱신했다. 새 폴더에 풀어 [소스 재빌드 안내](docs/DOWNLOAD_GUIDE.md#7-vsix가-작동하지-않을-때-개발자용-대안)를 따른다. ZIP 자체는 확장 설치 파일이 아니다.
 
@@ -126,7 +126,7 @@ node scripts/test-program-consumer.mjs <program checkout 경로>
 | 실제 frontend → HTTP/SSE → SQLite consumer | PASS (모델 경계는 deterministic fixture) |
 | 완료 뒤 후속 Builder·Helper | 각 3회, 중복 방지·재접속·기존 완료 보고/파일 보존 PASS (합성 Agent) |
 | Mac 0.1.3 설치·Core·도구 | 격리 Kiro 설치, 실제 패키지 검사9개 PASS, 설치 자산69개·ZIP 재빌드72항목 hash 일치; [재현·항목별 hash](docs/MAC_VSIX.md) |
-| Mac 0.1.3 실제 모델 | 앱 생성·실행, 후속 Decision 생성·Helper2회·재시작 복원 확인. 선택·적용/취소 등은 [부분 검증](docs/MAC_NATIVE_VERIFICATION_20260930.md)으로 기록 |
+| Mac 0.1.3 실제 모델 | 앱 생성·실행, Decision 선택·반영·Helper2회·재시작 복원·실제 취소 후 재개 확인. [범위와 실패 기록](docs/MAC_NATIVE_VERIFICATION_20260930.md); MVP 전체·다음 개인화 완료를 뜻하지 않음 |
 | 의존성 감사 | backend pnpm audit, frontend npm audit 모두 0건 |
 | 이전 9/28 개발 환경 실제 모델 수직 흐름 | 학습 목표 입력 → 후보 10개 → Spec 확정 → Builder Decision → Task 완료 → Helper → 후속 Task로 결과 수정 → 재시작 후 복원 (새 설치물의 모델 완주 검증은 아님) |
 

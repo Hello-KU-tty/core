@@ -38,14 +38,16 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - **소스 검증:** 집중38PASS+1SKIP, 추출본 전체check(unit177/integration418/eval43/Campus3/smoke6/E2E12, 11SKIP), frontend807, 패널 등219+2SKIP, 실제 consumer/완료 후속 요청 PASS. 실제 패키지 자산8개·격리 설치69개 hash·추출 소스 재빌드72항목 일치. Chromium sandbox의 최초 실행 차단을 기록하고 허용된 테스트 전용 환경에서 전체 재실행했다. 공개/유료 모델 호출은 하지 않았다.
 - **최종 로컬 묶음:** 소스 commit `7bf1c33` 기준 ZIP876항목/4,849,742 bytes를 새 폴더에서 frozen install→전체check(E2E12 포함), frontend807/타입/build로 재검증했다. 소스874개 hash가 불변이며 Mac0.1.2 VSIX41,583,212 bytes와 같은 기존 경로에 로컬 보관한다. 실제 설치된 자산 검사8개도 PASS다. 제출 문서 상대 링크71개 확인, 조직 profile/metadata는 로컬 초안만 준비했다. 사용자 원본·영상·실험·stash를 보존했고 push/GitHub 변경/유료 모델 호출은0이다. T19-M2는 승인 대기이며 상위 MVP 완료를 선언하지 않는다. 다음 착수는 Trust·최신 사용량 확인 뒤 T19-M2다.
 
-### [-] T19-M2. Mac 설치본의 실제 native 수직 흐름 검증
+### [x] T19-M2. Mac 설치본의 실제 native 수직 흐름 검증
 
 - **선행:** T19-M1, 설치된 Kiro 본인 계정과 사용량 확인. 패키징 검사와 아래 실제 모델 검증은 구분한다.
 - **재개 승인:** 2026-09-30 사용자가 격리 폴더 Trust 및 계정 누적2,000크레딧을 승인했다.1,980 신규 호출 중단·현재 사용량 관측·초과과금 비활성 조건으로 설치본을 검증한다. push는 하지 않는다.
 - **후속 UI 승인:** 사용자가 에이전트의 직접 폴더 신뢰와 기존 Kiro 창 종료를 명시적으로 허용했다. 정상 Quit으로 이전 인스턴스를 정리하고 설치본 `start-here` 창의 정확한 폴더 Trust가 적용된 것을 UI에서 확인했다. 기존 데이터와 미저장 변경을 삭제하거나 보안 저장소를 직접 수정하지 않는다. 이 승인으로 다음 착수 대상으로 재개한다.
 - **이전09:06 결과:** 격리 확장 호스트의 Core 자동 기동·인증 health·SQLite와 설치 자산을 모델0으로 확인했지만 새 창 제어가 막혔다. 이후 기존 창 정상 종료·직접 Trust로 해결했다.
 - **실제 검증:** 0.1.2의 native 역할 env 충돌을 재현해 `d8768d1`에서 수정하고0.1.3으로 검증했다. Discovery10후보→Spec→Builder 완료→브라우저 실제 앱 조작·reload, 별도 Helper2회·History, 완료 뒤 새 Task의 Decision 생성, 정상 종료·재시작 뒤 대기 Decision/대화 복원까지 확인했다. 최종10:57 KST879.82/2,000·overages Disabled. [추가 검증 보고](MAC_NATIVE_VERIFICATION_20260930.md).
-- **현재 대기:** 합성 Decision의 ‘등록 시 대기/진행 선택’ 확정이 승인 검토에서 차단됐다. 사용자에게 선택·반영·취소 검증 승인을 요청하고 우회하지 않았다. 해당 단계와 다음 개인화는 미완료이며 예산·폴더 승인 부족으로 기록하지 않는다. 실제 모델 추가 호출 없이 산출물·보고를 로컬 commit한다.
+- **이전 대기:** 합성 Decision 확정이 승인 검토에서 차단돼 사용자에게 선택·반영·취소 승인을 요청하고 우회하지 않았다. 아래 후속 승인으로 해당 검증을 재개했다.
+- **선택 승인/재개:** 사용자가 해당 선택지 확정과 Builder 반영·취소 검증을 승인했다. 11:09 KST dashboard879.82/2,000·overages Disabled를 새로 확인하고 동일 격리 프로젝트의 UI에서 재개한다. push 금지는 유지한다.
+- **11:24 종료 판정:** 실제 Decision resolution/application→Task 완료, 진행37쪽 등록·완료/기존 대기 등록/reload, 관리 도구로 타입·41tests PASS. 실제 RUNNING Builder를 UI로 취소해 CANCELLED·세션 종료·입력 복원을 확인했고 같은 Task 재개도 SUCCEEDED/COMPLETED다. Core 도구4건 실패 후 복구한 한계를 남긴다. 앱 소스19개 hash 불변, Task/완료 보고서3개·Analysis6개 성공·SQLite quick_check=ok·활성run0. 최종886.80/2,000·overages Disabled. T19-M2의 한정된 설치본 조건을 충족했으며 다음 개인화·T19 전체·MVP/장기 사용 완료로 확대하지 않는다. 소스·배포 binary는 변경하지 않고 검증 문서/receipt만 로컬 commit한다.
 - **최종 로컬 산출물:** Mac0.1.3 41,583,184 bytes, 개발자 ZIP877항목/4,858,103 bytes를 기존 파일 경로에 반영했다. 최종 ZIP 새 추출본의 전체check(unit177/integration418/eval43/Campus3/smoke6/E2E12, 11SKIP), frontend807/타입/build, 소스 선택 회귀6개 PASS. 검사 후 소스875개 hash 불변과 주요6문서의 상대 링크59개를 확인했다. ZIP 실행 소스는 앞서72항목 재빌드한 수정본과 같고 후속 문서·소스 목록/회귀만 다르다. receipt를 갱신했고 push하지 않았다.
 - **산출물/완료 조건:** 새 학습 목표의 Discovery→Spec→Builder·Helper·Decision→결과 실행/History를 설치본에서 실측하고 terminal 도구 환경·별도 Helper 창·취소와 실패를 기록한다. Windows/Intel/장기 사용으로 확대하지 않는다.
 
