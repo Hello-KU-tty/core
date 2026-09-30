@@ -27,7 +27,7 @@ await cp(portable.root, join(extension, 'portable'), { recursive: true })
 await cp(join(program, 'media'), join(extension, 'media'), { recursive: true })
 const pkg = {
   ...product,
-  version: '0.1.3',
+  version: '0.1.4',
   displayName: 'Hello Vibe',
   description: 'Kiro 1.1.70 extension for Apple Silicon Mac with local Core.',
   engines: { vscode: '^1.131.0' },
