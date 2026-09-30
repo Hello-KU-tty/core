@@ -17,11 +17,11 @@ Hello Vibe는 코딩 초보자가 배우고 싶은 기술 하나로 시작해 �
 
 **30초 버전**
 
-<video src="https://github.com/Hello-KU-tty/core/raw/main/docs/assets/hello-vibe-ad-30s.mp4" controls muted playsinline width="100%"></video>
+https://github.com/user-attachments/assets/e27d6737-d9c7-4a25-b6e4-46c6067b3d55
 
 **15초 버전**
 
-<video src="https://github.com/Hello-KU-tty/core/raw/main/docs/assets/hello-vibe-ad-15s.mp4" controls muted playsinline width="100%"></video>
+https://github.com/user-attachments/assets/c7d26a9e-8f31-4e01-a170-ff86e3b3bb84
 
 ## 해결하려는 문제
 
