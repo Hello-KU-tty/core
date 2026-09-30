@@ -13,15 +13,9 @@ Hello Vibe는 코딩 초보자가 배우고 싶은 기술 하나로 시작해 �
 
 ## 소개 영상
 
-실제 Kiro IDE 화면과 Builder가 만든 결과 앱으로 구성했다. 학습 목표 입력 → 프로젝트 후보 10개 → Learning Spec → Builder 개발 → 동작하는 서비스까지의 흐름이다.
+https://github.com/user-attachments/assets/aacdf659-c0f1-465a-b23b-72a0256fe466
 
-**30초 버전**
-
-https://github.com/user-attachments/assets/e27d6737-d9c7-4a25-b6e4-46c6067b3d55
-
-**15초 버전**
-
-https://github.com/user-attachments/assets/c7d26a9e-8f31-4e01-a170-ff86e3b3bb84
+실제 Kiro IDE에서 진행한 한 프로젝트의 흐름이다. 배우고 싶은 것 입력 → 프로젝트 후보 10개 → Learning Spec → Builder가 실제 결정을 사용자에게 넘김 → Helper에게 질문 → 이유를 적어 선택 → Evidence가 사용자의 이유만 이해 근거로 인정(질문만 한 것과 Agent가 작성한 코드는 제외) → 선택대로 완성된 앱이 새로고침 후에도 데이터를 유지한다.
 
 ## 해결하려는 문제
 
