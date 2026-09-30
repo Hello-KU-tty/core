@@ -40,7 +40,7 @@ GitHub 파일 화면이 열리면 **Download raw file**을 누릅니다. Windows
 
 **[Mac용 VSIX 0.1.1 다운로드](../releases/macos/0.1.0/builder-helper-agent-panel-0.1.0-darwin-arm64.vsix?raw=true)**
 
-2026-09-30 공개 frontend 0.0.18 기준으로 갱신했습니다. 기존 주소·파일명은 유지하며 설치되는 내부 확장 버전은 **0.1.1**입니다. 완료 뒤 지속 대화, 도구 재사용과 중복 Helper 요약 제거를 포함합니다.
+공개 frontend 0.0.18 기준으로 갱신했습니다. 기존 주소·파일명은 유지하며 설치되는 내부 확장 버전은 **0.1.1**입니다. 완료 뒤 지속 대화, 도구 재사용과 중복 Helper 요약 제거를 포함합니다.
 
 GitHub 파일 화면이 열리면 **Download raw file**을 누릅니다. Apple Silicon(M1 이상)용이며 Intel Mac용 파일은 아닙니다. Kiro는 `/Applications/Kiro.app`에 설치합니다. 파일 무결성 확인과 자세한 설치·복구 방법은 [Mac 설치 안내](MAC_VSIX.md)를 따르세요.
 
@@ -97,7 +97,7 @@ Helper·분석 작업에 필요한 보조 Kiro 창이 열릴 수 있습니다. �
 
 **[개발자용 소스 ZIP 다운로드](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/frontend-handoff/20260927/frontend-handoff-20260927.zip)** · [파일·SHA-256·검증 기록](../releases/frontend-handoff/20260927/README.md)
 
-기존 주소·파일명은 유지하지만 내용은 **2026-09-30 전체 실행 소스 snapshot**으로 교체했습니다. `backend/`와 `frontend/`(0.0.18), 파일별 hash를 기록한 `SOURCE_MANIFEST.json`을 포함합니다. 과거 update kit이나 이전 checkout에 덮어쓰지 말고 **새 폴더**에 압축을 푸세요. 20260926 kit 선행 적용은 필요하지 않습니다.
+`backend/`와 `frontend/`(0.0.18), 파일별 hash를 기록한 `SOURCE_MANIFEST.json`을 포함합니다. 과거 update kit이나 이전 checkout에 덮어쓰지 말고 **새 폴더**에 압축을 푸세요. 20260926 kit 선행 적용은 필요하지 않습니다.
 
 1. ZIP을 내려받고 SHA-256을 [현재 receipt](../releases/frontend-handoff/20260927/frontend-handoff-receipt.json)와 비교합니다.
 2. 새 개발 폴더에 풀고 ZIP 최상위 `README.md`를 읽습니다. Git clone 없이 빌드할 수 있습니다.
@@ -105,7 +105,7 @@ Helper·분석 작업에 필요한 보조 Kiro 창이 열릴 수 있습니다. �
 4. `backend/`에서 `pnpm install --frozen-lockfile`을 실행합니다. Mac은 `pnpm panel:pack:macos ../frontend`로 빌드합니다. Windows는 `frontend/`에서 `node ../backend/examples/frontend-handoff/package-program.mjs .`를 실행합니다.
 5. 생성된 운영체제별 `.vsix`를 Kiro에 설치합니다. ZIP 자체를 **Install from VSIX…**에 넣지 않습니다.
 
-포함된 Windows portable은 공개 frontend의 kit `2026.09.30.1` 원본이며 runtime dependencies와 라이선스를 포함합니다. Mac에서는 실행하지 않으며 별도 arm64 portable을 빌드합니다. 계정·DB·대화·개발 node_modules는 포함하지 않습니다. 빌드 도구와 의존성을 받으려면 네트워크가 필요합니다.
+포함된 Windows portable은 공개 frontend의 최신 kit 원본이며 runtime dependencies와 라이선스를 포함합니다. Mac에서는 실행하지 않으며 별도 arm64 portable을 빌드합니다. 계정·DB·대화·개발 node_modules는 포함하지 않습니다. 빌드 도구와 의존성을 받으려면 네트워크가 필요합니다.
 
 ```powershell
 Get-FileHash "$env:USERPROFILE\Downloads\frontend-handoff-20260927.zip" -Algorithm SHA256
