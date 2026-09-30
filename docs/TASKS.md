@@ -16,10 +16,11 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 
 ## 2. MVP 이전: 핵심 수직 흐름 완성
 
-### [~] T19-M5. 검증된 Mac 보완 게시
+### [x] T19-M5. 검증된 Mac 보완 게시
 
 - **승인:** Mac0.1.3·관련 Core·개발자 ZIP·문서를 `@hurdooagent`로 기존 `Hello-KU-tty/core/main`에 push. Windows0.0.18·program·영상·GitHub 설정은 보존한다.
 - **산출물/완료 조건:** 기존 다운로드 경로의 검증된 두 파일, 버전/출처/게시 상태 안내, 원격 commit 및 재다운로드 hash 일치. force push나 재빌드·유료 모델 호출은 하지 않는다.
+- **게시 결과:** 최초 push 직전 원격 `f230392`의 다운로드 가이드 수정이 추가되어 non-fast-forward로 거절됐다. 해당 날짜·표현 정리를 보존해 병합한 `e1fc4f2`를 정상 push하고 원격 SHA 일치를 확인했다. 11:46 KST 고정 URL에서 다시 받은 Mac41,583,184 bytes/SHA-256 `ff3ead843bde482d4fc575b175075c4606f44afc37a70bedd57819646c843e53`(내부0.1.3), ZIP4,858,103 bytes/SHA-256 `ab5aa41082f732cf026691d0b188ac0feed503299b457d0b8e0e94c684859f69`가 로컬 receipt와 일치했다. 원격 가이드도 병합본과 동일하다. Windows 파일 변경0, program 원격은 `e65cd7f` 그대로이며 원본 발표자료·영상·stash를 보존했다.
 
 ### [x] T19-M1. Mac 배포용 VSIX
 

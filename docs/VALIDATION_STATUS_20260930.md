@@ -46,6 +46,8 @@
 
 ## 전달
 
+2026-09-30 사용자 승인 후 `@hurdooagent`로 기존 core/main에 게시했다. 원격 다운로드 가이드 수정 `f230392`를 보존한 `e1fc4f2`가 게시 commit이다. 11:46 KST 고정 URL의 Mac0.1.3·개발자 ZIP을 다시 받아 크기/SHA-256·내부 버전과 원격 가이드 일치를 확인했다. Windows0.0.18 파일과 program 원격 `e65cd7f`는 변경하지 않았다. 세부 값은 아래 receipt를 따른다.
+
 [설치 가이드](DOWNLOAD_GUIDE.md) · [Mac 후보와 hash](MAC_VSIX.md) · [개발자 ZIP receipt](../releases/frontend-handoff/20260927/README.md) · [조직 소개 게시 초안](GITHUB_LANDING_HANDOFF.md).
 
 기존 URL/파일명은 유지하되 새 내부 버전과 hash를 명시한다. Git 이력·시각을 바꾸거나 마감 전 결과로 위장하지 않는다. 동결 ZIP 안의 미게시 문구는 당시 기록이며 최신 게시 상태는 저장소의 receipt를 기준으로 한다.

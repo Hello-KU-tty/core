@@ -1,7 +1,10 @@
 {
   "file": "frontend-handoff-20260927.zip",
   "status": "DEVELOPER_SOURCE_SNAPSHOT",
-  "publicationStatus": "APPROVED_FOR_GIT_MAIN_PUBLICATION",
+  "publicationStatus": "PUBLISHED_GIT_MAIN_VERIFIED",
+  "publicationCommit": "e1fc4f2de1b01e96b839fa4649861a32ca20b91a",
+  "downloadVerifiedAt": "2026-09-30T02:46:19Z",
+  "downloadSha256Matched": true,
   "updatedAt": "2026-09-30",
   "bytes": 4858103,
   "sha256": "ab5aa41082f732cf026691d0b188ac0feed503299b457d0b8e0e94c684859f69",

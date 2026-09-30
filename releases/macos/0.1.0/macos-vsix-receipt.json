@@ -1,7 +1,10 @@
 {
   "file": "builder-helper-agent-panel-0.1.0-darwin-arm64.vsix",
   "version": "0.1.3",
-  "publicationStatus": "APPROVED_FOR_GIT_MAIN_PUBLICATION",
+  "publicationStatus": "PUBLISHED_GIT_MAIN_VERIFIED",
+  "publicationCommit": "e1fc4f2de1b01e96b839fa4649861a32ca20b91a",
+  "downloadVerifiedAt": "2026-09-30T02:46:19Z",
+  "downloadSha256Matched": true,
   "updatedAt": "2026-09-30",
   "target": "darwin-arm64",
   "bytes": 41583184,
