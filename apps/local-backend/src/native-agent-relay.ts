@@ -804,10 +804,12 @@ export class NativeAgentRelay implements WorkflowAgentPort {
     const names = binding?.toolNames ?? []
     const receiptRoot = await realpath(this.#root)
     const receiptFile =
-      receiptRoot.startsWith('/private/tmp/') ||
-      (!(typeof __VIBE_PACKAGED_CORE__ !== 'undefined' && __VIBE_PACKAGED_CORE__) &&
-        process.env.VIBE_NATIVE_PERSISTENT_DIAGNOSTICS === '1' &&
-        receiptRoot === PERSISTENT_NATIVE_RUNTIME)
+      // Packaged roles must match the verified runtime descriptor exactly, even
+      // when installed under /private/tmp. Receipts are a development-only aid.
+      !(typeof __VIBE_PACKAGED_CORE__ !== 'undefined' && __VIBE_PACKAGED_CORE__) &&
+      (receiptRoot.startsWith('/private/tmp/') ||
+        (process.env.VIBE_NATIVE_PERSISTENT_DIAGNOSTICS === '1' &&
+          receiptRoot === PERSISTENT_NATIVE_RUNTIME))
         ? join(receiptRoot, 'native-core-receipts.jsonl')
         : null
     const config = {

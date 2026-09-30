@@ -3,13 +3,14 @@ import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { cp, mkdtemp, readFile, realpath, rename, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 
 const require = createRequire(import.meta.url)
 const execute = promisify(execFile)
-const root = await realpath(await mkdtemp(join(tmpdir(), 'vibe-mac-package-')))
+// Exercise the exact /private/tmp boundary used by an isolated Mac install.
+const root = await realpath(await mkdtemp('/private/tmp/vibe-mac-package-'))
+const { materializePackagedRoleRuntime } = require('../examples/kiro-panel/src/native-runtime.cjs')
 const installed = join(root, '설치 패키지')
 await cp(resolve(process.argv[2] ?? 'dist/portable-core-darwin-arm64'), installed, {
   recursive: true,
@@ -75,6 +76,47 @@ try {
   const c = create()
   assert.equal((await c.start()).health.backendInstanceId, first.health.backendInstanceId)
   pass('host_reload_preserves_core_and_history')
+  const discovery = await client.startDiscovery(
+    { learningGoal: 'Synthetic packaged role configuration regression' },
+    { enrichAfterPreview: false },
+  )
+  try {
+    const connection = await sdk.readLocalConnection(first.connectionFile)
+    const discoveryWorkspace = await realpath(join(storagePath, 'core-data/workspaces'))
+    let job
+    await waitUntil(async () => {
+      const response = await fetch(
+        `${connection.baseUrl}/api/native/next?workspace=${encodeURIComponent(discoveryWorkspace)}`,
+        { headers: { Authorization: `Bearer ${connection.token}` } },
+      )
+      assert.equal(response.status, 200)
+      job = (await response.json()).job
+      return Boolean(job)
+    })
+    assert.equal(job.role, 'DISCOVERY')
+    const config = JSON.parse(
+      await readFile(join(discoveryWorkspace, '.kiro/agents', `${job.roleName}.json`), 'utf8'),
+    )
+    assert.deepEqual(config.mcpServers['vibe-native-core'].env, selected.runtime.env)
+    const binding = JSON.parse(await readFile(job.bindingFile, 'utf8'))
+    await materializePackagedRoleRuntime(
+      {
+        windowsProduct: true,
+        runtimeDescriptor: selected.runtime,
+        bridgeScriptPath: resources.bridge,
+        prompts: {
+          DISCOVERY: {
+            text: await readFile(join(resources.promptDirectory, 'discovery.md'), 'utf8'),
+          },
+        },
+      },
+      job,
+      binding,
+    )
+    pass('private_tmp_packaged_role_matches_strict_worker_contract')
+  } finally {
+    await client.cancelRun(discovery.run.id)
+  }
   const workspace = await api.ownedPrivateDirectory(join(root, '생성 프로젝트'))
   const tc = await api.selectProjectToolchain({
     resources,
