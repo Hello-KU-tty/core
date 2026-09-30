@@ -50,6 +50,7 @@ const backendDocuments = new Set([
   'docs/FRONTEND_HANDOFF.md',
   'docs/DOWNLOAD_GUIDE.md',
   'docs/MAC_VSIX.md',
+  'docs/MAC_NATIVE_VERIFICATION_20260930.md',
   'docs/VALIDATION_STATUS_20260930.md',
   'docs/GITHUB_LANDING_HANDOFF.md',
   'docs/github-profile/README.md',

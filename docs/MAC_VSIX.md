@@ -1,10 +1,10 @@
 # Mac VSIX 설치
 
-현재 로컬 설치 후보는 Apple Silicon Mac(`darwin-arm64`)용 Hello Vibe **0.1.2**다. 공개 frontend **0.0.18 (`a61d408`, checkout `e65cd7f`)**과 Core `6f40da9` 이후 복구 변경을 포함한다. 완료 뒤 지속 대화·중복 요약 제거에 더해 구 설치 폴더 제거 및 등록 프로젝트 이동 후 도구 복구를 보완했다. Kiro IDE 1.1.70 / 내장 Agent 1.1.158 / API 1.131.0의 source hash를 확인한다. Kiro는 `/Applications/Kiro.app`에 설치하고 본인 계정으로 로그인한다. Intel Mac은 지원 대상이 아니다.
+현재 로컬 설치 후보는 Apple Silicon Mac(`darwin-arm64`)용 Hello Vibe **0.1.3**다. 공개 frontend **0.0.18 (`a61d408`, checkout `e65cd7f`)**과 Core `d8768d1`의 복구 변경을 포함한다. 완료 뒤 지속 대화·중복 요약 제거, 구 설치 제거·프로젝트 이동 후 도구 복구와 임시 경로에서 개발용 receipt가 native 설정 검사에 충돌하는 문제를 보완했다. Kiro IDE 1.1.70 / 내장 Agent 1.1.158 / API 1.131.0의 source hash를 확인한다. Kiro는 `/Applications/Kiro.app`에 설치하고 본인 계정으로 로그인한다. Intel Mac은 지원 대상이 아니다.
 
-[Mac용 VSIX 고정 경로](../releases/macos/0.1.0/builder-helper-agent-panel-0.1.0-darwin-arm64.vsix?raw=true) · 로컬 후보 41,583,212 bytes · SHA-256 `05f3b409239f47c9fa5b376dca3cc8ab4d7bbffcb7211acec64b07b9d4d26e70`
+[Mac용 VSIX 고정 경로](../releases/macos/0.1.0/builder-helper-agent-panel-0.1.0-darwin-arm64.vsix?raw=true) · 로컬 후보 41,583,184 bytes · SHA-256 `ff3ead843bde482d4fc575b175075c4606f44afc37a70bedd57819646c843e53`
 
-2026-09-30 로컬 후보를 갱신했으며 **이번 변경은 push하지 않았다**. 공개 URL은 사용자가 게시하기 전까지 종전 **0.1.1**이다. 기존 주소·파일명의 `0.1.0`은 호환 다운로드 경로이고 새 파일의 내부 버전은 **0.1.2**다. [receipt](../releases/macos/0.1.0/macos-vsix-receipt.json)와 [항목별 hash](../releases/macos/0.1.0/files.json)로 구분한다.
+2026-09-30 로컬 후보를 갱신했으며 **이번 변경은 push하지 않았다**. 공개 URL은 사용자가 게시하기 전까지 종전 **0.1.1**이다. 기존 주소·파일명의 `0.1.0`은 호환 다운로드 경로이고 새 파일의 내부 버전은 **0.1.3**다. [receipt](../releases/macos/0.1.0/macos-vsix-receipt.json)와 [항목별 hash](../releases/macos/0.1.0/files.json)로 구분한다.
 
 GitHub 파일 화면이 열리면 **Download raw file**을 누른다. 다운로드 후 터미널에서 아래 값이 위 SHA-256과 같은지 확인할 수 있다.
 
@@ -12,7 +12,7 @@ GitHub 파일 화면이 열리면 **Download raw file**을 누른다. 다운로�
 shasum -a 256 ~/Downloads/builder-helper-agent-panel-0.1.0-darwin-arm64.vsix
 ```
 
-0.1.2는 Kiro 격리 프로필 설치 및 실제 패키지 자산 Core/SQLite lifecycle·도구 재사용·변조 거절·업그레이드/이동 복구 **8개 검사 PASS**다. 자동 회귀 및 개발자 ZIP 재현의 최종 결과는 [검증 상태](VALIDATION_STATUS_20260930.md)와 receipt에 기록한다. ZIP timestamp로 압축 파일 전체 hash는 달라질 수 있다. 새 설치본 native 전체 완주와 자동 검사는 별개다.
+0.1.3은 Kiro 격리 프로필 설치 및 실제 패키지 자산 Core/SQLite lifecycle·도구 재사용·변조 거절·업그레이드/이동 복구·native 역할 설정 **9개 검사 PASS**다. 설치 자산69개 및 개발자 ZIP 재빌드72항목 hash가 일치한다. 자동 검사는 [검증 상태](VALIDATION_STATUS_20260930.md), 실제 모델 검증은 [후속 보고](MAC_NATIVE_VERIFICATION_20260930.md)로 구분한다. ZIP timestamp로 압축 파일 전체 hash는 달라질 수 있다.
 
 ## 설치와 사용
 
@@ -36,7 +36,7 @@ Core/SQLite는 확장 전용 global storage 아래 `core-data`, 생성 프로젝
 - 개발 도구 없는 선택 조건에서 Node/pnpm 준비, 실제 생성 프로젝트 명령, 재시작 후 기록 도구 재사용, launcher 변조와 잘못된 기록 거절.
 - Core unit/integration, Agent fixture, 패널 host·권한·runtime 회귀.
 
-구 설치 폴더가 제거된 상태와 유일한 프로젝트가 이동된 상태는 실제 패키지 자산으로 격리 재현했다. 실제 Kiro의 자동 정리 시점 전체·유료 Agent의 새 Discovery→Builder→Helper 완주·Intel Mac·장기 사용은 이 검사로 검증됐다고 주장하지 않는다. Windows 설치물은 Windows에서 별도로 만든다. 공개 Marketplace 게시나 사용자 일반 프로필 설치는 수행하지 않는다.
+구 설치 폴더가 제거된 상태와 유일한 프로젝트가 이동된 상태는 실제 패키지 자산으로 격리 재현했다. 자동 검사는 실제 Kiro의 자동 정리 시점 전체·모델 의미 품질·Intel Mac·장기 사용을 입증하지 않는다. 실제 설치본의 단계별 모델 결과와 실패·미검증 항목은 후속 보고에 남긴다. Windows 설치물은 Windows에서 별도로 만든다. 공개 Marketplace 게시나 사용자 일반 프로필 설치는 수행하지 않는다.
 
 ## 재현
 
@@ -52,4 +52,4 @@ node scripts/test-macos-package.mjs
 
 Git checkout을 쓴다면 `../frontend`를 실제 program checkout 경로로 바꾼다. 패키징은 매번 `dist/macos-vsix-*`에 VSIX와 항목별 hash·출처 receipt를 만든다. 공식 Node archive 검증용 임시 폴더와 테스트 데이터는 보존한다. `node scripts/build-developer-source.mjs <frontend 경로>`는 두 Git checkout에서 개발자 ZIP을 만들며 게시 작업은 하지 않는다.
 
-검증 환경 메모: 기존 개발 폴더의 `.local-experiments/kiro-native-recovery/biome.json`은 중첩 root로 format을 막는다. 해당 사용자 실험은 보존하고 **ZIP을 새 폴더에 풀어 전체 `pnpm check`를 통과**했다. E2E는 별도 `VIBE_E2E_FRONTEND_PORT=4573`을 사용했다. 이 결과를 원래 개발 폴더의 단일 check 성공으로 표현하지 않는다. 이전 0.1.0 검증 기록은 Git 이력과 `TASKS.md` T19-M1에 보존한다.
+검증 환경 메모: 기존 개발 폴더의 `.local-experiments/kiro-native-recovery/biome.json`은 중첩 root로 format을 막는다. 해당 사용자 실험은 보존하고 **ZIP을 새 폴더에 풀어 전체 `pnpm check`를 통과**했다. 0.1.3 E2E는 기존4173 서버를 종료하지 않고 `VIBE_E2E_FRONTEND_PORT=43173`을 사용했다. 이 결과를 원래 개발 폴더의 단일 check 성공으로 표현하지 않는다. 이전0.1.0~0.1.2 결과는 Git 이력과 TASKS에 보존한다.

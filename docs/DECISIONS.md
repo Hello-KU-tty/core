@@ -6,6 +6,7 @@
 - 정상 Quit으로 이전 인스턴스를 정리하여 Mac0.1.2 설치본 창에 연결했다. UI에서 정확한 `start-here` 폴더만 Trust 적용을 확인했으며 상위 폴더·profile·계정 저장 영역은 추가 신뢰하지 않았다. Trust DB를 직접 변경하거나 보호 기능을 전역 해제하지 않는다.
 - 누적2,000/신규 호출 중단1,980, 단계별 최신 사용량 확인, 초과과금 비활성, 로컬 commit만 허용·push 금지는 유지한다.
 - 실제 설치본 첫 Discovery는 모델 호출 전 `NATIVE_PACKAGED_ROLE_CONFIG_INVALID`로 실패했다. `/private/tmp` Core의 개발용 receipt 환경변수가 portable runtime의 정확한 env 계약과 충돌한다. packaged Core에는 개발용 receipt를 주입하지 않도록 수정하며 worker의 exact env·prompt·경로 검사를 완화하지 않는다. 실제 설치 자산을 `/private/tmp`에서 시작하고 역할 설정을 worker 검사까지 연결하는 모델0 회귀를 추가한다. 기존 0.1.2 실패 기록은 보존하고 수정 패키지는 새 버전으로 구분한다.
+- 수정본0.1.3은 실제 앱 생성·실행·후속 Decision/Helper·재시작 복원까지 확인했다. 합성 Decision 확정은 승인 검토가 차단하여 별도 사용자 승인을 요청하고 대기한다. UI 대신 SDK로 선택하거나 승인 경계를 우회하지 않는다. 누적879.82/2,000·overages Disabled에서 추가 모델 호출을 멈추고 부분 결과를 기록한다.
 
 ## 2026-09-30: Mac 설치본 native 검증 승인 재개
 

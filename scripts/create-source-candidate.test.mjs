@@ -32,6 +32,7 @@ test('source selection excludes private state, old packages and unreviewed exper
     assert.equal(safeName(name), false, name)
   assert.equal(selectedSource('backend', 'packages/contracts/src/index.ts'), true)
   assert.equal(selectedSource('backend', 'docs/agent-prompts/discovery.md'), true)
+  assert.equal(selectedSource('backend', 'docs/MAC_NATIVE_VERIFICATION_20260930.md'), true)
   for (const version of ['1.0.8', '1.0.9'])
     assert.equal(
       selectedSource(

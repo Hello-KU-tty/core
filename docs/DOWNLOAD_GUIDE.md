@@ -40,11 +40,11 @@ GitHub 파일 화면이 열리면 **Download raw file**을 누릅니다. Windows
 
 **[Mac용 VSIX 고정 다운로드 경로](../releases/macos/0.1.0/builder-helper-agent-panel-0.1.0-darwin-arm64.vsix?raw=true)**
 
-공개본은 **0.1.1**이며 이 checkout에는 공개 frontend 0.0.18 기준의 **0.1.2 로컬 후보**를 준비했습니다. 이번 변경은 push하지 않았으므로 공개 URL에는 아직 반영되지 않았습니다. 기존 주소·파일명은 유지하며 새 후보는 구 확장 제거와 프로젝트 이동 후 도구 복구를 보완합니다. 설치 파일 내부 버전과 [receipt](../releases/macos/0.1.0/macos-vsix-receipt.json)를 대조하세요.
+공개본은 **0.1.1**이며 이 checkout에는 공개 frontend 0.0.18 기준의 **0.1.3 로컬 후보**를 준비했습니다. 이번 변경은 push하지 않았으므로 공개 URL에는 아직 반영되지 않았습니다. 기존 주소·파일명은 유지하며 새 후보는 구 확장 제거·프로젝트 이동 후 도구 복구와 임시 경로 설치 시 native 역할 설정 충돌을 보완합니다. 설치 파일 내부 버전과 [receipt](../releases/macos/0.1.0/macos-vsix-receipt.json)를 대조하세요.
 
 GitHub 파일 화면이 열리면 **Download raw file**을 누릅니다. Apple Silicon(M1 이상)용이며 Intel Mac용 파일은 아닙니다. Kiro는 `/Applications/Kiro.app`에 설치합니다. 파일 무결성 확인과 자세한 설치·복구 방법은 [Mac 설치 안내](MAC_VSIX.md)를 따르세요.
 
-이 후보는 격리 프로필 설치와 실제 Core/SQLite·도구·구 설치 제거/이동 복구 자동 검사를 통과했습니다. 유료 모델의 Discovery→Builder→Helper 전체 흐름, 실제 IDE 자동 업데이트 전체와 장기 사용까지 검증한 것은 아닙니다.
+이 후보는 격리 프로필 설치와 실제 Core/SQLite·도구·구 설치 제거/이동 복구 자동 검사를 통과했습니다. 실제 모델로 Discovery/Spec→앱 생성·실행, 후속 Decision 생성·Helper·재시작 복원을 확인했습니다. Decision 선택·적용/취소 등 남은 단계는 [실제 설치본 검증 보고](MAC_NATIVE_VERIFICATION_20260930.md)를 보세요. 실제 IDE 자동 업데이트 전체와 장기 사용까지 검증한 것은 아닙니다.
 
 ## 4. Kiro에 확장 설치
 
