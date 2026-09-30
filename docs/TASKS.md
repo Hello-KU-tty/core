@@ -41,7 +41,8 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 ### [-] T19-M2. Mac 설치본의 실제 native 수직 흐름 검증
 
 - **선행:** T19-M1, 설치된 Kiro 본인 계정과 사용량 확인. 현재 패키징 세션에서는 유료 호출을 하지 않았다.
-- **현재 대기:** 새 격리 합성 폴더 Trust 승인 및 현재 계정 사용량 확인. 이 조건 없이 모델 호출하지 않는다.
+- **재개 승인:** 2026-09-30 사용자가 격리 폴더 Trust 및 계정 누적2,000크레딧을 승인했다.1,980 신규 호출 중단·현재 사용량 관측·초과과금 비활성 조건으로 설치본을 검증한다. push는 하지 않는다.
+- **추가 검증/현재 대기:** 새 격리 profile의 실제 Kiro 확장 호스트에서 Core 자동 기동·인증 health·프로젝트0·SQLite50테이블/quick_check=ok, 설치 자산69개 hash와 Kiro/Agent exact-source 일치를 확인했다. 모델 호출0. 컴퓨터 제어가 기존 Kiro 인스턴스만 선택하며 새 `start-here` 창의 Trust/패널 UI를 조작할 수 없어 사용자 화면 확인을 요청했다. 폴더 승인 자체는 받았으며 추가 비용 승인 대기가 아니다. [추가 검증 보고](MAC_NATIVE_VERIFICATION_20260930.md).
 - **산출물/완료 조건:** 새 학습 목표의 Discovery→Spec→Builder·Helper·Decision→결과 실행/History를 설치본에서 실측하고 terminal 도구 환경·별도 Helper 창·취소와 실패를 기록한다. Windows/Intel/장기 사용으로 확대하지 않는다.
 
 ### [x] T00. 문서 승인과 착수 차단 결정 해소

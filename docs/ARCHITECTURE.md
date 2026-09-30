@@ -8,6 +8,8 @@
 
 ## 1. 상태
 
+- 2026-09-30 native 검증은 수정하지 않은 Mac0.1.2 VSIX와 격리 Kiro profile을 사용한다. 제품의 기본 global storage/Core/workspace 경로와 별도 Helper 창을 유지한다. 개발 harness의900/880 admission을 우회하거나 제품 결과로 혼동하지 않으며 실제 계정 dashboard를 단계별 관측한다. 계정 자료를 복사하지 않는다.
+
 - 2026-09-30 배포 갱신은 명시적으로 지정한 frontend checkout에서 Mac 확장을 빌드하고 Core와 frontend 출처를 receipt에 남긴다. 개발자 ZIP은 오래된 부분 덮어쓰기 kit 대신 두 저장소 소스와 프론트의 검증된 기존 Windows portable 자산을 포함한 재현용 snapshot이다. Mac portable은 공식 arm64 Node를 포함해 별도로 빌드한다. 기존 URL은 호환 진입점이며 불변 artifact 식별자는 버전·SHA-256으로 구분한다.
 
 - 2026-09-29 Mac VSIX는 기존 frontend provider·Core lease lifecycle·native worker를 재사용한다. darwin-arm64 자산 검증과 Mac 도구 경로를 추가하며 Node 공식 배포본과 라이선스를 포함해 Homebrew/source checkout 의존을 없앤다. SQLite·prompt·권한 계약은 유지한다.
