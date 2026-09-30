@@ -1,5 +1,11 @@
 # 결정 기록
 
+## 2026-09-30 다운로드 링크의 첫 클릭 오류 복구
+
+- 사용자가 README·설치 안내의 링크를 수정하고 기존 `Hello-KU-tty/core`에 `@hurdooagent`로 commit/push하도록 승인했다. 가이드 URL·설치 파일 경로·버전·bytes는 유지하고 원격 영상 변경을 보존한다.
+- Chrome에서 가이드의 Mac `blob/...vsix?raw=true` 링크를 클릭하면 `Error loading page`가 나타나고, 새로고침하면 파일이 내려받아지는 현상을 재현했다. 같은 가이드의 `/raw/refs/heads/main/...zip` 링크는 첫 클릭으로 다운로드됐다. 관측상 GitHub 파일 화면의 client-side navigation과 raw 응답 처리 문제이며 파일 손상은 아니다.
+- 현재 README·다운로드 가이드·OS별 설치 안내와 개발자 ZIP 안내의 다운로드 링크를 기존 파일의 절대 `/raw/refs/heads/main/...` 주소로 통일한다. 오래된 링크의 대상도 삭제하지 않는다. 게시 후 실제 가이드에서 첫 클릭 다운로드와 SHA-256을 확인한다. 제품 코드·VSIX·ZIP 재빌드, 모델 호출과 버전 변경은 하지 않는다.
+
 ## 2026-09-30 Mac 보완 게시 승인
 
 - 사용자가 Mac 보완만 push하도록 요청하고 기존 `Hello-KU-tty/core`에 `@hurdooagent` 계정으로 게시하는 방식을 승인했다. 저장소 push 권한과 원격 main `6f40da9`를 확인했다.

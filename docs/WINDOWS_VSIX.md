@@ -2,9 +2,9 @@
 
 현재 설치 후보는 Windows x64용 Vibe Helper **0.0.18**이다. 지원 기준은 Kiro IDE **1.1.70** / 내장 Agent **1.1.158**이다. Windows ARM64와 다른 Kiro·Agent 버전은 이번 검증 대상이 아니다.
 
-**[Windows용 VSIX 0.0.18 다운로드](../releases/windows/0.0.18/builder-helper-agent-panel-0.0.18-win32-x64-74208fffa5c0.vsix?raw=true)** · 2,573,191 bytes · [패키지 검증 receipt](../releases/windows/0.0.18/program-vsix-receipt.json)
+**[Windows용 VSIX 0.0.18 다운로드](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/windows/0.0.18/builder-helper-agent-panel-0.0.18-win32-x64-74208fffa5c0.vsix)** · 2,573,191 bytes · [패키지 검증 receipt](../releases/windows/0.0.18/program-vsix-receipt.json)
 
-GitHub 파일 화면이 열리면 **Download raw file**을 누른다. 다운로드한 파일의 SHA-256은 다음과 같다.
+위 링크에서 VSIX 파일을 바로 내려받는다. 다운로드한 파일의 SHA-256은 다음과 같다.
 
 ```text
 8da34ce191799cbae5e19d11ed41e3148cd52bec7d174d3196dc192047aa5211

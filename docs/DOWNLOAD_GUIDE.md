@@ -30,19 +30,19 @@ Hello Vibe는 IDE 확장이므로 다운로드 페이지의 CLI·Crew가 아닌 
 
 ### Windows (x64)
 
-**[Windows용 VSIX 0.0.18 다운로드](../releases/windows/0.0.18/builder-helper-agent-panel-0.0.18-win32-x64-74208fffa5c0.vsix?raw=true)**
+**[Windows용 VSIX 0.0.18 다운로드](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/windows/0.0.18/builder-helper-agent-panel-0.0.18-win32-x64-74208fffa5c0.vsix)**
 
-GitHub 파일 화면이 열리면 **Download raw file**을 누릅니다. Windows x64용이며, Kiro IDE **1.1.70** / 내장 Agent **1.1.158**을 기준으로 합니다. 파일 무결성 확인과 설치·복구 방법은 [Windows 설치 안내](WINDOWS_VSIX.md)를 따르세요.
+위 링크를 누르면 VSIX 파일이 바로 다운로드됩니다. Windows x64용이며, Kiro IDE **1.1.70** / 내장 Agent **1.1.158**을 기준으로 합니다. 파일 무결성 확인과 설치·복구 방법은 [Windows 설치 안내](WINDOWS_VSIX.md)를 따르세요.
 
 0.0.18은 MVP 완료 후에도 빌더와 도우미를 계속 사용할 수 있습니다. 실행·설명·수정 요청은 같은 프로젝트의 후속 작업으로 이어지며 기존 완료 기록을 보존합니다. 도구 요청 제한은 해당 실행 기록에 표시하고 전체 권한 거부처럼 남겨 두지 않습니다. 0.0.17의 도구 재사용과 중복 요약 제거도 포함합니다. 검증 범위는 [Windows 설치 안내](WINDOWS_VSIX.md)를 확인하세요.
 
 ### Mac (Apple Silicon)
 
-**[Mac용 VSIX 고정 다운로드 경로](../releases/macos/0.1.0/builder-helper-agent-panel-0.1.0-darwin-arm64.vsix?raw=true)**
+**[Mac용 VSIX 고정 다운로드 경로](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/0.1.0/builder-helper-agent-panel-0.1.0-darwin-arm64.vsix)**
 
 현재 Mac 설치물은 공개 frontend0.0.18 기준의 **0.1.3**입니다. 기존 주소·파일명은 유지하며 구 확장 제거·프로젝트 이동 후 도구 복구와 임시 경로 설치 시 native 역할 설정 충돌을 보완합니다. 설치 파일 내부 버전과 [receipt](../releases/macos/0.1.0/macos-vsix-receipt.json)를 대조하세요. Windows 설치물은0.0.18을 유지합니다.
 
-GitHub 파일 화면이 열리면 **Download raw file**을 누릅니다. Apple Silicon(M1 이상)용이며 Intel Mac용 파일은 아닙니다. Kiro는 `/Applications/Kiro.app`에 설치합니다. 파일 무결성 확인과 자세한 설치·복구 방법은 [Mac 설치 안내](MAC_VSIX.md)를 따르세요.
+위 링크를 누르면 VSIX 파일이 바로 다운로드됩니다. Apple Silicon(M1 이상)용이며 Intel Mac용 파일은 아닙니다. Kiro는 `/Applications/Kiro.app`에 설치합니다. 파일 무결성 확인과 자세한 설치·복구 방법은 [Mac 설치 안내](MAC_VSIX.md)를 따르세요.
 
 이 후보는 격리 프로필 설치와 실제 Core/SQLite·도구·구 설치 제거/이동 복구 자동 검사를 통과했습니다. 실제 모델로 Discovery/Spec→앱 생성·실행, Decision 선택·반영, 별도 Helper, 재시작 복원과 실행 중 취소·재개를 확인했습니다. 실패 후 복구와 검증 한계는 [실제 설치본 검증 보고](MAC_NATIVE_VERIFICATION_20260930.md)를 보세요. 다음 개인화·MVP 전체, 실제 IDE 자동 업데이트 전체와 장기 사용까지 검증한 것은 아닙니다.
 

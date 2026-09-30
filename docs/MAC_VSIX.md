@@ -2,11 +2,11 @@
 
 현재 설치물은 Apple Silicon Mac(`darwin-arm64`)용 Hello Vibe **0.1.3**다. 공개 frontend **0.0.18 (`a61d408`, checkout `e65cd7f`)**과 Core `d8768d1`의 복구 변경을 포함한다. 완료 뒤 지속 대화·중복 요약 제거, 구 설치 제거·프로젝트 이동 후 도구 복구와 임시 경로에서 개발용 receipt가 native 설정 검사에 충돌하는 문제를 보완했다. Kiro IDE 1.1.70 / 내장 Agent 1.1.158 / API 1.131.0의 source hash를 확인한다. Kiro는 `/Applications/Kiro.app`에 설치하고 본인 계정으로 로그인한다. Intel Mac은 지원 대상이 아니다.
 
-[Mac용 VSIX 고정 경로](../releases/macos/0.1.0/builder-helper-agent-panel-0.1.0-darwin-arm64.vsix?raw=true) · 41,583,184 bytes · SHA-256 `ff3ead843bde482d4fc575b175075c4606f44afc37a70bedd57819646c843e53`
+[Mac용 VSIX 고정 경로](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/0.1.0/builder-helper-agent-panel-0.1.0-darwin-arm64.vsix) · 41,583,184 bytes · SHA-256 `ff3ead843bde482d4fc575b175075c4606f44afc37a70bedd57819646c843e53`
 
 2026-09-30 사용자 승인으로 기존 다운로드 경로에 **0.1.3**을 제공한다. 기존 주소·파일명의 `0.1.0`은 호환 경로이며 설치 파일 내부 버전과 [receipt](../releases/macos/0.1.0/macos-vsix-receipt.json)·[항목별 hash](../releases/macos/0.1.0/files.json)로 구분한다. Windows0.0.18 설치물은 변경하지 않았다.
 
-GitHub 파일 화면이 열리면 **Download raw file**을 누른다. 다운로드 후 터미널에서 아래 값이 위 SHA-256과 같은지 확인할 수 있다.
+위 링크에서 VSIX 파일을 바로 내려받는다. 다운로드 후 터미널에서 아래 값이 위 SHA-256과 같은지 확인할 수 있다.
 
 ```sh
 shasum -a 256 ~/Downloads/builder-helper-agent-panel-0.1.0-darwin-arm64.vsix

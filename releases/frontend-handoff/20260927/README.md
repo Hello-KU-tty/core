@@ -1,6 +1,6 @@
 # Hello Vibe 개발자 소스 — 2026-09-30
 
-[frontend-handoff-20260927.zip](frontend-handoff-20260927.zip?raw=true)을 **Download raw file**로 내려받고 [receipt](frontend-handoff-receipt.json)의 SHA-256을 확인한다. 제출한 다운로드 주소를 유지하기 위해 경로·파일명은 그대로 두었으며 내용은 2026-09-30에 갱신했다.
+[frontend-handoff-20260927.zip](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/frontend-handoff/20260927/frontend-handoff-20260927.zip)을 바로 내려받고 [receipt](frontend-handoff-receipt.json)의 SHA-256을 확인한다. 제출한 다운로드 주소를 유지하기 위해 경로·파일명은 그대로 두었으며 내용은 2026-09-30에 갱신했다.
 
 **Mac0.1.3 복구 보완을 포함한 검증된 ZIP**이다. 사용자 승인으로 기존 다운로드 경로에 제공한다. 동결 ZIP 안의 미게시 문구는 빌드 당시 기록이며 최신 게시 상태와 hash는 이 저장소의 receipt를 기준으로 한다. Windows portable은 기존 원본을 유지한다.
 

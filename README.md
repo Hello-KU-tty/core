@@ -84,9 +84,9 @@ Mac 복구 보완 **0.1.3**과 대응 개발자 ZIP을 제공한다. Windows 설
 
 다운로드 파일 선택부터 첫 실행·업데이트·오류 해결까지는 **[다운로드·설치 가이드](docs/DOWNLOAD_GUIDE.md)**를 참고한다.
 
-**[Windows용 VSIX 0.0.18 다운로드](releases/windows/0.0.18/builder-helper-agent-panel-0.0.18-win32-x64-74208fffa5c0.vsix?raw=true)** · Windows x64용. Kiro IDE 1.1.70 / 내장 Agent 1.1.158 기준이며 [Windows 설치 안내·검증 범위](docs/WINDOWS_VSIX.md)를 확인한다.
+**[Windows용 VSIX 0.0.18 다운로드](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/windows/0.0.18/builder-helper-agent-panel-0.0.18-win32-x64-74208fffa5c0.vsix)** · Windows x64용. Kiro IDE 1.1.70 / 내장 Agent 1.1.158 기준이며 [Windows 설치 안내·검증 범위](docs/WINDOWS_VSIX.md)를 확인한다.
 
-**[Mac용 VSIX 0.1.3 고정 다운로드 경로](releases/macos/0.1.0/builder-helper-agent-panel-0.1.0-darwin-arm64.vsix?raw=true)** · Apple Silicon(M1 이상)용. 기존 주소·파일명의 `0.1.0`은 호환 경로이며 설치 파일 내부 버전은 **0.1.3**이다. 버전·hash로 구분한다. Intel Mac은 지원 대상이 아니다. [Mac 설치 안내·검증 범위](docs/MAC_VSIX.md)를 확인한다.
+**[Mac용 VSIX 0.1.3 고정 다운로드 경로](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/0.1.0/builder-helper-agent-panel-0.1.0-darwin-arm64.vsix)** · Apple Silicon(M1 이상)용. 기존 주소·파일명의 `0.1.0`은 호환 경로이며 설치 파일 내부 버전은 **0.1.3**이다. 버전·hash로 구분한다. Intel Mac은 지원 대상이 아니다. [Mac 설치 안내·검증 범위](docs/MAC_VSIX.md)를 확인한다.
 
 1. [Kiro IDE](https://kiro.dev/downloads/)를 설치하고 본인 계정으로 로그인한다.
 2. Windows x64에서는 위 `win32-x64.vsix`를 받는다. Mac에서는 Kiro를 `/Applications/Kiro.app`에 설치하고 위 `darwin-arm64.vsix`를 받는다.

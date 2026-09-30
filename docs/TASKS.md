@@ -16,6 +16,12 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 
 ## 2. MVP 이전: 핵심 수직 흐름 완성
 
+### [~] T19-M6. 다운로드 링크의 첫 클릭 오류 복구
+
+- **승인/선행:** 사용자 오류 제보와 링크 수정·commit/push 승인. 최신 원격 영상 변경을 먼저 fast-forward로 통합했다.
+- **산출물:** README·다운로드 가이드·OS별 설치 안내·현재 개발자 ZIP 안내의 직접 다운로드 링크. 가이드 URL, 설치물·ZIP 경로/bytes와 기존 영상은 보존한다.
+- **완료 조건:** 기존 첫 클릭 오류/새로고침 다운로드 재현, 현재 다운로드 링크의 경로 정합성, 게시 후 가이드에서 Mac·Windows·ZIP 첫 클릭 다운로드와 기존 SHA-256 일치. 실제 Windows 설치나 제품 재검증으로 확대하지 않는다.
+
 ### [x] T19-M5. 검증된 Mac 보완 게시
 
 - **승인:** Mac0.1.3·관련 Core·개발자 ZIP·문서를 `@hurdooagent`로 기존 `Hello-KU-tty/core/main`에 push. Windows0.0.18·program·영상·GitHub 설정은 보존한다.
