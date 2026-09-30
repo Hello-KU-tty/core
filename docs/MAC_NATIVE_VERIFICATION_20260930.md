@@ -1,5 +1,7 @@
 # Mac 설치본 추가 검증 — 2026-09-30
 
+> 게시 후속: 아래 검증 당시에는 로컬 commit만 했다. 이후 사용자가 Mac 보완 게시를 승인했으며 최신 게시 상태는 [Mac receipt](../releases/macos/0.1.0/macos-vsix-receipt.json)와 [개발자 ZIP receipt](../releases/frontend-handoff/20260927/frontend-handoff-receipt.json)를 기준으로 한다. 검증했던 binary는 재빌드하지 않는다.
+
 ## 판정
 
 **0.1.3 설치본의 한정된 native 검증을 통과했다.** 실제 앱 생성·실행, Decision 선택·코드 반영, 별도 Helper, History, 대기 상태 재시작 복원, 실행 중 취소와 같은 작업 재개·완료를 확인했다. 아래09:06/10:57 기록은 이전 시점의 결과다. 다음 개인화·MVP 전체 완료, Windows/Intel·장기 안정성·사람의 학습 효과를 입증하는 결과는 아니다.

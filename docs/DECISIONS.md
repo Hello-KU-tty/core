@@ -1,5 +1,11 @@
 # 결정 기록
 
+## 2026-09-30 Mac 보완 게시 승인
+
+- 사용자가 Mac 보완만 push하도록 요청하고 기존 `Hello-KU-tty/core`에 `@hurdooagent` 계정으로 게시하는 방식을 승인했다. 저장소 push 권한과 원격 main `6f40da9`를 확인했다.
+- Mac0.1.3·관련 Core·개발자 ZIP·문서를 기존 main에 fast-forward push한다. Windows0.0.18 설치물·program 저장소·영상은 변경하지 않는다. 조직 소개 문서는 기존 로컬 초안 그대로이며 GitHub 조직 profile/settings에 적용하지 않는다.
+- 이미 검증한 VSIX/ZIP bytes를 유지하고 게시 안내만 갱신한다. 게시 후 고정 다운로드 URL을 다시 받아 SHA-256을 대조한다. Git 이력/시각을 수정하지 않는다.
+
 ## 2026-09-30 Decision 선택·반영·취소 검증 승인
 
 - 사용자가 격리 독서 앱의 ‘등록 시 대기/진행 선택’을 확정하고 Builder 반영·취소 검증을 이어가는 것을 승인했다. 기존 승인 검토 차단을 우회하지 않고 새 승인 뒤 같은 제품 UI로 진행한다.

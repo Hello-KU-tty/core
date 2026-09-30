@@ -16,6 +16,11 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 
 ## 2. MVP 이전: 핵심 수직 흐름 완성
 
+### [~] T19-M5. 검증된 Mac 보완 게시
+
+- **승인:** Mac0.1.3·관련 Core·개발자 ZIP·문서를 `@hurdooagent`로 기존 `Hello-KU-tty/core/main`에 push. Windows0.0.18·program·영상·GitHub 설정은 보존한다.
+- **산출물/완료 조건:** 기존 다운로드 경로의 검증된 두 파일, 버전/출처/게시 상태 안내, 원격 commit 및 재다운로드 hash 일치. force push나 재빌드·유료 모델 호출은 하지 않는다.
+
 ### [x] T19-M1. Mac 배포용 VSIX
 
 - **승인/선행:** 2026-09-29 Mac 배포용 사용자 요청, 기존 Mac source attestation 및 실제 frontend.

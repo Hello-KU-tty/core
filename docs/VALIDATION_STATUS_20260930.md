@@ -1,6 +1,6 @@
 # 제출·검증 상태 — 2026-09-30
 
-이 문서는 제출 화면, 사용자 확인, 자동 검사와 실제 모델 검증을 구분한다. 후속 변경은 사용자 지시에 따라 **로컬 commit만** 하며 push·GitHub 조직/저장소 설정 변경은 하지 않는다.
+이 문서는 제출 화면, 사용자 확인, 자동 검사와 실제 모델 검증을 구분한다. 처음에는 로컬 commit만 했으며 후속 사용자 승인으로 Mac0.1.3·관련 Core·개발자 ZIP·문서를 기존 `Hello-KU-tty/core`에 게시한다. Windows0.0.18 설치물·program 저장소·영상·GitHub 조직/저장소 설정은 변경하지 않는다.
 
 ## 제출 화면으로 확인한 것
 
@@ -16,8 +16,8 @@
 | --- | --- | --- |
 | 실제 사용 후 인터뷰 | 사용자가 수행 사실을 확인한 정성 근거 | 참여자 수·원문 재공개, 정량 학습 향상·완주율, 일반 Kiro 대비 우월성 |
 | 이전 Mac native | 9/28 개발 host의 실제 모델 수직 흐름과 당시 한계 | 새 Kiro1.1.70/VSIX0.1.2 전체 완주 |
-| 공개 설치물 기준 | Windows0.0.18, Mac0.1.1 및 frontend0.0.18 | 이번 Mac 코드 수정의 Windows 재검증 |
-| 로컬 후속 후보 | Mac0.1.3, persistent Node·기존 설치 제거·프로젝트 이동 복구·임시 경로 native 설정 충돌 수정 | 게시 완료, Intel Mac·장기 안정성 |
+| 설치물 기준 | Windows0.0.18, Mac0.1.3 및 frontend0.0.18 | 이번 Mac 코드 수정의 Windows 재검증 |
+| Mac 보완 | persistent Node·기존 설치 제거·프로젝트 이동 복구·임시 경로 native 설정 충돌 수정 | Intel Mac·장기 안정성 |
 | 이번 설치본 실제 모델 | 0.1.3 Discovery/Spec→앱 생성·실행, Decision 선택·반영·Helper2회, History·대기 상태 재시작 복원·실제 취소 후 재개 | 다음 개인화·MVP 전체 완료, 사람의 이해 향상·무오류 실행 |
 | 영상 | 기존 README 경로 유지, 별도 담당자가 재제작 중 | 교체 완료 또는 새 영상 검수 완료 |
 
@@ -48,4 +48,4 @@
 
 [설치 가이드](DOWNLOAD_GUIDE.md) · [Mac 후보와 hash](MAC_VSIX.md) · [개발자 ZIP receipt](../releases/frontend-handoff/20260927/README.md) · [조직 소개 게시 초안](GITHUB_LANDING_HANDOFF.md).
 
-기존 URL/파일명은 유지하되 새 내부 버전과 hash를 명시한다. Git 이력·시각을 바꾸거나 마감 전 결과로 위장하지 않는다. GitHub 공개 링크는 사용자가 실제로 push하기 전까지 이전 파일을 가리킨다.
+기존 URL/파일명은 유지하되 새 내부 버전과 hash를 명시한다. Git 이력·시각을 바꾸거나 마감 전 결과로 위장하지 않는다. 동결 ZIP 안의 미게시 문구는 당시 기록이며 최신 게시 상태는 저장소의 receipt를 기준으로 한다.

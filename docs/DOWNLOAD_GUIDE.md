@@ -40,7 +40,7 @@ GitHub 파일 화면이 열리면 **Download raw file**을 누릅니다. Windows
 
 **[Mac용 VSIX 고정 다운로드 경로](../releases/macos/0.1.0/builder-helper-agent-panel-0.1.0-darwin-arm64.vsix?raw=true)**
 
-공개본은 **0.1.1**이며 이 checkout에는 공개 frontend 0.0.18 기준의 **0.1.3 로컬 후보**를 준비했습니다. 이번 변경은 push하지 않았으므로 공개 URL에는 아직 반영되지 않았습니다. 기존 주소·파일명은 유지하며 새 후보는 구 확장 제거·프로젝트 이동 후 도구 복구와 임시 경로 설치 시 native 역할 설정 충돌을 보완합니다. 설치 파일 내부 버전과 [receipt](../releases/macos/0.1.0/macos-vsix-receipt.json)를 대조하세요.
+현재 Mac 설치물은 공개 frontend0.0.18 기준의 **0.1.3**입니다. 기존 주소·파일명은 유지하며 구 확장 제거·프로젝트 이동 후 도구 복구와 임시 경로 설치 시 native 역할 설정 충돌을 보완합니다. 설치 파일 내부 버전과 [receipt](../releases/macos/0.1.0/macos-vsix-receipt.json)를 대조하세요. Windows 설치물은0.0.18을 유지합니다.
 
 GitHub 파일 화면이 열리면 **Download raw file**을 누릅니다. Apple Silicon(M1 이상)용이며 Intel Mac용 파일은 아닙니다. Kiro는 `/Applications/Kiro.app`에 설치합니다. 파일 무결성 확인과 자세한 설치·복구 방법은 [Mac 설치 안내](MAC_VSIX.md)를 따르세요.
 
@@ -97,7 +97,7 @@ Helper·분석 작업에 필요한 보조 Kiro 창이 열릴 수 있습니다. �
 
 **[개발자용 소스 ZIP 다운로드](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/frontend-handoff/20260927/frontend-handoff-20260927.zip)** · [파일·SHA-256·검증 기록](../releases/frontend-handoff/20260927/README.md)
 
-기존 주소·파일명의 공개본은 **2026-09-30 전체 실행 소스 snapshot**입니다. 이 checkout의 복구 보완 ZIP은 로컬 후보이며 push 전까지 공개 다운로드는 이전 파일입니다. 해당 파일의 receipt/hash를 함께 확인하세요. `backend/`와 `frontend/`(0.0.18), 파일별 hash를 기록한 `SOURCE_MANIFEST.json`을 포함합니다. 과거 update kit이나 이전 checkout에 덮어쓰지 말고 **새 폴더**에 압축을 푸세요. 20260926 kit 선행 적용은 필요하지 않습니다.
+기존 주소·파일명의 공개본은 Mac0.1.3 복구 보완을 포함한 **2026-09-30 전체 실행 소스 snapshot**입니다. 해당 파일의 receipt/hash를 함께 확인하세요. `backend/`와 `frontend/`(0.0.18), 파일별 hash를 기록한 `SOURCE_MANIFEST.json`을 포함합니다. 동결 ZIP 안의 미게시 문구는 빌드 당시 기록이며 최신 게시 상태는 저장소의 receipt를 기준으로 합니다. 과거 update kit이나 이전 checkout에 덮어쓰지 말고 **새 폴더**에 압축을 푸세요. 20260926 kit 선행 적용은 필요하지 않습니다.
 
 1. ZIP을 내려받고 SHA-256을 [현재 receipt](../releases/frontend-handoff/20260927/frontend-handoff-receipt.json)와 비교합니다.
 2. 새 개발 폴더에 풀고 ZIP 최상위 `README.md`를 읽습니다. Git clone 없이 빌드할 수 있습니다.
