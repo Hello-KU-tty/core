@@ -228,6 +228,11 @@ function startNativeWorker(context, connectionFile, runtime) {
       delivery = delivery.then(() => post(connection, `${endpoint}/event`, value))
       void delivery.catch(() => signal.abort())
     }
+    // A refused tool is already denied to the Agent. Failing to display that
+    // row must not cancel the job or break the ordered delivery of later events.
+    const displayEvent = (value) => {
+      delivery = delivery.then(() => post(connection, `${endpoint}/event`, value).catch(() => {}))
+    }
     try {
       binding = job.bindingFile ? JSON.parse(await readFile(job.bindingFile, 'utf8')) : null
       await materializePackagedRoleRuntime(runtime, job, binding)
@@ -347,7 +352,7 @@ function startNativeWorker(context, connectionFile, runtime) {
         },
         onPermissionRequest: async (_summary, detail) => {
           if (job.role !== 'BUILDER') {
-            event(permissionDenialEvent(detail))
+            displayEvent(permissionDenialEvent(detail))
             event({ kind: 'PERMISSION_DENIED' }); return null
           }
           if (detail.toolName === 'shell') {
@@ -390,7 +395,7 @@ function startNativeWorker(context, connectionFile, runtime) {
               return tools.api.projectCommandArgs(logical) ? logical : denied()
             } : undefined, { windows1170Diagnostic: runtime.windows1170Diagnostic === true })
           if (!optionId) {
-            event(permissionDenialEvent(detail, denialReason))
+            displayEvent(permissionDenialEvent(detail, denialReason))
             event({ kind: 'PERMISSION_DENIED' }); return null
           }
           return optionId

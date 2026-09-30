@@ -34,6 +34,7 @@ import {
 
 const require = createRequire(import.meta.url)
 const { boundedCoreRole } = require('../../../examples/kiro-native-host/native-client.cjs')
+const { permissionDenialEvent } = require('../../../examples/kiro-panel/src/permission-denial.cjs')
 
 // Windows provisioning includes real ACL subprocesses, not just in-memory jobs.
 const jobPollAttempts = process.platform === 'win32' ? 1500 : 100
@@ -97,6 +98,23 @@ describe('native IDE Agent relay', { timeout: 60_000 }, () => {
     expect(builderJob.helperHostWorkspace).toBeTruthy()
     expect(builderJob.protectedBuiltin).toBe(false)
     expect(builderJob.bindingFile).toBeTruthy()
+    // A refused tool is display-only; Core accepts the row instead of failing the job.
+    const denial = permissionDenialEvent(
+      { sessionId: 'session-1', toolCallId: 'call-1', toolName: 'search' },
+      'PERMISSION_GUARD_BUILDER_WRITE_UNKNOWN_FIELD',
+    )
+    expect(() => relay.event(builderJob.id, denial)).not.toThrow()
+    expect(() => relay.event(builderJob.id, permissionDenialEvent(null))).not.toThrow()
+    for (const patch of [
+      { nativeStatus: 'completed' },
+      { toolName: 'shell', protocolKind: 'execute', command: 'pnpm test' },
+      { output: 'private output' },
+      { relativePath: 'src/app.ts' },
+      { bridgeErrorCode: 'PERMISSION_GUARD_private detail' },
+    ])
+      expect(() =>
+        relay.event(builderJob.id, { kind: 'TOOL', update: { ...denial.update, ...patch } }),
+      ).toThrow('NATIVE_EVENT_INVALID')
     const helper = invoke('HELPER', 'Runtime wrapper with exact user message.')
     const helperJob = await waitClaim(['BUILDER'])
     expect(helperJob).toMatchObject({
@@ -429,6 +447,20 @@ describe('native IDE Agent relay', { timeout: 60_000 }, () => {
         update: { ...envelopeUpdate, envelopeInputAction: 'PRIVATE_ACTION' },
       }),
     ).toThrow('NATIVE_EVENT_INVALID')
+    const readDenial = { sessionId: 'session-1', toolCallId: 'call-2', toolName: 'read' }
+    expect(() =>
+      relay.event(
+        job.id,
+        permissionDenialEvent(
+          readDenial,
+          'PERMISSION_GUARD_BUILDER_SHELL_PROJECT_TOOLCHAIN_DENIED',
+        ),
+      ),
+    ).toThrow('NATIVE_EVENT_INVALID')
+    expect(() => relay.event(job.id, permissionDenialEvent(readDenial))).not.toThrow()
+    expect(events.pop()).toMatchObject({
+      update: { bridgeErrorCode: 'NATIVE_TOOL_PERMISSION_DENIED', nativeStatus: 'failed' },
+    })
     relay.event(job.id, { kind: 'TEXT', text: 'Checking local concepts.' })
     relay.complete(job.id, { text: 'Prepared.', stopReason: 'end_turn' })
     expect(await pending).toEqual({ text: 'Prepared.', stopReason: 'end_turn' })

@@ -531,6 +531,19 @@ export class NativeAgentRelay implements WorkflowAgentPort {
       const bridgeErrorCode = update.bridgeErrorCode ?? null
       const nativeErrorCode = update.nativeErrorCode ?? null
       const nativeToolIdClass = update.nativeToolIdClass ?? null
+      // Display-only code for a tool request the permission guard refused. It
+      // never grants anything and carries no input, path, command or output.
+      const permissionDenialDisplay =
+        typeof bridgeErrorCode === 'string' &&
+        (bridgeErrorCode === 'NATIVE_TOOL_PERMISSION_DENIED' ||
+          (job.role === 'BUILDER' &&
+            /^PERMISSION_GUARD_BUILDER_[A-Z0-9_]{1,80}$/.test(bridgeErrorCode))) &&
+        update.nativeStatus === 'failed' &&
+        coreAction === null &&
+        envelopeInputAction === null &&
+        path === null &&
+        command === null &&
+        output === null
       const commandPattern =
         /^(?:\.\\\.kiro\\vibe-tools\.cmd )?(?:node --test(?: [A-Za-z0-9._/:=-]+)*|pnpm test(?: [A-Za-z0-9._/:=,-]+)*|pnpm rebuild esbuild|pnpm run [a-zA-Z0-9:_-]+(?: -- [A-Za-z0-9._/:=,-]+)*|pnpm install --frozen-lockfile|pnpm install --lockfile-only --ignore-scripts --ignore-pnpmfile|npm test(?: -- [A-Za-z0-9._/:=,-]+)*|npm run [a-zA-Z0-9:_-]+(?: -- [A-Za-z0-9._/:=,-]+)*|npm install(?: --include=dev)?)$/
       if (
@@ -597,6 +610,7 @@ export class NativeAgentRelay implements WorkflowAgentPort {
             update.coreSuccess !== null ||
             update.coreErrorCode !== null)) ||
         (bridgeErrorCode !== null &&
+          !permissionDenialDisplay &&
           (![
             'BRIDGE_ENVELOPE_SCHEMA_TOO_LARGE',
             'BRIDGE_ENVELOPE_WRAPPER_INVALID',
