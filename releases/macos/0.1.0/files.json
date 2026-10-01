@@ -7,7 +7,7 @@
   {
     "name": "extension.vsixmanifest",
     "bytes": 820,
-    "sha256": "97eec15740b9838cd3bf4bc77744cee6a927a44be7b98da46b5c416d2a461853"
+    "sha256": "b3e168ff9f57f9442804d8f2bc150d4f3fe4b0acb3a8e649a5e5ce5e8a991457"
   },
   {
     "name": "extension/dist/extension.js",
@@ -27,7 +27,7 @@
   {
     "name": "extension/package.json",
     "bytes": 1426,
-    "sha256": "d19ab26457ed177b22792d1744d5f3a0ac751b66c631af1080d46af2e77577cc"
+    "sha256": "6fd9aee505e53febc0538c589f10713f12ddda173ac7350a948fcebfd0c09794"
   },
   {
     "name": "extension/portable/agent-prompts/builder.md",
@@ -61,18 +61,18 @@
   },
   {
     "name": "extension/portable/bin/core.mjs",
-    "bytes": 1046557,
-    "sha256": "2e2801bf77c243e7dcadca4d3400feeee3e0bedab998ff86cc84882d8d9c5eed"
+    "bytes": 1046772,
+    "sha256": "90568223b5b04ac2629aa838980eed002f507c2bde9cb1ff24bd5af8560e3e7c"
   },
   {
     "name": "extension/portable/bin/extension.cjs",
-    "bytes": 575881,
-    "sha256": "97a3aa243cb012fc25468b574b15156b3fc581612751fba6b4a2e4625ae271be"
+    "bytes": 576451,
+    "sha256": "84ca6a7f0e9a19c3e461f8bbc7510b4dc61dceeb1f398245726dc5705e16ab7c"
   },
   {
     "name": "extension/portable/bin/frontend-host.cjs",
-    "bytes": 536739,
-    "sha256": "aa6e62adaa058f9489178e07110b95e86ac947cf5c6500191f9c129db209dc3c"
+    "bytes": 537308,
+    "sha256": "57a0cf62434bf96cd62eeb546b4e47e341fb92986a81d176d09eea856588a63f"
   },
   {
     "name": "extension/portable/bin/guard.mjs",
@@ -86,8 +86,8 @@
   },
   {
     "name": "extension/portable/bin/native-worker.cjs",
-    "bytes": 521593,
-    "sha256": "14bdcc679e85d4069eb155b234960937e3edfd5005452f6ef299b9d73db49839"
+    "bytes": 522161,
+    "sha256": "fd9aa14687041afaaa91c4900993cef52c3fa003e5a580f111d94b7c56c3c9a2"
   },
   {
     "name": "extension/portable/bin/node",
@@ -217,7 +217,7 @@
   {
     "name": "extension/portable/manifest.json",
     "bytes": 10442,
-    "sha256": "6997c940e4bab808eacfd10852d10c7c92a794223bf3a7d6062624914a930b60"
+    "sha256": "752bac98343991f45d1970d8f42dabefc5372e67ddba9aab687d0389ded5a265"
   },
   {
     "name": "extension/portable/node_modules/better-sqlite3/lib/binding.js",

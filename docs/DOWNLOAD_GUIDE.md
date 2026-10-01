@@ -40,7 +40,7 @@ Hello Vibe는 IDE 확장이므로 다운로드 페이지의 CLI·Crew가 아닌 
 
 **[Mac용 VSIX 고정 다운로드 경로](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/0.1.0/builder-helper-agent-panel-0.1.0-darwin-arm64.vsix)**
 
-현재 Mac 설치물은 공개 frontend0.0.18 기준의 **0.1.3**입니다. 기존 주소·파일명은 유지하며 구 확장 제거·프로젝트 이동 후 도구 복구와 임시 경로 설치 시 native 역할 설정 충돌을 보완합니다. 설치 파일 내부 버전과 [receipt](../releases/macos/0.1.0/macos-vsix-receipt.json)를 대조하세요. Windows 설치물은0.0.18을 유지합니다.
+현재 Mac 설치물은 공개 frontend0.0.18 기준의 **0.1.4**입니다. 기존 주소·파일명은 유지합니다. 0.1.3의 도구 복구 보완에 더해, 도구 요청 하나가 거부돼도 Builder 작업이 취소되지 않도록 고쳤습니다. 설치 파일 내부 버전과 [receipt](../releases/macos/0.1.0/macos-vsix-receipt.json)를 대조하세요. Windows 설치물은0.0.18을 유지합니다.
 
 위 링크를 누르면 VSIX 파일이 바로 다운로드됩니다. Apple Silicon(M1 이상)용이며 Intel Mac용 파일은 아닙니다. Kiro는 `/Applications/Kiro.app`에 설치합니다. 파일 무결성 확인과 자세한 설치·복구 방법은 [Mac 설치 안내](MAC_VSIX.md)를 따르세요.
 

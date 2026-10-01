@@ -24,8 +24,9 @@
 
 ## 게시 상태
 
-- Mac 0.1.4 VSIX는 로컬에서만 만들었다. 기존 다운로드 경로(`releases/macos/0.1.0/`)의 0.1.3 교체는 사용자 확인 전이라 하지 않았다.
-- 개발자 ZIP은 다시 만들지 않았다.
+- 사용자 승인으로 Mac 0.1.4를 기존 다운로드 경로(`releases/macos/0.1.0/`)에 게시했다. 크기·SHA-256·항목 hash는 [receipt](../releases/macos/0.1.0/macos-vsix-receipt.json)와 [files.json](../releases/macos/0.1.0/files.json)을 따른다.
+- 개발자 ZIP은 0.1.3 기준으로 두고 다시 만들지 않았다.
+- Windows 0.0.18 설치물과 program 저장소는 변경하지 않았다.
 
 ## Windows 0.0.19·프론트 kit 인계
 

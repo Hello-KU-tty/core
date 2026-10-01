@@ -74,13 +74,13 @@ Kiro IDE
 
 ## 다운로드·설치
 
-Mac 복구 보완 **0.1.3**과 대응 개발자 ZIP을 제공한다. Windows 설치물은 **0.0.18**을 유지한다. [현재 제출·검증 상태](docs/VALIDATION_STATUS_20260930.md)에서 설치물, 사람 인터뷰와 미검증 범위를 구분한다.
+Mac **0.1.4**와 개발자 ZIP을 제공한다. 개발자 ZIP은 0.1.3 기준이며 0.1.4의 권한 거부 수정은 이 저장소 소스에 있다. Windows 설치물은 **0.0.18**을 유지한다. [현재 제출·검증 상태](docs/VALIDATION_STATUS_20260930.md)에서 설치물, 사람 인터뷰와 미검증 범위를 구분한다.
 
 다운로드 파일 선택부터 첫 실행·업데이트·오류 해결까지는 **[다운로드·설치 가이드](docs/DOWNLOAD_GUIDE.md)**를 참고한다.
 
 **[Windows용 VSIX 0.0.18 다운로드](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/windows/0.0.18/builder-helper-agent-panel-0.0.18-win32-x64-74208fffa5c0.vsix)** · Windows x64용. Kiro IDE 1.1.70 / 내장 Agent 1.1.158 기준이며 [Windows 설치 안내·검증 범위](docs/WINDOWS_VSIX.md)를 확인한다.
 
-**[Mac용 VSIX 0.1.3 고정 다운로드 경로](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/0.1.0/builder-helper-agent-panel-0.1.0-darwin-arm64.vsix)** · Apple Silicon(M1 이상)용. 기존 주소·파일명의 `0.1.0`은 호환 경로이며 설치 파일 내부 버전은 **0.1.3**이다. 버전·hash로 구분한다. Intel Mac은 지원 대상이 아니다. [Mac 설치 안내·검증 범위](docs/MAC_VSIX.md)를 확인한다.
+**[Mac용 VSIX 0.1.4 고정 다운로드 경로](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/0.1.0/builder-helper-agent-panel-0.1.0-darwin-arm64.vsix)** · Apple Silicon(M1 이상)용. 기존 주소·파일명의 `0.1.0`은 호환 경로이며 설치 파일 내부 버전은 **0.1.4**이다. 버전·hash로 구분한다. Intel Mac은 지원 대상이 아니다. [Mac 설치 안내·검증 범위](docs/MAC_VSIX.md)를 확인한다.
 
 1. [Kiro IDE](https://kiro.dev/downloads/)를 설치하고 본인 계정으로 로그인한다.
 2. Windows x64에서는 위 `win32-x64.vsix`를 받는다. Mac에서는 Kiro를 `/Applications/Kiro.app`에 설치하고 위 `darwin-arm64.vsix`를 받는다.
@@ -91,7 +91,7 @@ Mac 복구 보완 **0.1.3**과 대응 개발자 ZIP을 제공한다. Windows 설
 
 VSIX가 작동하지 않으면 먼저 [연결 오류 해결](docs/DOWNLOAD_GUIDE.md#6-업데이트와-문제-해결)을 확인한다. [개발자용 ZIP](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/frontend-handoff/20260927/frontend-handoff-20260927.zip)은 백엔드·프론트 전체 실행 소스로 갱신했다. 새 폴더에 풀어 [소스 재빌드 안내](docs/DOWNLOAD_GUIDE.md#7-vsix가-작동하지-않을-때-개발자용-대안)를 따른다. ZIP 자체는 확장 설치 파일이 아니다.
 
-Mac과 개발자 ZIP은 공개 frontend `a61d408`(0.0.18)과 대응 Core를 기준으로 한다. 완료 뒤 Builder·Helper 대화 유지, 기록된 Node·pnpm 재사용, 중복 Helper 요약 제거를 포함한다. Mac0.1.3에는 구 설치 제거·프로젝트 이동 뒤 도구 복구와 임시 경로 설치 시 native 역할 설정 충돌 수정을 포함한다. Mac 패키지 버전과 Windows 패키지 버전은 별도로 관리한다.
+Mac과 개발자 ZIP은 공개 frontend `a61d408`(0.0.18)과 대응 Core를 기준으로 한다. 완료 뒤 Builder·Helper 대화 유지, 기록된 Node·pnpm 재사용, 중복 Helper 요약 제거를 포함한다. Mac0.1.3에는 구 설치 제거·프로젝트 이동 뒤 도구 복구와 임시 경로 설치 시 native 역할 설정 충돌 수정을 포함한다. Mac0.1.4는 도구 요청 하나가 거부돼도 Builder 턴이 취소되지 않도록 고쳤다([수정 기록](docs/PERMISSION_DENIAL_FIX_20260930.md)). Mac 패키지 버전과 Windows 패키지 버전은 별도로 관리한다.
 
 ## 개발 환경과 검증
 
@@ -125,7 +125,8 @@ node scripts/test-program-consumer.mjs <program checkout 경로>
 | frontend 0.0.18 (`program`) | typecheck, 807 tests, build PASS |
 | 실제 frontend → HTTP/SSE → SQLite consumer | PASS (모델 경계는 deterministic fixture) |
 | 완료 뒤 후속 Builder·Helper | 각 3회, 중복 방지·재접속·기존 완료 보고/파일 보존 PASS (합성 Agent) |
-| Mac 0.1.3 설치·Core·도구 | 격리 Kiro 설치, 실제 패키지 검사9개 PASS, 설치 자산69개·ZIP 재빌드72항목 hash 일치; [재현·항목별 hash](docs/MAC_VSIX.md) |
+| Mac 0.1.4 설치·Core·도구 | 격리 Kiro 설치, 실제 패키지 검사9개 PASS, 설치 자산69개·재빌드72항목 hash 일치; [재현·항목별 hash](docs/MAC_VSIX.md) |
+| Mac 0.1.4 권한 거부 | 거부 3회 뒤에도 Builder 턴 정상 종료(같은 수정 번들의 개발 로드). [수정 기록](docs/PERMISSION_DENIAL_FIX_20260930.md) |
 | Mac 0.1.3 실제 모델 | 앱 생성·실행, Decision 선택·반영·Helper2회·재시작 복원·실제 취소 후 재개 확인. [범위와 실패 기록](docs/MAC_NATIVE_VERIFICATION_20260930.md); MVP 전체·다음 개인화 완료를 뜻하지 않음 |
 | 의존성 감사 | backend pnpm audit, frontend npm audit 모두 0건 |
 | 이전 9/28 개발 환경 실제 모델 수직 흐름 | 학습 목표 입력 → 후보 10개 → Spec 확정 → Builder Decision → Task 완료 → Helper → 후속 Task로 결과 수정 → 재시작 후 복원 (새 설치물의 모델 완주 검증은 아님) |
