@@ -4,7 +4,7 @@
 
 [Mac용 VSIX 고정 경로](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/0.1.0/builder-helper-agent-panel-0.1.0-darwin-arm64.vsix) · 41,583,184 bytes · SHA-256 `ff3ead843bde482d4fc575b175075c4606f44afc37a70bedd57819646c843e53`
 
-2026-09-30 사용자 승인으로 기존 다운로드 경로에 **0.1.3**을 제공한다. 기존 주소·파일명의 `0.1.0`은 호환 경로이며 설치 파일 내부 버전과 [receipt](../releases/macos/0.1.0/macos-vsix-receipt.json)·[항목별 hash](../releases/macos/0.1.0/files.json)로 구분한다. Windows0.0.18 설치물은 변경하지 않았다.
+사용자 승인으로 기존 다운로드 경로에 **0.1.3**을 제공한다. 기존 주소·파일명의 `0.1.0`은 호환 경로이며 설치 파일 내부 버전과 [receipt](../releases/macos/0.1.0/macos-vsix-receipt.json)·[항목별 hash](../releases/macos/0.1.0/files.json)로 구분한다. Windows0.0.18 설치물은 변경하지 않았다.
 
 위 링크에서 VSIX 파일을 바로 내려받는다. 다운로드 후 터미널에서 아래 값이 위 SHA-256과 같은지 확인할 수 있다.
 

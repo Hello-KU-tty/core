@@ -1,10 +1,10 @@
-# 제출·검증 상태 — 2026-09-30
+# 제출·검증 상태
 
 이 문서는 제출 화면, 사용자 확인, 자동 검사와 실제 모델 검증을 구분한다. 처음에는 로컬 commit만 했으며 후속 사용자 승인으로 Mac0.1.3·관련 Core·개발자 ZIP·문서를 기존 `Hello-KU-tty/core`에 게시한다. Windows0.0.18 설치물·program 저장소·영상·GitHub 조직/저장소 설정은 변경하지 않는다.
 
 ## 제출 화면으로 확인한 것
 
-- 제출 마감 표시: 9월30일00:00. 마지막 저장 표시: 2026년9월29일23:59:59.
+- 제출 마감 표시를 확인했다. 마지막 저장 표시: 2026년9월29일23:59:59.
 - 제출 소개서는 업로드 PDF `/decks/31-322067.pdf`다. 저장소의 PDF를 바꿔도 서버에 이미 업로드한 파일은 바뀌지 않는다.
 - 소스 제출 주소: [Hello-KU-tty 조직](https://github.com/Hello-KU-tty).
 - 서비스 배포 주소: [고정 다운로드 가이드](https://github.com/Hello-KU-tty/core/blob/main/docs/DOWNLOAD_GUIDE.md).
@@ -42,11 +42,11 @@
 - 공식 배포 Node를 해시 검증 후 확장 데이터 영역의 private cache에 둔다. 구 확장 폴더 제거 뒤에도 생성 앱의 도구 선택을 유지한다.
 - 기존 bundled Node 기록은 같은 제품의 상위 버전에서만 이관한다. 외부 실행 파일 교체, 변조·링크·downgrade는 계속 거절한다.
 - 유일한 등록 프로젝트가 이동해도 정확한 도구 기록으로 새 프로젝트를 시작할 수 있다. 옮겨진 프로젝트를 검색하거나 자동 등록/이동하지 않으며 예전 경로를 재생성하지 않는다. 기존 프로젝트를 이어 쓰려면 사용자가 원래 위치를 복원해야 한다.
-- 원본 코드·DB·대화·기존 실험과 stash를 보존한다. 현재 Windows portable은 프론트의 기존 kit2026.09.30.1 그대로이며 이 Mac 수정이 적용됐다고 주장하지 않는다.
+- 원본 코드·DB·대화·기존 실험과 stash를 보존한다. 현재 Windows portable은 프론트의 기존 [Windows 0.0.18 대응 kit](../releases/windows/0.0.18/program-vsix-receipt.json) 그대로이며 이 Mac 수정이 적용됐다고 주장하지 않는다.
 
 ## 전달
 
-2026-09-30 사용자 승인 후 `@hurdooagent`로 기존 core/main에 게시했다. 원격 다운로드 가이드 수정 `f230392`를 보존한 `e1fc4f2`가 게시 commit이다. 11:46 KST 고정 URL의 Mac0.1.3·개발자 ZIP을 다시 받아 크기/SHA-256·내부 버전과 원격 가이드 일치를 확인했다. Windows0.0.18 파일과 program 원격 `e65cd7f`는 변경하지 않았다. 세부 값은 아래 receipt를 따른다.
+사용자 승인 후 `@hurdooagent`로 기존 core/main에 게시했다. 원격 다운로드 가이드 수정 `f230392`를 보존한 `e1fc4f2`가 게시 commit이다. 11:46 KST 고정 URL의 Mac0.1.3·개발자 ZIP을 다시 받아 크기/SHA-256·내부 버전과 원격 가이드 일치를 확인했다. Windows0.0.18 파일과 program 원격 `e65cd7f`는 변경하지 않았다. 세부 값은 아래 receipt를 따른다.
 
 [설치 가이드](DOWNLOAD_GUIDE.md) · [Mac 후보와 hash](MAC_VSIX.md) · [개발자 ZIP receipt](../releases/frontend-handoff/20260927/README.md) · [조직 소개 게시 초안](GITHUB_LANDING_HANDOFF.md).
 
