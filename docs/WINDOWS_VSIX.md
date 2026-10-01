@@ -42,7 +42,7 @@ Core 연결 실패는 명령 팔레트(`Ctrl+Shift+P`)의 **Vibe Helper: Retry C
 
 ## 검증 범위
 
-이 파일은 2026-09-30 현재 Windows PC에서 생성·검증한 VSIX를 그대로 게시한 것이다. backend kit는 **2026.09.30.1**이며 VSIX 내부 71개 파일과 프론트에 적용한 kit 관리 파일 118개의 hash를 확인했다.
+이 파일은 Windows PC에서 생성·검증한 VSIX를 그대로 게시한 것이다. backend kit는 [패키지 receipt](../releases/windows/0.0.18/program-vsix-receipt.json)에 명시된 버전이며 VSIX 내부 71개 파일과 프론트에 적용한 kit 관리 파일 118개의 hash를 확인했다.
 
 - Core `pnpm check`: unit 179, integration 411, eval 43, Campus Drop 3, smoke 6, E2E 12 통과. unit/integration은 각각 1개 skip이다.
 - 확장 host CJS 171개, 프론트 57파일/807테스트와 타입 검사·빌드 통과.

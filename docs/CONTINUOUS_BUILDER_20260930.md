@@ -1,4 +1,4 @@
-# 완료 후 지속 대화와 도구 제한 표시 — 2026-09-30
+# 완료 후 지속 대화와 도구 제한 표시
 
 사용자는 완료된 MVP에서도 실행·설명·수정 요청을 계속 보내고 Builder와 Helper를 사용할 수 있어야 한다고 명시했다. 또한 `권한이 거부되어 일부 작업을 수행하지 못했어요`가 완료 뒤에도 남는 문제를 보고했다. 새 VSIX 생성·Kiro 재시작 적용·버전 갱신·소스 및 설치본 push를 승인했다. 기존 `@HURDOO` 인증과 `Hello-KU-tty/core`, `Hello-KU-tty/program`의 main 게시 승인을 사용한다.
 
@@ -25,7 +25,7 @@ Builder는 `previousCompletionReport`를 이전 Agent 작업 맥락으로 받고
 | `node scripts/test-builder-follow-up.mjs ../program` | 완료 뒤 Builder 3회·Helper 3회, 중복 전송 1회 실행, 이전 보고·소스 보존, 패널 복구 무변경 PASS |
 | 최종 packaged project-tools | 기존 Node/pnpm와 관리 Node/pnpm 모두 PATH 없는 새 프로세스 재사용, 실제 frozen install/build/test/smoke/HTTP 앱 PASS |
 | 실패 경계 | offline, hash mismatch, network failure, cancellation, launcher 변조, descriptor hardlink 거부 PASS |
-| 새 kit 적용 | 2026.09.30.1, 관리 파일 118개 hash PASS |
+| 새 kit 적용 | [Windows 0.0.18 대응 kit](../releases/windows/0.0.18/program-vsix-receipt.json), 관리 파일 118개 hash PASS |
 | VSIX / 설치 파일 | 패키지 71개 파일; 설치된 프론트 번들 2개와 portable 64개 hash 일치 |
 | 실제 Kiro 재시작 | 모든 창 정상 종료 → CLI 0.0.18 설치 → 동일 프로젝트 재개; 연결 정상, 완료 보고 유지, Builder·Helper 입력/전송 활성, 기존 권한 경고 없음 |
 

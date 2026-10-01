@@ -16,6 +16,13 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 
 ## 2. MVP 이전: 핵심 수직 흐름 완성
 
+### [~] T19-D1. 문서 날짜 표기 정리
+
+- **승인/범위:** 사용자 요청에 따라 README·추적 중인 텍스트 문서에서 지정 기준 이후의 날짜 표기를 제거하고 commit/push한다. 기존 미게시 Mac 패키징 버전·검증 문서 커밋은 보존하고 날짜 정리만 원격 기준으로 분리 게시한다.
+- **보존:** 기존 링크 대상·파일명, 배포 파일·receipt·Git 이력과 검증 사실·한계는 유지한다. 날짜형 kit 식별자는 본문 대신 해당 receipt에서 확인하도록 안내한다. 미추적 원본 자료는 수정하거나 게시하지 않는다.
+- **완료 조건:** 전체 추적 문서의 본문 날짜 재검색, 링크 대상 보존, 문서 전용 diff와 whitespace 검사, 승인된 원격 반영 확인.
+- **로컬 검증:** 추적 문서 전체를 재검색해 링크 대상을 제외한 본문·제목의 요청 범위 날짜 표기가 없음을 확인했다. 기존 Markdown 링크가 모두 유지되고 추가한 receipt 링크가 존재하며, diff는 Markdown 문서로만 한정된다. 배포 파일·기계 판독 기록·기존 소스와 미추적 원본은 변경하지 않았다.
+
 ### [x] T19-M6. 다운로드 링크의 첫 클릭 오류 복구
 
 - **승인/선행:** 사용자 오류 제보와 링크 수정·commit/push 승인. 최신 원격 영상 변경을 먼저 fast-forward로 통합했다.
@@ -38,14 +45,14 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 
 ### [x] T19-M3. 최신 원격 소스·Mac 설치물·개발자 ZIP·README 게시
 
-- **승인/선행:** 2026-09-30 사용자 요청, 원격 최신 core/program 통합과 기존 Mac 변경 보존.
+- **승인/선행:** 사용자 요청, 원격 최신 core/program 통합과 기존 Mac 변경 보존.
 - **산출물:** frontend a61d408(0.0.18) 기준 Mac 0.1.1, 동일 URL의 최신 개발자 소스 ZIP, 실제 사용 인터뷰와 검증 한계를 구분한 README, 출처·무결성·설치 안내, commit/push.
 - **완료 조건:** 양쪽 소스 검사, ZIP 추출 재현, VSIX 격리 설치와 모델0 Core/도구 재사용 검사, 다운로드 주소 및 게시 hash 확인. 0.0.18 동기화로 이전 frontend 미공개 조건을 해소한다. 영상은 수정하지 않는다.
 - **검증/게시:** frontend 0.0.18의 807 tests·typecheck·build, 최종 ZIP 추출본의 frozen install→`pnpm check`(unit177/integration404/eval43/Campus3/smoke6/E2E12, 11 SKIP), 패널·개발 host·source 회귀220+2 SKIP, 실제 frontend HTTP/SSE/SQLite consumer와 완료 뒤 Builder3/Helper3 PASS. 격리 Kiro 설치와 설치 자산 lifecycle/도구6개 PASS, 최종 ZIP 재빌드 VSIX72항목 hash 일치. Mac41,582,063 bytes 및 ZIP4,837,102 bytes를 기존 주소에 게시하고 두 URL에서 다시 받은 SHA-256 일치를 확인했다. Core `b7beeb3`·`a0ce3a8`, program `e65cd7f`를 기존 main에 push했다. [Mac receipt](../releases/macos/0.1.0/macos-vsix-receipt.json)·[ZIP receipt](../releases/frontend-handoff/20260927/frontend-handoff-receipt.json). 모델0이며 새 설치본 native 완주는 T19-M2로 남긴다. 사용자 원본·영상·기존 실험과 보존 stash는 유지했다.
 
 ### [x] T19-M4. 후속 감사 복구·문서·로컬 후보
 
-- **승인/선행:** 2026-09-30 사용자 전체 보완 승인, commit까지만 수행.
+- **승인/선행:** 사용자 전체 보완 승인, commit까지만 수행.
 - **산출물:** Mac persistent Node/업그레이드·사라진 workspace 회귀, 역사 문서 정합성, 로컬 조직 소개 초안, 같은 경로의 Mac 0.1.2/개발자 ZIP 후보.
 - **완료 조건:** 관련 보안·복구 회귀, 최신 설치 자산 검사, 소스 ZIP clean 전체 check와 출처/hash 기록. 실제 모델 검증은 T19-M2에서 별도 판정하며 push하지 않는다.
 - **소스 검증:** 집중38PASS+1SKIP, 추출본 전체check(unit177/integration418/eval43/Campus3/smoke6/E2E12, 11SKIP), frontend807, 패널 등219+2SKIP, 실제 consumer/완료 후속 요청 PASS. 실제 패키지 자산8개·격리 설치69개 hash·추출 소스 재빌드72항목 일치. Chromium sandbox의 최초 실행 차단을 기록하고 허용된 테스트 전용 환경에서 전체 재실행했다. 공개/유료 모델 호출은 하지 않았다.
@@ -54,7 +61,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 ### [x] T19-M2. Mac 설치본의 실제 native 수직 흐름 검증
 
 - **선행:** T19-M1, 설치된 Kiro 본인 계정과 사용량 확인. 패키징 검사와 아래 실제 모델 검증은 구분한다.
-- **재개 승인:** 2026-09-30 사용자가 격리 폴더 Trust 및 계정 누적2,000크레딧을 승인했다.1,980 신규 호출 중단·현재 사용량 관측·초과과금 비활성 조건으로 설치본을 검증한다. push는 하지 않는다.
+- **재개 승인:** 사용자가 격리 폴더 Trust 및 계정 누적2,000크레딧을 승인했다.1,980 신규 호출 중단·현재 사용량 관측·초과과금 비활성 조건으로 설치본을 검증한다. push는 하지 않는다.
 - **후속 UI 승인:** 사용자가 에이전트의 직접 폴더 신뢰와 기존 Kiro 창 종료를 명시적으로 허용했다. 정상 Quit으로 이전 인스턴스를 정리하고 설치본 `start-here` 창의 정확한 폴더 Trust가 적용된 것을 UI에서 확인했다. 기존 데이터와 미저장 변경을 삭제하거나 보안 저장소를 직접 수정하지 않는다. 이 승인으로 다음 착수 대상으로 재개한다.
 - **이전09:06 결과:** 격리 확장 호스트의 Core 자동 기동·인증 health·SQLite와 설치 자산을 모델0으로 확인했지만 새 창 제어가 막혔다. 이후 기존 창 정상 종료·직접 Trust로 해결했다.
 - **실제 검증:** 0.1.2의 native 역할 env 충돌을 재현해 `d8768d1`에서 수정하고0.1.3으로 검증했다. Discovery10후보→Spec→Builder 완료→브라우저 실제 앱 조작·reload, 별도 Helper2회·History, 완료 뒤 새 Task의 Decision 생성, 정상 종료·재시작 뒤 대기 Decision/대화 복원까지 확인했다. 최종10:57 KST879.82/2,000·overages Disabled. [추가 검증 보고](MAC_NATIVE_VERIFICATION_20260930.md).
@@ -820,20 +827,20 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 
 #### [x] T19-F19. 완료 뒤 지속적인 Builder·Helper 대화와 도구 거부 표시 수정
 
-- **승인:** 2026-09-30 사용자가 권한 오류 표시와 MVP 완료 뒤 대화 차단 수정을 요청하고 새 VSIX·Kiro 재시작 적용·버전 갱신·저장소 push를 승인했다.
+- **승인:** 사용자가 권한 오류 표시와 MVP 완료 뒤 대화 차단 수정을 요청하고 새 VSIX·Kiro 재시작 적용·버전 갱신·저장소 push를 승인했다.
 - **선행 조건:** T19-F17/F18의 0.0.17 코드·배포본과 실제 완료 화면, 최신 양쪽 main.
 - **산출물:** 완료 후 반복 후속 Task/Core 계약과 입력 허용, 명확한 도구 거부 표시, 새 kit·VSIX·다운로드 링크와 설치 결과.
 - **완료 조건:** contract/domain/storage/runtime/frontend/실제 소비 검증, 전체 check, 기존 완료·프로젝트·Evidence 보존, 패키지 hash, Kiro 종료·업데이트·재시작 화면 확인과 GitHub 게시.
-- **로컬 결과:** Core 전체 check·CJS 171·프론트 57파일/807테스트·실제 HTTP/SSE/SQLite 연결과 연속 Builder 3회/Helper 3회 PASS. kit 2026.09.30.1·VSIX 0.0.18 생성, 설치 파일 hash와 Kiro 정상 재시작 후 두 입력/전송 활성 확인. core `8ce42db`, program `a61d408`로 기존 main에 push했고 원격 SHA 일치와 GitHub VSIX 재다운로드 hash·가이드 링크를 확인했다. 작업 중 추가된 upstream Hello Vibe README·소개 영상 변경도 보존했다. [검증 기록](CONTINUOUS_BUILDER_20260930.md).
+- **로컬 결과:** Core 전체 check·CJS 171·프론트 57파일/807테스트·실제 HTTP/SSE/SQLite 연결과 연속 Builder 3회/Helper 3회 PASS. [대응 kit](../releases/windows/0.0.18/program-vsix-receipt.json)·VSIX 0.0.18 생성, 설치 파일 hash와 Kiro 정상 재시작 후 두 입력/전송 활성 확인. core `8ce42db`, program `a61d408`로 기존 main에 push했고 원격 SHA 일치와 GitHub VSIX 재다운로드 hash·가이드 링크를 확인했다. 작업 중 추가된 upstream Hello Vibe README·소개 영상 변경도 보존했다. [검증 기록](CONTINUOUS_BUILDER_20260930.md).
 
 #### [x] T19-F18. Windows 0.0.17 VSIX 게시와 다운로드 가이드 연결
 
-- **승인:** 2026-09-30 사용자가 이 환경에서 만든 VSIX를 저장소에 추가해 GitHub에 올리고 최신 다운로드 가이드에 링크하도록 요청했다.
+- **승인:** 사용자가 이 환경에서 만든 VSIX를 저장소에 추가해 GitHub에 올리고 최신 다운로드 가이드에 링크하도록 요청했다.
 - **선행 조건:** 0.0.17 VSIX와 SHA-256 검증 receipt, 최신 `origin/main`의 다운로드 가이드.
 - **산출물:** `releases/windows/0.0.17/`의 동일 VSIX·receipt, Windows 설치 안내, README와 다운로드 가이드 링크.
 - **완료 조건:** 기존 로컬 변경 보존, VSIX 원본/게시본 hash 일치, 문서 링크·패키지 검사, 정상 commit/push와 원격 다운로드 확인.
 - **승인 이력:** 최신 main pull, VSIX 원본/게시 후보 SHA-256·71개 패키지 항목과 문서 상대 링크 40개 검증 PASS. 게시 대상 5개 파일만 staging했다. 최초 자동 승인 검토가 AGENTS.md의 게시 계정 방식 선택 미확인을 이유로 commit/push를 차단하여 현재 로그인된 `@HURDOO`로 기존 `Hello-KU-tty/core/main`에 게시할지 사용자 확인을 요청했다.
-- **재개 승인:** 2026-09-30 사용자가 위 `@HURDOO` 계정·기존 `Hello-KU-tty/core/main` 게시 확인에 “푸시하셈”으로 승인했다.
+- **재개 승인:** 사용자가 위 `@HURDOO` 계정·기존 `Hello-KU-tty/core/main` 게시 확인에 “푸시하셈”으로 승인했다.
 - **결과:** `0e4f881`을 `core/main`에 push했다. 원격 main 일치와 GitHub에서 다시 받은 VSIX의 SHA-256 `b4634b3ef9c899a7295b5317b25293ad002545bb09126fe64f0afa8c5344bcd3`, 원격 다운로드 가이드·README의 링크를 확인했다. 기존 Core·프론트 소스 수정은 보존했다.
 
 #### [x] T19-F17. 재시작 후 생성 앱 도구 재사용과 Helper 중복 요약 제거

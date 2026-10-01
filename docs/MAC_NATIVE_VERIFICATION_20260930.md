@@ -1,4 +1,4 @@
-# Mac 설치본 추가 검증 — 2026-09-30
+# Mac 설치본 추가 검증
 
 > 게시 후속: 아래 검증 당시에는 로컬 commit만 했다. 이후 사용자가 Mac 보완 게시를 승인했으며 최신 게시 상태는 [Mac receipt](../releases/macos/0.1.0/macos-vsix-receipt.json)와 [개발자 ZIP receipt](../releases/frontend-handoff/20260927/frontend-handoff-receipt.json)를 기준으로 한다. 검증했던 binary는 재빌드하지 않는다.
 
@@ -54,7 +54,7 @@
 
 ## 이번에 추가 확인한 것
 
-2026-09-30 09:06 KST 종료 점검. 수정하지 않은 Mac0.1.2 VSIX를 새 확장 디렉터리/사용자 데이터 디렉터리에 설치하고 실제 Kiro GUI 프로세스로 실행했다. 단순 CLI 설치 parser나 별도 테스트 Core만 확인한 것이 아니다.
+09:06 KST 종료 점검. 수정하지 않은 Mac0.1.2 VSIX를 새 확장 디렉터리/사용자 데이터 디렉터리에 설치하고 실제 Kiro GUI 프로세스로 실행했다. 단순 CLI 설치 parser나 별도 테스트 Core만 확인한 것이 아니다.
 
 | 검사 | 결과 |
 | --- | --- |

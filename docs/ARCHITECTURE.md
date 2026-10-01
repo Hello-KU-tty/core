@@ -1,6 +1,6 @@
 # Vibe Helper 기술 아키텍처
 
-## 2026-09-30 Mac 도구 복구 경계
+## Mac 도구 복구 경계
 
 - `acquireCoreNode`는 검증된 Mac 설치 Node/라이선스를 private hash-addressed cache에 원자적으로 복사한다. 모든 재사용에서 byte hash를 검사하고 실행 probe를 유지한다.
 - 이전 bundled Node 기록은 같은 확장의 단조 증가 버전과 정확한 이전 `portable/bin/node` 경로에 한해 새 cache descriptor로 정규화한다. shared shim·workspace launcher·descriptor의 중간 상태는 정확한 이전/새 바이트만 허용한다.
@@ -8,9 +8,9 @@
 
 ## 1. 상태
 
-- 2026-09-30 native 검증은 수정하지 않은 Mac0.1.2 VSIX와 격리 Kiro profile을 사용한다. 제품의 기본 global storage/Core/workspace 경로와 별도 Helper 창을 유지한다. 개발 harness의900/880 admission을 우회하거나 제품 결과로 혼동하지 않으며 실제 계정 dashboard를 단계별 관측한다. 계정 자료를 복사하지 않는다.
+- native 검증은 수정하지 않은 Mac0.1.2 VSIX와 격리 Kiro profile을 사용한다. 제품의 기본 global storage/Core/workspace 경로와 별도 Helper 창을 유지한다. 개발 harness의900/880 admission을 우회하거나 제품 결과로 혼동하지 않으며 실제 계정 dashboard를 단계별 관측한다. 계정 자료를 복사하지 않는다.
 
-- 2026-09-30 배포 갱신은 명시적으로 지정한 frontend checkout에서 Mac 확장을 빌드하고 Core와 frontend 출처를 receipt에 남긴다. 개발자 ZIP은 오래된 부분 덮어쓰기 kit 대신 두 저장소 소스와 프론트의 검증된 기존 Windows portable 자산을 포함한 재현용 snapshot이다. Mac portable은 공식 arm64 Node를 포함해 별도로 빌드한다. 기존 URL은 호환 진입점이며 불변 artifact 식별자는 버전·SHA-256으로 구분한다.
+- 배포 갱신은 명시적으로 지정한 frontend checkout에서 Mac 확장을 빌드하고 Core와 frontend 출처를 receipt에 남긴다. 개발자 ZIP은 오래된 부분 덮어쓰기 kit 대신 두 저장소 소스와 프론트의 검증된 기존 Windows portable 자산을 포함한 재현용 snapshot이다. Mac portable은 공식 arm64 Node를 포함해 별도로 빌드한다. 기존 URL은 호환 진입점이며 불변 artifact 식별자는 버전·SHA-256으로 구분한다.
 
 - 2026-09-29 Mac VSIX는 기존 frontend provider·Core lease lifecycle·native worker를 재사용한다. darwin-arm64 자산 검증과 Mac 도구 경로를 추가하며 Node 공식 배포본과 라이선스를 포함해 Homebrew/source checkout 의존을 없앤다. SQLite·prompt·권한 계약은 유지한다.
 
@@ -330,7 +330,7 @@ T17은 storage 내부 `EvidenceTrace`를 UI에 직접 노출하지 않고 Projec
 
 T18 완료 UI는 결과 실행을 먼저 제공하고, 선택적으로 `Helper와 개선 방향 찾기`를 시작한다. Final Upgrade는 Helper turn에서 생성된 같은 source Task의 `EVIDENCE_AWARE` Personalization Trace와 사용자가 직접 입력한 목표가 있어야 활성화된다. Core가 sequence·선행 Task·성공한 분석을 다시 검증해 새 Builder Task를 만들며, Task가 바뀌면 UI의 이전 `DONE` runtime 상태를 초기화해 새 versioned Builder slot을 자동 시작한다. 건너뛰기는 정상 완료이고 이 흐름 하나에서 Concept State를 `TRANSFERRED`로 올리지 않는다.
 
-2026-09-30 사용자 승인으로 완료 화면에서도 Builder/Helper composer를 유지한다. 일반 후속 요청은 명시적 UI command `UI_PREPARE_FOLLOW_UP_TASK`로 최신 완료 Task의 ID/revision·완료 보고·동일 workspace를 검증하고 다음 sequence의 PENDING Task를 원자적으로 준비한다. 원본 Task/Completion Report를 reopen·덮어쓰기하지 않는다. `prerequisiteTaskIds`로 이전 작업을 연결하며 이전 완료 보고는 Agent 작성 맥락으로만 제공한다. 이 경로는 Evidence-aware Final Upgrade의 평가·provenance 조건과 별개이고, 단순 복원/빈 입력은 mutation이나 dispatch를 만들지 않는다.
+사용자 승인으로 완료 화면에서도 Builder/Helper composer를 유지한다. 일반 후속 요청은 명시적 UI command `UI_PREPARE_FOLLOW_UP_TASK`로 최신 완료 Task의 ID/revision·완료 보고·동일 workspace를 검증하고 다음 sequence의 PENDING Task를 원자적으로 준비한다. 원본 Task/Completion Report를 reopen·덮어쓰기하지 않는다. `prerequisiteTaskIds`로 이전 작업을 연결하며 이전 완료 보고는 Agent 작성 맥락으로만 제공한다. 이 경로는 Evidence-aware Final Upgrade의 평가·provenance 조건과 별개이고, 단순 복원/빈 입력은 mutation이나 dispatch를 만들지 않는다.
 
 Personalization retrieval은 local single-user Ledger의 최신 head와 immutable accepted Evidence를 사용한다. Helper는 질문·Live Context·Decision의 명시적 Concept/alias match를 우선해 최대 5개를 받고, Discovery는 새 Project가 이전 Project의 bounded Ledger를 볼 수 있게 하되 흥미·실용성을 대체하는 deterministic curriculum score를 만들지 않는다. Core는 Agent-bound context마다 `EVIDENCE_AWARE` 또는 명시적 no-evidence reason이 있는 basis를 만들며, source Evidence·Episode·Project와 Ledger revision을 immutable Personalization Trace로 저장한다. Discovery의 일반 restore는 조회 전용이며 실제 Agent dispatch 직전 `UI_PREPARE_DISCOVERY_AGENT_CONTEXT`만 trace를 생성한다. Helper의 turn correlation은 각 요청과 personalization provenance를 식별하고, 여러 turn을 묶는 HELPER_CONVERSATION Episode의 Event는 최초 correlation을 유지한다. 이 Trace는 `Agent에게 제공됨`을 증명할 뿐 실제 semantic 사용을 단정하지 않으며, 결과 영향은 A/B Agent fixture와 target regression으로 검증한다. Helper/Discovery에는 기존 권한 외의 tool을 추가하지 않고 raw 대화·전체 Ledger·confidence percentage를 전달하지 않는다.
 

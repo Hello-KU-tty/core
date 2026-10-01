@@ -1,24 +1,30 @@
 # 결정 기록
 
-## 2026-09-30 다운로드 링크의 첫 클릭 오류 복구
+## 문서 날짜 표기 정리
+
+- 사용자 요청으로 README와 추적 중인 텍스트 문서의 지정 기준 이후 날짜 표기를 제거한다. 승인·변경 내용과 검증 결과·한계 자체는 남긴다.
+- 제출된 가이드와 다운로드 주소를 유지하기 위해 링크 대상·파일명을 변경하지 않는다. 날짜형 kit 번호는 대응 receipt 링크로 안내하며 실제 버전·hash·배포 파일·기계 판독 기록과 Git 이력은 변경하지 않는다.
+- 미추적 발표 원본·감사 초안은 보존하고 이번 문서 commit에 포함하지 않는다. 프로그램 소스, 별도 frontend 저장소와 ZIP 내부 snapshot은 이 작업의 수정 대상이 아니다.
+
+## 다운로드 링크의 첫 클릭 오류 복구
 
 - 사용자가 README·설치 안내의 링크를 수정하고 기존 `Hello-KU-tty/core`에 `@hurdooagent`로 commit/push하도록 승인했다. 가이드 URL·설치 파일 경로·버전·bytes는 유지하고 원격 영상 변경을 보존한다.
 - Chrome에서 가이드의 Mac `blob/...vsix?raw=true` 링크를 클릭하면 `Error loading page`가 나타나고, 새로고침하면 파일이 내려받아지는 현상을 재현했다. 같은 가이드의 `/raw/refs/heads/main/...zip` 링크는 첫 클릭으로 다운로드됐다. 관측상 GitHub 파일 화면의 client-side navigation과 raw 응답 처리 문제이며 파일 손상은 아니다.
 - 현재 README·다운로드 가이드·OS별 설치 안내와 개발자 ZIP 안내의 다운로드 링크를 기존 파일의 절대 `/raw/refs/heads/main/...` 주소로 통일한다. 오래된 링크의 대상도 삭제하지 않는다. 게시 후 실제 가이드에서 첫 클릭 다운로드와 SHA-256을 확인한다. 제품 코드·VSIX·ZIP 재빌드, 모델 호출과 버전 변경은 하지 않는다.
 
-## 2026-09-30 Mac 보완 게시 승인
+## Mac 보완 게시 승인
 
 - 사용자가 Mac 보완만 push하도록 요청하고 기존 `Hello-KU-tty/core`에 `@hurdooagent` 계정으로 게시하는 방식을 승인했다. 저장소 push 권한과 원격 main `6f40da9`를 확인했다.
 - Mac0.1.3·관련 Core·개발자 ZIP·문서를 기존 main에 fast-forward push한다. Windows0.0.18 설치물·program 저장소·영상은 변경하지 않는다. 조직 소개 문서는 기존 로컬 초안 그대로이며 GitHub 조직 profile/settings에 적용하지 않는다.
 - 이미 검증한 VSIX/ZIP bytes를 유지하고 게시 안내만 갱신한다. 게시 후 고정 다운로드 URL을 다시 받아 SHA-256을 대조한다. Git 이력/시각을 수정하지 않는다.
 
-## 2026-09-30 Decision 선택·반영·취소 검증 승인
+## Decision 선택·반영·취소 검증 승인
 
 - 사용자가 격리 독서 앱의 ‘등록 시 대기/진행 선택’을 확정하고 Builder 반영·취소 검증을 이어가는 것을 승인했다. 기존 승인 검토 차단을 우회하지 않고 새 승인 뒤 같은 제품 UI로 진행한다.
 - 11:09 KST dashboard879.82/2,000·overages Disabled를 확인했다. 누적2,000/신규 호출 중단1,980·단계별 관측·원본 보존·push 금지는 유지한다.
 - 선택·반영·41tests·브라우저 조작·실제 취소·같은 Task 재개/완료를 확인했다. 재개 중 Core 도구4건 실패 후 복구한 한계와 최종886.80/2,000·활성run0을 기록한다. 제품 코드·VSIX·ZIP은 그대로 두고 후속 문서와 receipt만 갱신한다. 다음 개인화와 MVP 전체 완료를 선언하지 않는다.
 
-## 2026-09-30 후속 UI 제어 승인
+## 후속 UI 제어 승인
 
 - 사용자가 에이전트의 검증 폴더 직접 신뢰 및 기존 Kiro 창 종료를 명시적으로 승인했다. 이전의 창 보존 제한은 정상 종료 허용으로 갱신하되, 미저장 변경·기존 데이터는 보존한다.
 - 정상 Quit으로 이전 인스턴스를 정리하여 Mac0.1.2 설치본 창에 연결했다. UI에서 정확한 `start-here` 폴더만 Trust 적용을 확인했으며 상위 폴더·profile·계정 저장 영역은 추가 신뢰하지 않았다. Trust DB를 직접 변경하거나 보호 기능을 전역 해제하지 않는다.
@@ -26,14 +32,14 @@
 - 실제 설치본 첫 Discovery는 모델 호출 전 `NATIVE_PACKAGED_ROLE_CONFIG_INVALID`로 실패했다. `/private/tmp` Core의 개발용 receipt 환경변수가 portable runtime의 정확한 env 계약과 충돌한다. packaged Core에는 개발용 receipt를 주입하지 않도록 수정하며 worker의 exact env·prompt·경로 검사를 완화하지 않는다. 실제 설치 자산을 `/private/tmp`에서 시작하고 역할 설정을 worker 검사까지 연결하는 모델0 회귀를 추가한다. 기존 0.1.2 실패 기록은 보존하고 수정 패키지는 새 버전으로 구분한다.
 - 수정본0.1.3은 실제 앱 생성·실행·후속 Decision/Helper·재시작 복원까지 확인했다. 합성 Decision 확정은 승인 검토가 차단하여 별도 사용자 승인을 요청하고 대기한다. UI 대신 SDK로 선택하거나 승인 경계를 우회하지 않는다. 누적879.82/2,000·overages Disabled에서 추가 모델 호출을 멈추고 부분 결과를 기록한다.
 
-## 2026-09-30: Mac 설치본 native 검증 승인 재개
+## Mac 설치본 native 검증 승인 재개
 
 - **사용자 승인:** 앞서 제시한 격리 합성 폴더 Trust와 누적2,000크레딧까지 사용. 기존 push 금지는 유지한다.
 - **범위:** Mac0.1.2 설치본으로 새 입력의 Discovery/Spec/Builder/Decision/Helper, 실행 결과와 History/후속 대화·취소를 검증한다. 실제 Agent와 합성 사용자의 provenance를 구분한다. 오류가 발생하면 안전 경계를 완화하지 않고 원인과 재현을 보고한다.
 - **격리:** 승인 폴더 아래 시작 폴더와 제품이 생성한 프로젝트만 신뢰한다. profile 자체와 상위 임시 디렉터리를 신뢰하지 않는다. 기본 사용자 profile·로그인·창을 복사/수정/종료하지 않는다.
 - **예산:** 새 호출 전15분 이내 실제 dashboard 관측, 계정 누적2,000 상한·1,980 신규 호출 중단·overages Disabled를 유지한다. 이전 observation/claim의 시각이나 한도를 재작성하지 않는다. 새 제품 경로는 개발 harness의 admission wrapper를 쓰지 않으므로 수동 단계 제한/관측이며 billing hard cap이라고 표현하지 않는다.
 
-## 2026-09-30: 후속 감사 복구와 로컬 commit
+## 후속 감사 복구와 로컬 commit
 
 - **승인:** 사용자가 감사 보완 전부를 요청하고 push 없이 commit까지만 지시했다. 기존 원본·영상·실험·stash는 보존한다.
 - **재현:** 설치 경로를 Node 실행 경로로 기록하면 구 확장 제거 뒤 도구 선택이 실패한다. 유일한 생성 workspace 이동도 전체 도구 선택을 막는다. 모델0 격리 재현을 근거로 cache 수명과 workspace 수명을 분리한다.
@@ -41,7 +47,7 @@
 - **문서/게시:** 옛 산출물 hash는 당시 기록으로 남기고 현재 다운로드 경로와 정성 인터뷰 한계를 연결한다. 조직 profile/description 초안은 core에 준비하며 GitHub에는 쓰지 않는다. Mac 후보 0.1.2와 개발자 ZIP은 기존 파일 경로로 로컬 갱신하고 공개본 0.1.1과 구분한다.
 - **실제 모델:** 새 합성 폴더 Trust와 최신 사용량이 확인되면 누적900/신규중단880·초과과금 비활성 조건으로 진행한다. 미확인·차단 시 PASS를 만들지 않고 T19-M2를 대기로 기록한다.
 
-## 2026-09-30: 완료 뒤 지속적인 Builder·Helper 사용과 도구 거부 표시
+## 완료 뒤 지속적인 Builder·Helper 사용과 도구 거부 표시
 
 - **승인:** 사용자가 완료 뒤 입력 차단 제거, 권한 오류 수정, 새 버전 VSIX 생성·Kiro 종료/재시작 적용·기존 저장소 push를 요청했다. 기존 `@HURDOO`/`Hello-KU-tty` 게시 승인을 유지한다.
 - **원인:** frontend가 `TASK_COMPLETED`를 composer disable 조건으로 쓰고 runtime도 완료 Task의 새 Builder run을 거절했다. 일반 후속 요청을 Evidence-aware Final Upgrade에만 맡긴 것은 지속적인 바이브코딩 요구와 맞지 않는다.
@@ -56,7 +62,7 @@
 - **Helper 표시:** 응답 일부를 다시 붙인 `도우미 답변 요약` 영역을 제거한다. 실제 답변 stream, 사용자 질문과 대화 상태는 유지한다. 내부 Helper 기록·Evidence provenance·저장 계약 및 Agent prompt는 변경하지 않는다.
 - **검증:** 새 PC에서의 무결함을 주장하지 않는다. 변경된 실행 환경과 packaged Node/pnpm의 재사용을 모델 없이 재현하고 frontend 회귀와 새 VSIX의 구성·hash를 확인한다. commit/push는 이번 요청에 포함하지 않는다.
 
-## 2026-09-30: 최신 공개 소스 기반 Mac·개발자 ZIP 게시
+## 최신 공개 소스 기반 Mac·개발자 ZIP 게시
 
 - **승인:** 사용자 요청으로 원격 최신 상태를 먼저 통합하고 Mac VSIX, 개발자 ZIP, 양쪽 README를 수정한 뒤 commit/push한다. 기존 승인된 `@hurdooagent` collaborator 경로를 사용하며 force push하지 않는다. 영상은 다른 담당자의 변경을 보존한다.
 - **출처:** 처음 선택한 frontend `e1cffdd`(0.0.16) 빌드는 게시하지 않는다. 사용자 후속 지시에 따라 공개 frontend `a61d408`(0.0.18), Core `7b35217`과 기존 Mac 변경을 통합한다. 도구 재사용·Helper 요약 제거 및 완료 뒤 지속 대화 소스가 포함되므로 이전 소스 미공개 재빌드 조건은 해소됐다.
