@@ -65,3 +65,27 @@ export function parseChatDecisionReply(
     ...(rationale === undefined ? {} : { rationale }),
   }
 }
+
+// Explicit option mentions anywhere in a message: "2번", "2번째", "옵션 2", "option 2", or a
+// leading "2." / "2)". Durations and counts such as "2시간", "24", "2 hours" are not mentions.
+const OPTION_MENTION =
+  /(?<![0-9])([1-6])\s*번(?:째)?(?![0-9])|(?:옵션|option)\s*([1-6])(?![0-9])|^\s*([1-6])[.)](?![0-9])/giu
+
+/**
+ * Lists the Decision options a learner explicitly named by number in their own messages.
+ * Core uses it only to reject a Builder mapping that contradicts a single explicit choice.
+ */
+export function findExplicitOptionMentions(
+  request: Pick<DecisionRequest, 'options'>,
+  messages: readonly string[],
+): readonly string[] {
+  const mentioned = new Set<string>()
+  for (const message of messages) {
+    for (const match of message.matchAll(OPTION_MENTION)) {
+      const number = Number(match[1] ?? match[2] ?? match[3])
+      const option = request.options[number - 1]
+      if (option !== undefined) mentioned.add(option.id)
+    }
+  }
+  return request.options.map((option) => option.id).filter((id) => mentioned.has(id))
+}

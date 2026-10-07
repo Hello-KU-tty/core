@@ -37,7 +37,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 ### [x] K02. Core의 host 중립 수집 경로
 
 - **선행:** K01에서 hook 수집 경로가 PASS 또는 PARTIAL.
-- **범위(조정):** Concept State의 host 중립 학습자 요약(`buildLearnerProfile`)과 채팅 Decision 답의 결정적 확정 규칙(`parseChatDecisionReply`)을 domain 순수 함수로 추가한다. 외부 workspace root 등록은 기존 프로젝트 import가 MVP 제외라 만들지 않고 생성 workspace를 Kiro 폴더로 연다. hook 이벤트는 기존 `UI_RECORD_HELPER_EXCHANGE`와 `UI_RESOLVE_DECISION`으로 받으므로 Core 계약·DB는 바꾸지 않는다. Kiro 형식은 Core에 넣지 않는다.
+- **범위(조정):** Concept State의 host 중립 학습자 요약(`buildLearnerProfile`)과 채팅 Decision 답의 결정적 확정 규칙(`parseChatDecisionReply`)을 domain 순수 함수로 추가한다. 외부 workspace root 등록은 기존 프로젝트 import가 MVP 제외라 만들지 않고 생성 workspace를 Kiro 폴더로 연다. Kiro 형식은 Core에 넣지 않는다. (후속: 사용자 승인으로 일반 채팅 Evidence와 채팅 Decision 혼합 확정을 추가하면서 Core 계약이 늘었다. K05 참조. DB 스키마는 그대로다.)
 - **완료 조건:** unit 테스트, provenance(USER rationale 원문 유지·추측 금지) 회귀, 타입 검사.
 - **검증:** 학습자 요약 5개·채팅 Decision 16개 테스트 추가. Node 24.19.0/pnpm 11.13.1에서 `pnpm typecheck` 통과, `pnpm test:unit` 177 통과·3 skip, `pnpm test:integration` 439 통과·8 skip(기존 418 + 신규 21). 새 파일은 Biome check 통과. 전체 `pnpm lint`·`format:check`는 기존 `.local-experiments` 중첩 Biome 설정 오류로 실행하지 못했고, build·smoke·E2E는 이번 domain 변경 범위에서 돌리지 않았다.
 
@@ -53,11 +53,12 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - **범위:** 확정 Learning Spec을 `.kiro/specs/<app>/requirements.md`(EARS)와 LEARNER_FOCUS·AGENT_SUPPORT·EXCLUDED 절로 렌더링하고 Kiro에서 시작하는 동작을 제공한다.
 - **완료 조건:** 렌더링 snapshot 테스트, 실제 Kiro의 Spec 인식과 task 실행 확인.
 
-### [ ] K05. Kiro 채팅 안의 Decision
+### [~] K05. Kiro 채팅 안의 Decision
 
 - **선행:** K01 S7·S8, K03.
-- **범위:** Steering과 MCP `request_decision`으로 Agent가 실제 Decision을 채팅에서 묻게 하고, promptSubmit으로 들어온 사용자 답을 해당 Decision에 연결한다. 패널에 같은 Decision 카드를 보여준다.
+- **범위:** Steering과 Builder MCP `request_user_decision`으로 Agent가 실제 Decision을 채팅에서 묻게 하고, 사용자 답은 Agent가 맥락으로 해석해 `resolve_decision_from_chat`(학습자 원문 인용 필수)으로 기록하며 Core가 인용·순서·명시 번호 모순을 검증한다. 일반 채팅 발언은 `UI_RECORD_CHAT_MESSAGE`로 USER Evidence가 된다. Agent 해석 정확도 평가 세트(정답이 있는 대화 약 20개)를 Kiro Auto로 측정한다. 패널에 같은 Decision 카드를 보여준다.
 - **완료 조건:** 연결 규칙 unit 테스트, 실제 Kiro에서 Decision 요청·사용자 답·Evidence 제안까지 한 번 이어짐. 호출률이 낮으면 fallback과 한계를 기록한다.
+- **진행:** Core 부분 완료. 계약 `UI_RECORD_CHAT_MESSAGE`·`BUILDER_RESOLVE_DECISION_FROM_CHAT`·`DecisionResolution.chatSource`, MCP 도구 `resolve_decision_from_chat`, domain `findExplicitOptionMentions`. 새 integration 7개·domain 7개 추가. `pnpm typecheck` 통과, unit 177 통과·3 skip, integration 453 통과·8 skip. Kiro 연결과 평가 세트는 K03 이후 진행.
 
 ### [ ] K06. Helper 위치 확정과 연결
 

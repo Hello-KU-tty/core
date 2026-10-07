@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseChatDecisionReply } from '../src/index.ts'
+import { findExplicitOptionMentions, parseChatDecisionReply } from '../src/index.ts'
 
 const request = {
   options: [
@@ -78,5 +78,19 @@ describe('parseChatDecisionReply', () => {
       kind: 'UNRESOLVED',
       reason: 'RATIONALE_TOO_LONG',
     })
+  })
+})
+
+describe('findExplicitOptionMentions', () => {
+  it.each([
+    [['2시간(1번)으로 할게'], ['decision_option_1h']],
+    [['음… 옵션 3이 좋겠어'], ['decision_option_7d']],
+    [['2. 하루면 충분해'], ['decision_option_24h']],
+    [['1번이랑 2번 고민했는데 2번'], ['decision_option_1h', 'decision_option_24h']],
+    [['24시간으로 하자', '2 hours면 짧아'], []],
+    [['12번 줄 코드가 이상해'], []],
+    [['9번'], []],
+  ])('finds explicit numbered choices in %j', (messages, expected) => {
+    expect(findExplicitOptionMentions(request, messages)).toEqual(expected)
   })
 })

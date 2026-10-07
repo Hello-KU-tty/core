@@ -3,10 +3,11 @@ import { z } from 'zod'
 import { activityEventSchema, episodeSchema } from './activity.js'
 import { analysisJobSchema } from './analysis.js'
 import {
+  builderResolveDecisionFromChatToolInputSchema,
   builderTaskSchema,
   contextRefreshRequestSchema,
-  decisionContextDraftSchema,
   decisionApplicationSchema,
+  decisionContextDraftSchema,
   decisionRequestDraftSchema,
   decisionRequestSchema,
   decisionResolutionSchema,
@@ -14,10 +15,10 @@ import {
   taskCompletionReportSchema,
 } from './build.js'
 import {
-  candidateRoundSchema,
   candidateEnrichmentBatchSchema,
   candidateEnrichmentSchema,
   candidatePreviewRoundSchema,
+  candidateRoundSchema,
   discoveryFeedbackSchema,
   discoverySessionSchema,
   projectCandidateRevisionSchema,
@@ -287,6 +288,20 @@ export const builderApplyDecisionCommandSchema = z.strictObject({
   context: decisionContextDraftSchema.omit({ blockingReason: true }),
 })
 
+export const builderResolveDecisionFromChatCommandSchema = z.strictObject({
+  ...builderQueryMetadata,
+  kind: z.literal('BUILDER_RESOLVE_DECISION_FROM_CHAT'),
+  idempotencyKey: idempotencyKeySchema,
+  ...builderResolveDecisionFromChatToolInputSchema.pick({
+    projectId: true,
+    taskId: true,
+    decisionId: true,
+    selection: true,
+    citedUserMessages: true,
+    rationaleQuote: true,
+  }).shape,
+})
+
 export const builderCompleteTaskCommandSchema = z
   .strictObject({
     ...builderQueryMetadata,
@@ -339,6 +354,7 @@ export const builderAgentRequestSchema = z.discriminatedUnion('kind', [
   builderUpdateLiveContextCommandSchema,
   builderRequestDecisionCommandSchema,
   builderApplyDecisionCommandSchema,
+  builderResolveDecisionFromChatCommandSchema,
   builderCompleteTaskCommandSchema,
 ])
 
@@ -364,6 +380,7 @@ export const agentRequestSchema = z.discriminatedUnion('kind', [
   builderUpdateLiveContextCommandSchema,
   builderRequestDecisionCommandSchema,
   builderApplyDecisionCommandSchema,
+  builderResolveDecisionFromChatCommandSchema,
   builderCompleteTaskCommandSchema,
   helperGetContextQuerySchema,
   helperRequestContextRefreshCommandSchema,

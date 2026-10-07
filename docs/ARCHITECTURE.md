@@ -453,6 +453,7 @@ Builder Agent:
 - `request_user_decision`
 - `get_decision_result`
 - `apply_decision_result`
+- `resolve_decision_from_chat`: 본선 Kiro-native 경로에서 학습자의 채팅 답을 원문 인용과 함께 Decision 확정으로 기록한다. Core가 인용·순서·명시 번호 모순을 검증한다
 - `complete_task`
 
 Helper Agent:

@@ -22,9 +22,11 @@ import {
   builderTaskContextSchema,
   type CandidateRound,
   type CanonicalConcept,
+  type ChatMessageReceipt,
   type CommandReceipt,
   type ContractError,
   canonicalConceptSchema,
+  chatMessageReceiptSchema,
   commandReceiptSchema,
   contextRefreshRequestSchema,
   correlationIdSchema,
@@ -84,6 +86,7 @@ import {
   closeEpisode,
   confirmLearningSpec,
   evaluateEvidenceProposal,
+  findExplicitOptionMentions,
   openDecision,
   planBuilderTask,
   planFinalUpgradeTask,
@@ -135,6 +138,7 @@ export type UiApplicationResponse =
   | AnalysisJob
   | readonly AnalysisJob[]
   | HelperExchangeReceipt
+  | ChatMessageReceipt
   | HelperContext
   | ProjectEvidenceTrace
   | PreparedBuilderTaskDescriptor
@@ -148,12 +152,15 @@ export type AnalysisApplicationResponse =
   | readonly AnalysisJob[]
   | EvidenceBatchApplicationResult
 
+const MAX_EPISODE_EVENTS = 500
+
 type IdPrefix =
   | 'discovery_session'
   | 'learning_spec'
   | 'task'
   | 'decision'
   | 'decision_option'
+  | 'decision_resolution'
   | 'decision_application'
   | 'context_refresh'
   | 'conversation'
@@ -384,6 +391,8 @@ export class ApplicationService {
         return this.#requestDecision(request)
       case 'BUILDER_APPLY_DECISION':
         return this.#applyDecision(request)
+      case 'BUILDER_RESOLVE_DECISION_FROM_CHAT':
+        return this.#resolveDecisionFromChat(request)
       case 'BUILDER_COMPLETE_TASK':
         return this.#completeTask(request)
       case 'HELPER_GET_CONTEXT':
@@ -429,6 +438,8 @@ export class ApplicationService {
         return this.#prepareBuilderSession(request)
       case 'UI_RECORD_HELPER_EXCHANGE':
         return this.#recordHelperExchange(request)
+      case 'UI_RECORD_CHAT_MESSAGE':
+        return this.#recordChatMessage(request)
       case 'UI_RETRY_ANALYSIS':
         return this.#retryAnalysis(request)
       case 'UI_READ_ANALYSIS_JOBS':
@@ -2639,6 +2650,13 @@ export class ApplicationService {
   ): CommandReceipt {
     return this.#storage.transaction((repository) =>
       this.#idempotent(repository, request, 'ui.resolve_decision', commandReceiptSchema, () => {
+        if (request.resolution.chatSource !== undefined) {
+          throw this.#validationError(
+            request.correlationId,
+            'DECISION_CHAT_SOURCE_NOT_ALLOWED',
+            'Only the Builder chat resolution path may record a chat source.',
+          )
+        }
         const resolution = decisionResolutionSchema.parse({
           ...request.resolution,
           ...(request.resolution.customProposal === undefined
@@ -2660,130 +2678,15 @@ export class ApplicationService {
         )
         if (decision === undefined)
           throw this.#notFound(request.correlationId, 'DECISION_NOT_FOUND')
-        const existingResolution = aggregate.decisionResolutions.find(
-          (item) => item.decisionId === decision.id,
-        )
-        const existingApplication = aggregate.decisionApplications.find(
-          (item) => item.decisionId === decision.id,
-        )
-        const reduced = resolveDecision({
-          aggregate: {
-            request: decision,
-            ...(existingResolution === undefined ? {} : { resolution: existingResolution }),
-            ...(existingApplication === undefined ? {} : { application: existingApplication }),
-          },
-          task: aggregate.task,
+        const nextTask = this.#storeUserDecisionResolution(repository, {
+          aggregate,
+          decision,
           resolution,
-          currentContextVersion: aggregate.liveContext?.contextVersion ?? 0,
-        })
-        if (reduced.outcome === 'REJECTED') {
-          throw this.#domainError(request.correlationId, reduced.reasonCode)
-        }
-        if (reduced.outcome === 'NO_OP') {
-          const response = this.#receipt(request.correlationId, aggregate.task.revision)
-          return {
-            response,
-            resourceId: decision.id,
-            resourceRevision: aggregate.task.revision,
-          }
-        }
-        repository.appendDecisionResolution(resolution)
-        const resolvedDecisionIds = new Set([
-          ...aggregate.decisionResolutions.map((resolution) => resolution.decisionId),
-          resolution.decisionId,
-        ])
-        const hasUnresolvedBlockingDecision = aggregate.decisionRequests.some(
-          (item) => !item.independentWorkCanContinue && !resolvedDecisionIds.has(item.id),
-        )
-        let nextTask = aggregate.task
-        if (
-          aggregate.task.status === 'BLOCKED' &&
-          !decision.independentWorkCanContinue &&
-          !hasUnresolvedBlockingDecision
-        ) {
-          const proposedTask = {
-            ...aggregate.task,
-            revision: aggregate.task.revision + 1,
-            status: 'ACTIVE' as const,
-            updatedAt: resolution.resolvedAt,
-          }
-          const taskResult = transitionBuilderTask({
-            current: aggregate.task,
-            proposed: proposedTask,
-          })
-          if (taskResult.outcome === 'REJECTED') {
-            throw this.#domainError(request.correlationId, taskResult.reasonCode)
-          }
-          nextTask = taskResult.value
-          repository.appendTask(nextTask)
-        }
-        const event = this.#appendActivityEvent(repository, {
-          projectId: decision.projectId,
-          taskId: decision.taskId,
-          decisionId: decision.id,
-          correlationId: decision.correlationId,
-          actor: { kind: 'USER' },
-          occurredAt: resolution.resolvedAt,
-          payload: {
-            type: 'DECISION_RESOLVED',
-            decisionId: decision.id,
-            resolutionId: resolution.id,
-            rationaleProvided: resolution.rationale !== undefined,
-          },
-          sourceReferences: [{ kind: 'USER_DECISION', decisionId: decision.id }],
-        })
-        const decisionEpisode = repository.readOpenEpisode(decision.projectId, 'DECISION', {
-          decisionId: decision.id,
-        })
-        const currentEpisode =
-          decisionEpisode === null
-            ? this.#openEpisode(repository, {
-                type: 'DECISION',
-                event,
-                taskId: decision.taskId,
-                decisionId: decision.id,
-                conceptNames: decision.relatedConceptNames,
-                contextReferences: decision.sourceReferences,
-              })
-            : this.#appendEpisodeEvent(repository, decisionEpisode, event)
-        this.#closeEpisodeAndQueue(
-          repository,
-          currentEpisode,
-          resolution.resolvedAt,
-          'User resolved the Decision.',
-        )
-        this.#closeHelperEpisodes(
-          repository,
-          decision.projectId,
-          { decisionId: decision.id },
-          resolution.resolvedAt,
-          'Related Decision was resolved.',
-          decision.correlationId,
-        )
-        this.#appendAudit(repository, {
           correlationId: request.correlationId,
-          actor: { kind: 'USER' },
-          action: 'RESOLVED',
-          resource: { type: 'DECISION', id: decision.id },
-          summary: 'Stored a validated user-authored Decision resolution.',
-          changedFields: ['status'],
-          occurredAt: resolution.resolvedAt,
+          auditActor: { kind: 'USER' },
+          auditSummary: 'Stored a validated user-authored Decision resolution.',
+          extraSourceReferences: [],
         })
-        if (nextTask.revision !== aggregate.task.revision) {
-          this.#appendAudit(repository, {
-            correlationId: request.correlationId,
-            actor: { kind: 'CORE' },
-            action: 'UPDATED',
-            resource: {
-              type: 'BUILDER_TASK',
-              id: nextTask.id,
-              revision: nextTask.revision,
-            },
-            summary: 'Resumed the Task after its blocking Decision was resolved.',
-            changedFields: ['status', 'revision'],
-            occurredAt: nextTask.updatedAt,
-          })
-        }
         const response = this.#receipt(request.correlationId, nextTask.revision)
         return {
           response,
@@ -2792,6 +2695,142 @@ export class ApplicationService {
         }
       }),
     )
+  }
+
+  #storeUserDecisionResolution(
+    repository: PersistenceRepository,
+    input: {
+      readonly aggregate: BuilderTaskAggregate
+      readonly decision: BuilderTaskAggregate['decisionRequests'][number]
+      readonly resolution: BuilderTaskAggregate['decisionResolutions'][number]
+      readonly correlationId: string
+      readonly auditActor: AuditRecord['actor']
+      readonly auditSummary: string
+      readonly extraSourceReferences: ActivityEvent['sourceReferences']
+    },
+  ): BuilderTask {
+    const { aggregate, decision, resolution } = input
+    const existingResolution = aggregate.decisionResolutions.find(
+      (item) => item.decisionId === decision.id,
+    )
+    const existingApplication = aggregate.decisionApplications.find(
+      (item) => item.decisionId === decision.id,
+    )
+    const reduced = resolveDecision({
+      aggregate: {
+        request: decision,
+        ...(existingResolution === undefined ? {} : { resolution: existingResolution }),
+        ...(existingApplication === undefined ? {} : { application: existingApplication }),
+      },
+      task: aggregate.task,
+      resolution,
+      currentContextVersion: aggregate.liveContext?.contextVersion ?? 0,
+    })
+    if (reduced.outcome === 'REJECTED') {
+      throw this.#domainError(input.correlationId, reduced.reasonCode)
+    }
+    if (reduced.outcome === 'NO_OP') return aggregate.task
+    repository.appendDecisionResolution(resolution)
+    const resolvedDecisionIds = new Set([
+      ...aggregate.decisionResolutions.map((resolution) => resolution.decisionId),
+      resolution.decisionId,
+    ])
+    const hasUnresolvedBlockingDecision = aggregate.decisionRequests.some(
+      (item) => !item.independentWorkCanContinue && !resolvedDecisionIds.has(item.id),
+    )
+    let nextTask = aggregate.task
+    if (
+      aggregate.task.status === 'BLOCKED' &&
+      !decision.independentWorkCanContinue &&
+      !hasUnresolvedBlockingDecision
+    ) {
+      const proposedTask = {
+        ...aggregate.task,
+        revision: aggregate.task.revision + 1,
+        status: 'ACTIVE' as const,
+        updatedAt: resolution.resolvedAt,
+      }
+      const taskResult = transitionBuilderTask({
+        current: aggregate.task,
+        proposed: proposedTask,
+      })
+      if (taskResult.outcome === 'REJECTED') {
+        throw this.#domainError(input.correlationId, taskResult.reasonCode)
+      }
+      nextTask = taskResult.value
+      repository.appendTask(nextTask)
+    }
+    const event = this.#appendActivityEvent(repository, {
+      projectId: decision.projectId,
+      taskId: decision.taskId,
+      decisionId: decision.id,
+      correlationId: decision.correlationId,
+      actor: { kind: 'USER' },
+      occurredAt: resolution.resolvedAt,
+      payload: {
+        type: 'DECISION_RESOLVED',
+        decisionId: decision.id,
+        resolutionId: resolution.id,
+        rationaleProvided: resolution.rationale !== undefined,
+      },
+      sourceReferences: [
+        { kind: 'USER_DECISION', decisionId: decision.id },
+        ...input.extraSourceReferences,
+      ],
+    })
+    const decisionEpisode = repository.readOpenEpisode(decision.projectId, 'DECISION', {
+      decisionId: decision.id,
+    })
+    const currentEpisode =
+      decisionEpisode === null
+        ? this.#openEpisode(repository, {
+            type: 'DECISION',
+            event,
+            taskId: decision.taskId,
+            decisionId: decision.id,
+            conceptNames: decision.relatedConceptNames,
+            contextReferences: decision.sourceReferences,
+          })
+        : this.#appendEpisodeEvent(repository, decisionEpisode, event)
+    this.#closeEpisodeAndQueue(
+      repository,
+      currentEpisode,
+      resolution.resolvedAt,
+      'User resolved the Decision.',
+    )
+    this.#closeHelperEpisodes(
+      repository,
+      decision.projectId,
+      { decisionId: decision.id },
+      resolution.resolvedAt,
+      'Related Decision was resolved.',
+      decision.correlationId,
+    )
+    this.#appendAudit(repository, {
+      correlationId: input.correlationId,
+      actor: input.auditActor,
+      action: 'RESOLVED',
+      resource: { type: 'DECISION', id: decision.id },
+      summary: input.auditSummary,
+      changedFields: ['status'],
+      occurredAt: resolution.resolvedAt,
+    })
+    if (nextTask.revision !== aggregate.task.revision) {
+      this.#appendAudit(repository, {
+        correlationId: input.correlationId,
+        actor: { kind: 'CORE' },
+        action: 'UPDATED',
+        resource: {
+          type: 'BUILDER_TASK',
+          id: nextTask.id,
+          revision: nextTask.revision,
+        },
+        summary: 'Resumed the Task after its blocking Decision was resolved.',
+        changedFields: ['status', 'revision'],
+        occurredAt: nextTask.updatedAt,
+      })
+    }
+    return nextTask
   }
 
   async #applyDecision(
@@ -3683,6 +3722,243 @@ export class ApplicationService {
             resourceId: episode.id,
             resourceRevision: response.episodeRevision,
           }
+        },
+      ),
+    )
+  }
+
+  #recordChatMessage(
+    request: Extract<UiRequest, { kind: 'UI_RECORD_CHAT_MESSAGE' }>,
+  ): ChatMessageReceipt {
+    const recordedAt = this.#timestamp()
+    return this.#storage.transaction((repository) =>
+      this.#idempotent(
+        repository,
+        request,
+        'ui.record_chat_message',
+        chatMessageReceiptSchema,
+        () => {
+          const recovery = repository.recoverProject(request.projectId)
+          if (recovery === null) throw this.#notFound(request.correlationId, 'PROJECT_NOT_FOUND')
+          const taskId = request.taskId ?? recovery.currentTask?.id
+          if (taskId === undefined) {
+            throw this.#notFound(request.correlationId, 'BUILDER_TASK_NOT_FOUND')
+          }
+          const aggregate = this.#requireBuilderAggregate(
+            repository,
+            request.projectId,
+            taskId,
+            request.correlationId,
+          )
+          const task = aggregate.task
+          const resolvedDecisionIds = new Set(
+            aggregate.decisionResolutions.map((resolution) => resolution.decisionId),
+          )
+          const openDecisionEpisodes = aggregate.decisionRequests.flatMap((decision) => {
+            if (resolvedDecisionIds.has(decision.id)) return []
+            const episode = repository.readOpenEpisode(request.projectId, 'DECISION', {
+              decisionId: decision.id,
+            })
+            return episode === null ? [] : [{ decision, episode }]
+          })
+          // A message during exactly one open Decision belongs to that Decision's Episode;
+          // otherwise it belongs to the Task's build Episode.
+          const decisionTarget =
+            openDecisionEpisodes.length === 1 ? openDecisionEpisodes[0] : undefined
+          const taskEpisodeType = this.#taskEpisodeType(task)
+          const targetEpisode =
+            decisionTarget?.episode ??
+            repository.readOpenEpisode(request.projectId, taskEpisodeType, { taskId: task.id })
+          const messageId = this.#generateId('message')
+          const event = this.#appendActivityEvent(repository, {
+            projectId: request.projectId,
+            taskId: task.id,
+            ...(decisionTarget === undefined ? {} : { decisionId: decisionTarget.decision.id }),
+            conversationId: request.conversationId,
+            correlationId: targetEpisode?.correlationId ?? request.correlationId,
+            actor: { kind: 'USER' },
+            occurredAt: recordedAt,
+            payload: {
+              type: 'USER_MESSAGE',
+              conversationId: request.conversationId,
+              messageId,
+              redactedExcerpt: redactSensitiveText(request.message),
+            },
+            sourceReferences: [
+              { kind: 'USER_MESSAGE', conversationId: request.conversationId, messageId },
+            ],
+          })
+          let episode: Episode | undefined
+          if (targetEpisode === null) {
+            if (['PENDING', 'ACTIVE', 'BLOCKED'].includes(task.status)) {
+              episode = this.#openEpisode(repository, {
+                type: taskEpisodeType,
+                event,
+                taskId: task.id,
+              })
+            }
+          } else if (targetEpisode.eventIds.length < MAX_EPISODE_EVENTS) {
+            episode = this.#appendEpisodeEvent(repository, targetEpisode, event)
+          }
+          const response = chatMessageReceiptSchema.parse({
+            schemaVersion: 1,
+            correlationId: request.correlationId,
+            conversationId: request.conversationId,
+            messageId,
+            eventId: event.id,
+            ...(episode === undefined
+              ? {}
+              : {
+                  episode: {
+                    id: episode.id,
+                    revision: episode.revision,
+                    type: episode.type,
+                    ...(episode.decisionId === undefined ? {} : { decisionId: episode.decisionId }),
+                  },
+                }),
+          })
+          return {
+            response,
+            resourceId: event.id,
+            resourceRevision: episode?.revision ?? 1,
+          }
+        },
+      ),
+    )
+  }
+
+  #resolveDecisionFromChat(
+    request: Extract<AgentRequest, { kind: 'BUILDER_RESOLVE_DECISION_FROM_CHAT' }>,
+  ): DecisionCommandReceipt {
+    const resolvedAt = this.#timestamp()
+    return this.#storage.transaction((repository) =>
+      this.#idempotent(
+        repository,
+        request,
+        'builder.resolve_decision_from_chat',
+        decisionCommandReceiptSchema,
+        () => {
+          const aggregate = this.#requireBuilderAggregate(
+            repository,
+            request.projectId,
+            request.taskId,
+            request.correlationId,
+          )
+          const decision = aggregate.decisionRequests.find((item) => item.id === request.decisionId)
+          if (decision === undefined) {
+            throw this.#notFound(request.correlationId, 'DECISION_NOT_FOUND')
+          }
+          // Learner messages after the Decision request, from the Episodes chat messages join.
+          const episodes = [
+            repository.readOpenEpisode(request.projectId, 'DECISION', {
+              decisionId: decision.id,
+            }),
+            repository.readOpenEpisode(request.projectId, this.#taskEpisodeType(aggregate.task), {
+              taskId: aggregate.task.id,
+            }),
+          ].filter((episode): episode is Episode => episode !== null)
+          const userMessages = episodes
+            .flatMap(
+              (episode) =>
+                repository.readEpisodeHistory(request.projectId, episode.id)?.events ?? [],
+            )
+            .flatMap((event) =>
+              event.payload.type === 'USER_MESSAGE' &&
+              event.actor.kind === 'USER' &&
+              event.taskId === decision.taskId &&
+              Date.parse(event.occurredAt) >= Date.parse(decision.requestedAt)
+                ? [{ event, payload: event.payload }]
+                : [],
+            )
+          const cited = request.citedUserMessages.map((citation) => {
+            const matches = userMessages.filter(
+              ({ payload }) =>
+                (citation.messageId === undefined || payload.messageId === citation.messageId) &&
+                payload.redactedExcerpt.includes(citation.quote),
+            )
+            const match = matches.at(-1)
+            if (match === undefined) {
+              throw this.#validationError(
+                request.correlationId,
+                'CHAT_DECISION_QUOTE_NOT_FOUND',
+                'Each cited quote must appear verbatim in a learner chat message sent after the Decision request.',
+              )
+            }
+            return match
+          })
+          const citedTexts = cited.map(({ payload }) => payload.redactedExcerpt)
+          const quoted = (text: string) => citedTexts.some((message) => message.includes(text))
+          if (request.rationaleQuote !== undefined && !quoted(request.rationaleQuote)) {
+            throw this.#validationError(
+              request.correlationId,
+              'CHAT_DECISION_RATIONALE_NOT_QUOTED',
+              'The rationale must be quoted verbatim from a cited learner message.',
+            )
+          }
+          if (request.selection.kind === 'CUSTOM' && !quoted(request.selection.proposalQuote)) {
+            throw this.#validationError(
+              request.correlationId,
+              'CHAT_DECISION_PROPOSAL_NOT_QUOTED',
+              'A custom proposal must be quoted verbatim from a cited learner message.',
+            )
+          }
+          const selectedOptionId =
+            request.selection.kind === 'OPTION'
+              ? request.selection.optionId
+              : request.selection.kind === 'RECOMMENDATION'
+                ? decision.recommendedOptionId
+                : undefined
+          const explicitMentions = findExplicitOptionMentions(decision, citedTexts)
+          if (explicitMentions.length === 1 && explicitMentions[0] !== selectedOptionId) {
+            throw this.#validationError(
+              request.correlationId,
+              'CHAT_DECISION_CONTRADICTS_EXPLICIT_CHOICE',
+              'The learner explicitly named a different option; ask the learner to confirm.',
+            )
+          }
+          const userMessageIds = [...new Set(cited.map(({ payload }) => payload.messageId))]
+          const resolution = decisionResolutionSchema.parse({
+            schemaVersion: 1,
+            id: this.#generateId('decision_resolution'),
+            decisionId: decision.id,
+            projectId: decision.projectId,
+            taskId: decision.taskId,
+            correlationId: decision.correlationId,
+            expectedContextVersion: aggregate.liveContext?.contextVersion ?? 0,
+            selectionKind: request.selection.kind,
+            ...(selectedOptionId === undefined ? {} : { selectedOptionId }),
+            ...(request.selection.kind === 'CUSTOM'
+              ? { customProposal: request.selection.proposalQuote }
+              : {}),
+            ...(request.rationaleQuote === undefined ? {} : { rationale: request.rationaleQuote }),
+            helperUsed: false,
+            chatSource: { mappedBy: 'BUILDER', userMessageIds },
+            resolvedAt,
+            source: { kind: 'USER' },
+            redactionStatus: 'VERIFIED_REDACTED',
+          })
+          const nextTask = this.#storeUserDecisionResolution(repository, {
+            aggregate,
+            decision,
+            resolution,
+            correlationId: request.correlationId,
+            auditActor: request.actor,
+            auditSummary:
+              'Builder mapped cited learner chat messages to a user Decision resolution; Core verified the quotes.',
+            extraSourceReferences: cited.map(({ payload }) => ({
+              kind: 'USER_MESSAGE' as const,
+              conversationId: payload.conversationId,
+              messageId: payload.messageId,
+            })),
+          })
+          const response = decisionCommandReceiptSchema.parse({
+            schemaVersion: 1,
+            correlationId: request.correlationId,
+            accepted: true,
+            resourceRevision: nextTask.revision,
+            decisionId: decision.id,
+          })
+          return { response, resourceId: decision.id, resourceRevision: nextTask.revision }
         },
       ),
     )
