@@ -25,7 +25,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - **완료 조건:** 추적 Markdown의 상대 링크가 이동 전과 같은 수준으로 해석된다(이동 전부터 있던 `dist/`·임시 경로 참조 제외). 로컬 commit까지만 한다.
 - **검증:** 문서 41개를 이동하고 56개 문서의 링크를 고쳤다. 추적·신규 Markdown 전체의 상대 링크 재검사에서 새로 깨진 링크는 0개다. `pnpm format:check`는 기존 `.local-experiments/kiro-native-recovery/biome.json` 중첩 설정 오류로 실행 전에 멈췄다(이전부터 있던 문제, Markdown은 Biome 대상 아님). 프론트 공유 문서는 사용자 요청으로 별도 브랜치 `finals/plan`에 push했다.
 
-### [>] K01. Kiro-native capability spike
+### [~] K01. Kiro-native capability spike
 
 - **선행:** K00.
 - **범위:** 합성 workspace(`/Users/hurdoo/coding/experiments/`)와 별도 Kiro 창에서 S1~S10을 실측한다. S1 hook 파일 형식, S2 trigger별 발동·stdin, S3 promptSubmit 출력의 맥락 주입, S4 preToolUse 차단·확인, S5 명령 hook 승인 UX, S6 Steering always와 `#[[file:]]` 즉시 반영, S7 `request_decision` 호출률, S8 `session_id` 탭 구분, S9 확장에서 채팅 열기·입력(Helper 후보 A), S10 확장이 쓴 Spec 인식과 task 실행.
