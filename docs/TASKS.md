@@ -32,7 +32,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - **비용 경계:** 모델 호출이 없는 항목을 먼저 한다. 모델 호출은 개인 계정 무료 플랜, Auto 모델, 15크레딧 상한, 합성 데이터만 쓴다. 로그인은 사용자가 직접 한다.
 - **산출물:** `docs/spikes/KIRO_NATIVE_HOOK_SPIKE.md`와 실행 기록. 항목별 PASS/PARTIAL/BLOCKED와 근거.
 - **완료 조건:** 각 항목의 판정과 재현 절차가 남고, K02~K06의 진행 여부와 Helper A/B 선택이 결정된다.
-- **결과:** [spike 결과](spikes/KIRO_NATIVE_HOOK_SPIKE.md). 개인 BuilderId·Auto로 약 3.0크레딧 사용. hook 수집·맥락 주입·도구 차단·Decision MCP 호출(4/4)·세션 연결·외부 Spec 실행은 PASS. `#[[file:]]` 참조는 반영되지 않아 학습자 요약은 Steering 본문에 직접 쓴다. Helper는 A(promptSubmit 주입)로 정한다. Spec task 시작·종료 hook(PreTaskExec·PostTaskExec, `task_success` 포함)도 PASS. `focusChatInput` 입력 채움은 사용자 화면 확인 결과 동작하지 않았다. 일반 trust 승인 화면과 ask 확인 창은 남은 확인으로 K03·K06에서 다시 본다. K02~K06은 진행한다.
+- **결과:** [spike 결과](spikes/KIRO_NATIVE_HOOK_SPIKE.md). 개인 BuilderId·Auto로 약 3.0크레딧 사용. hook 수집·맥락 주입·도구 차단·Decision MCP 호출(4/4)·세션 연결·외부 Spec 실행은 PASS. `#[[file:]]` 참조는 동작하나 Steering은 세션 시작 때 고정된다(처음 FAIL 판정은 실험 설계 오류로 정정). Helper는 `/vibe-helper` 슬래시 명령(manual Steering)으로 붙고 `inclusion: auto`도 동작한다(첫 승인 필요). Spec task 시작·종료 hook(PreTaskExec·PostTaskExec, `task_success` 포함)도 PASS. `focusChatInput` 입력 채움은 사용자 화면 확인 결과 동작하지 않았다. 일반 trust 승인 화면과 ask 확인 창은 남은 확인으로 K03·K06에서 다시 본다. K02~K06은 진행한다.
 
 ### [x] K02. Core의 host 중립 수집 경로
 
@@ -62,7 +62,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 ### [ ] K06. Helper 위치 확정과 연결
 
 - **선행:** K01 S9.
-- **범위:** K01에서 고른 A 경로를 연결한다. promptSubmit hook이 Helper 접두나 패널에서 연 채팅을 감지해 Helper 역할 지시를 주입한다(문자열 `#vibe-helper`는 manual Steering을 붙이지 않음). B(패널)는 fallback이다. Helper는 Core의 Evidence·State 변경 도구를 받지 않는다.
+- **범위:** Kiro 채팅에서 `/vibe-helper`(manual Steering) 또는 `inclusion: auto`로 Helper를 붙이고, 질문과 답을 Helper Episode로 기록한다. 답변 텍스트 수집 방법을 정한다. hook 접두 주입과 B(패널)는 fallback이다. Helper는 Core의 Evidence·State 변경 도구를 받지 않는다.
 - **완료 조건:** Helper 대화가 HELPER_CONVERSATION Episode로 묶이고 다음 개인화에 반영됨을 실제 흐름으로 확인.
 
 ### [ ] K07. 포스터 핵심 장면 확보
