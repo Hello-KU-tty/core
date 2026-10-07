@@ -25,6 +25,7 @@ import {
 import { openSqliteStorage } from '@vibe-helper/storage-sqlite'
 import { LocalAgentHost } from './agent-host.js'
 import { HostLeases } from './host-leases.js'
+import { createKiroHookBinding } from './kiro-hook-binding.js'
 import { NativeAgentRelay } from './native-agent-relay.js'
 import { createNativeCoreBinding } from './native-core-binding.js'
 import { privateDirectory } from './private-files.js'
@@ -54,6 +55,7 @@ const allowed = new Set([
   '--native-correlation-id',
   '--native-task-id',
   '--native-tools',
+  '--kiro-hooks',
 ])
 function option(name: string, fallback: string): string {
   const index = args.indexOf(name)
@@ -65,7 +67,7 @@ function option(name: string, fallback: string): string {
 for (let index = 0; index < args.length; index++) {
   const value = args[index]
   if (value === undefined || !allowed.has(value)) throw new Error('UNKNOWN_OPTION')
-  if (value !== '--live') index++
+  if (value !== '--live' && value !== '--kiro-hooks') index++
 }
 const root = resolve(option('--root', join(repository, '.data/local')))
 const executable = option('--kiro-cli', process.platform === 'win32' ? 'kiro-cli.exe' : 'kiro-cli')
@@ -243,6 +245,9 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
   let nativeWorkspace: string | undefined
   const nativeBindingFile = join(root, `native-mcp-${instanceId}.json`)
   let nativeBindingFileWritten = false
+  let kiroHookBinding: ReturnType<typeof createKiroHookBinding> | undefined
+  const kiroHookFile = join(root, `kiro-hook-${instanceId}.json`)
+  let kiroHookFileWritten = false
   let runtime: WorkflowRuntime | undefined
   let nativeRelay: NativeAgentRelay | undefined
   let result: ResultRuntimeSupervisor | undefined
@@ -261,6 +266,9 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
     await nativeBinding?.handler.close()
     if (nativeBindingFileWritten)
       await writeFile(nativeBindingFile, JSON.stringify({ status: 'REVOKED' }), { mode: 0o600 })
+    kiroHookBinding?.revoke()
+    if (kiroHookFileWritten)
+      await writeFile(kiroHookFile, JSON.stringify({ status: 'REVOKED' }), { mode: 0o600 })
     await result?.close()
     if (server?.listening) {
       server.closeAllConnections()
@@ -332,6 +340,17 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
         ...(option('--native-tools', '')
           ? { toolNames: option('--native-tools', '').split(',') }
           : {}),
+      })
+    }
+    if (args.includes('--kiro-hooks')) {
+      if (nativeRole !== 'BUILDER') throw new Error('KIRO_HOOKS_REQUIRE_BUILDER_BINDING')
+      kiroHookBinding = createKiroHookBinding({
+        application,
+        binding: {
+          projectId: option('--native-project-id', ''),
+          taskId: option('--native-task-id', ''),
+          correlationId: option('--native-correlation-id', ''),
+        },
       })
     }
     let projectTools: Promise<ProjectToolchain> | undefined
@@ -425,6 +444,7 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
     // Keep the live CLI handler map: LocalAgentHost registers each run after startup.
     const mcpHandlers = agents.handlers
     if (nativeBinding) mcpHandlers.set(nativeBinding.path, nativeBinding.handler)
+    if (kiroHookBinding) mcpHandlers.set(kiroHookBinding.path, kiroHookBinding.handler)
     server = createLocalServer({
       application,
       runtime,
@@ -474,6 +494,19 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
         { mode: 0o600, flag: 'wx' },
       )
       nativeBindingFileWritten = true
+    }
+    if (kiroHookBinding) {
+      await writeFile(
+        kiroHookFile,
+        JSON.stringify({
+          projectId: option('--native-project-id', ''),
+          taskId: option('--native-task-id', ''),
+          url: `${baseUrl}${kiroHookBinding.path}`,
+          authorization: kiroHookBinding.authorization,
+        }),
+        { mode: 0o600, flag: 'wx' },
+      )
+      kiroHookFileWritten = true
     }
     if (!coreOnly) runtime.startAnalystWorker()
     for (const signal of ['SIGINT', 'SIGTERM'] as const)

@@ -164,6 +164,7 @@ describe('experimental native Core binding', () => {
         'request_user_decision',
         'get_decision_result',
         'apply_decision_result',
+        'resolve_decision_from_chat',
         'complete_task',
       ])
       const args = {

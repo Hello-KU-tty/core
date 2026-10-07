@@ -93,7 +93,8 @@ export function createLocalServer(options: {
       return
     }
     const url = new URL(request.url ?? '/', `http://${expectedHost}`)
-    if (url.pathname.startsWith('/mcp/')) {
+    // Per-binding handlers (MCP runs and Kiro hooks) carry their own bearer authority.
+    if (url.pathname.startsWith('/mcp/') || url.pathname.startsWith('/hooks/')) {
       const handler = options.mcpHandlers.get(url.pathname)
       if (handler === undefined || url.search) {
         json(response, 404, { error: 'MCP_RUN_NOT_FOUND' })

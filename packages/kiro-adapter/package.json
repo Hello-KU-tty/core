@@ -41,6 +41,10 @@
     "./crew-app": {
       "types": "./dist/crew-app-client.d.ts",
       "import": "./dist/crew-app-client.js"
+    },
+    "./kiro-workspace-node": {
+      "types": "./dist/kiro-workspace-node.d.ts",
+      "import": "./dist/kiro-workspace-node.js"
     }
   },
   "dependencies": {

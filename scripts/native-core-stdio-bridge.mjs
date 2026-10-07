@@ -8,12 +8,12 @@ import {
 } from '../apps/mcp-server/node_modules/@modelcontextprotocol/client/dist/index.mjs'
 import { Server } from '../apps/mcp-server/node_modules/@modelcontextprotocol/server/dist/index.mjs'
 import { StdioServerTransport } from '../apps/mcp-server/node_modules/@modelcontextprotocol/server/dist/stdio.mjs'
+import nativePrivatePaths from '../examples/kiro-native-host/native-private-directory.cjs'
 import { candidateIdSchema } from '../packages/contracts/dist/primitives.js'
+import { createBridgeLifecycle } from './native-bridge-lifecycle.mjs'
 import { restoreCoreProvenEmptyActiveDecisions } from './native-builder-transport.mjs'
 import { describeCompletionInput } from './native-completion-diagnostic.mjs'
-import { createBridgeLifecycle } from './native-bridge-lifecycle.mjs'
 import { describeNativeCoreError } from './native-core-error-diagnostic.mjs'
-import { previewInputFailure } from './native-discovery-preview-validation.mjs'
 import {
   advertiseNativeEnrichment,
   bindNativeEnrichment,
@@ -21,6 +21,7 @@ import {
   nativeEnrichmentFailure,
   nativeEnrichmentToolError,
 } from './native-discovery-enrichment.mjs'
+import { previewInputFailure } from './native-discovery-preview-validation.mjs'
 import { restoreDiscoveryEmptyCollections } from './native-discovery-transport.mjs'
 import {
   advertiseJsonEnvelope,
@@ -30,7 +31,6 @@ import {
   jsonEnvelopeToolError,
 } from './native-json-envelope.mjs'
 import { allowedNativeReceipt } from './native-receipt-scope.mjs'
-import nativePrivatePaths from '../examples/kiro-native-host/native-private-directory.cjs'
 
 const ROLE_TOOLS = {
   DISCOVERY: [
@@ -48,6 +48,7 @@ const ROLE_TOOLS = {
     'request_user_decision',
     'get_decision_result',
     'apply_decision_result',
+    'resolve_decision_from_chat',
     'complete_task',
   ],
   HELPER: ['get_helper_context'],

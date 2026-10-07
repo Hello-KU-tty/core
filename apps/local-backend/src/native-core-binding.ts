@@ -20,6 +20,7 @@ const NATIVE_TOOLS: Partial<Record<AgentRole, readonly string[]>> = {
     'request_user_decision',
     'get_decision_result',
     'apply_decision_result',
+    'resolve_decision_from_chat',
     'complete_task',
   ],
   HELPER: ['get_helper_context'],

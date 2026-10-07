@@ -41,11 +41,12 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - **완료 조건:** unit 테스트, provenance(USER rationale 원문 유지·추측 금지) 회귀, 타입 검사.
 - **검증:** 학습자 요약 5개·채팅 Decision 16개 테스트 추가. Node 24.19.0/pnpm 11.13.1에서 `pnpm typecheck` 통과, `pnpm test:unit` 177 통과·3 skip, `pnpm test:integration` 439 통과·8 skip(기존 418 + 신규 21). 새 파일은 Biome check 통과. 전체 `pnpm lint`·`format:check`는 기존 `.local-experiments` 중첩 Biome 설정 오류로 실행하지 못했고, build·smoke·E2E는 이번 domain 변경 범위에서 돌리지 않았다.
 
-### [>] K03. Kiro adapter의 workspace 연결
+### [~] K03. Kiro adapter의 workspace 연결
 
 - **선행:** K01, K02.
 - **범위:** 확장이 대상 workspace의 `.kiro/`에 Steering·hook·MCP 설정을 설치·갱신·제거한다. hook 명령은 stdin JSON을 Core 이벤트로 바꾸는 Node 스크립트 하나로 통일한다. 사용자의 기존 `.kiro/` 파일을 덮어쓰지 않는다.
 - **완료 조건:** 설치·제거 왕복 테스트, 기존 파일 보존 테스트, 실제 Kiro에서 hook 발동과 Core 기록 확인.
+- **진행:** 개발 경로 완료. `packages/kiro-adapter/src/kiro-workspace-node.ts`(hook 입력 해석, 세션→대화 ID, hooks·MCP·Steering 생성, 기존 MCP 설정 보존 병합), `apps/local-backend/src/kiro-hook-binding.ts`(채팅 기록만 가능한 hook 전용 토큰 엔드포인트, `--kiro-hooks`), `scripts/kiro-hook.mjs`(항상 exit 0), `scripts/kiro-workspace-install.mjs`, `scripts/seed-kiro-native-demo.mjs`. 실제 Kiro에서 hook→Core 기록과 Builder MCP 연결 확인([끝단 실측](spikes/KIRO_NATIVE_E2E.md)). 남은 것: 확장 UI의 설치·제거와 사용자 동의, 기존 `.kiro/` 파일 충돌 처리, 패키징된 bridge 사본 갱신.
 
 ### [ ] K04. Learning Spec을 Kiro Spec으로 내보내기
 
@@ -58,7 +59,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - **선행:** K01 S7·S8, K03.
 - **범위:** Steering과 Builder MCP `request_user_decision`으로 Agent가 실제 Decision을 채팅에서 묻게 하고, 사용자 답은 Agent가 맥락으로 해석해 `resolve_decision_from_chat`(학습자 원문 인용 필수)으로 기록하며 Core가 인용·순서·명시 번호 모순을 검증한다. 일반 채팅 발언은 `UI_RECORD_CHAT_MESSAGE`로 USER Evidence가 된다. Agent 해석 정확도 평가 세트(정답이 있는 대화 약 20개)를 Kiro Auto로 측정한다. 패널에 같은 Decision 카드를 보여준다.
 - **완료 조건:** 연결 규칙 unit 테스트, 실제 Kiro에서 Decision 요청·사용자 답·Evidence 제안까지 한 번 이어짐. 호출률이 낮으면 fallback과 한계를 기록한다.
-- **진행:** Core 부분 완료. 계약 `UI_RECORD_CHAT_MESSAGE`·`BUILDER_RESOLVE_DECISION_FROM_CHAT`·`DecisionResolution.chatSource`, MCP 도구 `resolve_decision_from_chat`, domain `findExplicitOptionMentions`. 새 integration 7개·domain 7개 추가. `pnpm typecheck` 통과, unit 177 통과·3 skip, integration 453 통과·8 skip. Kiro 연결과 평가 세트는 K03 이후 진행.
+- **진행:** 실제 Kiro에서 Decision 요청 → 학습자 자연어 답 → `resolve_decision_from_chat` 수락 → 적용까지 1회 이어짐([끝단 실측](spikes/KIRO_NATIVE_E2E.md)). Steering 0.2.0(멱등키 형식, start_task 조건). Core 부분 완료. 계약 `UI_RECORD_CHAT_MESSAGE`·`BUILDER_RESOLVE_DECISION_FROM_CHAT`·`DecisionResolution.chatSource`, MCP 도구 `resolve_decision_from_chat`, domain `findExplicitOptionMentions`. 새 integration 7개·domain 7개 추가. `pnpm typecheck` 통과, unit 177 통과·3 skip, integration 453 통과·8 skip. Kiro 연결과 평가 세트는 K03 이후 진행.
 
 ### [ ] K06. Helper 위치 확정과 연결
 

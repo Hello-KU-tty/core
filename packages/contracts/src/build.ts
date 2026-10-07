@@ -397,7 +397,8 @@ export const builderApplyDecisionToolInputSchema = z.strictObject({
 })
 
 export const chatDecisionSelectionSchema = z.discriminatedUnion('kind', [
-  z.strictObject({ kind: z.literal('OPTION'), optionId: decisionOptionIdSchema }),
+  // Options are presented to the learner in request order, numbered from 1.
+  z.strictObject({ kind: z.literal('OPTION'), optionNumber: z.int().min(1).max(6) }),
   z.strictObject({ kind: z.literal('RECOMMENDATION') }),
   z.strictObject({ kind: z.literal('CUSTOM'), proposalQuote: nonEmptyTextSchema }),
 ])

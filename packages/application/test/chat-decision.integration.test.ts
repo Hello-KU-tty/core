@@ -189,7 +189,7 @@ describe('Kiro-native chat Evidence and chat Decision resolution', () => {
     ).toMatchObject({ success: true })
 
     const result = await resolveFromChat({
-      selection: { kind: 'OPTION', optionId: ids.optionB },
+      selection: { kind: 'OPTION', optionNumber: 2 },
       citedUserMessages: [{ quote: '그럼 하루짜리로 하자' }],
       rationaleQuote: '친구들이 보통 그날 안에는 열어보니까',
     })
@@ -216,7 +216,7 @@ describe('Kiro-native chat Evidence and chat Decision resolution', () => {
     for (const quote of ['24시간이 좋겠다', 'A day fits typical sharing between friends.']) {
       expect(
         await resolveFromChat({
-          selection: { kind: 'OPTION', optionId: ids.optionB },
+          selection: { kind: 'OPTION', optionNumber: 2 },
           citedUserMessages: [{ quote }],
         }),
       ).toMatchObject({ success: false, error: { code: 'CHAT_DECISION_QUOTE_NOT_FOUND' } })
@@ -231,7 +231,7 @@ describe('Kiro-native chat Evidence and chat Decision resolution', () => {
 
     expect(
       await resolveFromChat({
-        selection: { kind: 'OPTION', optionId: ids.optionA },
+        selection: { kind: 'OPTION', optionNumber: 1 },
         citedUserMessages: [{ quote: '1시간이면 될 듯' }],
       }),
     ).toMatchObject({ success: false, error: { code: 'CHAT_DECISION_QUOTE_NOT_FOUND' } })
@@ -247,7 +247,7 @@ describe('Kiro-native chat Evidence and chat Decision resolution', () => {
 
     expect(
       await resolveFromChat({
-        selection: { kind: 'OPTION', optionId: ids.optionB },
+        selection: { kind: 'OPTION', optionNumber: 2 },
         citedUserMessages: [{ quote: '2시간(1번)으로 할게' }],
       }),
     ).toMatchObject({
@@ -258,7 +258,7 @@ describe('Kiro-native chat Evidence and chat Decision resolution', () => {
 
     expect(
       await resolveFromChat({
-        selection: { kind: 'OPTION', optionId: ids.optionA },
+        selection: { kind: 'OPTION', optionNumber: 1 },
         citedUserMessages: [{ quote: '2시간(1번)으로 할게' }],
         rationaleQuote: '민감한 파일이 많아서',
       }),
@@ -298,6 +298,19 @@ describe('Kiro-native chat Evidence and chat Decision resolution', () => {
       selectionKind: 'CUSTOM',
       customProposal: '다운로드 한 번 하면 바로 만료되게',
     })
+  })
+
+  it('rejects an option number the Decision does not have', async () => {
+    const { storage, sendChat, requestDecision, resolveFromChat } = await createHarness()
+    expect(await requestDecision()).toMatchObject({ success: true })
+    expect(await sendChat('세 번째 거로 할게')).toMatchObject({ success: true })
+    expect(
+      await resolveFromChat({
+        selection: { kind: 'OPTION', optionNumber: 3 },
+        citedUserMessages: [{ quote: '세 번째 거로 할게' }],
+      }),
+    ).toMatchObject({ success: false, error: { code: 'CHAT_DECISION_OPTION_NOT_FOUND' } })
+    expect(resolutionOf(storage)).toBeUndefined()
   })
 
   it('does not let the UI path claim a Builder chat mapping', async () => {

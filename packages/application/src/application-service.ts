@@ -3904,10 +3904,17 @@ export class ApplicationService {
           }
           const selectedOptionId =
             request.selection.kind === 'OPTION'
-              ? request.selection.optionId
+              ? decision.options[request.selection.optionNumber - 1]?.id
               : request.selection.kind === 'RECOMMENDATION'
                 ? decision.recommendedOptionId
                 : undefined
+          if (request.selection.kind === 'OPTION' && selectedOptionId === undefined) {
+            throw this.#validationError(
+              request.correlationId,
+              'CHAT_DECISION_OPTION_NOT_FOUND',
+              'The selected option number does not exist for this Decision.',
+            )
+          }
           const explicitMentions = findExplicitOptionMentions(decision, citedTexts)
           if (explicitMentions.length === 1 && explicitMentions[0] !== selectedOptionId) {
             throw this.#validationError(
