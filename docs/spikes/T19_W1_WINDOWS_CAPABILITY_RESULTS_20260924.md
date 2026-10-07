@@ -2,7 +2,7 @@
 
 > 2026-09-24 KST · branch `codex/windows-extension-runtime-20260923` · baseline `b88ae5f`.
 > **W1 bounded capability PASS. W2 착수 근거 확보.** 현재 Kiro에서 한 창 custom Agent 병행은 FAIL이며, 두 창 분리에서만 병행 PASS다. 제품 설치·단일 창 UX·전체 수직 흐름 완료를 뜻하지 않는다.
-> [승인 계획](../T19_W1_WINDOWS_CAPABILITY_PLAN.md), [Windows 인계](../WINDOWS_EXTENSION_HANDOFF_20260923.md), [sanitized receipt](T19_W1_WINDOWS_RECEIPTS_20260924.json), [진단 사용법](../../examples/windows-capability/README.md).
+> [승인 계획](../archive/preliminary/T19_W1_WINDOWS_CAPABILITY_PLAN.md), [Windows 인계](../archive/preliminary/WINDOWS_EXTENSION_HANDOFF_20260923.md), [sanitized receipt](T19_W1_WINDOWS_RECEIPTS_20260924.json), [진단 사용법](../../examples/windows-capability/README.md).
 
 ## 1. 확인한 실행 조합
 

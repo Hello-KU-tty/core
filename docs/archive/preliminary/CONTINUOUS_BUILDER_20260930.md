@@ -25,7 +25,7 @@ Builder는 `previousCompletionReport`를 이전 Agent 작업 맥락으로 받고
 | `node scripts/test-builder-follow-up.mjs ../program` | 완료 뒤 Builder 3회·Helper 3회, 중복 전송 1회 실행, 이전 보고·소스 보존, 패널 복구 무변경 PASS |
 | 최종 packaged project-tools | 기존 Node/pnpm와 관리 Node/pnpm 모두 PATH 없는 새 프로세스 재사용, 실제 frozen install/build/test/smoke/HTTP 앱 PASS |
 | 실패 경계 | offline, hash mismatch, network failure, cancellation, launcher 변조, descriptor hardlink 거부 PASS |
-| 새 kit 적용 | [Windows 0.0.18 대응 kit](../releases/windows/0.0.18/program-vsix-receipt.json), 관리 파일 118개 hash PASS |
+| 새 kit 적용 | [Windows 0.0.18 대응 kit](../../../releases/windows/0.0.18/program-vsix-receipt.json), 관리 파일 118개 hash PASS |
 | VSIX / 설치 파일 | 패키지 71개 파일; 설치된 프론트 번들 2개와 portable 64개 hash 일치 |
 | 실제 Kiro 재시작 | 모든 창 정상 종료 → CLI 0.0.18 설치 → 동일 프로젝트 재개; 연결 정상, 완료 보고 유지, Builder·Helper 입력/전송 활성, 기존 권한 경고 없음 |
 
@@ -35,8 +35,8 @@ Builder는 `previousCompletionReport`를 이전 Agent 작업 맥락으로 받고
 
 ## 산출물과 한계
 
-- [Windows 0.0.18 VSIX](../releases/windows/0.0.18/builder-helper-agent-panel-0.0.18-win32-x64-74208fffa5c0.vsix?raw=true): 2,573,191 bytes, SHA-256 `8da34ce191799cbae5e19d11ed41e3148cd52bec7d174d3196dc192047aa5211`.
-- [패키지 receipt](../releases/windows/0.0.18/program-vsix-receipt.json), [kit 생성 시점 검증](spikes/T19_FRONTEND_HANDOFF_UPDATE_20260930_1.json). kit 생성 시점의 프론트 전체 검증 대기 상태는 위 최종 결과로 해소됐다.
+- [Windows 0.0.18 VSIX](../../../releases/windows/0.0.18/builder-helper-agent-panel-0.0.18-win32-x64-74208fffa5c0.vsix?raw=true): 2,573,191 bytes, SHA-256 `8da34ce191799cbae5e19d11ed41e3148cd52bec7d174d3196dc192047aa5211`.
+- [패키지 receipt](../../../releases/windows/0.0.18/program-vsix-receipt.json), [kit 생성 시점 검증](../../spikes/T19_FRONTEND_HANDOFF_UPDATE_20260930_1.json). kit 생성 시점의 프론트 전체 검증 대기 상태는 위 최종 결과로 해소됐다.
 - 로컬 생성 receipt: `dist/frontend-consumer-receipt.json`, `dist/builder-follow-up-receipt.json`, `dist/project-tools-receipt.json`. 개인 데이터나 설치 프로필을 저장소에 추가하지 않았다.
 - 자동화 Agent는 합성 fixture이며 모델 호출 0회다. 설치 후 UI·파일 검증은 완료했지만 0.0.18의 실제 native 모델 전체 수직 흐름과 다른 PC는 검증하지 않았다. 권한 제한을 모두 제거하거나 모든 모델·도구 실패가 없어졌다고 주장하지 않는다.
 

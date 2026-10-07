@@ -35,7 +35,7 @@ pnpm check
 pnpm frontend:handoff
 ```
 
-kit 적용/VSIX 조립은 [Windows quickstart](FRONTEND_WINDOWS_QUICKSTART.md)와 [update kit 절차](FRONTEND_HANDOFF_20260927.md)를 따른다. 기존 kit의 파일명/kitVersion만으로 최신 소스라고 판단하지 말고 **manifest의 backendHead와 실제 파일 hash**를 확인한다. 오래된 vendor bundle에 frontend만 reload하면 반영되지 않는다. 새 Windows ZIP/receipt가 제공됐다고 주장하지 않는다.
+kit 적용/VSIX 조립은 [Windows quickstart](../../FRONTEND_WINDOWS_QUICKSTART.md)와 [update kit 절차](FRONTEND_HANDOFF_20260927.md)를 따른다. 기존 kit의 파일명/kitVersion만으로 최신 소스라고 판단하지 말고 **manifest의 backendHead와 실제 파일 hash**를 확인한다. 오래된 vendor bundle에 frontend만 reload하면 반영되지 않는다. 새 Windows ZIP/receipt가 제공됐다고 주장하지 않는다.
 
 ## B7 — MCP 초기화 진단과 복구 경계
 
@@ -98,7 +98,7 @@ canonical Builder prompt와 adapter/CLI/native/package의 version 연결을 **1.
 
 “규칙 몇 번에 따라”, 도구 식별자로 진행을 설명하는 대신 지금 할 일·선택 이유·관찰 결과를 설명하도록 했다. 실제 ToolCall, schema 식별자, 파일명, 명령과 오류 코드는 그대로 유지한다. frontend의 사후 번역·TEXT 숨김은 필요하지 않다.
 
-새 fixture는 한국어/영어, 명시적 영어 요청, Personal Need 유무, 내부 규칙 인용 금지와 명령 원문 보존을 검토 대상으로 고정한다. **현재 검증은 prompt/version 연결의 기계적 회귀이며 실제 모델 응답 품질 PASS가 아니다.** [평가 기록](../tests/eval/results/builder-agent-v1.3.11.md).
+새 fixture는 한국어/영어, 명시적 영어 요청, Personal Need 유무, 내부 규칙 인용 금지와 명령 원문 보존을 검토 대상으로 고정한다. **현재 검증은 prompt/version 연결의 기계적 회귀이며 실제 모델 응답 품질 PASS가 아니다.** [평가 기록](../../../tests/eval/results/builder-agent-v1.3.11.md).
 
 ## 검증 결과와 프론트 회신 요청
 

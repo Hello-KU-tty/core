@@ -17,7 +17,7 @@
 - 성공 1회, 저장 실패 0회, 중복 클릭 병합, 프로젝트 전환/dispose, 다른 미해결 결정, 기존 실행, Task 변경 회귀 PASS. 기존 resolve-only의 자동 실행 금지 검사도 유지했다.
 - 실제 frontend dispatcher/controller/port → 인증 HTTP/SSE → SQLite/Core에서 blocking Decision 생성·저장·ACTIVE 전환·Builder 1회와 중복 클릭 병합 PASS. `node scripts/test-program-consumer.mjs ../program`으로 재현한다. Agent 경계는 delayed deterministic fixture이며 native 모델 검증과 구분한다.
 - kit 2026.09.29.3의 receipt와 실제 관리 파일 **118개** SHA-256이 모두 일치했다. portable manifest hash 검사를 거쳐 VSIX를 조립했다.
-- Core 소비 스크립트의 format/lint와 양쪽 `git diff --check` PASS. 이전 fixture ID 오류는 수정 후 재검증했고, 실제 program 경로의 sandbox 읽기 거부는 승인된 권한으로 다시 실행해 PASS했다. 이번 frontend orchestration 변경으로 전체 backend 검증을 새로 완료했다고 주장하지 않는다. 최신 backend 전체 검증은 [kit 3 기록](spikes/T19_FRONTEND_HANDOFF_UPDATE_20260929_3.json)에 있다.
+- Core 소비 스크립트의 format/lint와 양쪽 `git diff --check` PASS. 이전 fixture ID 오류는 수정 후 재검증했고, 실제 program 경로의 sandbox 읽기 거부는 승인된 권한으로 다시 실행해 PASS했다. 이번 frontend orchestration 변경으로 전체 backend 검증을 새로 완료했다고 주장하지 않는다. 최신 backend 전체 검증은 [kit 3 기록](../../spikes/T19_FRONTEND_HANDOFF_UPDATE_20260929_3.json)에 있다.
 
 ## 실제 사용자 세션
 

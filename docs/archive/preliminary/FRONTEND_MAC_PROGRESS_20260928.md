@@ -63,7 +63,7 @@ Windows portable의 Node/SQLite 및 exact source gate를 Mac 지원처럼 수정
 
 개발용 host는 credit observation 파일이 없으면 새 UI 모델 요청을 거절한다. fresh observation 하나당 최대 두 요청(JIT+SPEC)을 허용하며 재로드로 카운터가 초기화되지 않는다. 이는 개발 검증 가드이며 계정의 실제 billing hard cap이나 제품 quota 기능이 아니다. 후속 Analyst를 포함한 실행을 관찰하고 단계별 실제 사용량을 다시 확인해야 한다.
 
-F5에서 Analysis 명시적 재시도까지 admission 대상으로 보완했다. private stage의 claim을 배타적으로 만들어 여러 host/process 사이의 슬롯을 공유하며, 예전 log admission도 센다. 실패한 dispatch나 audit 파일 갱신으로 슬롯을 환급하지 않는다. 관측·audit의 손상/과대/비정규 파일·symlink는 fail-closed이고 prompt/entity ID/credential은 기록하지 않는다. `node --test examples/program-macos-dev/test/*.test.cjs`로34개 독립 모델0 회귀를 재현한다. 자세한 운영 경계는 [개발 harness README](../examples/program-macos-dev/README.md)에 있다.
+F5에서 Analysis 명시적 재시도까지 admission 대상으로 보완했다. private stage의 claim을 배타적으로 만들어 여러 host/process 사이의 슬롯을 공유하며, 예전 log admission도 센다. 실패한 dispatch나 audit 파일 갱신으로 슬롯을 환급하지 않는다. 관측·audit의 손상/과대/비정규 파일·symlink는 fail-closed이고 prompt/entity ID/credential은 기록하지 않는다. `node --test examples/program-macos-dev/test/*.test.cjs`로34개 독립 모델0 회귀를 재현한다. 자세한 운영 경계는 [개발 harness README](../../../examples/program-macos-dev/README.md)에 있다.
 
 ### 15:36 이전 모델0 원기록
 

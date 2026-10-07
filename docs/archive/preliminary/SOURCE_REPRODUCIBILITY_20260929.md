@@ -1,6 +1,6 @@
 # Windows 소스 후보 재현 — 2026-09-29
 
-> **역사 기록:** 아래 hash·수치는 당시 비공개 로컬 후보의 값이며 현재 ZIP의 값이 아니다. `dist/` 파일은 공개 다운로드 대상이 아니므로 이름만 보존한다. 현재 [개발자 ZIP과 receipt](../releases/frontend-handoff/20260927/README.md), [제출·검증 상태](VALIDATION_STATUS_20260930.md)를 별도로 확인한다.
+> **역사 기록:** 아래 hash·수치는 당시 비공개 로컬 후보의 값이며 현재 ZIP의 값이 아니다. `dist/` 파일은 공개 다운로드 대상이 아니므로 이름만 보존한다. 현재 [개발자 ZIP과 receipt](../../../releases/frontend-handoff/20260927/README.md), [제출·검증 상태](VALIDATION_STATUS_20260930.md)를 별도로 확인한다.
 
 **판정: 별도 압축 해제본의 자동 재현 PASS.** 실제 모델 호출·사람 pilot·기존 프로젝트 업그레이드 검증과 외부 제출은 이 판정에 포함하지 않는다.
 

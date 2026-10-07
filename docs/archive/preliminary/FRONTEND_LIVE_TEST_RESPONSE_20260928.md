@@ -79,4 +79,4 @@ worker가 generated root 안의 발급 workspace로 현재 창을 전환할 수 
 4. quota가 남은 승인 계정에서 오류 코드와 같은 Project 명시적 retry, 생성 폴더 Trust/재로드/Helper 창/취소를 실측한다. quota를 일부러 소진하거나 overage를 켜지 않는다.
 5. 새 Windows receipt와 파일 inventory로 kit/VSIX를 만든다. **기존20260927 verification metadata를 이번 변경의 새 Windows PASS처럼 재사용하지 않는다.**
 
-검증 수치와 상세 근거는 [Mac 전체 인계](spikes/T19_MAC_PERFORMANCE_HANDOFF_20260928.md), [B1–B5 상세 대조](spikes/T19_FRONTEND_LATE_LIVE_TRIAGE_20260928.md)에 있다. 이번 답변 자체는 외부 전송·push가 아니라 로컬 인계 초안이다.
+검증 수치와 상세 근거는 [Mac 전체 인계](../../spikes/T19_MAC_PERFORMANCE_HANDOFF_20260928.md), [B1–B5 상세 대조](../../spikes/T19_FRONTEND_LATE_LIVE_TRIAGE_20260928.md)에 있다. 이번 답변 자체는 외부 전송·push가 아니라 로컬 인계 초안이다.

@@ -10,11 +10,11 @@
 
 | 공개 평가 항목 | 배점 | 현재 연결할 수 있는 프로젝트 자료 | 부족한 근거 |
 | --- | ---: | --- | --- |
-| 목적 부합성 | 10 | [승인된 문제·범위](../PROJECT_BRIEF.md), build-first 수직 흐름 | 실제 초보 사용자의 필요·완주 관찰 |
-| 데이터 활용성 | 10 | [역할·출처·Evidence 설계](ARCHITECTURE.md), [평가 경계](../tests/eval/README.md) | 사람 annotation과 동의받은 최소 데이터 |
+| 목적 부합성 | 10 | [승인된 문제·범위](../../../PROJECT_BRIEF.md), build-first 수직 흐름 | 실제 초보 사용자의 필요·완주 관찰 |
+| 데이터 활용성 | 10 | [역할·출처·Evidence 설계](../../ARCHITECTURE.md), [평가 경계](../../../tests/eval/README.md) | 사람 annotation과 동의받은 최소 데이터 |
 | 기술적 우월성 | 30 | deterministic Core, 역할별 권한, durable 복원, 자동 회귀와 제한된 Core 성능 비교 | 동일 조건의 일반 Kiro baseline, 남은 Evidence 의미 오류 |
 | 서비스 활용성·완성도 | 30 | [실제 프론트 수정·Mac 검사](FRONTEND_MAC_PROGRESS_20260928.md), 후속 Task까지 bounded native 완주·Chrome 결과 실행 | 일반 제품 설치와 실사용 근거 |
-| 제출 코드·Markdown | 10 | [README](../README.md), 명세·결정·테스트·인계 | 제출 형식 확인, 최종 소스/자료 범위 고정과 비밀정보 검사 |
+| 제출 코드·Markdown | 10 | [README](../../../README.md), 명세·결정·테스트·인계 | 제출 형식 확인, 최종 소스/자료 범위 고정과 비밀정보 검사 |
 | 최종 발표 | 5 | 검증 결과와 제한을 구분한 설명 자료 | 공식 발표 시간·형식, 검증된 live/backup demo |
 | 대중 평가 | 5 | 해당 없음 | 실제 행사 투표이며 로컬 개발로 검증할 수 없음 |
 
@@ -61,15 +61,15 @@ consumer 실행 전 frontend checkout에서 기존 lockfile로 `npm ci --ignore-
 
 E2E 기본 포트가 점유돼 있다면 사용자 서버를 종료하지 말고 빈 포트를 `VIBE_E2E_FRONTEND_PORT`로 지정한다. 이번 Mac에서는4183을 썼다. GUI/browser 실행 권한 오류를 앱 테스트 PASS로 기록하지 않는다.
 
-실제 프론트의 Mac 개발 실행은 [개발 harness 안내](../examples/program-macos-dev/README.md)를 따른다. 이는 Windows 제품 패키지가 아니라 검증용 seam이며 frontend manifest/portable 지원 범위를 바꾸지 않는다. 모델 없는 검사만으로 지원 버전을 늘리지 않는다.
+실제 프론트의 Mac 개발 실행은 [개발 harness 안내](../../../examples/program-macos-dev/README.md)를 따른다. 이는 Windows 제품 패키지가 아니라 검증용 seam이며 frontend manifest/portable 지원 범위를 바꾸지 않는다. 모델 없는 검사만으로 지원 버전을 늘리지 않는다.
 
 ## 제출 전 반드시 남아 있는 항목
 
 1. **실제 연결의 범위:** Personal Need 없는 독서 기록 시나리오는 후속 Task 완료와 최신 Chrome 결과 실행까지 통과했다. 최초 앱의 서버 실행 불일치는 실제 후속 Builder로 수정했고 Helper의 동률 순서 설명 오류는 남은 품질 기록이다. 일반 Mac 제품 설치·다른 Kiro 버전·이번 제외 범위인 Windows PASS는 아니다.
 2. **안전·복구의 범위:** [T20 감사](T20_AUDIT_20260928.md)에 첫 안내·redaction·keyboard/label·실패/취소/복원과 미검증 OPS를 매핑했다. bounded Mac/자동 회귀만으로 모든 접근성·제품 lifecycle 보장을 선언하지 않는다.
-3. **의미 품질:** Analyst1.0.8은 출력 구조 개선에 한정한다. 미래의 계획을 실제 수행으로 오인한 기존 실패가 남아 있어 false mastery 안전성을 일반화할 수 없다. [원본/후보 전표본](spikes/t19-analyst-prompt-experiments/README.md)을 보존한다.
-4. **실제 사용자와 비교:** [SPEC10.2](SPEC.md#102-대회-제출-준비-완료-조건)는 초보 사용자 검증·동의된 증언·일반 Kiro baseline을 요구한다. 합성 fixture·개발자의 대리 클릭·LLM 평가를 이를 대신하는 사람 결과로 세지 않는다. 참가자 모집/동의/외부 전달은 별도 사용자 조율이 필요하다.
-5. **제출물 고정:** [제출 Markdown 초안](SUBMISSION.md), [데모·소스 범위](SUBMISSION_DEMO_AND_SOURCE.md), [비공개 소스 후보의 독립 재현](SOURCE_REPRODUCIBILITY_20260928.md)을 준비했다. 실제 안내에 맞는 최종 형식과 fallback recording은 아직 없다.19:06 공식 FAQ 재확인에서 본선은 새 입력의 실제 동작도 확인한다고 명시돼 있어, 저장 결과/영상만으로 live 요구를 충족했다고 하지 않는다. 계정 token, connection descriptor, DB, raw 대화, 민감 경로, 과거 private 실험 산출물은 제외한다. 현재 작업 트리를 통째로 archive하지 않는다.
+3. **의미 품질:** Analyst1.0.8은 출력 구조 개선에 한정한다. 미래의 계획을 실제 수행으로 오인한 기존 실패가 남아 있어 false mastery 안전성을 일반화할 수 없다. [원본/후보 전표본](../../spikes/t19-analyst-prompt-experiments/README.md)을 보존한다.
+4. **실제 사용자와 비교:** [SPEC10.2](../../SPEC.md#102-대회-제출-준비-완료-조건)는 초보 사용자 검증·동의된 증언·일반 Kiro baseline을 요구한다. 합성 fixture·개발자의 대리 클릭·LLM 평가를 이를 대신하는 사람 결과로 세지 않는다. 참가자 모집/동의/외부 전달은 별도 사용자 조율이 필요하다.
+5. **제출물 고정:** [제출 Markdown 초안](../../SUBMISSION.md), [데모·소스 범위](../../SUBMISSION_DEMO_AND_SOURCE.md), [비공개 소스 후보의 독립 재현](SOURCE_REPRODUCIBILITY_20260928.md)을 준비했다. 실제 안내에 맞는 최종 형식과 fallback recording은 아직 없다.19:06 공식 FAQ 재확인에서 본선은 새 입력의 실제 동작도 확인한다고 명시돼 있어, 저장 결과/영상만으로 live 요구를 충족했다고 하지 않는다. 계정 token, connection descriptor, DB, raw 대화, 민감 경로, 과거 private 실험 산출물은 제외한다. 현재 작업 트리를 통째로 archive하지 않는다.
 6. **전달 권한:** commit/push/공개 배포는 이번에 하지 않았다. 외부 제출이나 공개 채널 변경 전 사용자에게 범위·계정·대상 승인을 받아야 한다.
 
 상위 T19/T19-N, T20~T30과 최종 제출 준비 완료는 이 대조표로 닫지 않는다. 후속 검증 결과 또는 사용자가 명시적으로 승인한 제한이 있을 때만 관련 결정과 task를 갱신한다.

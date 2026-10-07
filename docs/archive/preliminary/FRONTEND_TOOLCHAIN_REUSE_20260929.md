@@ -24,7 +24,7 @@ Helper의 `도우미 답변 요약`은 `text.trim().slice(-240)`으로 저장된
 | 실패 경계 | 도구 누락·버전 변경·launcher/shim/descriptor 변조·downgrade 회귀, offline·hash mismatch·network·cancel·hardlink 거부 PASS |
 | kit 및 VSIX 무결성 | kit 적용 전 검사, 적용 후 118 관리 파일 hash, VSIX 내부 71 파일 hash PASS |
 
-검증 receipt: [T19_FRONTEND_HANDOFF_UPDATE_20260929_4.json](spikes/T19_FRONTEND_HANDOFF_UPDATE_20260929_4.json). 추가 생성 receipt는 `dist/project-tools-receipt.json`, `dist/frontend-consumer-receipt.json`, `dist/vsix-delivery-20260929-0.0.17/program-vsix-receipt.json`에 있다. 기존 lint warning과 Vite 설정 안내는 남아 있으나 검사 실패는 없다.
+검증 receipt: [T19_FRONTEND_HANDOFF_UPDATE_20260929_4.json](../../spikes/T19_FRONTEND_HANDOFF_UPDATE_20260929_4.json). 추가 생성 receipt는 `dist/project-tools-receipt.json`, `dist/frontend-consumer-receipt.json`, `dist/vsix-delivery-20260929-0.0.17/program-vsix-receipt.json`에 있다. 기존 lint warning과 Vite 설정 안내는 남아 있으나 검사 실패는 없다.
 
 추가 Git whitespace 검사는 Core와 프론트 app source에서 PASS다. 프론트 전체 `git diff --check`는 재생성된 portable SQL의 CRLF와 upstream Node LICENSE 공백을 보고한다. `git diff --ignore-space-at-eol --exit-code -- portable/drizzle portable/licenses/node-LICENSE`로 해당 파일들의 실질 내용 변화가 없음을 확인했다. 배포 manifest hash와 일치하는 원본 바이트를 유지하며 생성물에 별도 공백 수정을 하지 않았다.
 

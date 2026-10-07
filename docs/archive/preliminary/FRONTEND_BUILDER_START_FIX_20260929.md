@@ -21,9 +21,9 @@
 
 ## 설치 파일
 
-- [0.0.12 VSIX](../dist/submission-builder-start-20260929/builder-helper-agent-panel-0.0.12-win32-x64-76b2a36cbcfb.vsix): 71 files / 2,560,874 bytes.
+- [0.0.12 VSIX](../../../dist/submission-builder-start-20260929/builder-helper-agent-panel-0.0.12-win32-x64-76b2a36cbcfb.vsix): 71 files / 2,560,874 bytes.
 - SHA-256: `1794945177a89e33135c7014a97554a15b5468e67da1ed733c52a0634dceb8f6`.
-- [VSIX receipt](../dist/submission-builder-start-20260929/program-vsix-receipt.json), [실제 소비 검증 receipt](../dist/frontend-consumer-receipt.json).
+- [VSIX receipt](../../../dist/submission-builder-start-20260929/program-vsix-receipt.json), [실제 소비 검증 receipt](../../../dist/frontend-consumer-receipt.json).
 
 앞선0.0.10/0.0.11 VSIX와 source ZIP은 당시 검증 자료이며 이 수정을 소급 반영하지 않았다. program push는 기존 HURDOO Write 권한 대기다.
 

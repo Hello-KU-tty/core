@@ -1,6 +1,6 @@
 # T19-W2 portable Core·runtime 계획
 
-> 2026-09-24 · 사용자 `T19 w2` 요청으로 착수. [W1 결과](spikes/T19_W1_WINDOWS_CAPABILITY_RESULTS_20260924.md)를 입력으로 사용한다.
+> 2026-09-24 · 사용자 `T19 w2` 요청으로 착수. [W1 결과](../../spikes/T19_W1_WINDOWS_CAPABILITY_RESULTS_20260924.md)를 입력으로 사용한다.
 
 1. source checkout과 mutable root를 분리한 win32-x64 Core package를 만든다. Core/stdio bridge/guard/worker, canonical prompt, SQL migration·journal, 해당 SQLite prebuild와 runtime license만 명시적으로 수집한다.
 2. 실행 파일·고정 args/env·관측 version/API/architecture를 담은 descriptor를 사용한다. Kiro child → PATH의 기존 Node → 검증된 private cache → 조건부 공식 Node 다운로드 순서로 실제 SQLite transaction/reopen probe를 수행한다. 개발 pin은 유지한다.

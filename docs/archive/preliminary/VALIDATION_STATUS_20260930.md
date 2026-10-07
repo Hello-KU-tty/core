@@ -42,12 +42,12 @@
 - 공식 배포 Node를 해시 검증 후 확장 데이터 영역의 private cache에 둔다. 구 확장 폴더 제거 뒤에도 생성 앱의 도구 선택을 유지한다.
 - 기존 bundled Node 기록은 같은 제품의 상위 버전에서만 이관한다. 외부 실행 파일 교체, 변조·링크·downgrade는 계속 거절한다.
 - 유일한 등록 프로젝트가 이동해도 정확한 도구 기록으로 새 프로젝트를 시작할 수 있다. 옮겨진 프로젝트를 검색하거나 자동 등록/이동하지 않으며 예전 경로를 재생성하지 않는다. 기존 프로젝트를 이어 쓰려면 사용자가 원래 위치를 복원해야 한다.
-- 원본 코드·DB·대화·기존 실험과 stash를 보존한다. 현재 Windows portable은 프론트의 기존 [Windows 0.0.18 대응 kit](../releases/windows/0.0.18/program-vsix-receipt.json) 그대로이며 이 Mac 수정이 적용됐다고 주장하지 않는다.
+- 원본 코드·DB·대화·기존 실험과 stash를 보존한다. 현재 Windows portable은 프론트의 기존 [Windows 0.0.18 대응 kit](../../../releases/windows/0.0.18/program-vsix-receipt.json) 그대로이며 이 Mac 수정이 적용됐다고 주장하지 않는다.
 
 ## 전달
 
 사용자 승인 후 `@hurdooagent`로 기존 core/main에 게시했다. 원격 다운로드 가이드 수정 `f230392`를 보존한 `e1fc4f2`가 게시 commit이다. 11:46 KST 고정 URL의 Mac0.1.3·개발자 ZIP을 다시 받아 크기/SHA-256·내부 버전과 원격 가이드 일치를 확인했다. Windows0.0.18 파일과 program 원격 `e65cd7f`는 변경하지 않았다. 세부 값은 아래 receipt를 따른다.
 
-[설치 가이드](DOWNLOAD_GUIDE.md) · [Mac 후보와 hash](MAC_VSIX.md) · [개발자 ZIP receipt](../releases/frontend-handoff/20260927/README.md) · [조직 소개 게시 초안](GITHUB_LANDING_HANDOFF.md).
+[설치 가이드](../../DOWNLOAD_GUIDE.md) · [Mac 후보와 hash](../../MAC_VSIX.md) · [개발자 ZIP receipt](../../../releases/frontend-handoff/20260927/README.md) · [조직 소개 게시 초안](../../GITHUB_LANDING_HANDOFF.md).
 
 기존 URL/파일명은 유지하되 새 내부 버전과 hash를 명시한다. Git 이력·시각을 바꾸거나 마감 전 결과로 위장하지 않는다. 동결 ZIP 안의 미게시 문구는 당시 기록이며 최신 게시 상태는 저장소의 receipt를 기준으로 한다.

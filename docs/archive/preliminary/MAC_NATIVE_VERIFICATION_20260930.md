@@ -1,6 +1,6 @@
 # Mac 설치본 추가 검증
 
-> 게시 후속: 아래 검증 당시에는 로컬 commit만 했다. 이후 사용자가 Mac 보완 게시를 승인했으며 최신 게시 상태는 [Mac receipt](../releases/macos/0.1.0/macos-vsix-receipt.json)와 [개발자 ZIP receipt](../releases/frontend-handoff/20260927/frontend-handoff-receipt.json)를 기준으로 한다. 검증했던 binary는 재빌드하지 않는다.
+> 게시 후속: 아래 검증 당시에는 로컬 commit만 했다. 이후 사용자가 Mac 보완 게시를 승인했으며 최신 게시 상태는 [Mac receipt](../../../releases/macos/0.1.0/macos-vsix-receipt.json)와 [개발자 ZIP receipt](../../../releases/frontend-handoff/20260927/frontend-handoff-receipt.json)를 기준으로 한다. 검증했던 binary는 재빌드하지 않는다.
 
 ## 판정
 

@@ -44,7 +44,7 @@ Hello Vibe는 IDE 확장이므로 다운로드 페이지의 CLI·Crew가 아닌 
 
 위 링크를 누르면 VSIX 파일이 바로 다운로드됩니다. Apple Silicon(M1 이상)용이며 Intel Mac용 파일은 아닙니다. Kiro는 `/Applications/Kiro.app`에 설치합니다. 파일 무결성 확인과 자세한 설치·복구 방법은 [Mac 설치 안내](MAC_VSIX.md)를 따르세요.
 
-이 후보는 격리 프로필 설치와 실제 Core/SQLite·도구·구 설치 제거/이동 복구 자동 검사를 통과했습니다. 실제 모델로 Discovery/Spec→앱 생성·실행, Decision 선택·반영, 별도 Helper, 재시작 복원과 실행 중 취소·재개를 확인했습니다. 실패 후 복구와 검증 한계는 [실제 설치본 검증 보고](MAC_NATIVE_VERIFICATION_20260930.md)를 보세요. 다음 개인화·MVP 전체, 실제 IDE 자동 업데이트 전체와 장기 사용까지 검증한 것은 아닙니다.
+이 후보는 격리 프로필 설치와 실제 Core/SQLite·도구·구 설치 제거/이동 복구 자동 검사를 통과했습니다. 실제 모델로 Discovery/Spec→앱 생성·실행, Decision 선택·반영, 별도 Helper, 재시작 복원과 실행 중 취소·재개를 확인했습니다. 실패 후 복구와 검증 한계는 [실제 설치본 검증 보고](archive/preliminary/MAC_NATIVE_VERIFICATION_20260930.md)를 보세요. 다음 개인화·MVP 전체, 실제 IDE 자동 업데이트 전체와 장기 사용까지 검증한 것은 아닙니다.
 
 ## 4. Kiro에 확장 설치
 
@@ -117,8 +117,8 @@ Mac에서는 `shasum -a 256 <다운로드한 ZIP>`으로 확인합니다. 같은
 
 이 저장소를 수정·검증하려면 [README의 개발 환경과 검증](../README.md#개발-환경과-검증)을 따릅니다. 개발 도구는 Node.js **24.19.0**, pnpm **11.13.1**로 고정되어 있습니다.
 
-- [프론트 연동·패키징 인계](FRONTEND_HANDOFF.md)
+- [프론트 연동·패키징 인계](archive/preliminary/FRONTEND_HANDOFF.md)
 - [Windows 일반 설치 검증과 지원 범위](spikes/T19_W5_KIRO_1170_GENERAL_MODE_RESULTS_20260925.md)
-- [macOS 개발 검증 기록](FRONTEND_MAC_PROGRESS_20260928.md)
+- [macOS 개발 검증 기록](archive/preliminary/FRONTEND_MAC_PROGRESS_20260928.md)
 
 위 검증 기록의 과거 버전·파일은 당시 결과입니다. 실제 설치 대상은 담당자가 제공한 제품 VSIX와 해당 설치 안내를 기준으로 선택하세요.

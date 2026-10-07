@@ -10,9 +10,9 @@
 - backend 소스 commit: `bc8570b3d763a756710db214eacc44921e87be27`.
 - frontend 소스 commit: `deef685b39065efae590b89ee76be1e5855f84a5`.
 - 적용 kit: **2026.09.29.2**, 관리 파일118개 대조 PASS.
-- [현재 VSIX](../dist/submission-live-20260929/builder-helper-agent-panel-0.0.10-win32-x64-272221b7adbf.vsix): 71 files / 2,560,126 bytes.
+- [현재 VSIX](../../../dist/submission-live-20260929/builder-helper-agent-panel-0.0.10-win32-x64-272221b7adbf.vsix): 71 files / 2,560,126 bytes.
 - SHA-256: `b9afb36290830d1c3babe39f8e7e0496b147eb77d1f4af698d5564984f8b8021`.
-- [VSIX receipt](../dist/submission-live-20260929/program-vsix-receipt.json). 이전 후보와 내부 파일 inventory hash는 같고 재압축한 ZIP metadata 때문에 archive SHA는 다르다. 현재 설치·직접 사용 기준은 이 파일이다.
+- [VSIX receipt](../../../dist/submission-live-20260929/program-vsix-receipt.json). 이전 후보와 내부 파일 inventory hash는 같고 재압축한 ZIP metadata 때문에 archive SHA는 다르다. 현재 설치·직접 사용 기준은 이 파일이다.
 
 검증된 프론트 소스를 다시 빌드하고 kit hash를 확인한 뒤 조립했다. 실행 중인 동일 버전의 첫 재설치는 Windows 파일 잠금으로 실패했다. 준비용 Kiro 창을 정상 종료하고 재설치해 성공했으며, 설치 목록도0.0.10이다. 폴더나 사용자 DB를 삭제해 복구하지 않았다.
 

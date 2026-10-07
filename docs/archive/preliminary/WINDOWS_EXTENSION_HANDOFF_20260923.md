@@ -4,7 +4,7 @@
 
 > 작성: 2026-09-23 KST. 사용자와 합의한 요구와 구현 방향을 기록한다. 이번 인계는 문서 작업이며 Windows 실행·패키징·다운로드 기능은 아직 구현/검증되지 않았다.
 > 작업 브랜치: `codex/windows-extension-runtime-20260923`. 분기점: `codex/kiro-native-recovery-20260913`의 `21674e8`; native 구현 baseline: `445497b`.
-> 다음 작업은 [TASKS.md](TASKS.md)의 T19-W1이다. 상위 요구는 [PROJECT_BRIEF.md](../PROJECT_BRIEF.md) → [SPEC.md](SPEC.md) → [ARCHITECTURE.md](ARCHITECTURE.md) → [DECISIONS.md](DECISIONS.md) 순서로 읽는다.
+> 다음 작업은 [TASKS.md](../../TASKS.md)의 T19-W1이다. 상위 요구는 [PROJECT_BRIEF.md](../../../PROJECT_BRIEF.md) → [SPEC.md](../../SPEC.md) → [ARCHITECTURE.md](../../ARCHITECTURE.md) → [DECISIONS.md](../../DECISIONS.md) 순서로 읽는다.
 
 ## 1. 사용자가 확정한 목표
 
@@ -111,16 +111,16 @@ backend + MCP bridge runtime
 
 | source | 확인한 가정 / 필요한 변경 |
 | --- | --- |
-| [local backend main](../apps/local-backend/src/main.ts) | repository 상대 root·exact Node·수동 init/start. packaged assets와 mutable root 분리, supervised start |
-| [native runtime](../examples/kiro-panel/src/native-runtime.cjs), [runtime config](../examples/kiro-panel/runtime-config.json) | macOS/arm64·Homebrew path·exact source 고정. Windows 지원표와 runtime descriptor 추가 |
-| [native relay](../apps/local-backend/src/native-agent-relay.ts) | prompt/source path와 stdio `command` 하드코딩. packaged resource·runtime descriptor 주입 |
-| [native client](../examples/kiro-native-host/native-client.cjs) | stdio command·args·env exact 검증. 새 검증된 descriptor를 허용하되 권한을 넓히지 않음 |
-| [native worker](../examples/kiro-panel/src/native-worker.cjs), [bridge](../scripts/native-core-stdio-bridge.mjs) | runtime 전달, role binding/revoke, Windows descriptor ACL·path·stream/cancel 검사 |
-| [result runtime](../packages/runtime/src/result-runtime.ts) | `spawn(process.execPath)`와 축소 env. generated app용 runtime descriptor·Windows owned process 종료 필요 |
-| [storage](../packages/storage-sqlite/src/database.ts), [migration](../packages/storage-sqlite/src/migration.ts) | platform native loading, packaged migration path, disk transaction/backup·reopen 검증 |
-| [private files](../apps/local-backend/src/private-files.ts) | Windows ACL branch는 있지만 실제 ACL·한글/공백 경로·junction 검증 필요 |
-| [panel build](../scripts/build-kiro-panel.mjs), [VSIX packaging](../scripts/package-kiro-panel.mjs) | 현재 Core 제외, Unix zip 명령. OS별 artifact 목록·Windows 재현 가능한 packaging과 누출 검사 |
-| [connection manager](../examples/kiro-panel/src/core-connection.cjs), [frontend guide](FRONTEND_IDE_IMPLEMENTATION_GUIDE.md) | 수동 connection 설정을 manager 내부로 이동, generation/no-replay 유지 |
+| [local backend main](../../../apps/local-backend/src/main.ts) | repository 상대 root·exact Node·수동 init/start. packaged assets와 mutable root 분리, supervised start |
+| [native runtime](../../../examples/kiro-panel/src/native-runtime.cjs), [runtime config](../../../examples/kiro-panel/runtime-config.json) | macOS/arm64·Homebrew path·exact source 고정. Windows 지원표와 runtime descriptor 추가 |
+| [native relay](../../../apps/local-backend/src/native-agent-relay.ts) | prompt/source path와 stdio `command` 하드코딩. packaged resource·runtime descriptor 주입 |
+| [native client](../../../examples/kiro-native-host/native-client.cjs) | stdio command·args·env exact 검증. 새 검증된 descriptor를 허용하되 권한을 넓히지 않음 |
+| [native worker](../../../examples/kiro-panel/src/native-worker.cjs), [bridge](../../../scripts/native-core-stdio-bridge.mjs) | runtime 전달, role binding/revoke, Windows descriptor ACL·path·stream/cancel 검사 |
+| [result runtime](../../../packages/runtime/src/result-runtime.ts) | `spawn(process.execPath)`와 축소 env. generated app용 runtime descriptor·Windows owned process 종료 필요 |
+| [storage](../../../packages/storage-sqlite/src/database.ts), [migration](../../../packages/storage-sqlite/src/migration.ts) | platform native loading, packaged migration path, disk transaction/backup·reopen 검증 |
+| [private files](../../../apps/local-backend/src/private-files.ts) | Windows ACL branch는 있지만 실제 ACL·한글/공백 경로·junction 검증 필요 |
+| [panel build](../../../scripts/build-kiro-panel.mjs), [VSIX packaging](../../../scripts/package-kiro-panel.mjs) | 현재 Core 제외, Unix zip 명령. OS별 artifact 목록·Windows 재현 가능한 packaging과 누출 검사 |
+| [connection manager](../../../examples/kiro-panel/src/core-connection.cjs), [frontend guide](../../FRONTEND_IDE_IMPLEMENTATION_GUIDE.md) | 수동 connection 설정을 manager 내부로 이동, generation/no-replay 유지 |
 
 Core/MCP schema·SDK 계약은 유지한다. source pin, role catalog, workspace·shell guard, Helper/Analyst read-only, Evidence provenance는 runtime portability와 독립적으로 검증한다.
 

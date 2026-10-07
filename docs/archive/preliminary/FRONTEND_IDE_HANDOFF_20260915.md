@@ -1,6 +1,6 @@
 # Frontend IDE-only 인계 — 2026-09-15
 
-> 새 frontend 구현은 [IDE-only frontend 구현 가이드](FRONTEND_IDE_IMPLEMENTATION_GUIDE.md)에서 시작한다. 이 문서는 2026-09-15~16 실측의 시간순 handoff와 세부 receipt를 보존한다.
+> 새 frontend 구현은 [IDE-only frontend 구현 가이드](../../FRONTEND_IDE_IMPLEMENTATION_GUIDE.md)에서 시작한다. 이 문서는 2026-09-15~16 실측의 시간순 handoff와 세부 receipt를 보존한다.
 >
 > 목적: frontend 담당자가 **30분 착수 목표**로 IDE-only 화면 개발을 준비할 수 있게 현재 실행 경로, 계약, 책임과 막힌 gate를 한곳에 고정한다. 현재 pushed revision·backend installer가 없고 exact Kiro pin도 따로 확보해야 하므로, 30분은 모든 컴퓨터에서 보장되는 시간이 아니다.
 >

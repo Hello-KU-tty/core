@@ -1,6 +1,6 @@
 # Vibe Helper — 만들면서 이해의 근거를 남기는 AI 개발 도우미
 
-기술 설명 · 상태 정정. 이 Markdown은 제출된 발표 PDF 자체가 아니다. 사용자 제공 제출 화면에서 조직 GitHub, 다운로드 가이드와 별도 업로드 PDF가 제출된 것을 확인했다. [현재 제출·검증 상태](VALIDATION_STATUS_20260930.md)를 먼저 참고한다.
+기술 설명 · 상태 정정. 이 Markdown은 제출된 발표 PDF 자체가 아니다. 사용자 제공 제출 화면에서 조직 GitHub, 다운로드 가이드와 별도 업로드 PDF가 제출된 것을 확인했다. [현재 제출·검증 상태](archive/preliminary/VALIDATION_STATUS_20260930.md)를 먼저 참고한다.
 
 사용자 확인에 따라 실제 사용 후 정성 인터뷰를 수행했다. 참여자 수·원문·정량 학습 효과·일반 Kiro 비교 결과는 이 문서에서 새로 주장하지 않는다. 아래 수직 흐름과 검사 수치는 **9월 28~29일 당시 기술 검증 기록**이며, 새 Mac 설치물의 모델 완주와 사람 학습 효과를 증명하지 않는다.
 
@@ -44,9 +44,9 @@ Mac의 고정된 Kiro 개발 환경에서 실제 프론트와 native 모델로 �
 | native 소스 회귀 / Mac 개발 host | 9/29 CJS169 PASS. 이전 Mac 격리 환경/예산41 PASS는 당시 결과 |
 | 실제 provider→HTTP/SSE→SQLite | PASS. 모델 경계는 deterministic fixture이며 native 검사와 분리 |
 | 의존성 감사 | frontend npm/backend pnpm 공개 audit 각각0건(2026-09-28 관측) |
-| 독립 소스 재현 |752개 파일의 고정 archive를 새 폴더에서 설치·검사·빌드하고 검사 후 SHA 일치 PASS. [후보 hash·검사 보고서](SOURCE_REPRODUCIBILITY_20260928.md) |
+| 독립 소스 재현 |752개 파일의 고정 archive를 새 폴더에서 설치·검사·빌드하고 검사 후 SHA 일치 PASS. [후보 hash·검사 보고서](archive/preliminary/SOURCE_REPRODUCIBILITY_20260928.md) |
 
-첫 사용 수집 안내, 민감 텍스트의 저장 전 masking, 여러 응답 조각에 걸친 secret masking, 경로와 역할 검사, 실패/취소/재시도 및 늦은 응답의 프로젝트 혼입 방지를 보완했다. 입력 초안과 후보 선택 후 키보드 초점을 보존하고, 상태와 오류는 색상 외 텍스트로 표시한다. 자세한 요구사항별 근거와 미검증 항목은 [T20 감사](T20_AUDIT_20260928.md)에 있다.
+첫 사용 수집 안내, 민감 텍스트의 저장 전 masking, 여러 응답 조각에 걸친 secret masking, 경로와 역할 검사, 실패/취소/재시도 및 늦은 응답의 프로젝트 혼입 방지를 보완했다. 입력 초안과 후보 선택 후 키보드 초점을 보존하고, 상태와 오류는 색상 외 텍스트로 표시한다. 자세한 요구사항별 근거와 미검증 항목은 [T20 감사](archive/preliminary/T20_AUDIT_20260928.md)에 있다.
 
 ## 실행과 재현
 
@@ -80,4 +80,4 @@ npm run build
 - Mac Apple Silicon 설치 parser·실제 Core/SQLite·도구는 자동 검증했다. Intel Mac, 모든 키보드/보조공학 조합, 장기 안정성과 모든 Kiro 버전의 호환성은 인증하지 않았다. 생성 코드는 OS 수준 sandbox가 아니다.
 - redaction은 알려진 형태 중심이며 모든 개인정보를 탐지하지 못한다. 비밀정보를 입력하지 않아야 한다. local reset/export/자동 삭제는 아직 제공하지 않는다.
 
-제출 화면에는 자료 제출 마감과 업로드 PDF·조직 링크·다운로드 가이드 저장 상태가 표시되어 있다. 이 화면은 마감 뒤 수정 허용이나 심사 시작 시각을 증명하지 않는다. 영상 교체는 별도 담당 작업이며 이 변경에서는 수정하지 않았다. [현재 상태](VALIDATION_STATUS_20260930.md)와 [과거 데모·소스 준비 기록](SUBMISSION_DEMO_AND_SOURCE.md)을 구분한다.
+제출 화면에는 자료 제출 마감과 업로드 PDF·조직 링크·다운로드 가이드 저장 상태가 표시되어 있다. 이 화면은 마감 뒤 수정 허용이나 심사 시작 시각을 증명하지 않는다. 영상 교체는 별도 담당 작업이며 이 변경에서는 수정하지 않았다. [현재 상태](archive/preliminary/VALIDATION_STATUS_20260930.md)와 [과거 데모·소스 준비 기록](SUBMISSION_DEMO_AND_SOURCE.md)을 구분한다.

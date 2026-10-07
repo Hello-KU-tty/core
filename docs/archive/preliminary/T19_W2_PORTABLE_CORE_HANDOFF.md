@@ -1,6 +1,6 @@
 # T19-W2 portable Core 인계
 
-> 2026-09-24 · Windows x64 Core package와 runtime 준비. [결과](spikes/T19_W2_PORTABLE_CORE_RESULTS_20260924.md), [계획](T19_W2_PORTABLE_CORE_PLAN.md). 자동 확장 lifecycle·실제 Windows native worker 연결은 T19-W3다.
+> 2026-09-24 · Windows x64 Core package와 runtime 준비. [결과](../../spikes/T19_W2_PORTABLE_CORE_RESULTS_20260924.md), [계획](T19_W2_PORTABLE_CORE_PLAN.md). 자동 확장 lifecycle·실제 Windows native worker 연결은 T19-W3다.
 
 ## 생성과 검증
 
@@ -66,7 +66,7 @@ Core가 만든 `connection.json`은 host에서 SDK로 읽고 Webview에 token/�
 
 ## 획득과 실패 복구
 
-- 공식 고정 HTTPS URL `https://nodejs.org/dist/v24.19.0/win-x64/node.exe`, redirect 금지, 150MiB 상한, 120초 timeout, pinned SHA-256 검증 후에만 실행한다. 공식 출처와 hash는 [결정 기록](DECISIONS.md)에 남겼다.
+- 공식 고정 HTTPS URL `https://nodejs.org/dist/v24.19.0/win-x64/node.exe`, redirect 금지, 150MiB 상한, 120초 timeout, pinned SHA-256 검증 후에만 실행한다. 공식 출처와 hash는 [결정 기록](../../DECISIONS.md)에 남겼다.
 - 새 `download-<uuid>`에서 `.partial`을 기록하고 checksum·runtime probe 성공 뒤에만 완료 marker와 version cache를 publish한다. 부분 다운로드를 재개하는 Range 요청은 쓰지 않고 새 staging에서 명시적으로 재시도한다.
 - cache도 실행 전 exe hash·완료 marker·private ACL을 재확인한다. 손상 cache는 `.invalid-<uuid>`로 보존하고 재획득한다. 기존 사용자 Node/global PATH는 수정하지 않는다.
 - `RUNTIME_OFFLINE_UNAVAILABLE`, `RUNTIME_DOWNLOAD_UNAVAILABLE`, `RUNTIME_DOWNLOAD_INTERRUPTED`, `RUNTIME_DOWNLOAD_CANCELLED`, `RUNTIME_DOWNLOAD_HASH_MISMATCH`, `RUNTIME_ACQUISITION_BUSY`를 UI 준비/실패 상태로 매핑한다.

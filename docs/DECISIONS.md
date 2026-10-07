@@ -1,5 +1,26 @@
 # 결정 기록
 
+## 본선: Kiro-native 개입 구조로 전환
+
+- **맥락:** 사용자의 원래 구상은 일반 Kiro 바이브코딩 중에 확장이 hook 등으로 개입하는 것이었다. 예선에서는 시간 때문에 패널이 Kiro 내부 Agent 세션을 직접 운영하는 별도 바이브코딩 환경이 됐다. 이 경로는 비공개 Agent 연결부와 Helper 권한 격리 절차에 의존한다.
+- **결정:** 코딩은 사용자의 Kiro 채팅·Spec·task 실행이 맡고, Vibe Helper는 Kiro Spec 파일, Steering(상시 포함과 `#[[file:]]` 참조), MCP, Hook과 보조 패널로 개입한다. 확정 Learning Spec은 Kiro Spec으로 내보내고, 실제 Decision은 MCP `request_decision`으로 채팅에서 묻는다. 사용자 발언은 promptSubmit hook으로 USER 출처, Agent 도구 사용은 hook으로 AGENT 출처로 기록한다.
+- **대안:** 예선 패널 경로 유지(별도 환경 문제 유지), Kiro Power로 배포(keyword 기반 동적 활성화라 상시 개입과 Core 생명주기·UI를 담기 어려움, 대회 이후 재검토).
+- **확인 근거:** Kiro 공식 문서의 hook trigger·Steering·Spec·Power 설명과 설치된 Kiro 1.2.4 `kiro.kiro-agent` 번들의 hook 식별자(`promptSubmit`, `agentStop`, `preToolUse`, `postToolUse`, `fileEdited`, `pre/postTaskExecution`, `USER_PROMPT`, `hooks.migrateToV2`). 실제 동작은 K01 spike 전까지 미검증이다.
+- **영향:** 예선 패널 경로는 fallback으로 보존한다. 기존 코드는 삭제하지 않는다.
+
+## 본선: Helper 역할은 프롬프트로 제한하고 상태 권한만 Core가 강제
+
+- **맥락:** 예선의 Helper read-only 강제는 provenance 분리, Builder와의 동시 수정 방지, Helper가 일을 대신 밀지 않는 제품 역할, Agent의 상태 조작 방지를 위해서였다. 이를 위해 별도 all-deny 세션과 준비 순서가 필요했다.
+- **결정:** Helper의 코드·shell 제한은 프롬프트로 둔다. 사용자가 명시적으로 부탁하면 수정할 수 있다. Evidence·Concept State·Decision 확정은 계속 Core가 강제한다. Helper와 Builder에 해당 도구를 주지 않고, Core는 Agent 출처 입력을 사용자 이해 근거로 받지 않는다. Analyst는 도구 없는 proposal 생성기로 유지한다.
+- **이유:** Kiro-native 구조에서는 모든 Agent 도구 사용이 hook으로 AGENT 출처로 기록되므로 provenance가 권한 없이도 유지된다. Builder가 사용자 Kiro 채팅이면 우리 쪽 Builder 세션과의 동시 수정 충돌도 없다. "바이브코딩으로 AI에게 물어본다"는 경험을 권한 격리보다 우선한다.
+- **영향:** AGENTS.md 설계 불변식과 PROJECT_BRIEF §0을 갱신했다. Helper 위치는 Kiro 채팅 탭(A)을 먼저 실측하고 실패하면 패널(B)을 쓴다.
+
+## 본선: Core 최소 수정, Kiro 기능은 adapter에만
+
+- **맥락:** Core를 분리한 목적은 다른 host로의 이식성이다. Kiro 전용 기능은 AWS 대회 평가를 위해 쓴다.
+- **결정:** Core와 contracts는 host 중립으로 유지한다. 기존 `ActivityEvent`(`USER_MESSAGE`, `DECISION_REQUESTED/RESOLVED`, `CONCEPT_REPORTED`)와 Episode 계약을 재사용한다. Core 신규 후보는 외부 workspace root의 Project 등록과 Concept State의 host 중립 학습자 요약 두 가지로 제한한다. `.kiro/` 파일 위치, hook 형식, Steering 문법, EARS 렌더링, `session_id` 매핑은 `packages/kiro-adapter`와 확장에 둔다.
+- **영향:** Claude Code 등 다른 host는 같은 Core에 adapter만 추가하면 된다(예: 학습자 요약을 `CLAUDE.md`에 배치). 구체 Core 변경은 K02에서 테스트와 함께 확정한다.
+
 ## 문서 날짜 표기 정리
 
 - 사용자 요청으로 README와 추적 중인 텍스트 문서의 지정 기준 이후 날짜 표기를 제거한다. 승인·변경 내용과 검증 결과·한계 자체는 남긴다.
@@ -102,7 +123,7 @@
 - **검증/승인 경계:** 자동 검사·VSIX 후보 준비는 이번 요청 범위다. commit/push·외부 제출·Trust 변경·사용자 창 종료는 별도 실행하지 않는다. 최종 제출의 사람 pilot·baseline·live demo 요건을 완화하지 않는다. 미커밋 후보는 manifest의 dirty 상태를 그대로 기록한다.
 - **Spec 복귀:** frontend가 기존 Core mutation을 화면 이동에 잘못 호출하고 있었다. 돌아가기는 저장 후보·입력·Spec을 보존하고, 새 후보 받기에서만 기존 command와 새 preview를 실행한다. 선택 완료 Session 재개나 새 API는 추가하지 않는다.
 - **제출 소스:** Mac 전용 임시 경로 대신 OS 임시 경로를 사용하고 Windows home 표기 검사·문서 사본 일반화, 이번 kit helper/fixture 포함을 보완한다. 원본 runtime/test를 정제해서 바꾸지 않으며 신규 파일은 명시적 allowlist만 포함한다. 사본과 archive는 로컬 검토 후보이며 공개나 독립 clean 재현 PASS를 자동 선언하지 않는다.
-- **소스 재현 결과:** 고정 ZIP을 별도 폴더에 풀고 각 저장소 의존성을 lockfile로 새 설치했다. backend 전체 check, frontend753개/타입/build, panel build 뒤 native169+selector6, 실제 consumer PASS 및 source781개 hash 불변을 확인했다. OS·Node·pnpm·package store·Edge는 같은 PC의 검증된 자원을 사용하므로 새 PC/오프라인 재현이나 실제 모델 품질을 증명하지 않는다. ZIP 안 문서는 동결 시점 그대로 두고 후속 결과는 외부 receipt와 [재현 보고서](SOURCE_REPRODUCIBILITY_20260929.md)에 연결한다.
+- **소스 재현 결과:** 고정 ZIP을 별도 폴더에 풀고 각 저장소 의존성을 lockfile로 새 설치했다. backend 전체 check, frontend753개/타입/build, panel build 뒤 native169+selector6, 실제 consumer PASS 및 source781개 hash 불변을 확인했다. OS·Node·pnpm·package store·Edge는 같은 PC의 검증된 자원을 사용하므로 새 PC/오프라인 재현이나 실제 모델 품질을 증명하지 않는다. ZIP 안 문서는 동결 시점 그대로 두고 후속 결과는 외부 receipt와 [재현 보고서](archive/preliminary/SOURCE_REPRODUCIBILITY_20260929.md)에 연결한다.
 
 ## 2026-09-29: B7~B11 보완과 broken pnpm pin 교체
 
@@ -120,7 +141,7 @@
 - **결정:** 인식 가능한 local `logUri`에서 현재 창 ID를 구하고, canonical workspace와 ID가 모두 맞는 endpoint 하나만 선택한다. 현재 창 ID가 없으면 종전의 유일한 workspace endpoint만 허용한다. ID가 있는데 다른 창만 있으면 그 창으로 fallback하지 않으며 현재 창 등록을 bounded 대기한다. 모순/중복 endpoint·잘못된 port/token은 계속 거절한다. 이 선택을 일반 role, protected Helper/Analyst와 barrier에 함께 적용한다.
 - **전환/복구:** 대상 생성 폴더의 유효한 endpoint가 이미 있으면 현재 창을 같은 폴더로 재전환하지 않고 기존 창 worker에 처리를 맡긴다. 대상 창에 worker가 없거나 Trust가 필요한 경우 사용자에게 기존 창 확인과 명시적 재시도를 안내하며 창 강제 종료·자동 유료 retry·Trust 변경을 하지 않는다. `NATIVE_ENDPOINT_AMBIGUOUS`의 run 오류 전달은 유지한다. transient run의 재시작 후 소실은 B3의 별도 저장 계약이다.
 - **검증 경계:** 합성 Windows/POSIX context, 같은 폴더의 두 창/foreign 경로/누락/중복/등록 지연, worker 라우팅과 terminal 오류 전파를 모델 없이 재현한다. 기존 private source/permission gate·prompt·Core protocol·DB는 변경하지 않는다. Windows 1.1.70의 실제 context/두 창과 새 kit/VSIX는 해당 환경에서 추가 검증한다.
-- **결과:** unit156/integration365/eval41/Campus3/smoke6, 확장CJS167, panel build와 새 bundle activation PASS. E2E는 기존 사용자 서버/브라우저 sandbox 제약을 분리한 실행에서12개 PASS. 초기 환경 실패와 Windows 미실측은 [B6 답변](FRONTEND_LIVE_TEST_RESPONSE_20260929.md)에 보존했다.
+- **결과:** unit156/integration365/eval41/Campus3/smoke6, 확장CJS167, panel build와 새 bundle activation PASS. E2E는 기존 사용자 서버/브라우저 sandbox 제약을 분리한 실행에서12개 PASS. 초기 환경 실패와 Windows 미실측은 [B6 답변](archive/preliminary/FRONTEND_LIVE_TEST_RESPONSE_20260929.md)에 보존했다.
 
 ## 2026-09-28: 실제 프론트와 함께 제출 준비 재개
 
@@ -272,7 +293,7 @@
 ## 2026-09-24: 다른 기기 재개를 위한 개발 checkpoint
 
 - **사용자 요청:** 현재 W1~W5 작업의 commit/push와 다른 기기 재개 준비. push 대상은 collaborator 권한이 있는 기존 조직 remote `https://github.com/Hello-KU-tty/core.git`의 `codex/windows-extension-runtime-20260923`으로 확인했다. 과거 작업별 local-only 또는 commit/push 제외 범위는 당시 기록으로 보존한다.
-- **인계:** 필요한 source·검증 script·tests·canonical prompts와 sanitized 결과를 함께 commit한다. [재개 문서](CROSS_DEVICE_HANDOFF_20260924.md)에 도구 pin·빌드·실패 근거·남은 gate를 기록하고 새 기기에서는 새 합성 환경을 사용한다. private DB/profile/credential/원본 로그와 생성 설치물은 Git에 포함하지 않는다. PR/merge/release나 사용자 데이터 동기화는 수행하지 않는다.
+- **인계:** 필요한 source·검증 script·tests·canonical prompts와 sanitized 결과를 함께 commit한다. [재개 문서](archive/preliminary/CROSS_DEVICE_HANDOFF_20260924.md)에 도구 pin·빌드·실패 근거·남은 gate를 기록하고 새 기기에서는 새 합성 환경을 사용한다. private DB/profile/credential/원본 로그와 생성 설치물은 Git에 포함하지 않는다. PR/merge/release나 사용자 데이터 동기화는 수행하지 않는다.
 - **상태:** 소스 인계가 W5 출하 완료를 뜻하지 않는다. W5와 T19/T19-N의 기존 미완료 상태를 유지한다.
 
 ## 2026-09-24 W5 packaged 검증기 준비 한도 정합
@@ -339,7 +360,7 @@
 - **source spike:** pin한 Agent 1.1.28 SHA의 Windows native `DefaultTerminal`은 `process.env`에서 직접 PowerShell child를 만들며 VS Code terminal 환경 collection을 사용하지 않는다. 전역 환경이나 Agent private source를 수정하지 않는다. Core가 생성 workspace의 보호된 `.kiro/vibe-tools.cmd`를 발급하고 native shell은 이 고정 진입점으로 기존 허용 명령만 실행한다. worker는 파일·scope를 검증한 뒤 기존 one-time permission/command guard를 적용한다. 일반 workspace와 기존 Mac/CLI 경로는 유지한다.
 - **획득:** 공식 npm `pnpm/11.12.0` metadata를 2026-09-24 조회했다. tarball은 `https://registry.npmjs.org/pnpm/-/pnpm-11.12.0.tgz`, integrity는 `sha512-ggpvvQ2fBMImY4ACrq0eRTQKkTndXcB3wdg+9EqiSByOtmN7TJqmlqPH41uoGOSc8nIT5fK5ETjQm3o+JuiYug==`다. 고정 URL·hash·크기·timeout 후 일반 파일만 private staging으로 추출하고 cache를 다시 검증한다. dependency/install script 추가 없이 Node 기본 API를 쓴다.
 - **권한:** launcher는 Core 환경을 상속하지 않고 선택한 Node/pnpm과 private pnpm config/cache/store만 제공한다. package script는 기존 생성 앱 실행 권한 안에서 동작하며 승인된 esbuild/better-sqlite3 이외 dependency lifecycle은 거절한다. 이는 임의 생성 코드에 대한 OS sandbox 완성을 주장하지 않는다.
-- **검증:** [W4 계획](T19_W4_TOOLCHAIN_PLAN.md), [실측 결과](spikes/T19_W4_TOOLCHAIN_RESULTS_20260924.md). 두 도구 환경에서 native shell·실제 HTTP, 실패·복구와 최종 `pnpm check`를 통과했다. 중간 조회 실패는 같은 run의 read-only 재관측으로 확인했으며 최초 실패를 보존했다. clean machine·workspace 전환 host crash·조회 안정성과 전체 수직 흐름의 출하 판정은 W5에 남긴다.
+- **검증:** [W4 계획](archive/preliminary/T19_W4_TOOLCHAIN_PLAN.md), [실측 결과](spikes/T19_W4_TOOLCHAIN_RESULTS_20260924.md). 두 도구 환경에서 native shell·실제 HTTP, 실패·복구와 최종 `pnpm check`를 통과했다. 중간 조회 실패는 같은 run의 read-only 재관측으로 확인했으며 최초 실패를 보존했다. clean machine·workspace 전환 host crash·조회 안정성과 전체 수직 흐름의 출하 판정은 W5에 남긴다.
 
 ## 2026-09-24: W3 Core 소유권과 Windows Helper 보조 창
 
@@ -347,12 +368,12 @@
 - **선택:** global storage의 단일 Core lock/instance를 여러 확장 창이 공유한다. 각 host는 인증된 짧은 lease를 갱신하며, 한 창 종료나 workspace 전환 중에도 다른 창의 Core를 종료하지 않는다. 마지막 lease가 사라진 뒤 30초 유예를 지나면 Core가 SQLite를 닫고 credential을 폐기한다. crash 후 새 instance에는 durable state만 복원하며 응답 불명확 mutation과 진행 중 stream은 자동 재생하지 않는다. 정상 연결된 구버전 owner의 임의 종료 없이 업데이트 대기 상태를 표시한다.
 - **데이터:** 초기화와 migration은 owner lock 안에서 수행하며 기존 SQLite backup/quick_check를 재사용한다. 새 schema를 구버전 코드로 여는 것은 거절한다. DB/backup과 runtime cache/quarantine은 자동 삭제하지 않는다.
 - **native/UI:** Windows pinned source custom Agent와 기존 worker·SDK·제품 패널을 재사용한다. Helper/Analyst의 Core 발급 전용 workspace를 보조 창으로 열며 두 창 모두 같은 extension global storage를 사용한다. 준비/연결/native 가능 상태와 실제 Core 저장 완료를 구분한다.
-- **검증:** [W3 계획](T19_W3_LIFECYCLE_PLAN.md). 결과 확인 전 W3/W5 PASS를 주장하지 않는다. 새 dependency·Agent prompt 정책·전역 IDE 설정 변경은 없다.
+- **검증:** [W3 계획](archive/preliminary/T19_W3_LIFECYCLE_PLAN.md). 결과 확인 전 W3/W5 PASS를 주장하지 않는다. 새 dependency·Agent prompt 정책·전역 IDE 설정 변경은 없다.
 - **결과:** [W3 실측](spikes/T19_W3_LIFECYCLE_RESULTS_20260924.md)에서 통합 VSIX 일반 창 설치, native Discovery·Helper 저장, 자동 보조 창과 실제 owner/마지막 창 종료를 확인했다. 실제 owner 종료에서 발견한 Core 중단은 managed child의 process group 분리로 보정하고 lease 종료까지 검증했다. crash/rotation·update/backup·downgrade와 전체 회귀도 통과했다. W3 완료만 판정하며 W4/W5·T19/T19-N 한계는 유지한다.
 
 ## 2026-09-24: W2 portable Core와 검증된 private runtime
 
-- **상태:** 사용자 `T19 w2` 착수 요청과 기존 Windows 설치 요구에 따른 구현 선택. [계획](T19_W2_PORTABLE_CORE_PLAN.md)의 실제 결과로 완료 여부를 판정한다.
+- **상태:** 사용자 `T19 w2` 착수 요청과 기존 Windows 설치 요구에 따른 구현 선택. [계획](archive/preliminary/T19_W2_PORTABLE_CORE_PLAN.md)의 실제 결과로 완료 여부를 판정한다.
 - **결정:** 기존 esbuild로 Core/bridge/host adapter를 bundle하고 runtime resource manifest에 파일별 SHA-256·platform·prompt version을 기록한다. SQLite 13.0.3의 win32-x64 prebuild와 JS wrapper, migration SQL/journal 및 실행 dependency license만 포함한다. 런타임 탐색은 Kiro child → 기존 Node → 검증된 cache → 공식 Node 조건부 획득 순서를 따른다.
 - **획득:** 공식 `https://nodejs.org/dist/v24.19.0/SHASUMS256.txt`를 2026-09-24 재조회했다. `win-x64/node.exe`의 SHA-256은 `3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237`이다. HTTPS 고정 URL·redirect 금지·크기 제한·hash pin 후 private staging에서만 실행하며 완료 cache도 재검증한다. archive 대신 executable을 받아 임의 archive extraction을 피한다. Node license는 검증된 공식 ZIP의 LICENSE를 패키지에 동봉한다. 이 선택은 download bytes가 ZIP보다 커지는 tradeoff가 있어 실제 크기를 기록한다.
 - **도구:** 새 npm dependency나 lifecycle script는 추가하지 않는다. Windows VSIX writer/reader는 기본 PowerShell/.NET System.IO.Compression을 사용한다. 경로는 환경 변수 data로 전달하며 shell 문자열에 삽입하지 않는다. 기존 macOS packaging은 유지한다.
@@ -834,7 +855,7 @@
 - **완료 판정:** 계약·mock 인계, transport 실측, Discovery/Spec 실제 연결, Builder/Helper·Decision 연결과 프론트 로컬 재현을 단계별로 기록한다. T19 완료는 자체 패널의 실제 연속 흐름과 Crew/Core 저장 상태 일치로 판정하며 화면 mock이나 내장 Agent 선택기만으로 대체하지 않는다. Evidence/Final Upgrade 전체 화면 parity·polish와 공개 배포는 별도 후속 범위로 남긴다.
 - **tradeoff:** 내장 Agent config만 제공할 때보다 runtime lifecycle과 프론트 협업 계약이 늘어난다. 대신 프론트가 데이터 저장과 모델 실행을 혼동하거나 Crew 구현을 화면별로 복제하지 않고 Discovery부터 실제 프로젝트 작업까지 연결할 수 있다. 별도 IDE 제작, 다른 model provider·host adapter, 기존 project import, cloud sync와 외부 공개 서버는 추가하지 않는다.
 - **참조:** [프론트 prototype](https://github.com/Hello-KU-tty/program/tree/c639a595353f0db38e09112ba094ce5510fb1cbd), [Kiro ACP 공식 문서](https://kiro.dev/docs/cli/acp/), [프론트 연동 계획](FRONTEND_INTEGRATION.md). 공식 지원 설명은 설치 환경에서의 성공 증거를 대신하지 않는다.
-- **완료 기준 보완:** 같은 날 사용자는 계획 승인을 요청하며, push된 backend와 지침을 받은 frontend 개발자가 자신의 컴퓨터에서 실행하고 실제 Kiro IDE의 Discovery·Spec·Builder·History 화면을 모두 구현할 수 있어야 한다고 명시했다. History 목록·단계별 복원·재시작, 외부 client 소비와 clean checkout, 네 화면의 실제 IDE 최소 예제를 인계 조건에 포함한다. frontend 제품 화면의 최종 디자인 완료와 backend 인계 완료는 구분한다. 독립 local backend·HTTP/SSE·ACP·client 배치안은 [T19_IMPLEMENTATION_PLAN.md](T19_IMPLEMENTATION_PLAN.md)에 제안했으며 상세 계획 승인은 아직 받지 않았다.
+- **완료 기준 보완:** 같은 날 사용자는 계획 승인을 요청하며, push된 backend와 지침을 받은 frontend 개발자가 자신의 컴퓨터에서 실행하고 실제 Kiro IDE의 Discovery·Spec·Builder·History 화면을 모두 구현할 수 있어야 한다고 명시했다. History 목록·단계별 복원·재시작, 외부 client 소비와 clean checkout, 네 화면의 실제 IDE 최소 예제를 인계 조건에 포함한다. frontend 제품 화면의 최종 디자인 완료와 backend 인계 완료는 구분한다. 독립 local backend·HTTP/SSE·ACP·client 배치안은 [T19_IMPLEMENTATION_PLAN.md](archive/preliminary/T19_IMPLEMENTATION_PLAN.md)에 제안했으며 상세 계획 승인은 아직 받지 않았다.
 - **착수 승인:** 이후 사용자는 위 상세 계획에서 push를 제외하고 승인했다. 구현·실측·검증과 검증 후 commit은 진행하되 push 직전에 다시 승인받는다. frontend OS는 Windows로 확인됐다. Windows native/PowerShell 경로를 기준으로 하고 WSL이나 macOS 검증만으로 Windows 실행을 보장하지 않는다. 기존 사용자 Crew 설치·DB·설정은 변경하지 않고 격리된 synthetic data/workspace에서 첫 transport spike를 수행한다.
 
 ## 2026-09-07: T19 장기 실행의 SQLite 네이티브 충돌 검증
@@ -995,7 +1016,7 @@
 - **참고 근거:** [ESLint client](https://github.com/microsoft/vscode-eslint/blob/main/client/src/client.ts)와 [languageclient](https://github.com/microsoft/vscode-languageserver-node/blob/main/client/src/node/main.ts)의 editor runtime/fork, [.NET acquisition](https://github.com/dotnet/vscode-dotnet-runtime/blob/main/Documentation/commands.md)의 기존 탐색·user-level install, [Java extension](https://github.com/redhat-developer/vscode-java#setting-the-jdk)의 embedded JRE와 project JDK 구분을 2026-09-23 조회했다. [Electron runAsNode](https://www.electronjs.org/docs/latest/tutorial/fuses#runasnode)는 비활성화될 수 있어 Windows Kiro의 지원을 별도로 측정한다. 이는 Kiro public Agent API 또는 해당 dependency 추가 승인이 아니다.
 - **용량 관측:** 공식 npm `better-sqlite3-13.0.3.tgz`의 `prebuilds/win32-x64.node`는 압축 전 1,989,632 bytes다. Node 24.19.0 win-x64 전체 ZIP의 Content-Length는 37,304,352 bytes였다. 실제 VSIX/설치 디스크/RAM 측정값과 구분하며 총 용량 목표를 측정 없이 보장하지 않는다.
 - **대안과 tradeoff:** 모든 Node/OS binary를 포함하면 offline 최초 기동은 단순해지지만 중복 용량이 늘어난다. 설치된 Node만 요구하면 초보자의 무설치 경험이 깨진다. editor runtime 우선은 패키지를 줄이지만 host compatibility 검증이 필요하고, 조건부 다운로드는 network·재시도·무결성 관리가 필요하다. runtime 파일 재사용이 별도 Core process의 메모리 사용량을 없애지는 않는다.
-- **진행 경계:** [Windows 인계](WINDOWS_EXTENSION_HANDOFF_20260923.md)와 T19-W0~W5로 요구·artifact 목록·수직 흐름 검증을 관리한다. 기존 T19/T19-N 미완료와 Evidence quality 제한을 유지한다. 과거 macOS-only/fixed-path 결정은 그 baseline의 관측으로 보존하며, 제품 설치 목표는 이 결정이 갱신한다. runtime/Agent gate를 삭제해 성공으로 만들지 않는다.
+- **진행 경계:** [Windows 인계](archive/preliminary/WINDOWS_EXTENSION_HANDOFF_20260923.md)와 T19-W0~W5로 요구·artifact 목록·수직 흐름 검증을 관리한다. 기존 T19/T19-N 미완료와 Evidence quality 제한을 유지한다. 과거 macOS-only/fixed-path 결정은 그 baseline의 관측으로 보존하며, 제품 설치 목표는 이 결정이 갱신한다. runtime/Agent gate를 삭제해 성공으로 만들지 않는다.
 
 ## 2026-09-23: Windows 작업은 native recovery에서 분기
 
@@ -1005,7 +1026,7 @@
 
 ## 2026-09-24: W1 Windows runtime 재사용과 native capability 판정
 
-- **상태:** 사용자 승인 [W1 계획](T19_W1_WINDOWS_CAPABILITY_PLAN.md)의 8개 native turn과 회귀/종료 감사를 완료했다. [결과와 한계](spikes/T19_W1_WINDOWS_CAPABILITY_RESULTS_20260924.md), [sanitized receipt](spikes/T19_W1_WINDOWS_RECEIPTS_20260924.json)를 근거로 W1만 완료하고 W2를 다음 작업으로 둔다.
+- **상태:** 사용자 승인 [W1 계획](archive/preliminary/T19_W1_WINDOWS_CAPABILITY_PLAN.md)의 8개 native turn과 회귀/종료 감사를 완료했다. [결과와 한계](spikes/T19_W1_WINDOWS_CAPABILITY_RESULTS_20260924.md), [sanitized receipt](spikes/T19_W1_WINDOWS_RECEIPTS_20260924.json)를 근거로 W1만 완료하고 W2를 다음 작업으로 둔다.
 - **runtime:** 설치된 Kiro IDE 1.1.14 / Agent 1.1.28 / API 1.131.0 / Windows x64에서 extension-host의 Node 24.18.0·Electron 42.7.0·NAPI 10을 `process.execPath` + `ELECTRON_RUN_AS_NODE=1` child로 재사용할 수 있었다. 실제 win32-x64 SQLite transaction/reopen, Core/SDK와 stdio bridge가 통과했다. 개발 pin 24.19.0/11.12.0은 별도로 충족했으며 바꾸지 않는다. 다른 product runtime 후보나 ARM64를 검증했다고 확대하지 않는다.
 - **Windows 경계:** private directory/descriptor의 owner·DACL 검증을 추가하고 unsafe ACL/junction/hardlink를 거절한다. cloud session hash는 설치 source에 맞게 drive 경로의 slash/lowercase를 정규화한다. CRLF·separator·fixture portability를 고쳤고 canonical prompt 정책, dependency/lifecycle 허용 범위는 유지한다.
 - **native 동시성:** 한 창의 custom Builder/Helper queue는 여전히 직렬이었다. 이 Agent 버전은 `agentArtifacts`를 항상 켜는 승격 목록에 포함하여 과거 stable-empty-experiments 가정이 성립하지 않는다. 기존 protected built-in Helper를 Windows에 그대로 허용하지 않는다. 합성 profile에서 별도 Development Host를 만든 뒤 Helper의 empty catalog/all-deny, 별도 windowId와 실제 응답 중첩을 확인했다. 이는 **두 창 capability 관측**이며 제품 UX 채택 승인이 아니다. W3의 source gate와 lifecycle/UX 설계에 이 제한을 명시한다.
@@ -1015,7 +1036,7 @@
 ## 2026-09-26: 프론트 연결 인계 우선과 품질 개선 병행
 
 - **승인 근거:** 사용자는 성능·품질 개선을 모두 기다리기보다 frontend에 먼저 연결 기반을 넘기고 병행 작업하도록 재평가를 요청했다. frontend 요청서와 소스를 검토한 브리핑 뒤 해당 계획의 문서 작성을 승인했다.
-- **결정:** [프론트 인계 계획](FRONTEND_HANDOFF_PLAN_20260926.md)에 요청서 A~D 답변·전달물·기존 어댑터 수정점·검증 순서를 고정한다. `program`의 `LocalCoreDiscoveryPort`와 UI를 유지하고 Windows의 자동 Core/worker/connection 경계를 재사용 가능한 host 모듈로 제공하는 작업을 우선한다. 현재 reference panel 구현과 아직 제공되지 않은 독립 모듈을 구분한다.
+- **결정:** [프론트 인계 계획](archive/preliminary/FRONTEND_HANDOFF_PLAN_20260926.md)에 요청서 A~D 답변·전달물·기존 어댑터 수정점·검증 순서를 고정한다. `program`의 `LocalCoreDiscoveryPort`와 UI를 유지하고 Windows의 자동 Core/worker/connection 경계를 재사용 가능한 host 모듈로 제공하는 작업을 우선한다. 현재 reference panel 구현과 아직 제공되지 않은 독립 모듈을 구분한다.
 - **계약:** local protocol 1, Core 식별자·entity별 revision·idempotency·provenance와 권한 경계를 유지한다. frontend는 실제 지원 source 판정과 자동 연결을 사용하며 live 실패를 Mock 성공으로 바꾸지 않는다. 사용자 제품 설치에 수동 backend/connection 경로를 다시 요구하지 않는다.
 - **완료 구분:** W5 설치·실행은 기존 실측으로 완료됐다. 첫 frontend 연결 인계와 상위 T19/T19-N·MVP 완료는 별도 판정이다. 성능·Analyst 정확도·개인화 효과의 후속 개선은 병행하며 AC-MVP-012/015나 보안·데이터 경계를 완화하지 않는다. 새 제품 범위나 dependency 도입 결정은 아니다.
 - **이번 실행 범위:** 계획·인계 안내 링크·다음 작업 문서화다. host 구현, frontend 저장소 수정, 모델 호출, 외부 전달·commit/push는 이번 문서 작성으로 수행하거나 완료한 것으로 기록하지 않는다.

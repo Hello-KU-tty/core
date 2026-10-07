@@ -19,7 +19,8 @@
 ## 설계 불변식
 
 - Discovery, Builder, Helper와 Evidence Analyst는 Agent이고, validation과 Concept State 계산은 deterministic Core의 책임이다.
-- Helper와 Analyst는 read-only다. Builder의 write/shell은 생성 workspace로 제한한다.
+- Analyst는 도구 없이 proposal만 낸다. Helper의 역할은 프롬프트로 제한하고(본선 결정), Evidence·Concept State·Decision 확정 도구는 Helper와 Builder에게 주지 않는다.
+- 예선 패널 경로의 Builder write/shell은 생성 workspace로 제한한다. 본선 Kiro-native 경로의 Builder는 사용자의 Kiro Agent이며, Vibe Helper는 관찰·개입만 하고 Core는 등록된 workspace root 밖의 경로를 받지 않는다.
 - Agent-authored 설명·코드와 사용자 Evidence의 provenance를 분리한다. Agent 출력, 확인 응답이나 card click만으로 이해 상태를 높이지 않는다.
 - `MISCONCEPTION`은 Concept State가 아니라 해결 가능한 open issue다.
 - Builder stream을 숨기지 않되 저장·표시 전에 secret과 민감 경로를 redaction한다.

@@ -18,7 +18,7 @@ git log -1 --oneline
 
 기존 clone이면 먼저 `git status --short`와 현재 branch를 확인하고 기존 변경을 보존한다. 작업 트리가 깨끗한 경우 `git fetch origin`, `git switch codex/windows-extension-runtime-20260923`, `git pull --ff-only origin codex/windows-extension-runtime-20260923` 순서로 갱신한다. local branch가 없으면 fetch 뒤 `git switch --track origin/codex/windows-extension-runtime-20260923`을 사용한다. 분기된 이력이나 기존 변경을 reset/clean으로 없애지 않는다.
 
-읽는 순서는 [AGENTS.md](../AGENTS.md) → [PROJECT_BRIEF.md](../PROJECT_BRIEF.md) → [SPEC.md](SPEC.md) → [ARCHITECTURE.md](ARCHITECTURE.md) → [DECISIONS.md](DECISIONS.md) → [TASKS.md](TASKS.md)다. 이후 [W5 실측 결과](spikes/T19_W5_WINDOWS_RELEASE_RESULTS_20260924.md), [sanitized receipt](spikes/T19_W5_WINDOWS_RELEASE_RECEIPTS_20260924.json), [W5 설치 검증 인계](T19_W5_RELEASE_VALIDATION_HANDOFF.md), [W5 계획](T19_W5_RELEASE_VALIDATION_PLAN.md)을 읽는다. [2026-09-23 인계](WINDOWS_EXTENSION_HANDOFF_20260923.md)는 구현 전 역사 기록이다.
+읽는 순서는 [AGENTS.md](../../../AGENTS.md) → [PROJECT_BRIEF.md](../../../PROJECT_BRIEF.md) → [SPEC.md](../../SPEC.md) → [ARCHITECTURE.md](../../ARCHITECTURE.md) → [DECISIONS.md](../../DECISIONS.md) → [TASKS.md](../../TASKS.md)다. 이후 [W5 실측 결과](../../spikes/T19_W5_WINDOWS_RELEASE_RESULTS_20260924.md), [sanitized receipt](../../spikes/T19_W5_WINDOWS_RELEASE_RECEIPTS_20260924.json), [W5 설치 검증 인계](T19_W5_RELEASE_VALIDATION_HANDOFF.md), [W5 계획](T19_W5_RELEASE_VALIDATION_PLAN.md)을 읽는다. [2026-09-23 인계](WINDOWS_EXTENSION_HANDOFF_20260923.md)는 구현 전 역사 기록이다.
 
 ## 2. 개발 환경과 재빌드
 
@@ -68,14 +68,14 @@ node scripts/test-project-tool-recovery.mjs
 | native 초기화 / 취소 | 이후 취소 검사와 Kiro 재시작 후 새 Project 모두 모델 prompt 전 NATIVE_ROLE_CATALOG_UNVERIFIED. catalog 0개 관측, 실제 TEXT/TOOL 뒤 취소 PASS 미확보 |
 | GUI / frontend / clean OS | 일부 History 조회만 실제 GUI 확인. 전체 GUI와 통합 frontend, 개발 도구/source 없는 별도 Windows 환경은 미검증 |
 
-W5에서 수정한 주요 경계는 세션 소유권을 확인한 초기 catalog 알림 보존, ACL 검사 오류 구분, PID 재사용 판별, 상위 VSIX 버전의 생성 앱 launcher 갱신, 승인된 제한적 pnpm 설정의 script 없는 lock 갱신, 긴 no-Evidence 사유의 화면 preview다. Builder canonical prompt는 **1.3.8**이고 [평가 결과](../tests/eval/results/builder-agent-v1.3.8.md)를 함께 보존한다. 제품 설명보다 상세 원인·실패·버전별 관측은 W5 결과 문서를 기준으로 한다.
+W5에서 수정한 주요 경계는 세션 소유권을 확인한 초기 catalog 알림 보존, ACL 검사 오류 구분, PID 재사용 판별, 상위 VSIX 버전의 생성 앱 launcher 갱신, 승인된 제한적 pnpm 설정의 script 없는 lock 갱신, 긴 no-Evidence 사유의 화면 preview다. Builder canonical prompt는 **1.3.8**이고 [평가 결과](../../../tests/eval/results/builder-agent-v1.3.8.md)를 함께 보존한다. 제품 설명보다 상세 원인·실패·버전별 관측은 W5 결과 문서를 기준으로 한다.
 
 ## 4. 다음 작업
 
 1. **W5를 이어서 조사한다.** native catalog가 비는 시점의 MCP bridge 시작/종료, session 소유권, catalog 준비 시간·고정 오류 metadata를 대조한다. 등록 지연과 bridge 실패를 구분하기 전에 gate 완화, 무한 재시도나 timeout 확대를 적용하지 않는다. Core 초기 기동 지연도 별도로 측정한다.
 2. 최신 package의 **새 합성 root / 새 Project**로 Personal Need 유무 흐름을 각각 끝까지 검증한다. Spec 질문을 실제로 확인하고 제때 답변한다. Task 완료·Decision 적용·Helper·분석·결과 HTTP·History를 같은 실행에 연결한다. 이전 0.3.6 복구 성공을 최신 fresh 성공으로 옮겨 적지 않는다.
 3. 실제 TEXT/TOOL 발생 뒤 명시적 native 취소와 terminal ACK, 이후 새 실행을 확인한다. initialization 실패 후 cleanup cancel 호출은 이 gate의 PASS가 아니다.
-4. 전체 GUI와 [IDE frontend 계약](FRONTEND_IDE_IMPLEMENTATION_GUIDE.md)을 검증하고, 별도 환경이 준비되면 [clean Windows 절차](T19_W5_RELEASE_VALIDATION_HANDOFF.md)를 수행한다. 새 개발 기기에 도구/source를 설치한 것만으로 clean machine 조건을 충족하지 않는다. 기존 T19-N 의미 품질·실제 사용자 Evidence와 OS shell confinement 등의 미해결 gate도 유지한다.
+4. 전체 GUI와 [IDE frontend 계약](../../FRONTEND_IDE_IMPLEMENTATION_GUIDE.md)을 검증하고, 별도 환경이 준비되면 [clean Windows 절차](T19_W5_RELEASE_VALIDATION_HANDOFF.md)를 수행한다. 새 개발 기기에 도구/source를 설치한 것만으로 clean machine 조건을 충족하지 않는다. 기존 T19-N 의미 품질·실제 사용자 Evidence와 OS shell confinement 등의 미해결 gate도 유지한다.
 
 실제 모델을 쓰는 W5 harness는 아래와 같다. 두 명령은 각각 별도 실행이며 첫 실행을 정리한 뒤 두 번째를 시작한다. 로그인/Trust와 질문 대응이 가능한 상태에서 실행하고 Kiro 사용량과 원본 실패를 기록한다. 환경 준비만을 위해 자동 실행하지 않는다.
 

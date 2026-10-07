@@ -1,6 +1,6 @@
 # T19-W3 Windows 확장 lifecycle 결과
 
-> 2026-09-24 · **W3 완료**, W4 다음 착수. [계획](../T19_W3_LIFECYCLE_PLAN.md), [구현·재현 인계](../T19_W3_LIFECYCLE_HANDOFF.md), [sanitized receipt](T19_W3_LIFECYCLE_RECEIPTS_20260924.json).
+> 2026-09-24 · **W3 완료**, W4 다음 착수. [계획](../archive/preliminary/T19_W3_LIFECYCLE_PLAN.md), [구현·재현 인계](../archive/preliminary/T19_W3_LIFECYCLE_HANDOFF.md), [sanitized receipt](T19_W3_LIFECYCLE_RECEIPTS_20260924.json).
 > W3 범위는 통합 확장 자동 기동·연결·복구다. 생성 앱 도구는 W4, 개발 도구 없는 clean Windows 전체 수직 흐름은 W5로 남는다.
 
 ## 구현과 실제 결과

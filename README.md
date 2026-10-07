@@ -74,7 +74,7 @@ Kiro IDE
 
 ## 다운로드·설치
 
-Mac **0.1.4**와 개발자 ZIP을 제공한다. 개발자 ZIP은 0.1.3 기준이며 0.1.4의 권한 거부 수정은 이 저장소 소스에 있다. Windows 설치물은 **0.0.18**을 유지한다. [현재 제출·검증 상태](docs/VALIDATION_STATUS_20260930.md)에서 설치물, 사람 인터뷰와 미검증 범위를 구분한다.
+Mac **0.1.4**와 개발자 ZIP을 제공한다. 개발자 ZIP은 0.1.3 기준이며 0.1.4의 권한 거부 수정은 이 저장소 소스에 있다. Windows 설치물은 **0.0.18**을 유지한다. [현재 제출·검증 상태](docs/archive/preliminary/VALIDATION_STATUS_20260930.md)에서 설치물, 사람 인터뷰와 미검증 범위를 구분한다.
 
 다운로드 파일 선택부터 첫 실행·업데이트·오류 해결까지는 **[다운로드·설치 가이드](docs/DOWNLOAD_GUIDE.md)**를 참고한다.
 
@@ -87,11 +87,11 @@ Mac **0.1.4**와 개발자 ZIP을 제공한다. 개발자 ZIP은 0.1.3 기준이
 3. Kiro에서 Extensions → `…` → `Install from VSIX…`로 설치한 뒤 다시 로드한다.
 4. Agent Panel을 열고 배우고 싶은 기술을 입력한다.
 
-별도 서비스 로그인이나 API Key는 없다. 모델 사용량은 사용자 본인의 Kiro 계정에서 차감된다. 첫 실행 때 생성 앱의 도구·의존성 준비를 위해 network가 필요할 수 있다. VSIX 사용에는 Node·pnpm 수동 설치나 백엔드 수동 실행이 필요하지 않다. Mac 설치 후보의 검증 기준은 Kiro IDE 1.1.70 / Agent 1.1.158이다. 설치·Core 자동 검사와 실제 앱 생성·실행, Decision 선택·반영, 별도 Helper, 재시작 복원·취소 후 재개를 확인했다. 검증 범위와 복구 과정의 실패는 [실제 설치본 검증 보고](docs/MAC_NATIVE_VERIFICATION_20260930.md)에 구분한다.
+별도 서비스 로그인이나 API Key는 없다. 모델 사용량은 사용자 본인의 Kiro 계정에서 차감된다. 첫 실행 때 생성 앱의 도구·의존성 준비를 위해 network가 필요할 수 있다. VSIX 사용에는 Node·pnpm 수동 설치나 백엔드 수동 실행이 필요하지 않다. Mac 설치 후보의 검증 기준은 Kiro IDE 1.1.70 / Agent 1.1.158이다. 설치·Core 자동 검사와 실제 앱 생성·실행, Decision 선택·반영, 별도 Helper, 재시작 복원·취소 후 재개를 확인했다. 검증 범위와 복구 과정의 실패는 [실제 설치본 검증 보고](docs/archive/preliminary/MAC_NATIVE_VERIFICATION_20260930.md)에 구분한다.
 
 VSIX가 작동하지 않으면 먼저 [연결 오류 해결](docs/DOWNLOAD_GUIDE.md#6-업데이트와-문제-해결)을 확인한다. [개발자용 ZIP](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/frontend-handoff/20260927/frontend-handoff-20260927.zip)은 백엔드·프론트 전체 실행 소스로 갱신했다. 새 폴더에 풀어 [소스 재빌드 안내](docs/DOWNLOAD_GUIDE.md#7-vsix가-작동하지-않을-때-개발자용-대안)를 따른다. ZIP 자체는 확장 설치 파일이 아니다.
 
-Mac과 개발자 ZIP은 공개 frontend `a61d408`(0.0.18)과 대응 Core를 기준으로 한다. 완료 뒤 Builder·Helper 대화 유지, 기록된 Node·pnpm 재사용, 중복 Helper 요약 제거를 포함한다. Mac0.1.3에는 구 설치 제거·프로젝트 이동 뒤 도구 복구와 임시 경로 설치 시 native 역할 설정 충돌 수정을 포함한다. Mac0.1.4는 도구 요청 하나가 거부돼도 Builder 턴이 취소되지 않도록 고쳤다([수정 기록](docs/PERMISSION_DENIAL_FIX_20260930.md)). Mac 패키지 버전과 Windows 패키지 버전은 별도로 관리한다.
+Mac과 개발자 ZIP은 공개 frontend `a61d408`(0.0.18)과 대응 Core를 기준으로 한다. 완료 뒤 Builder·Helper 대화 유지, 기록된 Node·pnpm 재사용, 중복 Helper 요약 제거를 포함한다. Mac0.1.3에는 구 설치 제거·프로젝트 이동 뒤 도구 복구와 임시 경로 설치 시 native 역할 설정 충돌 수정을 포함한다. Mac0.1.4는 도구 요청 하나가 거부돼도 Builder 턴이 취소되지 않도록 고쳤다([수정 기록](docs/archive/preliminary/PERMISSION_DENIAL_FIX_20260930.md)). Mac 패키지 버전과 Windows 패키지 버전은 별도로 관리한다.
 
 ## 개발 환경과 검증
 
@@ -126,12 +126,12 @@ node scripts/test-program-consumer.mjs <program checkout 경로>
 | 실제 frontend → HTTP/SSE → SQLite consumer | PASS (모델 경계는 deterministic fixture) |
 | 완료 뒤 후속 Builder·Helper | 각 3회, 중복 방지·재접속·기존 완료 보고/파일 보존 PASS (합성 Agent) |
 | Mac 0.1.4 설치·Core·도구 | 격리 Kiro 설치, 실제 패키지 검사9개 PASS, 설치 자산69개·재빌드72항목 hash 일치; [재현·항목별 hash](docs/MAC_VSIX.md) |
-| Mac 0.1.4 권한 거부 | 거부 3회 뒤에도 Builder 턴 정상 종료(같은 수정 번들의 개발 로드). [수정 기록](docs/PERMISSION_DENIAL_FIX_20260930.md) |
-| Mac 0.1.3 실제 모델 | 앱 생성·실행, Decision 선택·반영·Helper2회·재시작 복원·실제 취소 후 재개 확인. [범위와 실패 기록](docs/MAC_NATIVE_VERIFICATION_20260930.md); MVP 전체·다음 개인화 완료를 뜻하지 않음 |
+| Mac 0.1.4 권한 거부 | 거부 3회 뒤에도 Builder 턴 정상 종료(같은 수정 번들의 개발 로드). [수정 기록](docs/archive/preliminary/PERMISSION_DENIAL_FIX_20260930.md) |
+| Mac 0.1.3 실제 모델 | 앱 생성·실행, Decision 선택·반영·Helper2회·재시작 복원·실제 취소 후 재개 확인. [범위와 실패 기록](docs/archive/preliminary/MAC_NATIVE_VERIFICATION_20260930.md); MVP 전체·다음 개인화 완료를 뜻하지 않음 |
 | 의존성 감사 | backend pnpm audit, frontend npm audit 모두 0건 |
 | 이전 9/28 개발 환경 실제 모델 수직 흐름 | 학습 목표 입력 → 후보 10개 → Spec 확정 → Builder Decision → Task 완료 → Helper → 후속 Task로 결과 수정 → 재시작 후 복원 (새 설치물의 모델 완주 검증은 아님) |
 
-실제 흐름 기록은 [docs/FRONTEND_MAC_PROGRESS_20260928.md](docs/FRONTEND_MAC_PROGRESS_20260928.md), 보안·접근성 감사는 [docs/T20_AUDIT_20260928.md](docs/T20_AUDIT_20260928.md), 독립 소스 재현은 [docs/SOURCE_REPRODUCIBILITY_20260928.md](docs/SOURCE_REPRODUCIBILITY_20260928.md)에 있다.
+실제 흐름 기록은 [docs/FRONTEND_MAC_PROGRESS_20260928.md](docs/archive/preliminary/FRONTEND_MAC_PROGRESS_20260928.md), 보안·접근성 감사는 [docs/T20_AUDIT_20260928.md](docs/archive/preliminary/T20_AUDIT_20260928.md), 독립 소스 재현은 [docs/SOURCE_REPRODUCIBILITY_20260928.md](docs/archive/preliminary/SOURCE_REPRODUCIBILITY_20260928.md)에 있다.
 
 ## 사용자 검증
 
@@ -173,4 +173,4 @@ tests/                    unit, integration, eval, smoke, E2E, Campus Drop fixtu
 5. [docs/TASKS.md](docs/TASKS.md): 작업 순서와 진행 상태
 6. [docs/agent-prompts/](docs/agent-prompts/): 네 Agent의 prompt 계약
 
-frontend 연동 안내는 [docs/FRONTEND_IDE_IMPLEMENTATION_GUIDE.md](docs/FRONTEND_IDE_IMPLEMENTATION_GUIDE.md), Windows 확장 runtime 기록은 [docs/WINDOWS_EXTENSION_HANDOFF_20260923.md](docs/WINDOWS_EXTENSION_HANDOFF_20260923.md)에서 시작한다. `spikes/`는 외부 기능 경계를 확인한 폐기 가능한 실험물이다.
+frontend 연동 안내는 [docs/FRONTEND_IDE_IMPLEMENTATION_GUIDE.md](docs/FRONTEND_IDE_IMPLEMENTATION_GUIDE.md), Windows 확장 runtime 기록은 [docs/WINDOWS_EXTENSION_HANDOFF_20260923.md](docs/archive/preliminary/WINDOWS_EXTENSION_HANDOFF_20260923.md)에서 시작한다. `spikes/`는 외부 기능 경계를 확인한 폐기 가능한 실험물이다.

@@ -5,7 +5,7 @@
 ## 시작 순서
 
 1. Windows 기존 변경을 먼저 확인하고 보존한다. 깨끗한 checkout에서 해당 브랜치를 fetch하고 fast-forward로 갱신한다. 로컬 변경/분기 충돌이 있으면 reset이나 강제 덮어쓰기를 하지 않는다.
-2. `AGENTS.md`, `PROJECT_BRIEF.md`, `docs/SPEC.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/TASKS.md`와 [최종 Mac 인계](spikes/T19_MAC_PERFORMANCE_HANDOFF_20260928.md), [프론트 후속 답변](FRONTEND_LIVE_TEST_RESPONSE_20260928.md)을 읽는다.
+2. `AGENTS.md`, `PROJECT_BRIEF.md`, `docs/SPEC.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/TASKS.md`와 [최종 Mac 인계](../../spikes/T19_MAC_PERFORMANCE_HANDOFF_20260928.md), [프론트 후속 답변](FRONTEND_LIVE_TEST_RESPONSE_20260928.md)을 읽는다.
 3. Node24.19.0/pnpm11.13.1 및 Kiro1.1.70/Agent1.1.158/API1.131.0 exact gate를 확인한다. `pnpm install --frozen-lockfile`, `pnpm check`, `pnpm panel:build` 및 인계의 추가 CJS/consumer 검사를 실행한다. 버전 검사를 우회하지 않는다.
 4. Windows portable/managed lifecycle/host/toolchain 검사를 실행한다. 특히 동일 bytes·다른 설치 root에서 옛 Core lease를 갱신하지 않고 정상 만료를 기다리는지 확인한다.
 5. 현재 코드의 새 Windows receipt를 남긴 뒤 kit/VSIX를 만든다. `frontend:handoff`의 기존20260927 검증 metadata는 이번 변경을 검증한 것이 아니므로 그대로 새 검증본처럼 배포하지 않는다.

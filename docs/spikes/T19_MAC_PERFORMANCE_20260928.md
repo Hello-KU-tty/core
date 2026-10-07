@@ -1,6 +1,6 @@
 # T19 맥 백엔드 성능 개선 — 2026-09-28
 
-아래 실행 경계와 진행 순서는 시작 당시의 기록이다. 최종 종료·채택 결과는 하단09:50 절과 [최종 인계](T19_MAC_PERFORMANCE_HANDOFF_20260928.md), Git 전달은 [Windows 재개 지침](../WINDOWS_RESUME_20260928.md)을 따른다.
+아래 실행 경계와 진행 순서는 시작 당시의 기록이다. 최종 종료·채택 결과는 하단09:50 절과 [최종 인계](T19_MAC_PERFORMANCE_HANDOFF_20260928.md), Git 전달은 [Windows 재개 지침](../archive/preliminary/WINDOWS_RESUME_20260928.md)을 따른다.
 
 ## 실행 경계
 

@@ -1,6 +1,6 @@
 # T19-W5 Windows 출하 검증 계획
 
-> 2026-09-25 완료: VSIX 0.3.15 / Kiro 1.1.70에서 두 fresh 프로젝트와 명시적 Helper 복구, 결과 앱·History·취소·재시작 및 최종 회귀를 검증했다. [최종 결과와 한계](spikes/T19_W5_KIRO_1170_GENERAL_MODE_RESULTS_20260925.md)를 따른다. 아래 미완료·중단 문단은 당시 기록으로 보존한다.
+> 2026-09-25 완료: VSIX 0.3.15 / Kiro 1.1.70에서 두 fresh 프로젝트와 명시적 Helper 복구, 결과 앱·History·취소·재시작 및 최종 회귀를 검증했다. [최종 결과와 한계](../../spikes/T19_W5_KIRO_1170_GENERAL_MODE_RESULTS_20260925.md)를 따른다. 아래 미완료·중단 문단은 당시 기록으로 보존한다.
 
 > 2026-09-25 환경 정정: 사용자가 현재 PC는 Kiro부터 새로 설치한 clean Windows라고 확인했다. 2026-09-24 이전 기기의 환경 부재 기록을 현재 PC에 적용하지 않는다. 별도 PC/VM 요청은 철회한다.
 
@@ -31,7 +31,7 @@
 
 ## 재개 기록
 
-사용자 `resume`으로 작업을 재개했다. 위 중단 시점의 결과는 과거 기록으로 보존하며 이후 결과는 [W5 실측 기록](spikes/T19_W5_WINDOWS_RELEASE_RESULTS_20260924.md)에 누적한다. 재개 후 실제 private path 검사가 정상 DACL에서도 PowerShell 시작 지연으로 5초를 넘는 것을 재현했다. 권한 조건은 유지하고 검사 timeout과 판정 오류를 구분하는 0.3.2를 준비한다. synthetic profile 재사용 시 새 receipt와 새 Project로 실행하며 이전 실패 mutation은 재전송하지 않는다.
+사용자 `resume`으로 작업을 재개했다. 위 중단 시점의 결과는 과거 기록으로 보존하며 이후 결과는 [W5 실측 기록](../../spikes/T19_W5_WINDOWS_RELEASE_RESULTS_20260924.md)에 누적한다. 재개 후 실제 private path 검사가 정상 DACL에서도 PowerShell 시작 지연으로 5초를 넘는 것을 재현했다. 권한 조건은 유지하고 검사 timeout과 판정 오류를 구분하는 0.3.2를 준비한다. synthetic profile 재사용 시 새 receipt와 새 Project로 실행하며 이전 실패 mutation은 재전송하지 않는다.
 
 2026-09-24 후속 재개: 현재 후보는 0.3.5다. 0.3.2에서 실제 Spec 생성/수정과 workspace 전환을 확인했고, 0.3.3/0.3.4 진단에서 설치 경로 갱신과 Windows PID 재사용 경계를 발견해 보완했다. packaged lifecycle 8개와 확장 CJS 100개가 통과했다. 알려진 terminal Builder 실패의 재개는 원본 hash/계보를 새 receipt에 보존하고, transient run ID와 durable Project 복원을 구분하는 검증 전용 옵션을 쓴다. 0.3.5 실제 Builder는 Core 도구 7개와 허용된 built-in catalog를 확인한 뒤 AGENT_RUNNING에 도달했다. 전체 수직 흐름/최종 check/clean 환경은 각각 후속 기록으로 판정한다.
 

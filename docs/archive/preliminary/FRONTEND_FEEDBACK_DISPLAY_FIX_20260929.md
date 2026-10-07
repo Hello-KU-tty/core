@@ -20,9 +20,9 @@
 
 ## 설치 파일
 
-- [0.0.11 VSIX](../dist/submission-feedback-20260929/builder-helper-agent-panel-0.0.11-win32-x64-8e4b64524d60.vsix): 71 files / 2,560,222 bytes.
+- [0.0.11 VSIX](../../../dist/submission-feedback-20260929/builder-helper-agent-panel-0.0.11-win32-x64-8e4b64524d60.vsix): 71 files / 2,560,222 bytes.
 - SHA-256: `6ef23a90b01501e4606118716b1571c95f09cab3ff8c9599fa8a10006f8b2542`.
-- [VSIX receipt](../dist/submission-feedback-20260929/program-vsix-receipt.json), [실제 소비 검증 receipt](../dist/frontend-consumer-receipt.json).
+- [VSIX receipt](../../../dist/submission-feedback-20260929/program-vsix-receipt.json), [실제 소비 검증 receipt](../../../dist/frontend-consumer-receipt.json).
 
 0.0.10 VSIX와 앞선 source ZIP은 이전 검증 산출물이다. 이 수정은 해당 ZIP에 소급 반영하지 않았다. 최신 확장 설치 기준은 위0.0.11이다. `Hello-KU-tty/program` push는 기존 HURDOO Write 권한 대기를 유지하며 권한 없는 push를 반복하지 않는다. 전체 Builder/Helper 이후 실측·사람 pilot·공식 제출은 이 수정으로 완료 처리하지 않는다.
 

@@ -1,27 +1,9 @@
 # Vibe Helper 제품 명세
 
-## 복구 보완
-
-- Mac 생성 앱 Node는 확장 설치 폴더가 아닌 해시 검증된 private cache에서 실행한다. 기존 설치 경로를 가리키는 기록은 동일 제품의 상위 버전에서만 검증·이관한다. 외부 Node 교체·downgrade·변조 허용은 하지 않는다.
-- 등록 프로젝트가 이동/삭제된 경우 해당 경로를 재생성하거나 자동 재연결하지 않는다. private 도구 기록과 공용 shim을 검증해 새 프로젝트 사용은 허용하며, 존재하는 workspace의 launcher 변조는 계속 거절한다.
-- 문서의 과거 제출·검증 기록과 현재 정성 사용자 검증을 구분한다. 조직 소개는 로컬 게시 초안이며 이번 작업은 commit만 한다.
-
 ## 1. 상태
 
-- 후속 실제 검증은 사용자 승인된 격리 폴더와 누적2,000크레딧 한도에서 Mac0.1.2 설치본의 수직 흐름을 확인한다. 신규 UI 호출은1,980 이상에서 중단하고 각 단계 전 최신 사용량을 관측한다. 과거900/880 한도는 당시 기록이며 이번 승인에만 새 한도를 적용한다. 실제 사람의 이해 평가로 계산하지 않는다.
-
-- 승인 범위는 원격 동기화, 공개 frontend 0.0.18 기준 Mac 설치물과 재현 가능한 개발자 소스 ZIP, 실제 사용 인터뷰를 반영한 README 및 commit/push다. 링크 주소는 유지하고 내용의 버전·출처를 명시한다. 새 모델 호출·새 사용자 연구·영상 제작은 포함하지 않는다.
-
-- 2026-09-29 사용자 요청으로 Mac 배포용 VSIX를 추가한다. 첫 대상은 darwin-arm64/Kiro 1.1.70이며 source checkout 없이 Core 자동 기동, 분리된 사용자 데이터와 생성 프로젝트 도구를 제공한다. Windows 설치물은 별도 Windows 작업으로 유지한다. 실제 Agent 완주는 패키징/모델0 검증과 구분한다.
-
-- 2026-09-29 최신 프론트 인계 후속은 기존 Windows 제품 범위의 kit·pnpm 업그레이드·0.0.10 설치 후보와 실제 frontend 자동 검사를 포함한다. Spec 복귀는 기존 FR-DIS-013대로 저장 후보/입력을 보존하는 화면 이동이며, 새 Session 생성은 명시적 새 후보 요청으로 미룬다. [현재 제출 gate](SUBMISSION_READINESS_20260929.md).
-
-- 2026-09-29 B7~B11 유지보수는 pnpm 11.13.1 exact pin, MCP 시작 진단, shell 실패 계약, 도구 표시 분류와 Builder 사용자 언어 정책을 포함한다. 실제 Windows/Kiro 재실측과 모델 응답 품질은 자동 fixture만으로 완료 판정하지 않는다.
-
-- 2026-09-28 제출 준비 재개는 백엔드와 실제 프론트의 기능·성능 보완 및 macOS 검증을 포함한다. 프론트 디자인·흐름은 유지하며 Windows 전용 검사·패키징은 이번 실행에서 제외한다. 기존 Windows·실제 사용자 연구 acceptance는 별도 근거가 필요한 항목으로 남긴다.
-- 상태: T00~T18 구현 완료, T19 자체 IDE 패널 연동 구현·검증 사용자 승인(2026-09-07), 진행 중. frontend 대상은 Windows이며 push는 별도 승인 대기다.
-- 2026-09-23 사용자는 Windows 중심의 확장 단독 설치 경험과 런타임 재사용 방향을 승인했다. T19-W의 Core 자동 기동·패키징은 MVP 필수이며 실제 Windows 지원은 아직 미검증이다. [Windows 인계](WINDOWS_EXTENSION_HANDOFF_20260923.md)를 따른다.
-- 2026-09-15의 마지막 4시간은 pin한 macOS Kiro 일반 profile에서 P3 Builder/late Helper 반복·확인된 Helper 취소 재사용·새 실제 Decision 해결/Builder 적용을 최소 실측한 뒤 IDE-only frontend 착수 가능 범위를 판정한다. 기존 CLI 구현은 삭제하지 않고 Windows·장기 안정성·정밀 CLI 비교를 완료로 간주하지 않는다. [판정 계획](spikes/T19_NATIVE_IDE_ONLY_4H_CUTOVER_PLAN_20260915.md)을 따른다.
+- 상태: 예선 MVP(T00~T19) 구현·제출 완료. 본선 방향 전환은 [PROJECT_BRIEF §0](../PROJECT_BRIEF.md)과 [DECISIONS](DECISIONS.md)를 따른다.
+- 예선 기간 상태 메모: [승인 이력](archive/preliminary/APPROVAL_HISTORY.md)
 - 기준일: 2026-08-24
 - 입력 원본: [PROJECT_BRIEF.md](../PROJECT_BRIEF.md)
 - 상세 맥락: [PROJECT_SPEC.md](../PROJECT_SPEC.md), [CONVERSATION_RECORD.md](../CONVERSATION_RECORD.md)
@@ -399,7 +381,7 @@ T01 macOS probe의 두 실행은 20~37ms에 dispatch가 반환되고 약 12초 �
 
 ### 8.4 배포
 
-- 제품 자체는 Windows Kiro 확장 설치와 local Core 자동 실행을 MVP 완료 조건으로 둔다. VSIX/조건부 runtime/생성 데이터 구분은 [Windows 인계](WINDOWS_EXTENSION_HANDOFF_20260923.md)를 따른다. 공개 marketplace 게시 여부와 배포 채널 운영은 별도다.
+- 제품 자체는 Windows Kiro 확장 설치와 local Core 자동 실행을 MVP 완료 조건으로 둔다. VSIX/조건부 runtime/생성 데이터 구분은 [Windows 인계](archive/preliminary/WINDOWS_EXTENSION_HANDOFF_20260923.md)를 따른다. 공개 marketplace 게시 여부와 배포 채널 운영은 별도다.
 - 생성 결과물의 hosted provider와 workflow는 미정이며 MVP 완료 조건 포함 여부는 별도 결정 사항이다.
 - hosted 배포를 추가하더라도 한 TypeScript Golden Path와 한 provider로 제한한다.
 

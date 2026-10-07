@@ -1,6 +1,6 @@
 # T19-W5 설치 검증 인계
 
-> T19-W5 검증 완료. 외부 배포·상위 MVP 전체 완료와는 구분한다. 최신 근거는 [1.1.70 일반 모드 최종 결과](spikes/T19_W5_KIRO_1170_GENERAL_MODE_RESULTS_20260925.md), 범위는 [계획](T19_W5_RELEASE_VALIDATION_PLAN.md)을 따른다.
+> T19-W5 검증 완료. 외부 배포·상위 MVP 전체 완료와는 구분한다. 최신 근거는 [1.1.70 일반 모드 최종 결과](../../spikes/T19_W5_KIRO_1170_GENERAL_MODE_RESULTS_20260925.md), 범위는 [계획](T19_W5_RELEASE_VALIDATION_PLAN.md)을 따른다.
 
 2026-09-25 최종 설치물은 **0.3.15**다. Kiro **1.1.70 / Agent 1.1.158 / Windows x64**의 정확한 source pin을 일반 설치에서도 지원한다. 새 Personal Need 양쪽 프로젝트의 실제 수직 흐름·앱 실행·History·취소·재시작·최종 회귀를 검증했다. Need 있음의 후속 Helper는 MCP catalog 사전 실패 1회 뒤 전용 보조 창을 닫고 새 질문 1회로 복구했다. 해당 제한을 숨기거나 자동 mutation 재전송으로 처리하지 않는다. 외부 debug/실행 정책 flag는 필요 없으며 Windows 영구 정책과 일반 Kiro profile은 변경하지 않았다. 설치물 hash·크기·지원표·실측은 최종 결과를 따른다. 아래 진단 전용/미완료/승인 대기 기록은 모두 과거 시점이다.
 
@@ -10,7 +10,7 @@
 
 ## 2026-09-25 Kiro 1.1.70 진단 재개
 
-**최신 진행:** 추가 승인 대기를 해제하고 프로세스 범위 RemoteSigned로 실제 terminal 출력·성공/실패 이벤트를 확인했다. 원본 Task는 15번째 Builder의 원본 build/typecheck/17 tests/HTTP smoke 검증 후 COMPLETED, 16번째 후속 Helper와 분석 3건·HTTP 200·History 무재실행까지 PASS다. [프로세스 검증 결과](spikes/T19_W5_WINDOWS_PROCESS_SHELL_RESULTS_20260925.md)를 따른다. 아래 승인 대기·Task ACTIVE·14회 기록은 이전 시점이다. 새 Personal Need 유무 흐름과 일반 지원 판정은 진행 중이다.
+**최신 진행:** 추가 승인 대기를 해제하고 프로세스 범위 RemoteSigned로 실제 terminal 출력·성공/실패 이벤트를 확인했다. 원본 Task는 15번째 Builder의 원본 build/typecheck/17 tests/HTTP smoke 검증 후 COMPLETED, 16번째 후속 Helper와 분석 3건·HTTP 200·History 무재실행까지 PASS다. [프로세스 검증 결과](../../spikes/T19_W5_WINDOWS_PROCESS_SHELL_RESULTS_20260925.md)를 따른다. 아래 승인 대기·Task ACTIVE·14회 기록은 이전 시점이다. 새 Personal Need 유무 흐름과 일반 지원 판정은 진행 중이다.
 
 **환경 정정:** 현재 PC는 사용자가 Kiro부터 새로 설치한 clean Windows 검증 환경이다. 이전 기기의 “별도 환경 없음”을 적용한 판단과 별도 PC/VM 또는 gate 분리 질문은 철회한다. 이후 검증용 임시 도구 준비는 초기 환경과 구분한다. 환경 확보와 전체 제품 흐름의 통과 여부는 별개이며 완료 기준은 변경하지 않는다.
 
@@ -22,7 +22,7 @@
 
 검증 Kiro 창과 대기용 test process는 종료했고 임시 진단 driver는 해당 합성 profile에서 제거했다. 이번에 만든 `User/settings.json`도 정확히 빈 설정인 것을 확인해 제거하여 원래 상태로 복원했다. `dist/managed-host-location.json`의 PID는 종료된 값이고 receipt는 14번째 원본 FAIL이다. root의 기존 일회성 intent는 소비됐으므로 `.data`의 이전 복구 스크립트를 그대로 재실행하지 않는다. 추가한 읽기 전용 사전검사와 문서의 format/lint/diff 검사는 PASS다.
 
-최신 후보는 **VSIX 0.3.11**, 실측·코드 보완은 [1.1.70 호환성 기록](spikes/T19_W5_KIRO_1170_COMPATIBILITY_20260925.md)과 [정제한 후속 receipt](spikes/T19_W5_KIRO_1170_ADAPTATION_RECEIPTS_20260925.json)를 따른다. 아래 1.1.14 결과는 과거 검증 범위로 보존한다.
+최신 후보는 **VSIX 0.3.11**, 실측·코드 보완은 [1.1.70 호환성 기록](../../spikes/T19_W5_KIRO_1170_COMPATIBILITY_20260925.md)과 [정제한 후속 receipt](../../spikes/T19_W5_KIRO_1170_ADAPTATION_RECEIPTS_20260925.json)를 따른다. 아래 1.1.14 결과는 과거 검증 범위로 보존한다.
 
 **현재 재개 기준:** PowerShell 승인 대상은 개발 환경에서 상속된 PSReadLine 형식 파일로 확인했고, 검증 자식 환경의 `PSModulePath`만 제거해 해결했다. `--recover-shell-from`은 기존 Node/pnpm을 유지해야 하므로 `--without-project-tools`와 함께 쓰면 안 된다. 실제 11번째 요청은 이 옵션 조합 실수로 모델 전 실패했다. 마지막 12번째 Builder는 기존 도구로 실행했지만 CP949의 UTF-8 batch 한글 경로 오류로 미완료였다. 0.3.11은 코드페이지 저장/복원과 정확한 이전 launcher/shim migration을 보완했고 전체 check/CJS 105개를 통과했다.
 

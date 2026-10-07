@@ -1,6 +1,6 @@
 # T19-W3 확장 lifecycle 인계
 
-> 2026-09-24. [계획](T19_W3_LIFECYCLE_PLAN.md), [실측 결과](spikes/T19_W3_LIFECYCLE_RESULTS_20260924.md), [Windows 설치 요구](WINDOWS_EXTENSION_HANDOFF_20260923.md), [W2 runtime 계약](T19_W2_PORTABLE_CORE_HANDOFF.md)을 따른다. 제품 지원 범위와 생성 앱 도구 준비·clean install gate는 구분한다.
+> 2026-09-24. [계획](T19_W3_LIFECYCLE_PLAN.md), [실측 결과](../../spikes/T19_W3_LIFECYCLE_RESULTS_20260924.md), [Windows 설치 요구](WINDOWS_EXTENSION_HANDOFF_20260923.md), [W2 runtime 계약](T19_W2_PORTABLE_CORE_HANDOFF.md)을 따른다. 제품 지원 범위와 생성 앱 도구 준비·clean install gate는 구분한다.
 
 ## 설치와 책임
 

@@ -1,6 +1,6 @@
 # T19-W4 생성 앱 도구 인계
 
-> 2026-09-24. 상태와 최종 검증은 [TASKS.md](TASKS.md), [W4 계획](T19_W4_TOOLCHAIN_PLAN.md), [실측 결과](spikes/T19_W4_TOOLCHAIN_RESULTS_20260924.md)와 [receipt](spikes/T19_W4_TOOLCHAIN_RECEIPTS_20260924.json)를 따른다. W5 clean Windows 전체 수직 흐름은 별도다.
+> 2026-09-24. 상태와 최종 검증은 [TASKS.md](../../TASKS.md), [W4 계획](T19_W4_TOOLCHAIN_PLAN.md), [실측 결과](../../spikes/T19_W4_TOOLCHAIN_RESULTS_20260924.md)와 [receipt](../../spikes/T19_W4_TOOLCHAIN_RECEIPTS_20260924.json)를 따른다. W5 clean Windows 전체 수직 흐름은 별도다.
 
 ## 제품 동작
 

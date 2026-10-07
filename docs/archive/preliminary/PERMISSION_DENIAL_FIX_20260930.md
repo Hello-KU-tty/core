@@ -24,7 +24,7 @@
 
 ## 게시 상태
 
-- 사용자 승인으로 Mac 0.1.4를 기존 다운로드 경로(`releases/macos/0.1.0/`)에 게시했다. 크기·SHA-256·항목 hash는 [receipt](../releases/macos/0.1.0/macos-vsix-receipt.json)와 [files.json](../releases/macos/0.1.0/files.json)을 따른다.
+- 사용자 승인으로 Mac 0.1.4를 기존 다운로드 경로(`releases/macos/0.1.0/`)에 게시했다. 크기·SHA-256·항목 hash는 [receipt](../../../releases/macos/0.1.0/macos-vsix-receipt.json)와 [files.json](../../../releases/macos/0.1.0/files.json)을 따른다.
 - 개발자 ZIP은 0.1.3 기준으로 두고 다시 만들지 않았다.
 - Windows 0.0.18 설치물과 program 저장소는 변경하지 않았다.
 
@@ -36,4 +36,4 @@ Windows portable과 VSIX 스크립트는 Windows x64 호스트에서만 실행�
 2. `pnpm frontend:handoff`로 새 kit을 만든다. 기존 [kit 절차](FRONTEND_HANDOFF.md)에 따라 program checkout에 적용하고 관리 파일 hash를 대조한다.
 3. program의 `package.json`·`package-lock.json` 버전을 0.0.19로 올리고, 타입 검사·테스트·빌드 후 VSIX를 만든다.
 4. `pnpm check`와 확장 host CJS 테스트를 돌린다. 설치 후에는 Builder가 거부된 요청 뒤에도 계속 진행하는지 실제 화면에서 확인한다.
-5. `releases/windows/0.0.19/`와 [Windows VSIX 문서](WINDOWS_VSIX.md)를 갱신한다.
+5. `releases/windows/0.0.19/`와 [Windows VSIX 문서](../../WINDOWS_VSIX.md)를 갱신한다.

@@ -1,6 +1,6 @@
 # Windows 프론트 연결 시작
 
-> 2026-09-27: 이미 이 kit을 적용한 `program`(`main` `048bce3` 이후)은 [update kit 안내와 Builder/Helper 연결 계약](FRONTEND_HANDOFF_20260927.md)을 따른다. 아래는 최초 적용용 20260926 기록이다.
+> 2026-09-27: 이미 이 kit을 적용한 `program`(`main` `048bce3` 이후)은 [update kit 안내와 Builder/Helper 연결 계약](archive/preliminary/FRONTEND_HANDOFF_20260927.md)을 따른다. 아래는 최초 적용용 20260926 기록이다.
 
 2026-09-26. `Hello-KU-tty/program`의 `73d0eb58e374357d6f28ea8db13e9b659cec5e5a`에 적용할 실행 kit다. 이 PC에서 **실제 프론트 VSIX 설치 → Core 자동 기동 → Kiro Agent → Discovery·Spec·Task·History**를 검증했다. 다른 기기 검증은 사용자 지시에 따라 제외했다. 기존 계획서와 macOS/수동 connection 안내보다 이 문서를 먼저 따른다.
 
@@ -157,4 +157,4 @@ pnpm check
 
 `frontend:handoff`는 SDK·portable·reference VSIX·kit을 생성한다. 빌드에 쓰는 검증된 Node 배포 디렉터리에 LICENSE가 없다면 공식 v24.19.0 LICENSE를 별도로 두고 `VIBE_NODE_DISTRIBUTION_LICENSE`에 경로를 지정한다. 빌더가 해당 LICENSE의 정확한 hash를 확인한다.
 
-검증 명령과 결과는 [이번 인계 결과](FRONTEND_HANDOFF_RESULTS_20260926.md)에 기록한다. 전달 ZIP의 manifest와 receipt는 소스 commit을 `backendHead`로 기록하고 `backendWorkingTreeDirty: false`인 상태에서 생성한다. ZIP을 저장소에 추가한 전달 commit과 소스 commit은 다르다. 로컬에서 수정 후 재생성하면 dirty 상태와 파일 hash가 달라지므로 해당 receipt를 함께 관리한다.
+검증 명령과 결과는 [이번 인계 결과](archive/preliminary/FRONTEND_HANDOFF_RESULTS_20260926.md)에 기록한다. 전달 ZIP의 manifest와 receipt는 소스 commit을 `backendHead`로 기록하고 `backendWorkingTreeDirty: false`인 상태에서 생성한다. ZIP을 저장소에 추가한 전달 commit과 소스 commit은 다르다. 로컬에서 수정 후 재생성하면 dirty 상태와 파일 hash가 달라지므로 해당 receipt를 함께 관리한다.

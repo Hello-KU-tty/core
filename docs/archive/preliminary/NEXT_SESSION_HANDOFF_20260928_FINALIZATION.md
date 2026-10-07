@@ -61,6 +61,6 @@
 ## 다음 순서
 
 1. 사용자 입력/새 제출 안내를 먼저 확인한다. 제한 승인 없이는 제출 기준을 내려서 완료 처리하지 않는다.
-2. [제출 초안](SUBMISSION.md), [데모·소스 범위](SUBMISSION_DEMO_AND_SOURCE.md), [T20 감사](T20_AUDIT_20260928.md), [준비 대조](SUBMISSION_READINESS_20260928.md)를 기준으로 미완료 항목만 처리한다.
+2. [제출 초안](../../SUBMISSION.md), [데모·소스 범위](../../SUBMISSION_DEMO_AND_SOURCE.md), [T20 감사](T20_AUDIT_20260928.md), [준비 대조](SUBMISSION_READINESS_20260928.md)를 기준으로 미완료 항목만 처리한다.
 3. source allowlist/SHA manifest·독립 재현은 위 private 후보로 완료했다. 형식/범위 확정 후 새 최종본이 필요하면 후보를 새 hash로 다시 고정한다. fallback recording은 없으며 기존 screenshot/저장 결과를 전체 live 시연이나 사람 실험으로 바꾸지 않는다. 전체 작업 트리/개인 DB/descriptor/로그/오래된 Windows binary를 묶지 않는다. 최종 공개/업로드는 승인 뒤에만 한다.
 4. 최신 technical source 검사 PASS와 bounded 실제 Mac 성공은 보존하되 Windows 제품화·모든 의미 품질/사람 평가 완료로 확대하지 않는다.

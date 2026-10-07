@@ -1,9 +1,9 @@
 # T19-W1 Windows runtime·native Agent 실측 계획
 
-> 작성: 2026-09-24 KST. 상태: 승인 범위의 실측·회귀·감사 완료. [결과와 제한](spikes/T19_W1_WINDOWS_CAPABILITY_RESULTS_20260924.md).
+> 작성: 2026-09-24 KST. 상태: 승인 범위의 실측·회귀·감사 완료. [결과와 제한](../../spikes/T19_W1_WINDOWS_CAPABILITY_RESULTS_20260924.md).
 > 기준: `codex/windows-extension-runtime-20260923`, 인계 commit `b88ae5f`.
 > 2026-09-24 사용자가 이 계획의 실행을 승인했다. T19-W1을 `[~]`로 전환한다.
-> 상위 기준: [PROJECT_BRIEF](../PROJECT_BRIEF.md) → [SPEC](SPEC.md) → [ARCHITECTURE](ARCHITECTURE.md) → [DECISIONS](DECISIONS.md) → [TASKS](TASKS.md), [Windows 인계](WINDOWS_EXTENSION_HANDOFF_20260923.md).
+> 상위 기준: [PROJECT_BRIEF](../../../PROJECT_BRIEF.md) → [SPEC](../../SPEC.md) → [ARCHITECTURE](../../ARCHITECTURE.md) → [DECISIONS](../../DECISIONS.md) → [TASKS](../../TASKS.md), [Windows 인계](WINDOWS_EXTENSION_HANDOFF_20260923.md).
 
 ## 1. 목표와 이번 판정
 

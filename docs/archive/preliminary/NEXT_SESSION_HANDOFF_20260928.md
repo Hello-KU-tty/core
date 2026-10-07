@@ -19,7 +19,7 @@
 1. 현재 저장소의 `AGENTS.md`, `PROJECT_BRIEF.md`, `docs/SPEC.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/TASKS.md`. T19/T19-N 상태와 `[>]`/`[~]` 작업 규칙을 따른다.
 2. [Windows 재개 지침](WINDOWS_RESUME_20260928.md): 전달 후 환경·검증·패키징 순서.
 3. [프론트 후속 답변](FRONTEND_LIVE_TEST_RESPONSE_20260928.md): B1–B5, 실제 오류코드, PREVIEW 재시도 계약.
-4. [최종 Mac 인계](spikes/T19_MAC_PERFORMANCE_HANDOFF_20260928.md): 채택·기각, 측정 범위, Windows 명령. 필요할 때만 [상세 대조](spikes/T19_FRONTEND_LATE_LIVE_TRIAGE_20260928.md)와 [정제 receipt](spikes/T19_MAC_PERFORMANCE_RECEIPTS_20260928.json)를 읽는다.
+4. [최종 Mac 인계](../../spikes/T19_MAC_PERFORMANCE_HANDOFF_20260928.md): 채택·기각, 측정 범위, Windows 명령. 필요할 때만 [상세 대조](../../spikes/T19_FRONTEND_LATE_LIVE_TRIAGE_20260928.md)와 [정제 receipt](../../spikes/T19_MAC_PERFORMANCE_RECEIPTS_20260928.json)를 읽는다.
 5. 프론트 수정에 착수하면 사용자가 지정한 별도 `Hello-KU-tty/program` clone의 `AGENTS.md`와 해당 저장소의 명세/작업 지침, 최신 `BACKEND_LIVE_TEST_ISSUES_20260928.md`도 읽는다. 백엔드 지침만으로 프론트 규칙을 대신하지 않는다.
 
 과거 장시간 실험 일지와 중간 resume 체크포인트 전체를 처음부터 다시 읽을 필요는 없다. 새 작업에 필요한 실패/채택 근거가 있을 때 해당 절만 확인한다.
