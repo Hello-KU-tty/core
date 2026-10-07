@@ -1,6 +1,6 @@
 # Windows W1 developer capability probe
 
-이 디렉터리는 제품 확장이 아닌 합성 진단용 Development Host다. 제품의 Mac source/runtime gate를 완화하지 않는다. [승인 계획](../../docs/T19_W1_WINDOWS_CAPABILITY_PLAN.md)과 [실측 결과](../../docs/spikes/T19_W1_WINDOWS_CAPABILITY_RESULTS_20260924.md)를 먼저 읽는다.
+이 디렉터리는 제품 확장이 아닌 합성 진단용 Development Host다. 제품의 Mac source/runtime gate를 완화하지 않는다. [승인 계획](../../docs/archive/preliminary/T19_W1_WINDOWS_CAPABILITY_PLAN.md)과 [실측 결과](../../docs/spikes/T19_W1_WINDOWS_CAPABILITY_RESULTS_20260924.md)를 먼저 읽는다.
 
 - 정확한 Windows x64 Kiro IDE 1.1.14 / commit `f694ef1b025756b1ae27ae7c3d9ed4215b0160fe` / Agent 1.1.28 / API 1.131.0 및 Agent bundle SHA-256에 한정한다.
 - 개발 Node 24.19.0 / pnpm 11.12.0으로 frozen install 및 build가 선행돼야 한다. 실제 Core/bridge probe는 Kiro extension host의 `process.execPath`와 `ELECTRON_RUN_AS_NODE=1`을 사용한다.
