@@ -8,6 +8,7 @@ import {
   parseKiroHookInput,
   renderHelperSteering,
   renderKiroHooksConfig,
+  renderKiroSpec,
   renderLearnerSteering,
   translateKiroHook,
 } from '../src/kiro-workspace-node.ts'
@@ -132,5 +133,63 @@ describe('Kiro-native workspace adapter', () => {
     const helper = renderHelperSteering()
     expect(helper.startsWith('---\ninclusion: manual\n---')).toBe(true)
     expect(helper).toContain('Do not edit files')
+  })
+
+  it('copies a confirmed Learning Spec and Task into a Kiro Spec without rewriting them', () => {
+    const source = {
+      project: { id: binding.projectId, title: 'Campus Drop', learningGoal: '만료되는 공유 흐름' },
+      learningSpec: {
+        productPurpose: '공용 PC와 개인 기기 사이에서 파일을 주고받는다.',
+        targetUsers: ['공용 PC를 쓰는 대학생'],
+        primaryUsageMoment: '과제 파일을 옮길 때',
+        successMoment: '시간이 지나면 링크가 막힌다.',
+        mvpFeatures: ['파일 업로드', '만료되는 공유 링크'],
+        scope: [
+          {
+            category: 'LEARNER_FOCUS' as const,
+            title: '만료 링크',
+            rationale: '핵심 판단이다.',
+            conceptNames: ['link expiry'],
+          },
+          {
+            category: 'EXCLUDED' as const,
+            title: '로그인',
+            rationale: '범위 밖.',
+            conceptNames: [],
+          },
+        ],
+        expectedDecisions: [
+          {
+            category: 'PRODUCT_BEHAVIOR' as const,
+            description: '링크를 얼마 동안 열지 정한다.',
+            whyUserInputMatters: '보안과 편의가 바뀐다.',
+          },
+        ],
+        deploymentConstraints: ['로컬 실행'],
+      },
+      task: {
+        title: '만료되는 공유 링크 만들기',
+        productGoal: '파일마다 만료되는 링크를 만든다.',
+        requirements: ['링크마다 만료 시각을 둔다.', '만료된 링크는 거절한다.'],
+        acceptanceCriteria: [
+          { key: 'expiring_link', description: '만료 시각이 지난 링크는 거절된다.' },
+        ],
+        excludedWork: ['로그인'],
+      },
+    }
+    const spec = renderKiroSpec(source)
+    expect(spec.directory).toBe('.kiro/specs/campus-drop')
+    const requirements = spec.files['requirements.md']
+    expect(requirements).toContain('### 학습자가 이해하고 판단할 부분')
+    expect(requirements).toContain('- 만료 링크: 핵심 판단이다. (개념: link expiry)')
+    expect(requirements).toContain('### 이번 MVP에서 하지 않는 부분')
+    expect(requirements).not.toContain('Agent가 주로 구현할 부분')
+    expect(requirements).toContain('- 링크를 얼마 동안 열지 정한다. 보안과 편의가 바뀐다.')
+    expect(requirements).toContain('1. THE system SHALL satisfy: 만료 시각이 지난 링크는 거절된다.')
+    expect(spec.files['tasks.md']).toContain('- [ ] 2. 만료된 링크는 거절한다.')
+    expect(spec.files['design.md']).toContain('- 하지 않음: 로그인')
+    expect(
+      renderKiroSpec({ ...source, project: { ...source.project, title: '캠퍼스 드롭' } }).directory,
+    ).toBe('.kiro/specs/vibe-helper-000000000001')
   })
 })

@@ -48,11 +48,12 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - **완료 조건:** 설치·제거 왕복 테스트, 기존 파일 보존 테스트, 실제 Kiro에서 hook 발동과 Core 기록 확인.
 - **진행:** 개발 경로 완료. `packages/kiro-adapter/src/kiro-workspace-node.ts`(hook 입력 해석, 세션→대화 ID, hooks·MCP·Steering 생성, 기존 MCP 설정 보존 병합), `apps/local-backend/src/kiro-hook-binding.ts`(채팅 기록만 가능한 hook 전용 토큰 엔드포인트, `--kiro-hooks`), `scripts/kiro-hook.mjs`(항상 exit 0), `scripts/kiro-workspace-install.mjs`, `scripts/seed-kiro-native-demo.mjs`. 실제 Kiro에서 hook→Core 기록과 Builder MCP 연결 확인([끝단 실측](spikes/KIRO_NATIVE_E2E.md)). 남은 것: 확장 UI의 설치·제거와 사용자 동의, 기존 `.kiro/` 파일 충돌 처리, 패키징된 bridge 사본 갱신.
 
-### [ ] K04. Learning Spec을 Kiro Spec으로 내보내기
+### [~] K04. Learning Spec을 Kiro Spec으로 내보내기
 
 - **선행:** K01 S10.
 - **범위:** 확정 Learning Spec을 `.kiro/specs/<app>/requirements.md`(EARS)와 LEARNER_FOCUS·AGENT_SUPPORT·EXCLUDED 절로 렌더링하고 Kiro에서 시작하는 동작을 제공한다.
 - **완료 조건:** 렌더링 snapshot 테스트, 실제 Kiro의 Spec 인식과 task 실행 확인.
+- **진행:** `renderKiroSpec`(확정 Learning Spec·Task → `.kiro/specs/<slug>/` requirements·design·tasks, 문장은 옮기기만 하고 바꾸지 않음, 한글 제목은 `vibe-helper-<id>` 폴더)과 설치 스크립트의 Core 스냅샷 조회·기존 Spec 보존을 추가했다. 단위 테스트 1개, 실제 Core에서 Campus Drop Spec 생성 확인. 이번 생성 파일로 Kiro task 실행은 크레딧 때문에 아직 하지 않았다(같은 구조의 외부 Spec 실행은 K01 S10에서 PASS). 확장의 "Kiro에서 시작하기" 버튼은 K03 UI 작업과 함께 남았다.
 
 ### [~] K05. Kiro 채팅 안의 Decision
 

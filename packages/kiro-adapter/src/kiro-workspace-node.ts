@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
 
-import type { UiRequest } from '@vibe-helper/contracts'
+import type { BuilderTask, LearningSpecRevision, Project, UiRequest } from '@vibe-helper/contracts'
 
 /** Kiro-native intervention files are versioned so an installer can recognise its own output. */
 export const KIRO_NATIVE_STEERING_VERSION = '0.2.0'
@@ -216,4 +216,141 @@ For this turn you are the learner's peer helper, not the builder:
 - Do not choose a pending decision for the learner. You may compare its options.
 - Keep it short and concrete, and match the learner profile in the steering above.
 `
+}
+
+export interface KiroSpecSource {
+  readonly project: Pick<Project, 'id' | 'title' | 'learningGoal'>
+  readonly learningSpec: Pick<
+    LearningSpecRevision,
+    | 'productPurpose'
+    | 'targetUsers'
+    | 'primaryUsageMoment'
+    | 'successMoment'
+    | 'mvpFeatures'
+    | 'scope'
+    | 'expectedDecisions'
+    | 'deploymentConstraints'
+  >
+  readonly task: Pick<
+    BuilderTask,
+    'title' | 'productGoal' | 'requirements' | 'acceptanceCriteria' | 'excludedWork'
+  >
+}
+
+const scopeTitles = {
+  LEARNER_FOCUS: '학습자가 이해하고 판단할 부분',
+  AGENT_SUPPORT: 'Agent가 주로 구현할 부분',
+  EXCLUDED: '이번 MVP에서 하지 않는 부분',
+} as const
+
+function specDirectoryName(project: KiroSpecSource['project']): string {
+  const slug = project.title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48)
+  return slug.length >= 3 ? slug : `vibe-helper-${project.id.slice(-12)}`
+}
+
+const line = (value: string) => value.replace(/\s+/g, ' ').trim()
+
+/**
+ * Renders a confirmed Learning Spec and its Core Task as a Kiro Spec. Text is copied, not
+ * rewritten: user stories and acceptance criteria keep the Spec's own wording.
+ */
+export function renderKiroSpec(source: KiroSpecSource): {
+  readonly directory: string
+  readonly files: Readonly<Record<'requirements.md' | 'design.md' | 'tasks.md', string>>
+} {
+  const { project, learningSpec: spec, task } = source
+  const users = spec.targetUsers.map(line).join(', ')
+  const requirements = [
+    '# Requirements Document',
+    '',
+    '## Introduction',
+    '',
+    line(spec.productPurpose),
+    '',
+    `- 학습 목표: ${line(project.learningGoal)}`,
+    `- 주로 쓰는 순간: ${line(spec.primaryUsageMoment)}`,
+    `- 성공 순간: ${line(spec.successMoment)}`,
+    '',
+    '## 학습 범위 (Vibe Helper)',
+    '',
+    ...(['LEARNER_FOCUS', 'AGENT_SUPPORT', 'EXCLUDED'] as const).flatMap((category) => {
+      const items = spec.scope.filter((item) => item.category === category)
+      if (items.length === 0) return []
+      return [
+        `### ${scopeTitles[category]}`,
+        '',
+        ...items.map(
+          (item) =>
+            `- ${line(item.title)}: ${line(item.rationale)}${item.conceptNames.length > 0 ? ` (개념: ${item.conceptNames.map(line).join(', ')})` : ''}`,
+        ),
+        '',
+      ]
+    }),
+    ...(spec.expectedDecisions.length === 0
+      ? []
+      : [
+          '### 학습자에게 물을 실제 결정',
+          '',
+          ...spec.expectedDecisions.map(
+            (decision) => `- ${line(decision.description)} ${line(decision.whyUserInputMatters)}`,
+          ),
+          '',
+        ]),
+    '## Requirements',
+    '',
+    ...spec.mvpFeatures.flatMap((feature, index) => [
+      `### Requirement ${index + 1}`,
+      '',
+      `**User Story:** As ${users}, I want ${line(feature)}, so that ${line(spec.productPurpose)}`,
+      '',
+    ]),
+    `### Requirement ${spec.mvpFeatures.length + 1}: ${line(task.title)}`,
+    '',
+    `**User Story:** As ${users}, I want ${line(task.productGoal)}`,
+    '',
+    '#### Acceptance Criteria',
+    '',
+    ...task.acceptanceCriteria.map(
+      (criterion, index) =>
+        `${index + 1}. THE system SHALL satisfy: ${line(criterion.description)}`,
+    ),
+    '',
+  ].join('\n')
+
+  const design = [
+    '# Design Document',
+    '',
+    '## Overview',
+    '',
+    line(task.productGoal),
+    '',
+    '## Constraints',
+    '',
+    ...spec.deploymentConstraints.map((constraint) => `- ${line(constraint)}`),
+    ...task.excludedWork.map((work) => `- 하지 않음: ${line(work)}`),
+    '',
+    '## Learner decisions',
+    '',
+    '학습 범위에 속한 실제 결정은 구현 전에 Vibe Helper Decision으로 학습자에게 묻는다.',
+    '',
+  ].join('\n')
+
+  const tasks = [
+    '# Implementation Plan',
+    '',
+    ...task.requirements.map(
+      (requirement, index) =>
+        `- [ ] ${index + 1}. ${line(requirement)}\n  - _Requirements: ${spec.mvpFeatures.length + 1}_`,
+    ),
+    '',
+  ].join('\n')
+
+  return {
+    directory: `.kiro/specs/${specDirectoryName(project)}`,
+    files: { 'requirements.md': requirements, 'design.md': design, 'tasks.md': tasks },
+  }
 }
