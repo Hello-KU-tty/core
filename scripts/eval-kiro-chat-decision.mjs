@@ -189,6 +189,8 @@ async function cleanup(decisionId, resolved) {
     if (!response.success) throw new Error(`cleanup resolve failed ${JSON.stringify(response)}`)
   }
   const fresh = await builderTask()
+  // The Agent may already have applied the learner's choice itself.
+  if (fresh.decisionApplications.some((item) => item.decisionId === decisionId)) return
   await tool('apply_decision_result', {
     schemaVersion: 1,
     ...scope,
@@ -248,6 +250,7 @@ if (process.env.VIBE_EVAL_DRY_RUN === '1') {
 
 const results = []
 let spent = 0
+let stopped = false
 for (const testCase of fixture.cases) {
   if (spent > budget - 1.5) {
     results.push({ id: testCase.id, skipped: 'CREDIT_BUDGET' })
@@ -283,7 +286,13 @@ for (const testCase of fixture.cases) {
     credits: Number(turn.usage.toFixed(3)),
     agentReplyTail: turn.lastSay.slice(-160),
   })
-  await cleanup(decisionId, resolution !== null)
+  try {
+    await cleanup(decisionId, resolution !== null)
+  } catch (error) {
+    // An unclosed Decision would leak into the next case, so stop the run here.
+    results.at(-1).cleanupError = error instanceof Error ? error.message : String(error)
+    stopped = true
+  }
   await writeFile(
     outPath,
     `${JSON.stringify({ fixture: fixture.version, spent, results }, null, 2)}\n`,
@@ -291,6 +300,7 @@ for (const testCase of fixture.cases) {
   process.stdout.write(
     `${testCase.id}: ${verdict.pass ? 'PASS' : 'FAIL'} (${verdict.reason}) credits=${turn.usage.toFixed(2)}\n`,
   )
+  if (stopped) break
 }
 await mcp.close()
 process.stdout.write(`total credits ${spent.toFixed(2)}\n`)
