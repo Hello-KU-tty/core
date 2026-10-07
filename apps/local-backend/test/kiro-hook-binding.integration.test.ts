@@ -96,8 +96,10 @@ describe('Kiro hook binding', () => {
 
   it('ignores non-prompt events and rejects bad input or credentials without recording', async () => {
     const { binding, post, userMessages } = await setup()
+    const tool = await post({ hook_event_name: 'PostToolUse', session_id: 's', cwd: '/w' })
+    expect(await tool.json()).toEqual({ ignored: 'NOT_A_USER_PROMPT' })
     const stop = await post({ hook_event_name: 'Stop', session_id: 's', cwd: '/w' })
-    expect(await stop.json()).toEqual({ ignored: 'NOT_A_USER_PROMPT' })
+    expect(await stop.json()).toEqual({ ignored: 'NO_PENDING_HELPER_QUESTION' })
     expect((await post({ session_id: 's' })).status).toBe(400)
     expect(
       (
@@ -113,5 +115,27 @@ describe('Kiro hook binding', () => {
         .status,
     ).toBe(401)
     expect(userMessages()).toEqual([])
+  })
+
+  it('records a /vibe-helper question with the reply when its turn stops, not as general chat', async () => {
+    const { post, userMessages } = await setup()
+    const question = await post({
+      hook_event_name: 'UserPromptSubmit',
+      session_id: 'sess_helper',
+      cwd: '/w',
+      prompt: '/vibe-helper 만료 토큰은 왜 서명해?',
+    })
+    expect(await question.json()).toEqual({ pending: 'HELPER_QUESTION' })
+    expect(userMessages()).toEqual([])
+    const stop = await post({
+      hook_event_name: 'Stop',
+      session_id: 'sess_helper',
+      cwd: '/w',
+      vibe_helper_reply: '서명이 없으면 만료 시각을 고쳐서 링크를 연장할 수 있어요.',
+    })
+    const body = await stop.json()
+    expect(body).toMatchObject({ recorded: true, receipt: { status: 'OPEN' } })
+    const again = await post({ hook_event_name: 'Stop', session_id: 'sess_helper', cwd: '/w' })
+    expect(await again.json()).toEqual({ ignored: 'NO_PENDING_HELPER_QUESTION' })
   })
 })

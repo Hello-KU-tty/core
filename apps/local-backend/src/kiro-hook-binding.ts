@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import type { ApplicationService } from '@vibe-helper/application'
 import {
+  helperExchangeRequest,
   type KiroCoreBinding,
   parseKiroHookInput,
   translateKiroHook,
@@ -23,6 +24,8 @@ export function createKiroHookBinding(options: {
   const path = `/hooks/kiro-${randomUUID()}`
   const authorization = `Bearer ${randomBytes(32).toString('hex')}`
   let active = true
+  // One pending `/vibe-helper` question per Kiro session until that turn stops.
+  const pendingHelperQuestions = new Map<string, { conversationId: string; question: string }>()
   return {
     path,
     authorization,
@@ -48,7 +51,21 @@ export function createKiroHookBinding(options: {
         }
         const translated = translateKiroHook(options.binding, input)
         if (translated.kind === 'IGNORED') return json(200, { ignored: translated.reason })
-        const result = await options.application.executeUi(translated.request)
+        if (translated.kind === 'HELPER_QUESTION') {
+          pendingHelperQuestions.set(translated.sessionId, translated)
+          return json(200, { pending: 'HELPER_QUESTION' })
+        }
+        const coreRequest =
+          translated.kind === 'COMMAND'
+            ? translated.request
+            : (() => {
+                const pending = pendingHelperQuestions.get(translated.sessionId)
+                if (pending === undefined) return null
+                pendingHelperQuestions.delete(translated.sessionId)
+                return helperExchangeRequest(options.binding, pending, translated.reply)
+              })()
+        if (coreRequest === null) return json(200, { ignored: 'NO_PENDING_HELPER_QUESTION' })
+        const result = await options.application.executeUi(coreRequest)
         if (!result.success) return json(409, { error: result.error.code })
         return json(200, { recorded: true, receipt: result.data })
       },

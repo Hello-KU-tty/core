@@ -62,11 +62,12 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - **완료 조건:** 연결 규칙 unit 테스트, 실제 Kiro에서 Decision 요청·사용자 답·Evidence 제안까지 한 번 이어짐. 호출률이 낮으면 fallback과 한계를 기록한다.
 - **진행:** 실제 Kiro에서 Decision 요청 → 학습자 자연어 답 → `resolve_decision_from_chat` 수락 → 적용까지 1회 이어짐([끝단 실측](spikes/KIRO_NATIVE_E2E.md)). Steering 0.2.0(멱등키 형식, start_task 조건). Core 부분 완료. 계약 `UI_RECORD_CHAT_MESSAGE`·`BUILDER_RESOLVE_DECISION_FROM_CHAT`·`DecisionResolution.chatSource`, MCP 도구 `resolve_decision_from_chat`, domain `findExplicitOptionMentions`. 새 integration 7개·domain 7개 추가. `pnpm typecheck` 통과, unit 177 통과·3 skip, integration 453 통과·8 skip. Kiro 연결과 평가 세트는 K03 이후 진행.
 
-### [ ] K06. Helper 위치 확정과 연결
+### [~] K06. Helper 위치 확정과 연결
 
 - **선행:** K01 S9.
 - **범위:** Kiro 채팅에서 `/vibe-helper`(manual Steering) 또는 `inclusion: auto`로 Helper를 붙이고, 질문과 답을 Helper Episode로 기록한다. 답변 텍스트 수집 방법을 정한다. hook 접두 주입과 B(패널)는 fallback이다. Helper는 Core의 Evidence·State 변경 도구를 받지 않는다.
 - **완료 조건:** Helper 대화가 HELPER_CONVERSATION Episode로 묶이고 다음 개인화에 반영됨을 실제 흐름으로 확인.
+- **진행:** `/vibe-helper 질문`(manual Steering 슬래시 명령)을 hook이 Helper 질문으로 보관하고, 턴이 끝나는 Stop hook에서 hook 실행기가 Kiro 세션 기록의 마지막 Agent 답을 읽어 붙인다. Core는 기존 `UI_RECORD_HELPER_EXCHANGE`로 질문(USER)과 답 요약(AGENT/HELPER, 240자)을 HELPER_CONVERSATION Episode에 기록한다. Helper 질문은 일반 채팅 Evidence로 중복 기록하지 않는다. 실제 Kiro에서 확인(0.11크레딧). 남은 것: Helper Episode 종료 시점(현재는 Decision 확정·Task 완료 때 닫힘), `inclusion: auto` 자동 진입의 첫 승인 UX, 세션 기록 형식이 바뀔 때의 fallback(답 미확보 시 안내 문구로 기록).
 
 ### [ ] K07. 포스터 핵심 장면 확보
 

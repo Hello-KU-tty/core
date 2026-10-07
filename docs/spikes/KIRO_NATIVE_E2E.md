@@ -22,6 +22,8 @@ Kiro 채팅 → hook → Core 기록, 그리고 Kiro Agent가 Core MCP로 Decisi
 | 자연어 답 확정 | PASS | 새 세션에서 "하루 정도로 하자. … 1시간은 짧아."에 Agent가 `get_builder_task`로 열린 Decision을 찾고 `resolve_decision_from_chat`(2번, 원문 인용) 호출. Core 수락: `selectionKind OPTION`, 선택지 2(24시간), `rationale`은 학습자 원문 그대로, `chatSource.mappedBy BUILDER`, 출처 USER |
 | 적용·Episode | PASS | `apply_decision_result`·`update_build_context` 수락. DECISION Episode는 학습자 답 2건 포함 후 `PENDING_ANALYSIS`, Analyst 작업 1건 `PENDING` |
 
+| Helper 기록(K06) | PASS | `/vibe-helper 만료 시간을 24시간으로 정했는데, 링크에 토큰 서명은 왜 따로 필요한 거야?` → Helper Steering으로 설명만 답함(파일 수정 없음). Core에 HELPER_CONVERSATION Episode: 질문 USER `USER_MESSAGE`(접두 제거), 답 AGENT/HELPER `HELPER_RESPONSE`. 일반 채팅 기록에는 중복되지 않음. 0.11크레딧 |
+
 ## 발견한 문제와 조치
 
 1. **멱등키 생성:** Agent가 `idem_<uuid v4>`를 직접 쓰다 형식을 틀리거나(넷째 묶음 0으로 시작) python으로 만들려다 셸 승인 대기에 걸렸다. Steering 0.2.0에 UUID v4 형식과 "명령을 실행하지 말 것"을 넣은 뒤 다음 세션에서는 유효한 키를 썼다. `kiroAgent.execution.rejectAll`로는 대기를 풀지 못했다.

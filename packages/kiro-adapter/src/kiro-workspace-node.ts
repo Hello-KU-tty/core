@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
+import { join } from 'node:path'
 
 import type { BuilderTask, LearningSpecRevision, Project, UiRequest } from '@vibe-helper/contracts'
 
@@ -19,6 +20,8 @@ export interface KiroHookInput {
   readonly session_id: string
   readonly cwd: string
   readonly prompt?: string
+  /** Added by the Vibe Helper hook runner on Stop: the Agent's reply for the finished turn. */
+  readonly vibe_helper_reply?: string
 }
 
 /** Validates the fields Vibe Helper reads; other Kiro fields are ignored. */
@@ -33,7 +36,11 @@ export function parseKiroHookInput(value: unknown): KiroHookInput {
     return field
   }
   const prompt = record.prompt
-  if (prompt !== undefined && typeof prompt !== 'string') {
+  const reply = record.vibe_helper_reply
+  if (
+    (prompt !== undefined && typeof prompt !== 'string') ||
+    (reply !== undefined && typeof reply !== 'string')
+  ) {
     throw new TypeError('KIRO_HOOK_INPUT_INVALID')
   }
   return {
@@ -41,6 +48,7 @@ export function parseKiroHookInput(value: unknown): KiroHookInput {
     session_id: text('session_id', 200),
     cwd: text('cwd', 4_096),
     ...(prompt === undefined ? {} : { prompt }),
+    ...(reply === undefined ? {} : { vibe_helper_reply: reply }),
   }
 }
 
@@ -57,25 +65,40 @@ export function kiroConversationId(sessionId: string): string {
   return `conversation_${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`
 }
 
+export const HELPER_SLASH_COMMAND = '/vibe-helper'
+const MAX_HELPER_SUMMARY_CHARS = 240
+
 export type KiroHookTranslation =
   | {
       readonly kind: 'COMMAND'
       readonly request: Extract<UiRequest, { kind: 'UI_RECORD_CHAT_MESSAGE' }>
     }
   | {
+      readonly kind: 'HELPER_QUESTION'
+      readonly sessionId: string
+      readonly conversationId: string
+      readonly question: string
+    }
+  | { readonly kind: 'TURN_ENDED'; readonly sessionId: string; readonly reply: string | null }
+  | {
       readonly kind: 'IGNORED'
       readonly reason: 'NOT_A_USER_PROMPT' | 'EMPTY_PROMPT' | 'PROMPT_TOO_LONG'
     }
 
 /**
- * Turns one Kiro hook event into a Core command. Only UserPromptSubmit carries learner-authored
+ * Turns one Kiro hook event into Core work. Only UserPromptSubmit carries learner-authored
  * text: Kiro does not fire it for Spec task runs or Stop-hook continuations (K01 spike).
+ * A `/vibe-helper` prompt is a Helper question, recorded with the reply when the turn stops.
  */
 export function translateKiroHook(
   binding: KiroCoreBinding,
   input: KiroHookInput,
   idempotencyKey: string = `idem_${randomUUID()}`,
 ): KiroHookTranslation {
+  if (input.hook_event_name === 'Stop') {
+    const reply = input.vibe_helper_reply?.trim()
+    return { kind: 'TURN_ENDED', sessionId: input.session_id, reply: reply ? reply : null }
+  }
   if (input.hook_event_name !== 'UserPromptSubmit') {
     return { kind: 'IGNORED', reason: 'NOT_A_USER_PROMPT' }
   }
@@ -83,6 +106,16 @@ export function translateKiroHook(
   if (message.length === 0) return { kind: 'IGNORED', reason: 'EMPTY_PROMPT' }
   // Long pastes are not truncated: a shortened learner message would misquote them.
   if (message.length > MAX_CHAT_MESSAGE_CHARS) return { kind: 'IGNORED', reason: 'PROMPT_TOO_LONG' }
+  if (message === HELPER_SLASH_COMMAND || message.startsWith(`${HELPER_SLASH_COMMAND} `)) {
+    const question = message.slice(HELPER_SLASH_COMMAND.length).trim()
+    if (question.length === 0) return { kind: 'IGNORED', reason: 'EMPTY_PROMPT' }
+    return {
+      kind: 'HELPER_QUESTION',
+      sessionId: input.session_id,
+      conversationId: kiroConversationId(input.session_id),
+      question,
+    }
+  }
   return {
     kind: 'COMMAND',
     request: {
@@ -97,6 +130,77 @@ export function translateKiroHook(
       message,
     },
   }
+}
+
+/** Builds the Helper exchange for a `/vibe-helper` question once its turn has stopped. */
+export function helperExchangeRequest(
+  binding: KiroCoreBinding,
+  pending: { readonly conversationId: string; readonly question: string },
+  reply: string | null,
+  idempotencyKey: string = `idem_${randomUUID()}`,
+): Extract<UiRequest, { kind: 'UI_RECORD_HELPER_EXCHANGE' }> {
+  const text = (reply ?? '').replace(/\s+/g, ' ').trim()
+  const summary =
+    text.length === 0
+      ? 'Helper reply was not available from the Kiro session record.'
+      : text.length <= MAX_HELPER_SUMMARY_CHARS
+        ? text
+        : `${text.slice(0, MAX_HELPER_SUMMARY_CHARS - 1)}…`
+  return {
+    schemaVersion: 1,
+    kind: 'UI_RECORD_HELPER_EXCHANGE',
+    correlationId: binding.correlationId,
+    actor: { kind: 'UI' },
+    idempotencyKey,
+    projectId: binding.projectId,
+    taskId: binding.taskId,
+    conversationId: pending.conversationId,
+    userMessage: pending.question,
+    helperResponseSummary: summary,
+    origin: 'FREE_TEXT',
+    closeConversation: false,
+  }
+}
+
+/** Kiro IDE 1.2.4 session record location (private format; verified in the K01 spike). */
+export function kiroSessionTranscriptPath(
+  homeDirectory: string,
+  workspaceRoot: string,
+  sessionId: string,
+): string {
+  if (!/^sess_[0-9a-f-]{36}$/.test(sessionId)) throw new TypeError('KIRO_SESSION_ID_INVALID')
+  const workspaceHash = createHash('sha256').update(workspaceRoot).digest('hex').slice(0, 16)
+  return join(homeDirectory, '.kiro', 'sessions', workspaceHash, sessionId, 'messages.jsonl')
+}
+
+/** The Agent's spoken reply after the last user message in a Kiro session record. */
+export function lastAssistantReply(messagesJsonl: string): string | null {
+  const payloads: Array<Record<string, unknown>> = []
+  for (const line of messagesJsonl.split('\n')) {
+    if (line.trim().length === 0) continue
+    try {
+      const record = JSON.parse(line) as { payload?: unknown }
+      if (typeof record.payload === 'object' && record.payload !== null)
+        payloads.push(record.payload as Record<string, unknown>)
+    } catch {
+      return null
+    }
+  }
+  let lastUser = -1
+  payloads.forEach((payload, index) => {
+    if (payload.type === 'user') lastUser = index
+  })
+  if (lastUser < 0) return null
+  const said = payloads
+    .slice(lastUser + 1)
+    .filter(
+      (payload) =>
+        payload.type === 'assistant' &&
+        payload.operationType === 'Say' &&
+        typeof payload.content === 'string',
+    )
+    .map((payload) => payload.content as string)
+  return said.length === 0 ? null : said.join('\n')
 }
 
 export interface KiroCommandPaths {
@@ -118,6 +222,11 @@ export function renderKiroHooksConfig(paths: KiroCommandPaths): unknown {
       {
         name: 'vibe-helper-learner-chat',
         trigger: 'UserPromptSubmit',
+        action: { type: 'command', command, timeout: 5 },
+      },
+      {
+        name: 'vibe-helper-turn-end',
+        trigger: 'Stop',
         action: { type: 'command', command, timeout: 5 },
       },
     ],
