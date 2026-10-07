@@ -32,7 +32,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - **비용 경계:** 모델 호출이 없는 항목을 먼저 한다. 모델 호출은 개인 계정 무료 플랜, Auto 모델, 15크레딧 상한, 합성 데이터만 쓴다. 로그인은 사용자가 직접 한다.
 - **산출물:** `docs/spikes/KIRO_NATIVE_HOOK_SPIKE.md`와 실행 기록. 항목별 PASS/PARTIAL/BLOCKED와 근거.
 - **완료 조건:** 각 항목의 판정과 재현 절차가 남고, K02~K06의 진행 여부와 Helper A/B 선택이 결정된다.
-- **결과:** [spike 결과](spikes/KIRO_NATIVE_HOOK_SPIKE.md). 개인 BuilderId·Auto로 2.58크레딧 사용. hook 수집·맥락 주입·도구 차단·Decision MCP 호출(4/4)·세션 연결·외부 Spec 실행은 PASS. `#[[file:]]` 참조는 반영되지 않아 학습자 요약은 Steering 본문에 직접 쓴다. Helper는 A(promptSubmit 주입)로 정한다. 일반 trust 승인 화면, ask 확인 창, `focusChatInput` 입력 채움, PostTaskExec는 남은 확인으로 K03·K06에서 다시 본다. K02~K06은 진행한다.
+- **결과:** [spike 결과](spikes/KIRO_NATIVE_HOOK_SPIKE.md). 개인 BuilderId·Auto로 약 3.0크레딧 사용. hook 수집·맥락 주입·도구 차단·Decision MCP 호출(4/4)·세션 연결·외부 Spec 실행은 PASS. `#[[file:]]` 참조는 반영되지 않아 학습자 요약은 Steering 본문에 직접 쓴다. Helper는 A(promptSubmit 주입)로 정한다. Spec task 시작·종료 hook(PreTaskExec·PostTaskExec, `task_success` 포함)도 PASS. `focusChatInput` 입력 채움은 사용자 화면 확인 결과 동작하지 않았다. 일반 trust 승인 화면과 ask 확인 창은 남은 확인으로 K03·K06에서 다시 본다. K02~K06은 진행한다.
 
 ### [x] K02. Core의 host 중립 수집 경로
 

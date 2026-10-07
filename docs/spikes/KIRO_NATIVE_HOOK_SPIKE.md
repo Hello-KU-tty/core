@@ -16,7 +16,7 @@
 | # | 항목 | 판정 | 근거 |
 | --- | --- | --- | --- |
 | S1 | hook 파일 형식 | PASS | `.kiro/hooks/*.json`(`version: v1`, `hooks[]`, `trigger`, `action.type: command`) 10개 로드 로그. legacy `.kiro.hook`은 목록에 보이지만 발동하지 않았다 |
-| S2 | trigger 발동·stdin | PASS | SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, PostFileCreate, PostFileSave, Stop, PreTaskExec 발동. 모든 stdin에 `session_id`, `cwd`, `hook_event_name`. UserPromptSubmit은 `prompt`, Tool 계열은 `tool_name`·`tool_input`(Post는 `tool_response`), File 계열은 `file_path`, Task 계열은 `spec_name`·`task_name` |
+| S2 | trigger 발동·stdin | PASS | SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, PostFileCreate, PostFileSave, Stop, PreTaskExec, PostTaskExec 발동(PostFileDelete는 미시험). 모든 stdin에 `session_id`, `cwd`, `hook_event_name`. UserPromptSubmit은 `prompt`, Tool 계열은 `tool_name`·`tool_input`(Post는 `tool_response`), File 계열은 `file_path`, Task 계열은 `spec_name`·`task_name`(Post는 `task_success`) |
 | S3 | promptSubmit 출력 주입 | PASS | hook stdout의 "ORCHID-42"를 Agent가 그대로 답함 |
 | S4 | 도구 차단·확인 | 차단 PASS / 확인 PARTIAL | exit 2 + stderr로 `fs_write` 차단, Agent가 차단 사실을 설명. stdout `{"hookSpecificOutput":{"permissionDecision":"ask"}}` 뒤 턴이 PreToolUse에서 멈췄으나 확인 창 자체는 화면으로 보지 못했다 |
 | S5 | 승인 UX | PARTIAL | command hook은 승인 없이 실행(trust 꺼진 격리 프로필). MCP 도구 첫 호출은 `tool_approval` 대기. `mcp.json`의 `autoApprove`는 무시되고 시작 시 `~/.kiro/workspace-roots/<hash>/permissions.yaml`로 이관된다. `rules: [{capability: mcp, match: [server/tool], effect: allow}]`를 쓰자 승인 없이 호출됐다 |
@@ -25,7 +25,7 @@
 | S8 | 세션 연결 | PASS | MCP 호출 자체에는 세션 정보가 없지만 PostToolUse hook이 `mcp_vibe_spike_request_decision`을 `session_id`·질문·응답과 함께 전달. 사용자 답(이유 포함)도 같은 `session_id`의 UserPromptSubmit으로 수집되고 Agent가 선택대로 구현 |
 | S9 | 확장에서 채팅 열기 | PARTIAL | `kiroAgent.focusChatInput({newSession, prompt, submit})`로 새 탭은 생겼으나 입력창은 비어 있었고(사용자 화면 확인) 자동 전송도 안 됐다. `kiroAgent.sessions.create`·`sessions.sendPrompt(sessionId, text)`는 프롬프트 전송까지 동작 |
 | S9-A | Helper 후보 A | PASS(경로 변경) | 문자열 `#vibe-helper`는 manual Steering을 붙이지 않았다. 대신 promptSubmit hook이 `도우미:` 접두를 감지해 Helper 역할 지시를 주입하자 Agent가 파일 수정 없이 비교 설명(`[VH-HELPER]`) |
-| S10 | 외부 작성 Spec 실행 | PASS / PostTaskExec 미발동 | 외부에서 쓴 `.kiro/specs/<name>/` 3파일을 `kiro.spec.runAllTasks({documentUri})`로 실행. spec mode가 task를 실행해 완료했다(사용자 화면: "All done. Task 1 is complete", 0.7크레딧). PreTaskExec와 Stop은 발동했지만 task 완료 뒤에도 PostTaskExec는 발동하지 않았다. BUILD_TASK Episode 종료는 Stop과 tasks.md 상태 변화로 판단해야 한다 |
+| S10 | 외부 작성 Spec 실행 | PASS | 외부에서 쓴 `.kiro/specs/<name>/` 3파일을 `kiro.spec.runAllTasks({documentUri})`로 실행. spec mode가 하위 Agent로 task를 실행해 완료했다(사용자 화면: "All done. Task 1 is complete", 0.7크레딧). PreTaskExec(`spec_name`, `task_name`)와 PostTaskExec(같은 필드 + `task_success: true`)가 task 완료 업데이트 직후 발동했고, 하위 Agent의 도구 사용도 부모 `session_id`로 들어왔다. PostTaskExec로 BUILD_TASK Episode를 닫을 수 있다 |
 | 추가 | Stop hook 계속 실행 | PASS(조건부) | stdout `{"decision":"block","reason":...}`로 Agent가 이어서 실행. 학습 목적 지시(`report_concepts` 호출)는 따랐고, 임의 지시(파일에 단어 쓰기)는 주입 공격으로 보고 거절 |
 | 추가 | 계정별 MCP | 확인 | 만료된 팀 Enterprise 토큰에서는 거버넌스 조회 401로 `mcpDisabled: true, mcpReason: api_failure`. 개인 BuilderId에서는 `mcpDisabled: false` |
 
@@ -39,6 +39,10 @@
 6. **hook 입력은 redaction 후 저장한다.** `tool_input`·`tool_response`에 파일 전체 내용과 절대 경로가 들어온다.
 7. **MCP가 꺼진 계정 대비.** Enterprise 거버넌스는 MCP를 끌 수 있다. hook만으로 Evidence 수집이 동작하게 하고, Decision은 Stop hook이 정해진 형식의 질문을 찾아 기록하는 대체 경로를 K05에서 검증한다. 본선 팀 계정이 나오면 `GovernanceService Resolved` 로그로 MCP 상태를 먼저 확인한다.
 
+## 측정 오류 정정
+
+처음 보고에서 PostTaskExec가 발동하지 않았다고 적었으나 틀렸다. 대기 조건을 "hook 로그에 `PostTaskExec` 문자열이 있음"으로 썼는데, 앞선 실험에서 Agent가 읽은 hook 설정 파일 내용이 이미 로그에 있어 대기가 즉시 끝났다. 실제 발동(task 완료 직후) 전에 결과를 읽었다. 이후 판정은 `hook_event_name` 필드로만 한다.
+
 ## 비공개 인터페이스 의존
 
 다음은 공식 문서에 없는 명령·인자·파일 형식이라 버전마다 깨질 수 있다. 제품에서는 버전 확인과 실패 시 fallback을 둔다.
@@ -51,7 +55,8 @@
 ## 남은 확인
 
 - 일반 trust 프로필에서 command hook·MCP 첫 실행 승인 화면(S5)과 ask 확인 창(S4)을 화면으로 확인
-- PostTaskExec 발동 조건(S10). 채팅 탭 입력 채움은 동작하지 않으므로 Helper 진입은 접두나 패널 안내로 한다
+- 채팅 탭 입력 채움은 동작하지 않으므로 Helper 진입은 접두나 패널 안내로 한다
+- task 실패 시 PostTaskExec의 `task_success: false` 형태
 - MCP 없는 Decision 대체 경로(K05)
 - 본선 팀 계정의 MCP 거버넌스 상태
 - Windows에서 hook 명령(`node <script>`)의 경로·인용 처리
