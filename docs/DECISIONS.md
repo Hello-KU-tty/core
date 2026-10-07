@@ -6,7 +6,7 @@
 - **결정:** Agent가 사용자 답을 선택지로 대신 해석하지 않는다. Steering은 선택지에 번호를 붙여 묻게 하고, Core의 결정적 규칙 `parseChatDecisionReply`(정책 1.0.0)가 사용자 답 맨 앞의 명시적 선택(`2번`, `2.`, `옵션 2`, 숫자만, `추천대로`)만 읽는다. 나머지 사용자 원문은 그대로 rationale이 된다. 선택이 분명하지 않거나(`2시간`, `2 hours`, 질문), 범위를 벗어나거나, 이유가 4,000자를 넘으면 확정하지 않고 대화를 이어 가게 한다. 확정은 사용자 쪽 표면(hook adapter)이 기존 `UI_RESOLVE_DECISION`으로 보내므로 resolution 출처는 USER이고 Core 계약과 DB는 바꾸지 않는다.
 - **출처 근거:** K01에서 UserPromptSubmit은 사용자가 보낸 프롬프트에만 발동했고, Kiro가 만든 Spec 실행 프롬프트와 Stop hook 계속 실행에는 발동하지 않았다. 단, 확장이 `sessions.sendPrompt`로 보낸 문장도 사용자 프롬프트로 들어오므로 Vibe Helper 확장은 이 경로로 내용을 대신 보내지 않는다.
 - **workspace:** 기존 프로젝트 import는 MVP 제외이므로 외부 workspace root 등록 계약을 만들지 않는다. "Kiro에서 시작하기"는 Core가 이미 관리하는 생성 workspace를 Kiro 폴더로 열고 그 안의 `.kiro/`에 Steering·hook·MCP 설정을 설치한다. 기존 `WorkspacePathPolicy` 경계를 그대로 쓴다.
-- **학습자 요약:** Core의 `buildLearnerProfile`(1.0.0)이 Concept State를 점수 없는 안내문으로 만들고, 열린 오해 이슈는 따옴표 안의 한 줄 요약(200자 상한)으로만 넣는다. Kiro adapter는 이 결과를 Steering 본문에 직접 쓴다(`#[[file:]]` 참조는 K01에서 신뢰할 수 없었다).
+- **학습자 요약:** Core의 `buildLearnerProfile`(1.0.0)이 Concept State를 점수 없는 안내문으로 만들고, 열린 오해 이슈는 따옴표 안의 한 줄 요약(200자 상한)으로만 넣는다. Kiro adapter는 이 결과를 Steering이 `#[[file:]]`로 참조하는 파일에 쓴다. Steering은 세션 시작 때 고정되므로 세션 도중 변화는 UserPromptSubmit hook 출력으로 보완한다.
 
 ## 본선: Kiro-native 개입 구조로 전환
 
