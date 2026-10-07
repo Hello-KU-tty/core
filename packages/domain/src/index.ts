@@ -1,5 +1,6 @@
 export * from './analysis-job-reducer.js'
 export * from './candidate-reducer.js'
+export * from './chat-decision-reply.js'
 export * from './concept-state-reducer.js'
 export * from './decision-reducer.js'
 export * from './episode-reducer.js'

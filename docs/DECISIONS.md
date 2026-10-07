@@ -1,5 +1,13 @@
 # 결정 기록
 
+## 본선: 채팅 Decision 확정과 생성 workspace 재사용
+
+- **맥락:** K01 spike에서 Agent가 MCP로 Decision을 요청하고 사용자가 채팅에서 이유와 함께 답하는 흐름을 확인했다. 사용자는 Decision이 Kiro 채팅 안에서 끝나는 방식(A)을 골랐다. Core가 확정하려면 선택지가 필요하지만 사용자 답은 자연어다.
+- **결정:** Agent가 사용자 답을 선택지로 대신 해석하지 않는다. Steering은 선택지에 번호를 붙여 묻게 하고, Core의 결정적 규칙 `parseChatDecisionReply`(정책 1.0.0)가 사용자 답 맨 앞의 명시적 선택(`2번`, `2.`, `옵션 2`, 숫자만, `추천대로`)만 읽는다. 나머지 사용자 원문은 그대로 rationale이 된다. 선택이 분명하지 않거나(`2시간`, `2 hours`, 질문), 범위를 벗어나거나, 이유가 4,000자를 넘으면 확정하지 않고 대화를 이어 가게 한다. 확정은 사용자 쪽 표면(hook adapter)이 기존 `UI_RESOLVE_DECISION`으로 보내므로 resolution 출처는 USER이고 Core 계약과 DB는 바꾸지 않는다.
+- **출처 근거:** K01에서 UserPromptSubmit은 사용자가 보낸 프롬프트에만 발동했고, Kiro가 만든 Spec 실행 프롬프트와 Stop hook 계속 실행에는 발동하지 않았다. 단, 확장이 `sessions.sendPrompt`로 보낸 문장도 사용자 프롬프트로 들어오므로 Vibe Helper 확장은 이 경로로 내용을 대신 보내지 않는다.
+- **workspace:** 기존 프로젝트 import는 MVP 제외이므로 외부 workspace root 등록 계약을 만들지 않는다. "Kiro에서 시작하기"는 Core가 이미 관리하는 생성 workspace를 Kiro 폴더로 열고 그 안의 `.kiro/`에 Steering·hook·MCP 설정을 설치한다. 기존 `WorkspacePathPolicy` 경계를 그대로 쓴다.
+- **학습자 요약:** Core의 `buildLearnerProfile`(1.0.0)이 Concept State를 점수 없는 안내문으로 만들고, 열린 오해 이슈는 따옴표 안의 한 줄 요약(200자 상한)으로만 넣는다. Kiro adapter는 이 결과를 Steering 본문에 직접 쓴다(`#[[file:]]` 참조는 K01에서 신뢰할 수 없었다).
+
 ## 본선: Kiro-native 개입 구조로 전환
 
 - **맥락:** 사용자의 원래 구상은 일반 Kiro 바이브코딩 중에 확장이 hook 등으로 개입하는 것이었다. 예선에서는 시간 때문에 패널이 Kiro 내부 Agent 세션을 직접 운영하는 별도 바이브코딩 환경이 됐다. 이 경로는 비공개 Agent 연결부와 Helper 권한 격리 절차에 의존한다.

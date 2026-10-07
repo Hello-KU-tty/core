@@ -34,13 +34,14 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - **완료 조건:** 각 항목의 판정과 재현 절차가 남고, K02~K06의 진행 여부와 Helper A/B 선택이 결정된다.
 - **결과:** [spike 결과](spikes/KIRO_NATIVE_HOOK_SPIKE.md). 개인 BuilderId·Auto로 2.58크레딧 사용. hook 수집·맥락 주입·도구 차단·Decision MCP 호출(4/4)·세션 연결·외부 Spec 실행은 PASS. `#[[file:]]` 참조는 반영되지 않아 학습자 요약은 Steering 본문에 직접 쓴다. Helper는 A(promptSubmit 주입)로 정한다. 일반 trust 승인 화면, ask 확인 창, `focusChatInput` 입력 채움, PostTaskExec는 남은 확인으로 K03·K06에서 다시 본다. K02~K06은 진행한다.
 
-### [>] K02. Core의 host 중립 수집 경로
+### [x] K02. Core의 host 중립 수집 경로
 
 - **선행:** K01에서 hook 수집 경로가 PASS 또는 PARTIAL.
-- **범위:** 외부 host 이벤트를 기존 `ActivityEvent` 계약으로 받는 입력 경로, 사용자가 연 workspace root를 Project에 등록하는 경계, Concept State에서 host 중립 학습자 요약을 만드는 순수 함수. Kiro 형식은 Core에 넣지 않는다.
-- **완료 조건:** contract·unit·storage integration 테스트, USER/AGENT provenance 회귀, path validation 테스트.
+- **범위(조정):** Concept State의 host 중립 학습자 요약(`buildLearnerProfile`)과 채팅 Decision 답의 결정적 확정 규칙(`parseChatDecisionReply`)을 domain 순수 함수로 추가한다. 외부 workspace root 등록은 기존 프로젝트 import가 MVP 제외라 만들지 않고 생성 workspace를 Kiro 폴더로 연다. hook 이벤트는 기존 `UI_RECORD_HELPER_EXCHANGE`와 `UI_RESOLVE_DECISION`으로 받으므로 Core 계약·DB는 바꾸지 않는다. Kiro 형식은 Core에 넣지 않는다.
+- **완료 조건:** unit 테스트, provenance(USER rationale 원문 유지·추측 금지) 회귀, 타입 검사.
+- **검증:** 학습자 요약 5개·채팅 Decision 16개 테스트 추가. Node 24.19.0/pnpm 11.13.1에서 `pnpm typecheck` 통과, `pnpm test:unit` 177 통과·3 skip, `pnpm test:integration` 439 통과·8 skip(기존 418 + 신규 21). 새 파일은 Biome check 통과. 전체 `pnpm lint`·`format:check`는 기존 `.local-experiments` 중첩 Biome 설정 오류로 실행하지 못했고, build·smoke·E2E는 이번 domain 변경 범위에서 돌리지 않았다.
 
-### [ ] K03. Kiro adapter의 workspace 연결
+### [>] K03. Kiro adapter의 workspace 연결
 
 - **선행:** K01, K02.
 - **범위:** 확장이 대상 workspace의 `.kiro/`에 Steering·hook·MCP 설정을 설치·갱신·제거한다. hook 명령은 stdin JSON을 Core 이벤트로 바꾸는 Node 스크립트 하나로 통일한다. 사용자의 기존 `.kiro/` 파일을 덮어쓰지 않는다.
