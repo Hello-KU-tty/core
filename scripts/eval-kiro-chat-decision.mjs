@@ -95,9 +95,11 @@ async function openDecision() {
 
 const inbox = join(probeLogs, 'inbox.jsonl')
 const outbox = join(probeLogs, 'outbox.jsonl')
-async function probe(cmd, args = []) {
+async function probe(cmd, args = [], waitForResult = true) {
   const id = `eval-${randomUUID()}`
   await appendFile(inbox, `${JSON.stringify({ id, cmd, args })}\n`)
+  // sendPrompt resolves only when the turn ends; the session record is polled instead.
+  if (!waitForResult) return null
   for (let attempt = 0; attempt < 60; attempt++) {
     await delay(1_000)
     const line = (await readFile(outbox, 'utf8'))
@@ -153,62 +155,70 @@ async function resolutionOf(decisionId) {
   return parsed.length === 0 ? null : JSON.parse(parsed[0].payload_json)
 }
 
-async function cleanup(decisionId, resolved) {
-  const context = await builderTask()
-  if (!resolved) {
-    const decision = context.decisionRequests.find((item) => item.id === decisionId)
-    const response = await fetch(new URL('/api/application', connection.baseUrl), {
-      method: 'POST',
-      headers: { authorization: `Bearer ${connection.token}`, 'content-type': 'application/json' },
-      body: JSON.stringify({
-        protocolVersion: 1,
-        request: {
+// Closes every Decision left open or unapplied (the harness's and any the Agent opened), so the
+// next case starts with no pending Decision. Synthetic evaluation data only.
+async function closeOpenDecision(decision, context) {
+  const response = await fetch(new URL('/api/application', connection.baseUrl), {
+    method: 'POST',
+    headers: { authorization: `Bearer ${connection.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      protocolVersion: 1,
+      request: {
+        schemaVersion: 1,
+        kind: 'UI_RESOLVE_DECISION',
+        correlationId: decision.correlationId,
+        actor: { kind: 'UI' },
+        idempotencyKey: idem(),
+        resolution: {
           schemaVersion: 1,
-          kind: 'UI_RESOLVE_DECISION',
+          id: `decision_resolution_${randomUUID()}`,
+          decisionId: decision.id,
+          projectId: scope.projectId,
+          taskId: scope.taskId,
           correlationId: decision.correlationId,
-          actor: { kind: 'UI' },
-          idempotencyKey: idem(),
-          resolution: {
-            schemaVersion: 1,
-            id: `decision_resolution_${randomUUID()}`,
-            decisionId,
-            projectId: scope.projectId,
-            taskId: scope.taskId,
-            correlationId: decision.correlationId,
-            expectedContextVersion: context.liveContext?.contextVersion ?? 0,
-            selectionKind: 'RECOMMENDATION',
-            selectedOptionId: decision.recommendedOptionId,
-            helperUsed: false,
-            resolvedAt: new Date().toISOString(),
-            source: { kind: 'USER' },
-            redactionStatus: 'VERIFIED_REDACTED',
-          },
+          expectedContextVersion: context.liveContext?.contextVersion ?? 0,
+          selectionKind: 'RECOMMENDATION',
+          selectedOptionId: decision.recommendedOptionId,
+          helperUsed: false,
+          resolvedAt: new Date().toISOString(),
+          source: { kind: 'USER' },
+          redactionStatus: 'VERIFIED_REDACTED',
         },
-      }),
-    }).then((value) => value.json())
-    if (!response.success) throw new Error(`cleanup resolve failed ${JSON.stringify(response)}`)
+      },
+    }),
+  }).then((value) => value.json())
+  if (!response.success) throw new Error(`cleanup resolve failed ${JSON.stringify(response)}`)
+}
+
+async function cleanup() {
+  let context = await builderTask()
+  const resolvedIds = () => new Set(context.decisionResolutions.map((item) => item.decisionId))
+  for (const decision of context.decisionRequests.filter((item) => !resolvedIds().has(item.id))) {
+    await closeOpenDecision(decision, context)
+    context = await builderTask()
   }
-  const fresh = await builderTask()
-  // The Agent may already have applied the learner's choice itself.
-  if (fresh.decisionApplications.some((item) => item.decisionId === decisionId)) return
-  await tool('apply_decision_result', {
-    schemaVersion: 1,
-    ...scope,
-    decisionId,
-    idempotencyKey: idem(),
-    expectedTaskRevision: fresh.task.revision,
-    expectedContextVersion: fresh.liveContext?.contextVersion ?? 0,
-    appliedResult: 'Evaluation harness closed this synthetic Decision without implementing it.',
-    sourceReferences: [],
-    context: {
-      stage: '평가 사례 정리',
-      currentGoal: '만료되는 공유 링크를 만든다.',
-      recentChanges: ['평가용 Decision을 정리했다.'],
-      activeConceptNames: ['link expiry'],
-      relatedFiles: [],
-      nextActions: ['다음 평가 사례'],
-    },
-  })
+  const appliedIds = new Set(context.decisionApplications.map((item) => item.decisionId))
+  for (const decision of context.decisionRequests.filter((item) => !appliedIds.has(item.id))) {
+    context = await builderTask()
+    await tool('apply_decision_result', {
+      schemaVersion: 1,
+      ...scope,
+      decisionId: decision.id,
+      idempotencyKey: idem(),
+      expectedTaskRevision: context.task.revision,
+      expectedContextVersion: context.liveContext?.contextVersion ?? 0,
+      appliedResult: 'Evaluation harness closed this synthetic Decision without implementing it.',
+      sourceReferences: [],
+      context: {
+        stage: '평가 사례 정리',
+        currentGoal: '만료되는 공유 링크를 만든다.',
+        recentChanges: ['평가용 Decision을 정리했다.'],
+        activeConceptNames: ['link expiry'],
+        relatedFiles: [],
+        nextActions: ['다음 평가 사례'],
+      },
+    })
+  }
 }
 
 function judge(expect, resolution, options) {
@@ -238,8 +248,9 @@ function judge(expect, resolution, options) {
 
 if (process.env.VIBE_EVAL_DRY_RUN === '1') {
   // Harness self-check without Kiro or model credits: open one Decision, then close it.
+  await cleanup()
   const { decisionId, options } = await openDecision()
-  await cleanup(decisionId, false)
+  await cleanup()
   const closed = await resolutionOf(decisionId)
   process.stdout.write(
     `${JSON.stringify({ dryRun: true, decisionId, options: options.length, closedBy: closed?.selectionKind ?? null })}\n`,
@@ -251,7 +262,10 @@ if (process.env.VIBE_EVAL_DRY_RUN === '1') {
 const results = []
 let spent = 0
 let stopped = false
+const only = new Set((process.env.VIBE_EVAL_ONLY ?? '').split(',').filter(Boolean))
+await cleanup()
 for (const testCase of fixture.cases) {
+  if (only.size > 0 && !only.has(testCase.id)) continue
   if (spent > budget - 1.5) {
     results.push({ id: testCase.id, skipped: 'CREDIT_BUDGET' })
     continue
@@ -259,10 +273,11 @@ for (const testCase of fixture.cases) {
   const { decisionId, options } = await openDecision()
   const created = await probe('kiroAgent.sessions.create')
   const sessionId = created.result.sessionId
-  await probe('kiroAgent.sessions.sendPrompt', [
-    sessionId,
-    `${testCase.message} (지금은 코드 작성은 하지 말아줘.)`,
-  ])
+  await probe(
+    'kiroAgent.sessions.sendPrompt',
+    [sessionId, `${testCase.message} (지금은 코드 작성은 하지 말아줘.)`],
+    false,
+  )
   let turn = await readTurn(sessionId)
   for (let attempt = 0; attempt < 60 && !turn.done && !turn.pending; attempt++) {
     await delay(3_000)
@@ -287,7 +302,7 @@ for (const testCase of fixture.cases) {
     agentReplyTail: turn.lastSay.slice(-160),
   })
   try {
-    await cleanup(decisionId, resolution !== null)
+    await cleanup()
   } catch (error) {
     // An unclosed Decision would leak into the next case, so stop the run here.
     results.at(-1).cleanupError = error instanceof Error ? error.message : String(error)
