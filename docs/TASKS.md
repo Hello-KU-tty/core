@@ -25,15 +25,16 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - **완료 조건:** 추적 Markdown의 상대 링크가 이동 전과 같은 수준으로 해석된다(이동 전부터 있던 `dist/`·임시 경로 참조 제외). 로컬 commit까지만 한다.
 - **검증:** 문서 41개를 이동하고 56개 문서의 링크를 고쳤다. 추적·신규 Markdown 전체의 상대 링크 재검사에서 새로 깨진 링크는 0개다. `pnpm format:check`는 기존 `.local-experiments/kiro-native-recovery/biome.json` 중첩 설정 오류로 실행 전에 멈췄다(이전부터 있던 문제, Markdown은 Biome 대상 아님). 프론트 공유 문서는 사용자 요청으로 별도 브랜치 `finals/plan`에 push했다.
 
-### [~] K01. Kiro-native capability spike
+### [x] K01. Kiro-native capability spike
 
 - **선행:** K00.
 - **범위:** 합성 workspace(`/Users/hurdoo/coding/experiments/`)와 별도 Kiro 창에서 S1~S10을 실측한다. S1 hook 파일 형식, S2 trigger별 발동·stdin, S3 promptSubmit 출력의 맥락 주입, S4 preToolUse 차단·확인, S5 명령 hook 승인 UX, S6 Steering always와 `#[[file:]]` 즉시 반영, S7 `request_decision` 호출률, S8 `session_id` 탭 구분, S9 확장에서 채팅 열기·입력(Helper 후보 A), S10 확장이 쓴 Spec 인식과 task 실행.
 - **비용 경계:** 모델 호출이 없는 항목을 먼저 한다. 모델 호출은 개인 계정 무료 플랜, Auto 모델, 15크레딧 상한, 합성 데이터만 쓴다. 로그인은 사용자가 직접 한다.
 - **산출물:** `docs/spikes/KIRO_NATIVE_HOOK_SPIKE.md`와 실행 기록. 항목별 PASS/PARTIAL/BLOCKED와 근거.
 - **완료 조건:** 각 항목의 판정과 재현 절차가 남고, K02~K06의 진행 여부와 Helper A/B 선택이 결정된다.
+- **결과:** [spike 결과](spikes/KIRO_NATIVE_HOOK_SPIKE.md). 개인 BuilderId·Auto로 2.58크레딧 사용. hook 수집·맥락 주입·도구 차단·Decision MCP 호출(4/4)·세션 연결·외부 Spec 실행은 PASS. `#[[file:]]` 참조는 반영되지 않아 학습자 요약은 Steering 본문에 직접 쓴다. Helper는 A(promptSubmit 주입)로 정한다. 일반 trust 승인 화면, ask 확인 창, `focusChatInput` 입력 채움, PostTaskExec는 남은 확인으로 K03·K06에서 다시 본다. K02~K06은 진행한다.
 
-### [ ] K02. Core의 host 중립 수집 경로
+### [>] K02. Core의 host 중립 수집 경로
 
 - **선행:** K01에서 hook 수집 경로가 PASS 또는 PARTIAL.
 - **범위:** 외부 host 이벤트를 기존 `ActivityEvent` 계약으로 받는 입력 경로, 사용자가 연 workspace root를 Project에 등록하는 경계, Concept State에서 host 중립 학습자 요약을 만드는 순수 함수. Kiro 형식은 Core에 넣지 않는다.
@@ -60,7 +61,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 ### [ ] K06. Helper 위치 확정과 연결
 
 - **선행:** K01 S9.
-- **범위:** A(Kiro 채팅 탭 + `#vibe-helper`) 또는 B(패널, 권한 격리 절차 제거) 중 실측으로 고른 경로를 연결한다. Helper는 Core의 Evidence·State 변경 도구를 받지 않는다.
+- **범위:** K01에서 고른 A 경로를 연결한다. promptSubmit hook이 Helper 접두나 패널에서 연 채팅을 감지해 Helper 역할 지시를 주입한다(문자열 `#vibe-helper`는 manual Steering을 붙이지 않음). B(패널)는 fallback이다. Helper는 Core의 Evidence·State 변경 도구를 받지 않는다.
 - **완료 조건:** Helper 대화가 HELPER_CONVERSATION Episode로 묶이고 다음 개인화에 반영됨을 실제 흐름으로 확인.
 
 ### [ ] K07. 포스터 핵심 장면 확보
