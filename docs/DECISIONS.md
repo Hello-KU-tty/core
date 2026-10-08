@@ -1,5 +1,11 @@
 # 결정 기록
 
+## 본선: Evidence Analyst 기본 모델은 Auto
+
+- **근거:** 같은 16개 고정 사례·결정적 판정으로 kiro-cli 모델을 비교했다. Auto 14/16(형식 오류 0, 사례당 약 0.12크레딧), Sonnet 4.5 11→12/16(두 실행 판정 15/16 일치), GLM-5 12/16, Haiku 4.5 9/16, DeepSeek 3.2와 MiniMax M2.5는 형식 오류가 잦았다. 무료 Builder ID 계정에서는 Opus·GPT 계열이 열리지 않았다. [비교 결과](../tests/eval/results/evidence-analyst-models-kiro-cli.md).
+- **결정:** Core 일반 모드의 Analyst 기본 모델을 `auto`로 하고 `--analyst-model`로 바꿀 수 있게 한다. 다른 역할은 기존 `--model` 기본값(Haiku 4.5)을 쓰며 역할별로 바꿀 수 있다.
+- **위험과 대응:** Auto는 서버가 모델을 고르므로 시간이 지나면 바뀔 수 있다. 결과는 Core 규칙으로 걸러져 품질 저하가 잘못된 이해 판정이 아니라 Evidence 누락으로 나타난다. 본선 팀 계정에서 모델 목록과 같은 평가를 다시 확인하고, 고정 대안은 Sonnet 4.5로 둔다.
+
 ## 본선: 채팅 확정 Decision의 판단 근거 Evidence와 kiro-cli 버전 범위
 
 - **맥락:** kiro-cli 2.28 Analyst로 실제 채팅 확정 Decision Episode를 분석했더니 JUSTIFIED_DECISION 제안이 거절됐다. 원인은 둘이다. Analyst가 학습자 문장의 순서를 바꿔 인용했고(정당한 거절), 규칙이 개념 표현을 확정 이유 문장 안에서만 찾았다. 채팅 확정의 이유는 "1시간은 짧아" 같은 짧은 원문 구절이라 개념 표현("공유 링크 만료 시간")은 같은 메시지의 앞부분에 있다.

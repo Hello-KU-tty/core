@@ -408,9 +408,8 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
                 ? { DISCOVERY: option('--discovery-model', '') }
                 : {}),
               ...(option('--helper-model', '') ? { HELPER: option('--helper-model', '') } : {}),
-              ...(option('--analyst-model', '')
-                ? { EVIDENCE_ANALYST: option('--analyst-model', '') }
-                : {}),
+              // Measured best on the fixed Analyst corpus (tests/eval/results/evidence-analyst-models-kiro-cli.md).
+              EVIDENCE_ANALYST: option('--analyst-model', 'auto'),
             },
           })
     nativeRelay = nativeMode
