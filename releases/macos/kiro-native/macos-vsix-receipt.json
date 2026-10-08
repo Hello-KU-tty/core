@@ -1,16 +1,17 @@
 {
-  "file": "builder-helper-agent-panel-0.2.0-darwin-arm64.vsix",
-  "version": "0.2.0",
+  "file": "builder-helper-agent-panel-0.2.1-darwin-arm64.vsix",
+  "version": "0.2.1",
   "hostMode": "KIRO_NATIVE",
   "publicationStatus": "LOCAL_COMMIT_NOT_PUSHED",
   "target": "darwin-arm64",
-  "bytes": 41526688,
-  "sha256": "cc4fd5ec8f802074d7747f41ff61ccf66f73cd0c6456f3aa9188d0e2de25202a",
-  "files": 73,
+  "bytes": 41536528,
+  "sha256": "bea07d49ed29dc4a4435b0c53fe95b9aef4b1d4400fe613cd6a942b537c5d5af",
+  "files": 74,
   "fileInventory": "files.json",
   "frontendVersion": "0.0.18",
-  "buildFrontendCommit": "e65cd7ff341e34bd6b160c468225819b0ab02254",
-  "buildBackendCommit": "271d4b4b7fc3cb051812c9621ec4bd3c7c0bdd91",
-  "workingTreeChangesIncluded": false,
-  "liveCheck": "The same 73 file hashes were installed in an isolated Kiro 1.2.37 profile; see docs/FRONTEND_KIRO_NATIVE_HANDOFF.md. Only the archive timestamp differs from the checked build."
+  "buildFrontendCommit": "c2c873c27b5563037853236aa402cd1b97910929",
+  "buildFrontendBranch": "finals/trial-feedback (local, not on the frontend remote)",
+  "buildBackendCommit": "4def349453ddc6b6e1137d3c7160041ee3cdce4e",
+  "workingTreeNote": "The backend checkout had one untracked file outside the build inputs (the learner's feedback notes).",
+  "liveCheck": "Installed in an isolated Kiro 1.2.37 profile without model calls; see docs/FRONTEND_KIRO_NATIVE_HANDOFF.md. Chat-level checks wait for model credits (K09)."
 }

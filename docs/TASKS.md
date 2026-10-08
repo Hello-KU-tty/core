@@ -86,6 +86,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - **출처:** 사용자 직접 체험(2026-10-09, Kiro 1.2.37, 개인 Builder ID)과 피드백 15건. 검토·검증 기록은 [첫 체험 기록](spikes/KIRO_NATIVE_FIRST_TRIAL_20261009.md).
 - **범위:** 패널 문구·버튼·로딩(1·2·3·5, frontend), Steering 0.5.0(4·8·13: 예상 Decision은 예고로만, 구현 중 하나씩, 묻기 전 기록, 시작 전 환경 확인), 빈 현재 폴더를 Project 폴더로 등록(6), 신뢰 안내(7), Helper가 Builder 진행 상황을 보게 함(9), Vibe Helper 도구 허용 규칙(11), Kiro 채팅의 Helper 에이전트(12), 예선 전역 에이전트 정리(14).
 - **완료 조건:** 관련 unit·integration·패널 테스트, VSIX 재생성, 실제 Kiro 재실측. 재실측에는 6 적용 뒤 신뢰·hook·Steering 적재 시점(7)을 다시 보는 것을 포함한다(모델 크레딧 필요).
+- **진행:** 코드·문서 반영과 0.2.1 VSIX 완료(backend `0cd52c8`·`4def349`, frontend `program` `finals/trial-feedback` `c2c873c`). 자동 검사 통과(backend unit 177·integration 489, 패널 CJS 179, frontend 811, Mac 패키지 9). 패널 화면은 Chrome 1280px·360px로 확인. 모델 호출 없는 격리 Kiro 확인: 빈 현재 폴더 연결, 다시 로드 없이 Builder MCP 연결과 `vibe-helper` 에이전트 등록, 새 채팅 세션에서 hook 2개 적재. 남은 것: 크레딧이 필요한 채팅 단계 재실측(hook 기록, Steering 0.5.0 Decision 시점, Helper 탭의 Builder 활동 사용, 허용 규칙으로 승인 창 감소), 신뢰 화면과 확인 창의 실제 화면, 프론트 변경의 프론트 담당자 공유.
 
 ### [ ] K10. Kiro 채팅 Builder 워크플로 재설계
 
