@@ -1,0 +1,16 @@
+{
+  "file": "builder-helper-agent-panel-0.2.0-darwin-arm64.vsix",
+  "version": "0.2.0",
+  "hostMode": "KIRO_NATIVE",
+  "publicationStatus": "LOCAL_COMMIT_NOT_PUSHED",
+  "target": "darwin-arm64",
+  "bytes": 41526688,
+  "sha256": "cc4fd5ec8f802074d7747f41ff61ccf66f73cd0c6456f3aa9188d0e2de25202a",
+  "files": 73,
+  "fileInventory": "files.json",
+  "frontendVersion": "0.0.18",
+  "buildFrontendCommit": "e65cd7ff341e34bd6b160c468225819b0ab02254",
+  "buildBackendCommit": "271d4b4b7fc3cb051812c9621ec4bd3c7c0bdd91",
+  "workingTreeChangesIncluded": false,
+  "liveCheck": "The same 73 file hashes were installed in an isolated Kiro 1.2.37 profile; see docs/FRONTEND_KIRO_NATIVE_HANDOFF.md. Only the archive timestamp differs from the checked build."
+}

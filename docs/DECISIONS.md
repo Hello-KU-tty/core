@@ -1,5 +1,12 @@
 # 결정 기록
 
+## 본선: Mac 설치물의 host를 Kiro-native로 전환(0.2.0)
+
+- **맥락:** 프론트 담당자가 본선 구조로 패널을 다듬으려면 설치 가능한 VSIX가 필요하다. 예선 0.1.4 host는 Kiro 1.1.70 설치본 hash와 IDE 내부 비공개 Agent 연결을 전제로 해서 현재 Kiro(1.2.37)에서는 Agent를 실행하지 못한다. Core에는 `managed-kiro` 명령과 Project별 연결 API가 이미 있었지만, 포장된 Core가 그 명령을 거절했다.
+- **결정:** `finals/kiro-native`의 frontend host는 Core를 `managed-kiro --kiro-cli <설치 경로>`로 띄운다. 준비 상태는 kiro-cli 존재와 `kiro-cli whoami` 성공(종료 코드만 확인, 계정 출력은 읽지 않음)이다. 설치되지 않았으면 Core를 띄우지 않고, 로그인이 없으면 History만 읽게 한다. host는 `vibeHelper.openInKiro` 명령과 `openProjectInKiro(projectId)`로 POST `/api/kiro/bind` 후 생성 폴더를 새 창으로 연다. 응답의 폴더가 private `workspaces` 아래가 아니면 열지 않는다. 명령 등록은 패키징 때 manifest에 더해 프론트 저장소를 바꾸지 않는다. 버전은 0.2.0이다.
+- **예선 경로:** 1.1.70 IDE 내부 worker 코드는 저장소에 남지만 이 host 묶음에는 들어가지 않는다. 예선 0.1.4 설치물은 `main`의 `releases/macos/0.1.0/`에 그대로 있다.
+- **검증과 한계:** 격리 Kiro 1.2.37 프로필에서 설치, Core 시작, 연결, 채팅 hook, 채팅 Decision, kiro-cli Analyst, Concept State 갱신, Discovery 미리보기를 Core의 구조화 필드로 확인했다. 확장 업데이트 뒤에는 hook·MCP 경로가 이전 확장 폴더를 가리키므로 다시 연결해야 한다. MCP 첫 승인과 Workspace Trust 화면은 미확인이다. [프론트 인계](FRONTEND_KIRO_NATIVE_HANDOFF.md).
+
 ## 본선: Evidence Analyst 기본 모델은 Auto
 
 - **근거:** 같은 16개 고정 사례·결정적 판정으로 kiro-cli 모델을 비교했다. Auto 14/16(형식 오류 0, 사례당 약 0.12크레딧), Sonnet 4.5 11→12/16(두 실행 판정 15/16 일치), GLM-5 12/16, Haiku 4.5 9/16, DeepSeek 3.2와 MiniMax M2.5는 형식 오류가 잦았다. 무료 Builder ID 계정에서는 Opus·GPT 계열이 열리지 않았다. [비교 결과](../tests/eval/results/evidence-analyst-models-kiro-cli.md).
