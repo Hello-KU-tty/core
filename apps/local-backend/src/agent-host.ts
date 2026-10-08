@@ -74,6 +74,11 @@ export class LocalAgentHost implements WorkflowAgentPort {
       roleModels?: Partial<Record<'DISCOVERY' | 'BUILDER' | 'HELPER' | 'EVIDENCE_ANALYST', string>>
       /** Kiro-native mode: the Builder is the learner's own Kiro chat, never a CLI run. */
       builderInHostChat?: boolean
+      /**
+       * Canonical role prompts (docs/agent-prompts or the packaged copy). When set, a non-Builder
+       * role uses its canonical prompt instead of the older generated Agent JSON prompt.
+       */
+      promptDirectory?: string
     },
   ) {}
   setBaseUrl(value: string): void {
@@ -84,9 +89,24 @@ export class LocalAgentHost implements WorkflowAgentPort {
     const [suffix, role, toolNames] = definitions[request.mode]
     if (role === 'BUILDER' && this.options.builderInHostChat)
       throw new WorkflowError('BUILDER_RUNS_IN_HOST_CHAT')
-    const original = JSON.parse(
-      await readFile(join(this.options.definitionsRoot, `vibe-helper-${suffix}.json`), 'utf8'),
-    ) as { prompt: string; toolsSettings?: unknown }
+    const canonicalFile = {
+      DISCOVERY: 'discovery.md',
+      HELPER: 'helper.md',
+      EVIDENCE_ANALYST: 'evidence-analyst.md',
+    }[role as 'DISCOVERY' | 'HELPER' | 'EVIDENCE_ANALYST']
+    const original =
+      this.options.promptDirectory !== undefined && canonicalFile !== undefined
+        ? {
+            prompt: (
+              await readFile(join(this.options.promptDirectory, canonicalFile), 'utf8')
+            ).replaceAll('\r\n', '\n'),
+          }
+        : (JSON.parse(
+            await readFile(
+              join(this.options.definitionsRoot, `vibe-helper-${suffix}.json`),
+              'utf8',
+            ),
+          ) as { prompt: string; toolsSettings?: unknown })
     if (typeof original.prompt !== 'string' || original.prompt.length < 100)
       throw new WorkflowError('AGENT_DEFINITION_INVALID')
     const unique = randomUUID()

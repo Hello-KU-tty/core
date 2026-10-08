@@ -492,3 +492,98 @@ export function renderKiroSpec(source: KiroSpecSource): {
     files: { 'requirements.md': requirements, 'design.md': design, 'tasks.md': tasks },
   }
 }
+
+export interface KiroWorkspaceInstallOptions {
+  readonly workspace: string
+  readonly binding: KiroCoreBinding
+  readonly nodeExecutable: string
+  readonly hookScript: string
+  readonly hookDescriptor: string
+  readonly bridgeScript: string
+  readonly bindingDescriptor: string
+  readonly learnerScope?: KiroLearnerScope
+  readonly spec?: KiroSpecSource
+}
+
+/**
+ * Writes Vibe Helper's Kiro files into one generated workspace: steering, hooks, the MCP server
+ * entry (other servers kept), an initial learner profile and, when absent, the Kiro Spec.
+ * Credentials stay in the private descriptors the commands point to, never in the workspace.
+ */
+export async function installKiroWorkspace(
+  options: KiroWorkspaceInstallOptions,
+): Promise<{ readonly spec: string }> {
+  const { access, mkdir, readFile, writeFile } = await import('node:fs/promises')
+  const { dirname } = await import('node:path')
+  const write = async (relative: string, content: string) => {
+    const target = join(options.workspace, relative)
+    await mkdir(dirname(target), { recursive: true })
+    await writeFile(target, content, 'utf8')
+  }
+  await write(
+    KIRO_LEARNER_STEERING_FILE,
+    renderLearnerSteering(options.binding, options.learnerScope),
+  )
+  await write(KIRO_HELPER_STEERING_FILE, renderHelperSteering())
+  await write(
+    KIRO_HOOK_FILE,
+    `${JSON.stringify(
+      renderKiroHooksConfig({
+        nodeExecutable: options.nodeExecutable,
+        hookScript: options.hookScript,
+        hookDescriptor: options.hookDescriptor,
+      }),
+      null,
+      2,
+    )}\n`,
+  )
+  const existing = await readFile(join(options.workspace, KIRO_MCP_CONFIG_FILE), 'utf8').catch(
+    (error: NodeJS.ErrnoException) => {
+      if (error.code === 'ENOENT') return null
+      throw error
+    },
+  )
+  await write(
+    KIRO_MCP_CONFIG_FILE,
+    mergeKiroMcpConfig(
+      existing,
+      renderKiroMcpServerEntry({
+        nodeExecutable: options.nodeExecutable,
+        bridgeScript: options.bridgeScript,
+        bindingDescriptor: options.bindingDescriptor,
+        workspace: options.workspace,
+      }),
+    ),
+  )
+  const profilePath = join(options.workspace, LEARNER_PROFILE_FILE)
+  const hasProfile = await access(profilePath)
+    .then(() => true)
+    .catch(() => false)
+  if (!hasProfile)
+    await write(
+      LEARNER_PROFILE_FILE,
+      '# 학습자 개념 상태 (Vibe Helper)\n\n아직 확인된 개념이 없다. 처음 나오는 개념은 쉬운 말로 설명한다.\n',
+    )
+  await write('.vibe-helper/.gitignore', '*\n')
+  if (options.spec === undefined) return { spec: 'SKIPPED_NO_CONFIRMED_SPEC' }
+  const spec = renderKiroSpec(options.spec)
+  const exists = await access(join(options.workspace, spec.directory))
+    .then(() => true)
+    .catch(() => false)
+  if (exists) return { spec: `KEPT_EXISTING ${spec.directory}` }
+  for (const [name, content] of Object.entries(spec.files))
+    await write(join(spec.directory, name), content)
+  return { spec: `WRITTEN ${spec.directory}` }
+}
+
+/** The learner scope a confirmed Learning Spec hands to the Builder steering. */
+export function learnerScopeFrom(
+  spec: Pick<LearningSpecRevision, 'scope' | 'expectedDecisions'>,
+): KiroLearnerScope {
+  return {
+    learnerFocus: spec.scope
+      .filter((item) => item.category === 'LEARNER_FOCUS')
+      .map((item) => ({ title: item.title, conceptNames: item.conceptNames })),
+    expectedDecisions: spec.expectedDecisions.map((item) => ({ description: item.description })),
+  }
+}

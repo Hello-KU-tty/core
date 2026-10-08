@@ -46,6 +46,8 @@ export function createLocalServer(options: {
   resultLauncher?: {
     launch(value: ReturnType<typeof generatedResultDescriptorSchema.parse>): Promise<unknown>
   }
+  /** Kiro-native mode: connect a Project's generated workspace to the learner's Kiro chat. */
+  kiroBindings?: { bind(projectId: string): Promise<unknown> }
 }) {
   if (!/^[0-9a-f]{64}$/.test(options.token)) throw new TypeError('LOCAL_TOKEN_INVALID')
   const server = createServer((request, response) => {
@@ -245,6 +247,42 @@ export function createLocalServer(options: {
         json(response, 200, await options.runtime.cancel(runId))
         return
       }
+    }
+    if (url.pathname === '/api/kiro/bind' && request.method === 'POST' && !url.search) {
+      if (options.kiroBindings === undefined) {
+        json(response, 404, { error: 'KIRO_NATIVE_NOT_ENABLED' })
+        return
+      }
+      if (request.headers['content-type']?.split(';')[0] !== 'application/json') {
+        json(response, 415, { error: 'JSON_REQUIRED' })
+        return
+      }
+      const input: unknown = JSON.parse((await body(request)).toString('utf8'))
+      const projectId =
+        typeof input === 'object' && input !== null && 'projectId' in input
+          ? input.projectId
+          : undefined
+      if (
+        typeof input !== 'object' ||
+        input === null ||
+        !('protocolVersion' in input) ||
+        input.protocolVersion !== LOCAL_PROTOCOL_VERSION ||
+        typeof projectId !== 'string' ||
+        !/^project_[0-9a-f-]{36}$/.test(projectId)
+      ) {
+        json(response, 400, { error: 'KIRO_BIND_REQUEST_INVALID' })
+        return
+      }
+      try {
+        json(response, 200, { success: true, data: await options.kiroBindings.bind(projectId) })
+      } catch (error) {
+        const code =
+          error instanceof Error && /^[A-Z][A-Z0-9_]{0,99}$/.test(error.message)
+            ? error.message
+            : 'KIRO_BIND_FAILED'
+        json(response, 409, { success: false, error: code })
+      }
+      return
     }
     if (
       request.method !== 'POST' ||

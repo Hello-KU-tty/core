@@ -25,6 +25,7 @@ import {
 import { openSqliteStorage } from '@vibe-helper/storage-sqlite'
 import { LocalAgentHost } from './agent-host.js'
 import { HostLeases } from './host-leases.js'
+import { KiroBindingManager } from './kiro-bindings.js'
 import { createKiroHookBinding } from './kiro-hook-binding.js'
 import { NativeAgentRelay } from './native-agent-relay.js'
 import { createNativeCoreBinding } from './native-core-binding.js'
@@ -212,12 +213,17 @@ async function recover(): Promise<void> {
     throw error
   }
 }
-async function start(coreOnly = false, nativeMode = false, managed = false): Promise<void> {
+async function start(
+  coreOnly = false,
+  nativeMode = false,
+  managed = false,
+  kiroNative = false,
+): Promise<void> {
   if (!managed) await initialized()
   if (!coreOnly && !nativeMode) await kiroVersion()
   if (
     macProductProtocol &&
-    (!nativeMode ||
+    ((!nativeMode && !kiroNative) ||
       process.versions.node !== '24.19.0' ||
       process.env.VIBE_NATIVE_SINGLE_WINDOW_BUILTIN_H === '1')
   )
@@ -257,6 +263,7 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
   let kiroHookFileWritten = false
   let runtime: WorkflowRuntime | undefined
   let nativeRelay: NativeAgentRelay | undefined
+  let kiroBindings: KiroBindingManager | undefined
   let result: ResultRuntimeSupervisor | undefined
   let server: ReturnType<typeof createLocalServer> | undefined
   let closing = false
@@ -269,6 +276,7 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
     // Revoke Agent authority and stop owned children before closing persistence.
     await runtime?.close()
     await nativeRelay?.close()
+    kiroBindings?.close()
     nativeBinding?.revoke()
     await nativeBinding?.handler.close()
     if (nativeBindingFileWritten)
@@ -403,7 +411,8 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
             guardPath: join(repository, 'packages/kiro-adapter/dist/builder-tool-guard-node.js'),
             executable,
             model,
-            builderInHostChat: args.includes('--kiro-hooks'),
+            builderInHostChat: kiroNative || args.includes('--kiro-hooks'),
+            promptDirectory: resources?.promptDirectory ?? join(repository, 'docs/agent-prompts'),
             roleModels: {
               ...(option('--discovery-model', '')
                 ? { DISCOVERY: option('--discovery-model', '') }
@@ -466,6 +475,18 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
     const mcpHandlers = agents.handlers
     if (nativeBinding) mcpHandlers.set(nativeBinding.path, nativeBinding.handler)
     if (kiroHookBinding) mcpHandlers.set(kiroHookBinding.path, kiroHookBinding.handler)
+    let listeningBaseUrl = ''
+    if (kiroNative)
+      kiroBindings = new KiroBindingManager({
+        application,
+        policy,
+        root,
+        handlers: mcpHandlers,
+        baseUrl: () => listeningBaseUrl,
+        nodeExecutable: process.execPath,
+        bridgeScript: resources?.bridge ?? join(repository, 'scripts/native-core-stdio-bridge.mjs'),
+        hookScript: resources?.kiroHook ?? join(repository, 'scripts/kiro-hook.mjs'),
+      })
     server = createLocalServer({
       application,
       runtime,
@@ -477,6 +498,7 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
       ...(coreOnly ? { runStartDisabledCode: 'NATIVE_RUNTIME_NOT_ATTACHED' as const } : {}),
       isClosing: () => closing,
       resultLauncher: result,
+      ...(kiroBindings ? { kiroBindings } : {}),
     })
     await new Promise<void>((done, reject) => {
       server?.once('error', reject)
@@ -485,6 +507,7 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
     const address = server.address()
     if (address === null || typeof address === 'string') throw new Error('LISTEN_FAILED')
     const baseUrl = `http://127.0.0.1:${address.port}`
+    listeningBaseUrl = baseUrl
     localAgents?.setBaseUrl(baseUrl)
     nativeRelay?.setBaseUrl(baseUrl)
     const nextDescriptorPath = `${descriptorPath}.${instanceId}.tmp`
@@ -590,6 +613,8 @@ try {
   else if (command === 'core-only') await start(true)
   else if (command === 'native') await start(false, true)
   else if (command === 'managed' && packaged) await start(false, true, true)
+  else if (command === 'kiro-native' && !packaged) await start(false, false, false, true)
+  else if (command === 'managed-kiro' && packaged) await start(false, false, true, true)
   else throw new Error('UNKNOWN_COMMAND')
 } catch (error) {
   // Diagnostics do not print provider stderr, absolute credential paths or raw payloads.
