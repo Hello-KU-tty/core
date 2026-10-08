@@ -91,6 +91,14 @@ export const builderGetDecisionResultQuerySchema = z.strictObject({
   decisionId: decisionIdSchema,
 })
 
+/** Small Builder read for chat hosts: revisions and the Decisions still waiting on someone. */
+export const builderGetBuildStatusQuerySchema = z.strictObject({
+  ...builderQueryMetadata,
+  kind: z.literal('BUILDER_GET_BUILD_STATUS'),
+  projectId: projectIdSchema,
+  taskId: taskIdSchema,
+})
+
 export const helperGetContextQuerySchema = z.strictObject({
   ...helperQueryMetadata,
   kind: z.literal('HELPER_GET_CONTEXT'),
@@ -350,6 +358,7 @@ export const discoveryAgentRequestSchema = z.discriminatedUnion('kind', [
 export const builderAgentRequestSchema = z.discriminatedUnion('kind', [
   builderGetTaskQuerySchema,
   builderGetDecisionResultQuerySchema,
+  builderGetBuildStatusQuerySchema,
   builderStartTaskCommandSchema,
   builderUpdateLiveContextCommandSchema,
   builderRequestDecisionCommandSchema,
@@ -376,6 +385,7 @@ export const agentRequestSchema = z.discriminatedUnion('kind', [
   discoverySubmitLearningSpecCommandSchema,
   builderGetTaskQuerySchema,
   builderGetDecisionResultQuerySchema,
+  builderGetBuildStatusQuerySchema,
   builderStartTaskCommandSchema,
   builderUpdateLiveContextCommandSchema,
   builderRequestDecisionCommandSchema,
@@ -480,6 +490,35 @@ export const episodeContextSchema = z.strictObject({
     .nullable(),
 })
 
+export const buildStatusSchema = z.strictObject({
+  schemaVersion: schemaVersionSchema,
+  correlationId: correlationIdSchema,
+  task: z.strictObject({
+    id: taskIdSchema,
+    title: labelSchema,
+    status: builderTaskSchema.shape.status,
+    revision: entityRevisionSchema,
+  }),
+  contextVersion: z.int().nonnegative(),
+  openDecisions: z
+    .array(
+      z.strictObject({
+        decisionId: decisionIdSchema,
+        question: nonEmptyTextSchema,
+        state: z.enum(['AWAITING_LEARNER', 'RESOLVED_NOT_APPLIED']),
+        options: z
+          .array(z.strictObject({ number: z.int().min(1).max(6), label: labelSchema }))
+          .min(2)
+          .max(6),
+        recommendedOptionNumber: z.int().min(1).max(6),
+        resolvedOptionNumber: z.int().min(1).max(6).optional(),
+        requestedAt: utcTimestampSchema,
+      }),
+    )
+    .max(10),
+  omittedOpenDecisionCount: z.int().nonnegative(),
+})
+
 export const decisionResultSchema = z.strictObject({
   schemaVersion: schemaVersionSchema,
   correlationId: correlationIdSchema,
@@ -516,5 +555,6 @@ export type HelperSourceExcerpt = z.infer<typeof helperSourceExcerptSchema>
 export type HelperReferenceDetail = z.infer<typeof helperReferenceDetailSchema>
 export type EpisodeContext = z.infer<typeof episodeContextSchema>
 export type DecisionResult = z.infer<typeof decisionResultSchema>
+export type BuildStatus = z.infer<typeof buildStatusSchema>
 export type DecisionCommandReceipt = z.infer<typeof decisionCommandReceiptSchema>
 export type CommandReceipt = z.infer<typeof commandReceiptSchema>

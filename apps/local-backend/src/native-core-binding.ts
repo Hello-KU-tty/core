@@ -15,6 +15,7 @@ const NATIVE_TOOLS: Partial<Record<AgentRole, readonly string[]>> = {
   ],
   BUILDER: [
     'get_builder_task',
+    'get_build_status',
     'start_task',
     'update_build_context',
     'request_user_decision',

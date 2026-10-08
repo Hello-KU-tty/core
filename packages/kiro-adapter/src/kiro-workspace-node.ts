@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import type { BuilderTask, LearningSpecRevision, Project, UiRequest } from '@vibe-helper/contracts'
 
 /** Kiro-native intervention files are versioned so an installer can recognise its own output. */
-export const KIRO_NATIVE_STEERING_VERSION = '0.2.0'
+export const KIRO_NATIVE_STEERING_VERSION = '0.3.0'
 export const KIRO_MCP_SERVER_NAME = 'vibe-helper'
 export const KIRO_HOOK_FILE = '.kiro/hooks/vibe-helper.json'
 export const KIRO_LEARNER_STEERING_FILE = '.kiro/steering/vibe-helper-learner.md'
@@ -284,7 +284,7 @@ Call the \`${KIRO_MCP_SERVER_NAME}\` MCP tools with exactly these values:
 - taskId: \`${binding.taskId}\`
 - correlationId: \`${binding.correlationId}\`
 
-Read \`get_builder_task\` when a tool needs the current \`expectedTaskRevision\` (task revision), \`expectedContextVersion\` (Live Context version) or the open Decisions. The task is already started; call \`start_task\` only if its status is PENDING.
+Use \`get_build_status\` for the current \`expectedTaskRevision\` (task revision), \`expectedContextVersion\` (context version) and the Decisions still waiting, with their option numbers. Call \`get_builder_task\` only when you need the full Learning Spec. The task is already started; call \`start_task\` only if its status is PENDING.
 
 Every write call needs a new \`idempotencyKey\`: \`idem_\` followed by a lowercase UUID v4 that you write yourself, shaped \`xxxxxxxx-xxxx-4xxx-Yxxx-xxxxxxxxxxxx\` where x is 0-9 or a-f and Y is 8, 9, a or b (for example \`idem_5f0c2a9e-3b1d-4c7e-9a42-6d8e1f0b7c33\`). Never run a command to generate it.
 

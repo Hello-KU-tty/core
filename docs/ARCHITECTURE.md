@@ -448,6 +448,7 @@ Discovery Agent:
 Builder Agent:
 
 - `get_builder_task`
+- `get_build_status`: 본선 Kiro-native 경로의 작은 조회. Task revision, Live Context 버전, 아직 학습자를 기다리거나 적용되지 않은 Decision(번호 붙은 선택지)만 돌려준다. 큰 도구 응답이 파일로 빠져 Agent가 셸로 읽으려는 문제를 막는다
 - `start_task`
 - `update_build_context`
 - `request_user_decision`

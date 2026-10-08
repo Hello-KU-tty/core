@@ -142,6 +142,7 @@ describe('Kiro-native workspace adapter', () => {
     expect(learner.startsWith('---\ninclusion: always\n---')).toBe(true)
     for (const value of Object.values(binding)) expect(learner).toContain(value)
     expect(learner).toContain('resolve_decision_from_chat')
+    expect(learner).toContain('get_build_status')
     expect(learner).toContain('#[[file:.vibe-helper/learner-profile.md]]')
     const helper = renderHelperSteering()
     expect(helper.startsWith('---\ninclusion: manual\n---')).toBe(true)

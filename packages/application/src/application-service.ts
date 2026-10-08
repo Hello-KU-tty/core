@@ -18,8 +18,10 @@ import {
   type BuilderSessionBindingDescriptor,
   type BuilderTask,
   type BuilderTaskContext,
+  type BuildStatus,
   builderSessionBindingDescriptorSchema,
   builderTaskContextSchema,
+  buildStatusSchema,
   type CandidateRound,
   type CanonicalConcept,
   type ChatMessageReceipt,
@@ -127,6 +129,7 @@ export type AgentApplicationResponse =
   | DiscoveryContext
   | BuilderTaskContext
   | DecisionResult
+  | BuildStatus
   | DecisionCommandReceipt
   | HelperContext
   | EpisodeContext
@@ -383,6 +386,8 @@ export class ApplicationService {
         return this.#getBuilderTask(request)
       case 'BUILDER_GET_DECISION_RESULT':
         return this.#getDecisionResult(request)
+      case 'BUILDER_GET_BUILD_STATUS':
+        return this.#getBuildStatus(request)
       case 'BUILDER_START_TASK':
         return this.#startTask(request)
       case 'BUILDER_UPDATE_LIVE_CONTEXT':
@@ -2623,6 +2628,51 @@ export class ApplicationService {
         },
       ),
     )
+  }
+
+  #getBuildStatus(
+    request: Extract<AgentRequest, { kind: 'BUILDER_GET_BUILD_STATUS' }>,
+  ): BuildStatus {
+    const aggregate = this.#storage.transaction((repository) =>
+      repository.readBuilderTaskAggregate(request.projectId, request.taskId),
+    )
+    if (aggregate === null) throw this.#notFound(request.correlationId, 'BUILDER_TASK_NOT_FOUND')
+    const applied = new Set(aggregate.decisionApplications.map((item) => item.decisionId))
+    const open = aggregate.decisionRequests
+      .filter((decision) => !applied.has(decision.id))
+      .sort((left, right) => Date.parse(right.requestedAt) - Date.parse(left.requestedAt))
+    const numberOf = (decision: (typeof open)[number], optionId: string | undefined) =>
+      decision.options.findIndex((option) => option.id === optionId) + 1
+    return buildStatusSchema.parse({
+      schemaVersion: 1,
+      correlationId: request.correlationId,
+      task: {
+        id: aggregate.task.id,
+        title: aggregate.task.title,
+        status: aggregate.task.status,
+        revision: aggregate.task.revision,
+      },
+      contextVersion: aggregate.liveContext?.contextVersion ?? 0,
+      openDecisions: open.slice(0, 10).map((decision) => {
+        const resolution = aggregate.decisionResolutions.find(
+          (item) => item.decisionId === decision.id,
+        )
+        const resolvedNumber = numberOf(decision, resolution?.selectedOptionId)
+        return {
+          decisionId: decision.id,
+          question: decision.question,
+          state: resolution === undefined ? 'AWAITING_LEARNER' : 'RESOLVED_NOT_APPLIED',
+          options: decision.options.map((option, index) => ({
+            number: index + 1,
+            label: option.label,
+          })),
+          recommendedOptionNumber: numberOf(decision, decision.recommendedOptionId),
+          ...(resolvedNumber > 0 ? { resolvedOptionNumber: resolvedNumber } : {}),
+          requestedAt: decision.requestedAt,
+        }
+      }),
+      omittedOpenDecisionCount: Math.max(0, open.length - 10),
+    })
   }
 
   #getDecisionResult(

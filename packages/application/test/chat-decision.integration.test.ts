@@ -333,4 +333,52 @@ describe('Kiro-native chat Evidence and chat Decision resolution', () => {
       }),
     ).toMatchObject({ success: false, error: { code: 'DECISION_CHAT_SOURCE_NOT_ALLOWED' } })
   })
+
+  it('reports a small build status with numbered open Decisions for chat hosts', async () => {
+    const { service, sendChat, requestDecision, resolveFromChat } = await createHarness()
+    const status = () =>
+      service.executeAgent('BUILDER', {
+        schemaVersion: 1,
+        kind: 'BUILDER_GET_BUILD_STATUS',
+        correlationId: ids.correlation,
+        actor: { kind: 'AGENT', role: 'BUILDER' },
+        projectId: ids.project,
+        taskId: ids.task,
+      })
+    expect(await status()).toMatchObject({
+      success: true,
+      data: { task: { status: 'ACTIVE' }, contextVersion: 1, openDecisions: [] },
+    })
+    expect(await requestDecision()).toMatchObject({ success: true })
+    const awaiting = await status()
+    expect(awaiting).toMatchObject({
+      success: true,
+      data: {
+        openDecisions: [
+          {
+            decisionId: ids.decision,
+            state: 'AWAITING_LEARNER',
+            options: [
+              { number: 1, label: '1 hour' },
+              { number: 2, label: '24 hours' },
+            ],
+            recommendedOptionNumber: 2,
+          },
+        ],
+        omittedOpenDecisionCount: 0,
+      },
+    })
+    expect(JSON.stringify(awaiting).length).toBeLessThan(2_048)
+    expect(await sendChat('2번으로 하자')).toMatchObject({ success: true })
+    expect(
+      await resolveFromChat({
+        selection: { kind: 'OPTION', optionNumber: 2 },
+        citedUserMessages: [{ quote: '2번으로 하자' }],
+      }),
+    ).toMatchObject({ success: true })
+    expect(await status()).toMatchObject({
+      success: true,
+      data: { openDecisions: [{ state: 'RESOLVED_NOT_APPLIED', resolvedOptionNumber: 2 }] },
+    })
+  })
 })

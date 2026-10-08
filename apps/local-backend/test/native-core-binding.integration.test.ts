@@ -159,6 +159,7 @@ describe('experimental native Core binding', () => {
       const listed = await client.listTools()
       expect(listed.tools.map((tool) => tool.name)).toEqual([
         'get_builder_task',
+        'get_build_status',
         'start_task',
         'update_build_context',
         'request_user_decision',

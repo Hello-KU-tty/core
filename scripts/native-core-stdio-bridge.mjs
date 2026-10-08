@@ -43,6 +43,7 @@ const ROLE_TOOLS = {
   ],
   BUILDER: [
     'get_builder_task',
+    'get_build_status',
     'start_task',
     'update_build_context',
     'request_user_decision',

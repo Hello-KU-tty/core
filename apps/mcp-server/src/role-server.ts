@@ -16,6 +16,7 @@ import {
   builderApplyDecisionToolInputSchema,
   builderCompleteTaskCommandSchema,
   builderCompleteTaskToolInputSchema,
+  builderGetBuildStatusQuerySchema,
   builderGetDecisionResultQuerySchema,
   builderGetTaskQuerySchema,
   builderRequestDecisionCommandSchema,
@@ -151,6 +152,14 @@ export const ROLE_TOOL_CATALOG: Readonly<Record<AgentRole, readonly RoleToolDefi
       title: 'Get Builder Task',
       description: 'Read the current validated Builder Task aggregate.',
       inputSchema: builderGetTaskQuerySchema,
+      readOnly: true,
+    },
+    {
+      name: 'get_build_status',
+      title: 'Get build status',
+      description:
+        'Read a small summary: task revision, Live Context version and the Decisions still awaiting the learner or not yet applied, with numbered options.',
+      inputSchema: builderGetBuildStatusQuerySchema,
       readOnly: true,
     },
     {
