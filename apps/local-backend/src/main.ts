@@ -594,7 +594,7 @@ try {
     currentCoreRuntime()
     resources = await loadCoreResources(resolve(dirname(fileURLToPath(import.meta.url)), '..'))
     if (!args.includes('--root')) throw new Error('PACKAGED_PRIVATE_ROOT_REQUIRED')
-    if (!['init', 'native', 'managed', 'core-only', 'recover'].includes(command))
+    if (!['init', 'native', 'managed', 'managed-kiro', 'core-only', 'recover'].includes(command))
       throw new Error('PACKAGED_COMMAND_UNSUPPORTED')
     const assetPath = resources.root.toLowerCase()
     const dataPath = root.toLowerCase()

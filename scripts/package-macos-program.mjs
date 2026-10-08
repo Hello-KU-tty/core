@@ -25,12 +25,27 @@ const extension = join(stage, 'extension')
 await mkdir(extension, { recursive: true })
 await cp(portable.root, join(extension, 'portable'), { recursive: true })
 await cp(join(program, 'media'), join(extension, 'media'), { recursive: true })
+// Kiro-native host (finals): the host registers `vibeHelper.openInKiro`, so the manifest
+// gains that command here without requiring a frontend checkout change.
+const hostCommands = [
+  { command: 'vibeHelper.openInKiro', title: 'Vibe Helper: Open Project in Kiro Chat' },
+]
 const pkg = {
   ...product,
-  version: '0.1.4',
+  version: '0.2.0',
   displayName: 'Hello Vibe',
-  description: 'Kiro 1.1.70 extension for Apple Silicon Mac with local Core.',
+  description:
+    'Kiro-native Vibe Helper for Apple Silicon Mac: local Core, kiro-cli Agents and Kiro chat hooks.',
   engines: { vscode: '^1.131.0' },
+  contributes: {
+    ...product.contributes,
+    commands: [
+      ...(product.contributes?.commands ?? []).filter(
+        (entry) => !hostCommands.some((host) => host.command === entry.command),
+      ),
+      ...hostCommands,
+    ],
+  },
 }
 delete pkg.scripts
 delete pkg.devDependencies

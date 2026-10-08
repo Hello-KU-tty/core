@@ -43,10 +43,10 @@ function harness(options = {}) {
     },
     isLockOwnerAlive: async () => true,
   }
-  const spawn = (executable, args, options) => {
+  const spawn = (executable, args, spawnOptions) => {
     assert.equal(executable, selected.runtime.executable)
-    assert.ok(args.includes('managed'))
-    assert.equal(options.detached, true)
+    assert.ok(args.includes(options.command ?? 'managed'))
+    assert.equal(spawnOptions.detached, true)
     launches.push({ executable, args })
     lock = { pid: 6789, instanceId: replacementInstance, packageHash, runtimeIdentity: identity }
     const child = new EventEmitter()
@@ -74,6 +74,7 @@ function harness(options = {}) {
     },
   })
   const manager = module.exports.createCoreLifecycle({ api, storagePath: '/private/synthetic',
+    ...(options.command ? { command: options.command, launchArgs: options.launchArgs } : {}),
     selectRuntime: async () => { preparations++; return selected },
     connect: async () => {
       connects++
@@ -145,6 +146,23 @@ test('same-content new installation starts after the old owner exits without old
     assert.ok(h.statuses.some(value => value.errorCode === 'CORE_UPDATE_WAITING_FOR_OWNER_EXIT'))
     assert.doesNotMatch(JSON.stringify(h.statuses), /verified|private|synthetic-secret/)
   } finally { await h.manager.dispose() }
+})
+
+test('Kiro-native host launches managed-kiro with its kiro-cli path as a shared Core', async () => {
+  const h = harness({ owner: { runtimeIdentity: otherIdentity }, expireAt: 6000,
+    command: 'managed-kiro', launchArgs: () => ['--kiro-cli', '/verified/kiro-cli'] })
+  try {
+    await h.manager.start()
+    assert.equal(h.launches.length, 1)
+    const { args } = h.launches[0]
+    assert.equal(args[1], 'managed-kiro')
+    assert.equal(JSON.stringify(args.slice(-2)), JSON.stringify(['--kiro-cli', '/verified/kiro-cli']))
+    assert.equal(h.manager.getStatus().ownership, 'OWNED')
+  } finally { await h.manager.dispose() }
+})
+
+test('an unknown Core command is rejected before any launch', () => {
+  assert.throws(() => harness({ command: 'start' }), /CORE_COMMAND_INVALID/)
 })
 
 for (const invalid of ['', ['1'.repeat(64)], 123, 'bad']) test(`invalid owner identity fails closed ${JSON.stringify(invalid)}`, async () => {

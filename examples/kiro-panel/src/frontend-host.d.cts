@@ -9,7 +9,7 @@ export interface HostStatus {
   native: 'NOT_READY' | 'WORKER_READY' | 'UNAVAILABLE'
   nativeErrorCode?: string | null
   errorCode?: string | null
-  helperMode?: 'SEPARATE_WINDOW'
+  helperMode?: 'SEPARATE_WINDOW' | 'KIRO_CLI'
   restoreRequired?: boolean
 }
 export interface NativeQuestion {
@@ -60,6 +60,13 @@ export interface FrontendHost {
   subscribeStatus(listener: (status: HostStatus) => void): () => void
   onDidRotate(listener: (event: { generation: number; backendInstanceId: string; previousBackendInstanceId: string }) => void): () => void
   worker: NativeWorker
+  /**
+   * Kiro-native: connects the Project's generated folder to Core (Steering, hooks, MCP, Spec)
+   * and opens it in a new Kiro window unless it is already this window's only folder.
+   * Rejects with a code such as `KIRO_BIND_TASK_NOT_READY` (no confirmed Spec or Task yet).
+   * Also available as the `vibeHelper.openInKiro` command.
+   */
+  openProjectInKiro(projectId: string): Promise<{ projectId: string; taskId: string; openedNewWindow: boolean }>
   dispose(): Promise<void>
 }
 export function createFrontendHost(context: {
