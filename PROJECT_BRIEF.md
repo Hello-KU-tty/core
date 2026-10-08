@@ -303,6 +303,7 @@ MVP 필수:
 
 ### 대회 이후 확장
 
+- 채팅 밖 Agent 실행기의 LLM API 어댑터(초보자 설치·로그인 부담 제거). 본선은 kiro-cli 실행기를 쓴다
 - Claude Code와 Codex adapter
 - 기존 프로젝트 import
 - 다언어 project runtime

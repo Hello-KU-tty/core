@@ -1,5 +1,13 @@
 # 결정 기록
 
+## 본선: 채팅 밖 Agent는 kiro-cli로 실행하고, 실행기는 어댑터로 교체 가능하게 둔다
+
+- **맥락:** Kiro-native 구조에서 Builder는 사용자의 Kiro 채팅이지만 Discovery, 패널 Helper, Evidence Analyst는 채팅 밖에서 돌아야 한다. 예선 제품의 IDE 내부 실행기는 비공개 Agent 연결부와 Kiro 설치본의 정확한 버전·해시 고정에 의존해, 현재 Kiro 1.2.4와 자동 갱신되는 Agent 확장(실측 중 1.1.237→1.1.294)에서 거절되거나 다시 깨질 수 있다. kiro-cli는 IDE에 포함되지 않는 별도 앱이고 로그인도 따로다.
+- **결정:** 본선에서는 Core의 기존 kiro-cli ACP 실행기(`LocalAgentHost`, 역할별 `agents/vibe-helper-*.json`)로 채팅 밖 Agent를 돌린다. 사용자는 처음 한 번 kiro-cli 설치와 로그인을 한다. 같은 Kiro 구독 크레딧을 쓰는 이점이 있다.
+- **교체 가능성 확인:** Core 실행 계층(`packages/runtime`)은 `WorkflowAgentPort.invoke()`만 알고, kiro-cli 구현(`LocalAgentHost`)과 예선 IDE 내부 구현(`NativeAgentRelay`)이 같은 포트를 구현한다. 역할 결과는 역할별 Core MCP 도구로 제출되고 Core가 검증한다. 따라서 LLM API 실행기는 같은 포트를 구현하고 역할 프롬프트와 MCP 도구 호출 루프만 담당하면 되며 Core·계약·MCP는 바꾸지 않는다. 남는 정리 거리: 이벤트 타입 이름(`KiroAcpEvent`)의 Kiro 표기, 역할 프롬프트가 Kiro Agent JSON에 들어 있는 형식.
+- **실측:** kiro-cli 2.28.0의 `acp`가 initialize에 protocolVersion 1, HTTP MCP 지원으로 응답했다(모델 호출 없음). 개인 계정 로그인 뒤 실제 Analyst 실행은 남은 확인이다.
+- **대회 이후:** 초보자 제품화에서는 설치·로그인 부담을 없애는 LLM API 실행기를 어댑터로 추가하는 방안을 검토한다. 구독만으로 쓰는 이점은 CLI, 사용자 편의는 API가 크다. MVP 범위의 Bedrock 제외 결정은 그대로다.
+
 ## 본선: 채팅 Decision 확정과 생성 workspace 재사용
 
 - **맥락:** K01 spike에서 Agent가 MCP로 Decision을 요청하고 사용자가 채팅에서 이유와 함께 답하는 흐름을 확인했다. 사용자는 Decision이 Kiro 채팅 안에서 끝나는 방식(A)을 골랐다. Core가 확정하려면 선택지가 필요하지만 사용자 답은 자연어다.
