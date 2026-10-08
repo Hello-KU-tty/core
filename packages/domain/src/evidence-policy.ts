@@ -354,8 +354,20 @@ export function evaluateEvidenceProposal(
         'A justified Decision requires stored user-authored rationale.',
       )
     }
+    // A chat-resolved Decision also counts the learner's own cited chat messages in this
+    // Episode: the rationale quote is short, while the topic is usually earlier in the message.
     const citedDecisionTexts = reasonedResolutionContexts
-      .flatMap(({ resolution }) => [resolution.rationale, resolution.customProposal])
+      .flatMap(({ resolution }) => [
+        resolution.rationale,
+        resolution.customProposal,
+        ...episodeEvents.flatMap((event) =>
+          event.actor.kind === 'USER' &&
+          event.payload.type === 'USER_MESSAGE' &&
+          resolution.chatSource?.userMessageIds.includes(event.payload.messageId)
+            ? [event.payload.redactedExcerpt]
+            : [],
+        ),
+      ])
       .filter((text): text is string => text !== undefined)
     if (
       !citedDecisionTexts.some((text) => text.includes(proposal.concept.originalExpression)) ||
@@ -364,7 +376,7 @@ export function evaluateEvidenceProposal(
       return rejectEvidence(
         input,
         'INVALID_REFERENCE',
-        'Quoted Evidence and the original Concept expression must occur in the cited user Decision rationale or custom proposal.',
+        'Quoted Evidence and the original Concept expression must occur in the cited user Decision rationale, custom proposal or cited chat message.',
       )
     }
   }

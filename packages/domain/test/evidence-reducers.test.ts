@@ -129,6 +129,87 @@ describe('Evidence acceptance policy', () => {
     expect(result.decision.reasonCode).toBe('INVALID_REFERENCE')
   })
 
+  describe('chat-resolved Decisions', () => {
+    const chatMessageId = 'message_00000000-0000-4000-8000-000000000071'
+    const chatMessageEvent = {
+      ...activityEventFixture,
+      id: 'event_00000000-0000-4000-8000-000000000072',
+      decisionId: ids.decision,
+      payload: {
+        type: 'USER_MESSAGE' as const,
+        conversationId: ids.conversation,
+        messageId: chatMessageId,
+        redactedExcerpt: '아까 공유 링크 만료 시간 말인데 하루로 하자. 집에서 받을 때도 있어서',
+      },
+      sourceReferences: [
+        {
+          kind: 'USER_MESSAGE' as const,
+          conversationId: ids.conversation,
+          messageId: chatMessageId,
+        },
+      ],
+    }
+    const chatResolution = {
+      ...decisionResolutionFixture,
+      rationale: '집에서 받을 때도 있어서',
+      chatSource: { mappedBy: 'BUILDER' as const, userMessageIds: [chatMessageId] },
+    }
+    const chatProposal = {
+      ...reasonedDecisionProposal,
+      concept: { ...reasonedDecisionProposal.concept, originalExpression: '공유 링크 만료 시간' },
+      redactedEvidenceExcerpt: '공유 링크 만료 시간 말인데 하루로 하자',
+    }
+    const episode = {
+      ...episodeFixture,
+      eventIds: [chatMessageEvent.id, reasonedDecisionEvent.id],
+    }
+
+    it('accepts quotes from the learner chat message the resolution cites', () => {
+      const result = evaluate(chatProposal, {
+        episode,
+        events: [chatMessageEvent, reasonedDecisionEvent],
+        decisionResolutions: [chatResolution],
+      })
+      expect(result.outcome).toBe('ACCEPTED')
+    })
+
+    it('keeps rejecting the same quotes when the resolution has no chat source', () => {
+      const { chatSource: _ignored, ...uiResolution } = chatResolution
+      const result = evaluate(chatProposal, {
+        episode,
+        events: [chatMessageEvent, reasonedDecisionEvent],
+        decisionResolutions: [uiResolution],
+      })
+      expect(result.outcome).toBe('REJECTED')
+      expect(result.decision.reasonCode).toBe('INVALID_REFERENCE')
+    })
+
+    it('rejects when the cited chat message is not part of the Episode', () => {
+      const result = evaluate(chatProposal, {
+        episode: { ...episodeFixture, eventIds: [reasonedDecisionEvent.id] },
+        events: [chatMessageEvent, reasonedDecisionEvent],
+        decisionResolutions: [chatResolution],
+      })
+      expect(result.outcome).toBe('REJECTED')
+      expect(result.decision.reasonCode).toBe('INVALID_REFERENCE')
+    })
+
+    it('rejects a reordered quote that is not verbatim in the learner message', () => {
+      const result = evaluate(
+        {
+          ...chatProposal,
+          redactedEvidenceExcerpt: '하루로 하자. 아까 공유 링크 만료 시간 말인데',
+        },
+        {
+          episode,
+          events: [chatMessageEvent, reasonedDecisionEvent],
+          decisionResolutions: [chatResolution],
+        },
+      )
+      expect(result.outcome).toBe('REJECTED')
+    })
+  })
+
   it('rejects JUSTIFIED_DECISION when its quotes are absent from the stored user reason', () => {
     const result = evaluate(
       {

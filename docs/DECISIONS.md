@@ -1,5 +1,11 @@
 # 결정 기록
 
+## 본선: 채팅 확정 Decision의 판단 근거 Evidence와 kiro-cli 버전 범위
+
+- **맥락:** kiro-cli 2.28 Analyst로 실제 채팅 확정 Decision Episode를 분석했더니 JUSTIFIED_DECISION 제안이 거절됐다. 원인은 둘이다. Analyst가 학습자 문장의 순서를 바꿔 인용했고(정당한 거절), 규칙이 개념 표현을 확정 이유 문장 안에서만 찾았다. 채팅 확정의 이유는 "1시간은 짧아" 같은 짧은 원문 구절이라 개념 표현("공유 링크 만료 시간")은 같은 메시지의 앞부분에 있다.
+- **결정:** 확정 이유가 있고 `chatSource`가 있는 Decision에 한해, 확정 기록이 인용한 학습자 채팅 메시지 중 같은 Episode에 있는 USER `USER_MESSAGE` 원문도 개념 표현과 인용의 근거 텍스트로 인정한다. 글자 그대로 일치해야 하는 조건, 출처 USER, Episode 범위, 확정 이유 필수 조건은 그대로다. UI 확정 Decision의 규칙은 바뀌지 않는다.
+- **kiro-cli 버전:** Core 일반 모드의 kiro-cli 확인을 정확히 2.21.1에서 2.21.1 이상 2.x로 넓혔다. 2.28.0에서 ACP initialize와 실제 Analyst 1회(SUCCEEDED, 약 8초)를 확인했다. 3.x는 별도 확인 전까지 거절한다.
+
 ## 본선: 채팅 밖 Agent는 kiro-cli로 실행하고, 실행기는 어댑터로 교체 가능하게 둔다
 
 - **맥락:** Kiro-native 구조에서 Builder는 사용자의 Kiro 채팅이지만 Discovery, 패널 Helper, Evidence Analyst는 채팅 밖에서 돌아야 한다. 예선 제품의 IDE 내부 실행기는 비공개 Agent 연결부와 Kiro 설치본의 정확한 버전·해시 고정에 의존해, 현재 Kiro 1.2.4와 자동 갱신되는 Agent 확장(실측 중 1.1.237→1.1.294)에서 거절되거나 다시 깨질 수 있다. kiro-cli는 IDE에 포함되지 않는 별도 앱이고 로그인도 따로다.
