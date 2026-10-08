@@ -70,6 +70,8 @@ export class LocalAgentHost implements WorkflowAgentPort {
       guardPath: string
       executable: string
       model: string
+      /** Per-role model overrides; roles without one use `model`. */
+      roleModels?: Partial<Record<'DISCOVERY' | 'BUILDER' | 'HELPER' | 'EVIDENCE_ANALYST', string>>
       /** Kiro-native mode: the Builder is the learner's own Kiro chat, never a CLI run. */
       builderInHostChat?: boolean
     },
@@ -162,7 +164,7 @@ export class LocalAgentHost implements WorkflowAgentPort {
           name,
           description: `Local ${role} run`,
           prompt: original.prompt,
-          model: this.options.model,
+          model: this.options.roleModels?.[role] ?? this.options.model,
           includeMcpJson: false,
           resources: [],
           tools: toolList,
@@ -194,7 +196,7 @@ export class LocalAgentHost implements WorkflowAgentPort {
         executable: this.options.executable,
         cwd,
         agent: name,
-        model: this.options.model,
+        model: this.options.roleModels?.[role] ?? this.options.model,
         onEvent: request.onEvent,
         signal: request.signal,
         // Keep package-manager cache writes out of the developer's global cache.

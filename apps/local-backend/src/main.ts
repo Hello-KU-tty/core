@@ -49,6 +49,9 @@ const allowed = new Set([
   '--port',
   '--kiro-cli',
   '--model',
+  '--discovery-model',
+  '--helper-model',
+  '--analyst-model',
   '--live',
   '--native-role',
   '--native-project-id',
@@ -400,6 +403,15 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
             executable,
             model,
             builderInHostChat: args.includes('--kiro-hooks'),
+            roleModels: {
+              ...(option('--discovery-model', '')
+                ? { DISCOVERY: option('--discovery-model', '') }
+                : {}),
+              ...(option('--helper-model', '') ? { HELPER: option('--helper-model', '') } : {}),
+              ...(option('--analyst-model', '')
+                ? { EVIDENCE_ANALYST: option('--analyst-model', '') }
+                : {}),
+            },
           })
     nativeRelay = nativeMode
       ? new NativeAgentRelay({
