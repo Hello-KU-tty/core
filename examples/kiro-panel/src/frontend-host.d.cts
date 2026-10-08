@@ -61,12 +61,20 @@ export interface FrontendHost {
   onDidRotate(listener: (event: { generation: number; backendInstanceId: string; previousBackendInstanceId: string }) => void): () => void
   worker: NativeWorker
   /**
-   * Kiro-native: connects the Project's generated folder to Core (Steering, hooks, MCP, Spec)
-   * and opens it in a new Kiro window unless it is already this window's only folder.
-   * Rejects with a code such as `KIRO_BIND_TASK_NOT_READY` (no confirmed Spec or Task yet).
-   * Also available as the `vibeHelper.openInKiro` command.
+   * Kiro-native: connects the Project to Kiro chat (Steering, hooks, MCP, Helper agent, Spec).
+   * An empty open folder becomes the Project folder in this window (`REGISTERED`). A folder with
+   * other files asks the learner, then opens a Core-generated folder in a new window
+   * (`GENERATED`); declining returns `CANCELLED`. The first call asks once whether Kiro may run
+   * Vibe Helper's Core tools without prompting. Rejects with a code such as
+   * `KIRO_BIND_TASK_NOT_READY`. Also available as the `vibeHelper.openInKiro` command.
    */
-  openProjectInKiro(projectId: string): Promise<{ projectId: string; taskId: string; openedNewWindow: boolean }>
+  openProjectInKiro(projectId: string): Promise<{
+    projectId: string
+    taskId: string | null
+    openedNewWindow: boolean
+    folder: 'REGISTERED' | 'GENERATED' | 'CANCELLED'
+    coreTools?: 'WRITTEN' | 'ALREADY_ALLOWED' | 'UNRECOGNIZED' | 'NOT_REQUESTED'
+  }>
   dispose(): Promise<void>
 }
 export function createFrontendHost(context: {

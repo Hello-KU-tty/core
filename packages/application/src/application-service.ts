@@ -4875,7 +4875,18 @@ export class ApplicationService {
         'Generated result is not ready to launch.',
       )
     }
-    await this.#workspacePolicy.resolveProjectWorkspace(result.project, request.correlationId)
+    const resultWorkspace = await this.#workspacePolicy.resolveProjectWorkspace(
+      result.project,
+      request.correlationId,
+    )
+    // The result launcher runs only Core-generated folders; a registered folder runs in its host.
+    if (!this.#workspacePolicy.isGeneratedWorkspace(resultWorkspace)) {
+      throw this.#validationError(
+        request.correlationId,
+        'RESULT_RUN_REQUIRES_GENERATED_WORKSPACE',
+        'This Project runs in its registered folder; start it from that folder instead.',
+      )
+    }
     return generatedResultDescriptorSchema.parse({
       schemaVersion: 1,
       correlationId: request.correlationId,

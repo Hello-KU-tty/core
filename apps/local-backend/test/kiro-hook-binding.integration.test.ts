@@ -1,4 +1,4 @@
-import { mkdtemp, readFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ApplicationService, WorkspacePathPolicy } from '@vibe-helper/application'
@@ -13,7 +13,10 @@ import {
   projectCandidateRevisionSchema,
   projectSchema,
 } from '@vibe-helper/contracts'
-import { kiroConversationId } from '@vibe-helper/kiro-adapter/kiro-workspace-node'
+import {
+  kiroConversationId,
+  kiroSessionsDirectory,
+} from '@vibe-helper/kiro-adapter/kiro-workspace-node'
 import { openInMemorySqliteStorage } from '@vibe-helper/storage-sqlite'
 import { describe, expect, it } from 'vitest'
 import {
@@ -31,7 +34,7 @@ import {
 } from '../../../packages/contracts/test/fixtures.js'
 import { createKiroHookBinding } from '../src/kiro-hook-binding.js'
 
-const setup = async () => {
+const setup = async (paths: { workspace?: string; homeDirectory?: string } = {}) => {
   const storage = await openInMemorySqliteStorage()
   storage.transaction((repository) => {
     repository.appendProject(projectSchema.parse(projectFixture))
@@ -52,6 +55,7 @@ const setup = async () => {
   const binding = createKiroHookBinding({
     application,
     binding: { projectId: ids.project, taskId: ids.task, correlationId: ids.correlation },
+    ...paths,
   })
   const post = (body: unknown, authorization = binding.authorization) =>
     binding.handler.fetch(
@@ -197,5 +201,78 @@ describe('Kiro hook binding', () => {
     expect(await prompt('sess_a', '계속 해줘')).not.toHaveProperty('context')
     expect(await prompt('sess_b', '새 세션이야')).not.toHaveProperty('context')
     binding.revoke()
+  })
+
+  it("adds the Builder tab's live activity to a Helper tab question, not to the Builder's own", async () => {
+    const base = await realpath(await mkdtemp(join(tmpdir(), 'vibe-kiro-activity-')))
+    const workspace = join(base, 'memo app')
+    const homeDirectory = join(base, 'home')
+    await mkdir(workspace)
+    const builderSession = 'sess_00000000-0000-4000-8000-0000000000aa'
+    const helperSession = 'sess_00000000-0000-4000-8000-0000000000bb'
+    const sessions = kiroSessionsDirectory(homeDirectory, workspace)
+    const writeSession = async (id: string, agentMode: string, records: unknown[]) => {
+      await mkdir(join(sessions, id), { recursive: true })
+      await writeFile(join(sessions, id, 'session.json'), JSON.stringify({ id, agentMode }))
+      await writeFile(
+        join(sessions, id, 'messages.jsonl'),
+        records
+          .map((payload, index) =>
+            JSON.stringify({ id: `r${index}`, timestamp: `2026-10-08T17:10:0${index}Z`, payload }),
+          )
+          .join('\n'),
+      )
+    }
+    await writeSession(builderSession, 'vibe', [
+      { type: 'user', content: '메모 API 만들어줘' },
+      { type: 'turn_start' },
+      {
+        type: 'assistant',
+        operationType: 'Say',
+        content: `메모 라우터를 ${workspace}/src/memo.ts 에 만들게요.`,
+      },
+      { type: 'tool_call', title: 'Write src/memo.ts', status: 'completed' },
+    ])
+    await writeSession(helperSession, 'vibe-helper', [{ type: 'user', content: 'x' }])
+    const { binding, post, userMessages } = await setup({ workspace, homeDirectory })
+    const chat = await post({
+      hook_event_name: 'UserPromptSubmit',
+      session_id: builderSession,
+      cwd: workspace,
+      prompt: '메모 API 만들어줘',
+    })
+    expect(await chat.json()).toMatchObject({ recorded: true })
+    expect(userMessages()).toHaveLength(1)
+
+    const question = await post({
+      hook_event_name: 'UserPromptSubmit',
+      session_id: helperSession,
+      cwd: workspace,
+      prompt: '지금 Builder가 뭐 하고 있어?',
+    })
+    const body = await question.json()
+    expect(body.pending).toBe('HELPER_QUESTION')
+    expect(body.context).toContain('지금 진행 중인 턴 포함')
+    expect(body.context).toContain('Builder: 메모 라우터를 [WORKSPACE]/src/memo.ts 에 만들게요.')
+    expect(body.context).toContain('도구: Write src/memo.ts (completed)')
+    expect(body.context).not.toContain(workspace)
+    // A Helper tab question is not general chat Evidence.
+    expect(userMessages()).toHaveLength(1)
+
+    // `/vibe-helper` inside the Builder session already has its own context.
+    const inline = await post({
+      hook_event_name: 'UserPromptSubmit',
+      session_id: builderSession,
+      cwd: workspace,
+      prompt: '/vibe-helper 라우터가 뭐야?',
+    })
+    expect(await inline.json()).toEqual({ pending: 'HELPER_QUESTION' })
+    binding.revoke()
+
+    // After a restart the latest non-Helper session is used.
+    await utimes(join(sessions, helperSession, 'messages.jsonl'), new Date(), new Date())
+    const restarted = await setup({ workspace, homeDirectory })
+    expect(await restarted.binding.builderActivity()).toContain('메모 API 만들어줘')
+    restarted.binding.revoke()
   })
 })

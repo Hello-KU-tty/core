@@ -31,6 +31,7 @@ import { NativeAgentRelay } from './native-agent-relay.js'
 import { createNativeCoreBinding } from './native-core-binding.js'
 import { privateDirectory } from './private-files.js'
 import { createLocalServer } from './server.js'
+import { WorkspaceRegistry } from './workspace-registry.js'
 
 const execute = promisify(execFile)
 declare const __VIBE_PACKAGED_CORE__: boolean
@@ -310,10 +311,19 @@ async function start(
       dataDirectory: join(root, 'data'),
       ...(resources ? { migrationsDirectory: resources.migrationsDirectory } : {}),
     })
-    const policy = await WorkspacePathPolicy.create(
-      join(root, 'workspaces'),
-      packaged ? { prepareNewWorkspace: privateDirectory } : {},
-    )
+    // Kiro-native Projects may live in the learner's own empty folder, registered at bind time.
+    const workspaceRegistry = kiroNative
+      ? await WorkspaceRegistry.open({
+          file: join(root, 'registered-workspaces.json'),
+          coreRoot: root,
+        })
+      : undefined
+    const policy = await WorkspacePathPolicy.create(join(root, 'workspaces'), {
+      ...(packaged ? { prepareNewWorkspace: privateDirectory } : {}),
+      ...(workspaceRegistry
+        ? { registeredWorkspace: (projectId: string) => workspaceRegistry.get(projectId) }
+        : {}),
+    })
     const application = new ApplicationService({ storage, workspacePolicy: policy })
     const nativeRole = option('--native-role', '')
     if (
@@ -413,6 +423,8 @@ async function start(
             model,
             builderInHostChat: kiroNative || args.includes('--kiro-hooks'),
             promptDirectory: resources?.promptDirectory ?? join(repository, 'docs/agent-prompts'),
+            helperSupplement: (projectId: string) =>
+              kiroBindings?.builderActivity(projectId) ?? Promise.resolve(null),
             roleModels: {
               ...(option('--discovery-model', '')
                 ? { DISCOVERY: option('--discovery-model', '') }
@@ -476,7 +488,8 @@ async function start(
     if (nativeBinding) mcpHandlers.set(nativeBinding.path, nativeBinding.handler)
     if (kiroHookBinding) mcpHandlers.set(kiroHookBinding.path, kiroHookBinding.handler)
     let listeningBaseUrl = ''
-    if (kiroNative)
+    if (kiroNative && workspaceRegistry) {
+      const promptDirectory = resources?.promptDirectory ?? join(repository, 'docs/agent-prompts')
       kiroBindings = new KiroBindingManager({
         application,
         policy,
@@ -486,7 +499,11 @@ async function start(
         nodeExecutable: process.execPath,
         bridgeScript: resources?.bridge ?? join(repository, 'scripts/native-core-stdio-bridge.mjs'),
         hookScript: resources?.kiroHook ?? join(repository, 'scripts/kiro-hook.mjs'),
+        registry: workspaceRegistry,
+        steeringTemplate: join(promptDirectory, 'kiro-steering.md'),
+        helperPrompt: join(promptDirectory, 'helper.md'),
       })
+    }
     server = createLocalServer({
       application,
       runtime,

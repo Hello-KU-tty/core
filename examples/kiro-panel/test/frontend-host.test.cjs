@@ -5,13 +5,16 @@ const { runInNewContext } = require('node:vm')
 const { test } = require('node:test')
 
 const projectId = 'project_00000000-0000-4000-8000-000000000001'
-const workspace = '/private/core-data/workspaces/campus-drop'
+const generatedRoot = '/private/core-data/workspaces'
+const workspace = `${generatedRoot}/projects/campus-drop`
+const ok = data => ({ status: 200, body: { success: true, data: { projectId, taskId: 'task_1', registered: false, coreTools: 'NOT_REQUESTED', ...data } } })
+const refuse = error => ({ status: 409, body: { success: false, error } })
 
 function harness({ trusted = true, installed = true, loggedIn = true, fail = false, platform = 'darwin',
-  bind = { status: 200, body: { success: true, data: { projectId, taskId: 'task_1', workspace } } },
-  openFolders = [] } = {}) {
+  binds = [ok({ workspace })], openFolders = [], answers = {}, bound = false, consent } = {}) {
   let listener, trustListener, stopped = 0, starts = 0, mutations = 0, terminals = 0
-  const commands = new Map(), opened = [], messages = [], fetches = [], whoami = []
+  const commands = new Map(), executed = [], messages = [], fetches = [], whoami = [], dialogs = []
+  const globalState = new Map(consent ? [['vibeHelper.coreToolsConsent', consent]] : [])
   let lifecycleOptions
   const code = readFileSync(join(__dirname, '../src/frontend-host.cjs'), 'utf8')
   const rawClient = { health: async () => ({}),
@@ -24,24 +27,36 @@ function harness({ trusted = true, installed = true, loggedIn = true, fail = fal
       listener({ phase: 'CORE_CONNECTED' }); return { connectionFile: '/private/core-data/connection.json',
         resources: { promptDirectory: '/portable/prompts' }, runtime: {} } },
     retry() { return this.start() }, async dispose() { stopped++ } }
+  // Dialogs answer by their buttons; unanswered ones resolve to undefined (dismissed).
+  const dialog = kind => async (text, ...rest) => {
+    const items = rest.filter(item => typeof item === 'string')
+    dialogs.push({ kind, text, items, modal: rest.some(item => item?.modal === true) })
+    for (const item of items) if (answers[item]) return item
+    if (!items.length) messages.push([kind, text])
+    return undefined
+  }
   const modules = {
     vscode: {
       workspace: { isTrusted: trusted, workspaceFolders: openFolders.map(fsPath => ({ uri: { fsPath } })),
         onDidGrantWorkspaceTrust(fn) { trustListener = fn; return { dispose() { trustListener = undefined } } } },
       commands: {
         registerCommand(name, fn) { commands.set(name, fn); return { dispose() { commands.delete(name) } } },
-        async executeCommand(name, uri, options) { opened.push({ name, path: uri.fsPath, options }) },
+        async executeCommand(name, uri, options) { executed.push({ name, path: uri?.fsPath, options }) },
       },
       window: {
         showQuickPick: async items => items[0],
-        showInformationMessage: async text => { messages.push(['info', text]) },
+        showInformationMessage: dialog('info'),
+        showWarningMessage: dialog('warning'),
         showErrorMessage: async text => { messages.push(['error', text]) },
       },
       Uri: { file: fsPath => ({ fsPath }) },
     },
     'node:child_process': { execFile(file, args, options, done) { whoami.push([file, ...args]); done(loggedIn ? null : new Error('1')) } },
     'node:fs/promises': { mkdir: async () => {}, realpath: async value => value,
-      access: async () => { if (!installed) throw new Error('ENOENT') }, constants: { X_OK: 1 } },
+      access: async path => {
+        if (path.endsWith('.kiro/hooks/vibe-helper.json')) { if (!bound) throw new Error('ENOENT'); return }
+        if (!installed) throw new Error('ENOENT')
+      }, constants: { X_OK: 1 } },
     'node:os': { homedir: () => '/Users/synthetic' },
     'node:path': require('node:path'),
     '@vibe-helper/frontend-client/node': {
@@ -53,16 +68,22 @@ function harness({ trusted = true, installed = true, loggedIn = true, fail = fal
     './mac-terminal-environment.cjs': { prepareMacProjectTerminal: async () => { terminals++ } },
   }
   const module = { exports: {} }
+  const queue = [...binds]
   runInNewContext(code, { module, require: name => modules[name] ?? {}, process: { ...process, platform },
     AbortSignal, fetch: async (url, init) => {
-      fetches.push({ url, init })
-      return { ok: bind.status === 200, json: async () => bind.body }
+      fetches.push({ url, init, body: JSON.parse(init.body) })
+      const next = queue.shift() ?? refuse('NO_MORE_BINDS')
+      return { ok: next.status === 200, json: async () => next.body }
     } })
-  return { create: () => module.exports.createFrontendHost({ extensionPath: '/extension', globalStorageUri: { fsPath: '/private' } }),
+  const context = { extensionPath: '/extension', globalStorageUri: { fsPath: '/private' },
+    globalState: { get: key => globalState.get(key), update: async (key, value) => { globalState.set(key, value) } } }
+  return { create: () => module.exports.createFrontendHost(context),
     grantTrust() { modules.vscode.workspace.isTrusted = true; trustListener?.() },
-    lifecycleOptions: () => lifecycleOptions, commands, opened, messages, fetches, whoami,
+    lifecycleOptions: () => lifecycleOptions, commands, executed, messages, fetches, whoami, dialogs, globalState,
+    opened: () => executed.filter(item => item.name === 'vscode.openFolder'),
     counters: () => ({ stopped, starts, mutations, terminals }) }
 }
+const settle = () => new Promise(resolve => setImmediate(resolve))
 
 test('host runs Core as managed-kiro with the installed kiro-cli and becomes ready after login', async () => {
   const h = harness(), host = await h.create()
@@ -129,43 +150,95 @@ test('untrusted window skips terminal tools until the user grants trust', async 
   await host.dispose()
 })
 
-test('Open in Kiro binds through Core with the global token and opens the generated folder', async () => {
-  const h = harness(), host = await h.create()
+test('Open in Kiro without an open folder binds the generated folder and opens it in a new window', async () => {
+  const h = harness({ answers: { '허용': true } }), host = await h.create()
   await h.commands.get('vibeHelper.openInKiro')()
   assert.equal(h.fetches.length, 1)
   assert.equal(h.fetches[0].url, 'http://127.0.0.1:1/api/kiro/bind')
   assert.equal(h.fetches[0].init.headers.authorization, 'Bearer synthetic-secret')
-  assert.equal(h.fetches[0].init.body, JSON.stringify({ protocolVersion: 1, projectId }))
-  assert.equal(h.opened.length, 1)
-  assert.equal(h.opened[0].name, 'vscode.openFolder')
-  assert.equal(h.opened[0].path, workspace)
-  assert.equal(h.opened[0].options.forceNewWindow, true)
-  assert.equal(h.messages.length, 0)
+  assert.equal(JSON.stringify(h.fetches[0].body), JSON.stringify({ protocolVersion: 1, projectId, allowCoreTools: true }))
+  assert.equal(h.opened().length, 1)
+  assert.equal(h.opened()[0].path, workspace)
+  assert.equal(h.opened()[0].options.forceNewWindow, true)
+  assert.equal(h.globalState.get('vibeHelper.coreToolsConsent'), 'ALLOW')
   await host.dispose()
 })
 
-test('Open in Kiro in the already-open Project folder refreshes without a new window', async () => {
-  const h = harness({ openFolders: [workspace] }), host = await h.create()
-  await host.prepare()
+test('Open in Kiro uses the empty open folder as the Project folder in this window', async () => {
+  const folder = '/Users/synthetic/memo'
+  const h = harness({ openFolders: [folder], consent: 'ASK',
+    binds: [ok({ workspace: folder, registered: true })] }), host = await h.create()
+  await h.commands.get('vibeHelper.openInKiro')()
+  assert.equal(JSON.stringify(h.fetches[0].body), JSON.stringify({ protocolVersion: 1, projectId, workspace: folder, allowCoreTools: false }))
+  assert.equal(h.opened().length, 0)
+  assert.equal(h.dialogs.some(item => item.items.includes('허용')), false)
+  assert.match(h.messages.at(-1)[1], /이 폴더를 Vibe Helper Project로 연결했어요/)
+  await host.dispose()
+})
+
+test('a folder with other files leads to a generated folder in a new window only after the learner agrees', async () => {
+  const folder = '/Users/synthetic/busy'
+  const agreed = harness({ openFolders: [folder], consent: 'ALLOW', answers: { '새 창에서 열기': true },
+    binds: [refuse('WORKSPACE_FOLDER_NOT_EMPTY'), ok({ workspace })] })
+  let host = await agreed.create(); await host.prepare()
   const result = await host.openProjectInKiro(projectId)
-  assert.equal(result.openedNewWindow, false)
-  assert.equal(h.opened.length, 0)
+  assert.equal(result.folder, 'GENERATED')
+  assert.equal(agreed.fetches[1].body.workspace, undefined)
+  assert.equal(agreed.opened()[0].path, workspace)
+  assert.ok(agreed.dialogs.some(item => item.modal && /이미 다른 파일이 있어요/.test(item.text)))
+  await host.dispose()
+  const declined = harness({ openFolders: [folder], consent: 'ALLOW',
+    binds: [refuse('WORKSPACE_FOLDER_NOT_EMPTY'), ok({ workspace })] })
+  host = await declined.create(); await host.prepare()
+  assert.equal((await host.openProjectInKiro(projectId)).folder, 'CANCELLED')
+  assert.equal(declined.fetches.length, 1)
+  assert.equal(declined.opened().length, 0)
   await host.dispose()
 })
 
-test('bind refusals surface an exact code and never open a folder outside generated workspaces', async () => {
-  const notReady = harness({ bind: { status: 409, body: { success: false, error: 'KIRO_BIND_TASK_NOT_READY' } } })
-  let host = await notReady.create()
-  await notReady.commands.get('vibeHelper.openInKiro')()
-  assert.equal(notReady.opened.length, 0)
-  assert.equal(notReady.messages[0][0], 'error')
-  assert.match(notReady.messages[0][1], /Learning Spec/)
+test('a Project already built in another folder opens that folder instead of splitting the work', async () => {
+  const elsewhere = '/Users/synthetic/memo-first'
+  const h = harness({ openFolders: ['/Users/synthetic/empty'], consent: 'ALLOW',
+    binds: [refuse('PROJECT_REGISTERED_ELSEWHERE'), ok({ workspace: elsewhere, registered: true })] })
+  const host = await h.create(); await host.prepare()
+  const result = await host.openProjectInKiro(projectId)
+  assert.equal(result.folder, 'REGISTERED')
+  assert.equal(h.opened()[0].path, elsewhere)
   await host.dispose()
-  const escaped = harness({ bind: { status: 200,
-    body: { success: true, data: { projectId, taskId: 'task_1', workspace: '/Users/synthetic/elsewhere' } } } })
-  host = await escaped.create()
-  await host.prepare()
+})
+
+test('the generated folder window rebinds in place, and an unconfirmed outside folder never opens', async () => {
+  const inPlace = harness({ openFolders: [workspace], consent: 'ALLOW' })
+  let host = await inPlace.create(); await host.prepare()
+  assert.equal((await host.openProjectInKiro(projectId)).openedNewWindow, false)
+  assert.equal(inPlace.fetches[0].body.workspace, undefined)
+  assert.equal(inPlace.opened().length, 0)
+  await host.dispose()
+  const escaped = harness({ consent: 'ALLOW', binds: [ok({ workspace: '/Users/synthetic/elsewhere', registered: false })] })
+  host = await escaped.create(); await host.prepare()
   await assert.rejects(host.openProjectInKiro(projectId), /KIRO_BIND_WORKSPACE_UNSAFE/)
-  assert.equal(escaped.opened.length, 0)
+  assert.equal(escaped.opened().length, 0)
   await host.dispose()
+  const notReady = harness({ consent: 'ALLOW', binds: [refuse('KIRO_BIND_TASK_NOT_READY')] })
+  host = await notReady.create()
+  await notReady.commands.get('vibeHelper.openInKiro')()
+  assert.match(notReady.messages.at(-1)[1], /Learning Spec/)
+  await host.dispose()
+})
+
+test('a bound folder asks for trust, then offers a reload once trust is granted', async () => {
+  const h = harness({ trusted: false, bound: true, openFolders: [workspace], answers: { '신뢰 설정 열기': true, '다시 로드': true } })
+  const host = await h.create()
+  await settle(); await settle()
+  assert.ok(h.dialogs.some(item => /신뢰해야 Vibe Helper가 Kiro 채팅에 연결돼요/.test(item.text)))
+  assert.ok(h.executed.some(item => item.name === 'workbench.trust.manage'))
+  h.grantTrust()
+  await settle(); await settle()
+  assert.ok(h.executed.some(item => item.name === 'workbench.action.reloadWindow'))
+  await host.dispose()
+  const plain = harness({ trusted: false, bound: false })
+  const other = await plain.create()
+  await settle(); await settle()
+  assert.equal(plain.dialogs.length, 0)
+  await other.dispose()
 })

@@ -11,11 +11,12 @@
 
 - **원래 구상으로 복귀:** 사용자는 평소처럼 Kiro 자체 채팅·Spec·task 실행으로 바이브코딩하고, Vibe Helper는 Kiro의 Spec 파일, Steering, MCP, Hook과 확장 패널로 그 흐름에 개입한다. 예선의 "패널 안에서 Builder를 직접 운영하는 별도 바이브코딩 환경"은 본선 fallback으로 남긴다.
 - **Builder:** 사용자가 쓰는 Kiro Agent다. Vibe Helper는 Steering으로 행동을 조정하고 hook으로 Activity를 관찰하며, 실제 Decision은 Core Builder MCP `request_user_decision`으로 Kiro 채팅 안에서 사용자에게 묻게 한다. 학습자의 답은 Agent가 맥락으로 해석해 `resolve_decision_from_chat`으로 기록하되 학습자 원문을 인용해야 하고, LLM이 없는 Core는 인용·순서·명시 번호 모순만 검증한다. 이유는 학습자 원문 그대로 저장한다.
-- **Helper:** 권한 격리가 아니라 프롬프트로 역할을 제한한다. 사용자가 명시적으로 부탁하면 코드를 고칠 수 있다. Kiro 채팅에서 `/vibe-helper 질문`(manual Steering 슬래시 명령)으로 부르고, 질문과 답 요약을 Helper 대화 Episode로 기록한다. 패널은 fallback이다.
+- **Helper:** 권한 격리가 아니라 프롬프트로 역할을 제한한다. 사용자가 명시적으로 부탁하면 코드를 고칠 수 있다. Kiro 채팅에서 `/vibe-helper 질문`(manual Steering 슬래시 명령)이나 별도 채팅 탭의 Vibe Helper 에이전트로 부르고, 질문과 답 요약을 Helper 대화 Episode로 기록한다. Helper는 Builder 세션의 진행 중 활동을 기록으로 참고한다. 패널은 fallback이다.
 - **유지하는 강제 경계:** Evidence와 Concept State는 Core의 deterministic rule로만 바뀐다. Helper·Builder에는 Evidence·State 변경 도구를 주지 않고, Core는 Agent 출처 입력을 사용자 이해 근거로 받지 않는다. Analyst는 도구 없이 proposal만 낸다.
 - **Evidence 수집:** Kiro hook이 사용자가 채팅에 직접 친 발언을 USER Activity로 Core에 기록하고(일반 채팅도 Evidence 대상), 턴 종료로 Helper 교환을 마무리한다. Agent의 Core 도구 호출은 Core가 AGENT 출처로 기록한다. Event마다 추론하지 않고 Episode 종료 뒤 분석하는 원칙은 유지한다.
 - **개인화:** 기존 다음 Helper·Discovery 개인화에 더해, Core가 만든 학습자 요약을 Steering이 참조하는 파일로 모든 Kiro 대화에 반영한다. Steering은 세션 시작 때 고정되므로 세션 도중 변화는 프롬프트 hook 출력으로 보완한다.
 - **Discovery·Learning Spec:** 패널에 유지하고, 확정 Spec을 Kiro Spec(`requirements.md`)으로 내보낸다.
+- **Project 폴더:** 사용자가 Kiro에서 연 폴더가 비어 있으면 그 폴더를 Project 폴더로 등록해 같은 창에서 진행한다. 이미 파일이 있으면 Core가 만든 새 폴더를 새 창으로 여는 것을 제안한다. 기존 프로젝트 import는 여전히 범위 밖이다.
 - **Core 최소 수정:** Core와 데이터 계약은 host 중립으로 유지하고 Kiro 전용 기능은 `packages/kiro-adapter`와 확장에만 둔다. Kiro 기능 사용은 AWS 대회 평가를 위한 adapter 단계의 선택이다.
 - **일정:** 포스터 사전 제출 10/11에는 실측된 핵심 장면을, 본선 10/18까지는 안정화와 추가 구현을 진행한다.
 

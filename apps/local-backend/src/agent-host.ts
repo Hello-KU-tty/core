@@ -79,6 +79,11 @@ export class LocalAgentHost implements WorkflowAgentPort {
        * role uses its canonical prompt instead of the older generated Agent JSON prompt.
        */
       promptDirectory?: string
+      /**
+       * Kiro-native: the learner's Builder chat activity for a Helper run, added to the question
+       * as a labeled record. Agent-authored; never learner Evidence.
+       */
+      helperSupplement?: (projectId: string) => Promise<string | null>
     },
   ) {}
   setBaseUrl(value: string): void {
@@ -227,7 +232,13 @@ export class LocalAgentHost implements WorkflowAgentPort {
         turnTimeoutMs: role === 'BUILDER' ? 600_000 : 240_000,
       })
       if (request.signal.aborted) throw new WorkflowError('CANCELLED')
-      return await session.prompt(request.message)
+      const supplement =
+        role === 'HELPER'
+          ? await this.options.helperSupplement?.(request.projectId).catch(() => null)
+          : null
+      return await session.prompt(
+        supplement ? `${request.message}\n\n${supplement}` : request.message,
+      )
     } finally {
       active = false
       request.signal.removeEventListener('abort', revoke)

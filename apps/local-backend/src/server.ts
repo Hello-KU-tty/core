@@ -46,8 +46,13 @@ export function createLocalServer(options: {
   resultLauncher?: {
     launch(value: ReturnType<typeof generatedResultDescriptorSchema.parse>): Promise<unknown>
   }
-  /** Kiro-native mode: connect a Project's generated workspace to the learner's Kiro chat. */
-  kiroBindings?: { bind(projectId: string): Promise<unknown> }
+  /** Kiro-native mode: connect a Project folder to the learner's Kiro chat. */
+  kiroBindings?: {
+    bind(
+      projectId: string,
+      request: { workspace?: string; allowCoreTools?: boolean },
+    ): Promise<unknown>
+  }
 }) {
   if (!/^[0-9a-f]{64}$/.test(options.token)) throw new TypeError('LOCAL_TOKEN_INVALID')
   const server = createServer((request, response) => {
@@ -258,23 +263,35 @@ export function createLocalServer(options: {
         return
       }
       const input: unknown = JSON.parse((await body(request)).toString('utf8'))
-      const projectId =
-        typeof input === 'object' && input !== null && 'projectId' in input
-          ? input.projectId
+      const field = (name: string): unknown =>
+        typeof input === 'object' && input !== null && name in input
+          ? (input as Record<string, unknown>)[name]
           : undefined
+      const projectId = field('projectId')
+      const workspace = field('workspace')
+      const allowCoreTools = field('allowCoreTools')
       if (
         typeof input !== 'object' ||
         input === null ||
-        !('protocolVersion' in input) ||
-        input.protocolVersion !== LOCAL_PROTOCOL_VERSION ||
+        Object.keys(input).some(
+          (key) => !['protocolVersion', 'projectId', 'workspace', 'allowCoreTools'].includes(key),
+        ) ||
+        field('protocolVersion') !== LOCAL_PROTOCOL_VERSION ||
         typeof projectId !== 'string' ||
-        !/^project_[0-9a-f-]{36}$/.test(projectId)
+        !/^project_[0-9a-f-]{36}$/.test(projectId) ||
+        (workspace !== undefined &&
+          (typeof workspace !== 'string' || workspace.length === 0 || workspace.length > 4096)) ||
+        (allowCoreTools !== undefined && typeof allowCoreTools !== 'boolean')
       ) {
         json(response, 400, { error: 'KIRO_BIND_REQUEST_INVALID' })
         return
       }
       try {
-        json(response, 200, { success: true, data: await options.kiroBindings.bind(projectId) })
+        const data = await options.kiroBindings.bind(projectId, {
+          ...(workspace === undefined ? {} : { workspace }),
+          ...(allowCoreTools === undefined ? {} : { allowCoreTools }),
+        })
+        json(response, 200, { success: true, data })
       } catch (error) {
         const code =
           error instanceof Error && /^[A-Z][A-Z0-9_]{0,99}$/.test(error.message)

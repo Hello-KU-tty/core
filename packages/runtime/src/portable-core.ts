@@ -151,7 +151,7 @@ export async function loadCoreResources(resourceRoot: string): Promise<CoreResou
     ...(manifest.target === 'darwin-arm64' ? ['bin/node', 'licenses/node-LICENSE'] : []),
   ]
   if (required.some((name) => !manifest.files[name])) fail('CORE_RESOURCE_REQUIRED_ASSET_MISSING')
-  for (const name of ['discovery', 'builder', 'helper', 'evidence-analyst']) {
+  for (const name of ['discovery', 'builder', 'helper', 'evidence-analyst', 'kiro-steering']) {
     const version = manifest.promptVersions[name]
     const file = `agent-prompts/${name}.md`
     if (

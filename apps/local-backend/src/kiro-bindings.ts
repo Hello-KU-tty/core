@@ -1,27 +1,41 @@
 import { randomUUID } from 'node:crypto'
-import { rename, writeFile } from 'node:fs/promises'
+import { readFile, rename, writeFile } from 'node:fs/promises'
+import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { ApplicationService, WorkspacePathPolicy } from '@vibe-helper/application'
 import { projectSessionSnapshotSchema } from '@vibe-helper/contracts'
 import {
+  allowKiroCoreTools,
   installKiroWorkspace,
   learnerScopeFrom,
+  parseKiroSteeringTemplates,
 } from '@vibe-helper/kiro-adapter/kiro-workspace-node'
 import { privateDirectory } from '@vibe-helper/runtime'
 import type { LocalMcpHandler } from './agent-host.js'
 import { createKiroHookBinding } from './kiro-hook-binding.js'
 import { createNativeCoreBinding } from './native-core-binding.js'
+import { folderHasWork, type WorkspaceRegistry } from './workspace-registry.js'
 
 interface ActiveBinding {
   readonly taskId: string
   readonly revoke: () => void
+  readonly builderActivity: () => Promise<string | null>
+}
+
+export interface KiroBindRequest {
+  /** The learner's open, empty Kiro folder to use as the Project folder. Omitted: generated one. */
+  readonly workspace?: string
+  /** The learner agreed to stop Kiro asking before each Vibe Helper Core tool in this folder. */
+  readonly allowCoreTools?: boolean
 }
 
 export interface KiroBindResult {
   readonly projectId: string
   readonly taskId: string
   readonly workspace: string
+  readonly registered: boolean
   readonly spec: string
+  readonly coreTools: 'WRITTEN' | 'ALREADY_ALLOWED' | 'UNRECOGNIZED' | 'NOT_REQUESTED'
 }
 
 async function writePrivateJson(path: string, value: unknown): Promise<void> {
@@ -48,10 +62,20 @@ export class KiroBindingManager {
       readonly nodeExecutable: string
       readonly bridgeScript: string
       readonly hookScript: string
+      readonly registry: WorkspaceRegistry
+      /** `kiro-steering.md` and the canonical `helper.md` (repository or packaged copies). */
+      readonly steeringTemplate: string
+      readonly helperPrompt: string
+      readonly homeDirectory?: string
     },
   ) {}
 
-  async bind(projectId: string): Promise<KiroBindResult> {
+  /** The bound Project's Builder chat activity, for a Helper run outside Kiro chat. */
+  builderActivity(projectId: string): Promise<string | null> {
+    return this.#active.get(projectId)?.builderActivity() ?? Promise.resolve(null)
+  }
+
+  async bind(projectId: string, request: KiroBindRequest = {}): Promise<KiroBindResult> {
     const restored = await this.options.application.executeUi({
       schemaVersion: 1,
       kind: 'UI_RESTORE_PROJECT_SESSION',
@@ -65,6 +89,22 @@ export class KiroBindingManager {
     const task = snapshot.currentTask
     if (task === null || snapshot.learningSpec?.status !== 'CONFIRMED')
       throw new Error('KIRO_BIND_TASK_NOT_READY')
+    // Templates are read before anything changes, so a broken install fails without side effects.
+    const templates = parseKiroSteeringTemplates(
+      await readFile(this.options.steeringTemplate, 'utf8'),
+    )
+    const helperPrompt = await readFile(this.options.helperPrompt, 'utf8')
+    if (request.workspace !== undefined) {
+      // Work already started in the generated folder stays there instead of being split.
+      if (this.options.registry.get(projectId) === undefined) {
+        const generated = await this.options.policy.resolveProjectWorkspace(
+          snapshot.project,
+          task.correlationId,
+        )
+        if (await folderHasWork(generated)) throw new Error('PROJECT_HAS_GENERATED_FOLDER')
+      }
+      await this.options.registry.register(projectId, request.workspace)
+    }
     const workspace = await this.options.policy.resolveProjectWorkspace(
       snapshot.project,
       task.correlationId,
@@ -76,24 +116,37 @@ export class KiroBindingManager {
       role: 'BUILDER',
       ...scope,
     })
+    const helper = createNativeCoreBinding({
+      application: this.options.application,
+      role: 'HELPER',
+      ...scope,
+    })
     const hook = createKiroHookBinding({
       application: this.options.application,
       binding: scope,
       workspace,
+      ...(this.options.homeDirectory === undefined
+        ? {}
+        : { homeDirectory: this.options.homeDirectory }),
     })
-    this.options.handlers.set(builder.path, builder.handler)
-    this.options.handlers.set(hook.path, hook.handler)
+    for (const binding of [builder, helper, hook])
+      this.options.handlers.set(binding.path, binding.handler)
     const directory = await privateDirectory(join(this.options.root, 'kiro-bindings', projectId))
     const bindingDescriptor = join(directory, 'builder-mcp.json')
+    const helperDescriptor = join(directory, 'helper-mcp.json')
     const hookDescriptor = join(directory, 'hook.json')
-    await writePrivateJson(bindingDescriptor, {
-      role: 'BUILDER',
-      ...scope,
-      workspace,
-      toolNames: builder.toolNames,
-      url: `${this.options.baseUrl()}${builder.path}`,
-      authorization: builder.authorization,
-    })
+    for (const [file, role, binding] of [
+      [bindingDescriptor, 'BUILDER', builder],
+      [helperDescriptor, 'HELPER', helper],
+    ] as const)
+      await writePrivateJson(file, {
+        role,
+        ...scope,
+        workspace,
+        toolNames: binding.toolNames,
+        url: `${this.options.baseUrl()}${binding.path}`,
+        authorization: binding.authorization,
+      })
     await writePrivateJson(hookDescriptor, {
       projectId,
       taskId: task.id,
@@ -102,6 +155,7 @@ export class KiroBindingManager {
     })
     const installed = await installKiroWorkspace({
       workspace,
+      templates,
       binding: scope,
       nodeExecutable: this.options.nodeExecutable,
       hookScript: this.options.hookScript,
@@ -110,20 +164,35 @@ export class KiroBindingManager {
       bindingDescriptor,
       learnerScope: learnerScopeFrom(snapshot.learningSpec),
       spec: { project: snapshot.project, learningSpec: snapshot.learningSpec, task },
+      helperAgent: { helperPrompt, helperDescriptor },
     })
     await hook.syncProfile().catch(() => null)
+    const coreTools = request.allowCoreTools
+      ? await allowKiroCoreTools({
+          homeDirectory: this.options.homeDirectory ?? homedir(),
+          workspace,
+        }).catch(() => 'UNRECOGNIZED' as const)
+      : 'NOT_REQUESTED'
     this.#active.set(projectId, {
       taskId: task.id,
+      builderActivity: () => hook.builderActivity(),
       revoke: () => {
-        builder.revoke()
-        hook.revoke()
-        this.options.handlers.delete(builder.path)
-        this.options.handlers.delete(hook.path)
-        void writePrivateJson(bindingDescriptor, { status: 'REVOKED' }).catch(() => {})
-        void writePrivateJson(hookDescriptor, { status: 'REVOKED' }).catch(() => {})
+        for (const binding of [builder, helper, hook]) {
+          binding.revoke()
+          this.options.handlers.delete(binding.path)
+        }
+        for (const file of [bindingDescriptor, helperDescriptor, hookDescriptor])
+          void writePrivateJson(file, { status: 'REVOKED' }).catch(() => {})
       },
     })
-    return { projectId, taskId: task.id, workspace, spec: installed.spec }
+    return {
+      projectId,
+      taskId: task.id,
+      workspace,
+      registered: this.options.registry.get(projectId) === workspace,
+      spec: installed.spec,
+      coreTools,
+    }
   }
 
   close(): void {

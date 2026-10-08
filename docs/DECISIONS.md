@@ -1,5 +1,18 @@
 # 결정 기록
 
+## 본선: 첫 실사용 체험 피드백 반영(K09)
+
+- **맥락:** 사용자가 0.2.0으로 처음부터 직접 써 본 뒤 피드백 15건을 남겼다. 확인한 원인은 [첫 체험 기록](spikes/KIRO_NATIVE_FIRST_TRIAL_20261009.md)에 있다.
+- **사용자 승인(2026-10-09):** 10(Builder 워크플로 재설계), 13의 명령 자동 허용, 15(크레딧)는 별도 작업 K10~K12로 남긴다. 7은 6을 반영한 뒤 다시 실측한다. 나머지는 검토 보고의 제안대로 진행한다.
+- **Project 폴더(범위 변경):** 사용자가 Kiro에서 연 폴더가 비어 있으면(편집기·VCS 메타데이터만 허용) 그 폴더를 Project 폴더로 등록해 같은 창에서 진행한다. 파일이 있으면 Core 생성 폴더를 새 창으로 여는 것을 묻는다. 등록은 local-backend의 private 파일(`registered-workspaces.json`)에 두는 host adapter 상태이고, Core 경로 정책은 등록 폴더를 canonical·디렉터리·생성 루트와 겹치지 않음으로 다시 확인한다. 소유자, 홈·루트 자체, Core 데이터와의 겹침, symlink를 거절한다. 다른 폴더에서 이미 작업 중인 Project는 옮기지 않는다. 패널의 결과 실행은 생성 폴더 전용으로 남긴다. 기존 프로젝트 import는 여전히 범위 밖이다.
+- **Steering 0.5.0과 원문 위치:** Kiro Steering 원문을 `docs/agent-prompts/kiro-steering.md`(버전 포함)로 옮기고 adapter는 자리만 채운다. 예상 Decision은 예고로만 주고 구현이 닿을 때 하나씩 묻게 했다. 묻기 전에 기록하게 했다. `start_task` 직후와 계획 변경·적용·검증·완료 때 작업 맥락을 남기게 했다. 첫 빌드 전에 실행 환경을 확인해 있는 도구로 만들게 했다(패키지 관리자를 고정하지 않음). 평가는 크레딧 확보 뒤 K09 재실측에서 한다.
+- **Helper가 Builder 진행 중 활동을 봄:** Helper 질문이 다른 탭에서 오면 hook이 Builder 세션 기록(Kiro 비공개 형식)의 최근 두 턴을 읽어 질문 맥락에 붙인다. 진행 중인 턴도 포함한다. 패널 Helper(kiro-cli)에도 같은 기록을 붙인다. Agent 출처 기록이라고 표시하고 redaction한다. Core에 저장하지 않으며 Evidence가 아니다. 기록을 못 읽으면 붙이지 않는다.
+- **Kiro 채팅의 Helper 에이전트:** 연결 때 Project 폴더에 `.kiro/agents/vibe-helper.json`을 쓴다. 이 에이전트는 작업 공간 MCP 파일을 쓰지 않고(`includeMcpJson: false`) 자기 Helper 역할 Core 서버(`get_helper_context`만)를 쓴다. 역할은 프롬프트로 제한한다(정식 `helper.md`에 본선 규칙을 앞에 붙임). 이 탭의 모든 질문을 Helper 질문으로 기록한다. 탭 자동 생성은 공개 API가 없어 하지 않는다.
+- **Vibe Helper 도구 허용:** 연결 때 한 번 동의를 받으면 Kiro 작업 공간 권한 파일에 `vibe-helper/*`, `vibe-helper-helper/*` 허용 규칙 한 줄을 더한다. Kiro가 직접 쓴 모양의 파일만 고치고, 그 밖의 모양이면 손대지 않는다. 내부 형식이라 깨지면 Kiro가 다시 묻는 상태로 돌아간다.
+- **신뢰 안내:** 연결된 폴더가 신뢰되지 않았으면 신뢰가 필요하다고 알리고, 신뢰 직후 창 다시 로드를 제안한다. Kiro는 신뢰 전 hook·Steering을 적용하지 않고 hook을 세션 시작 때 읽기 때문이다.
+- **정리:** 예선 때 `~/.kiro/agents/`에 남은 Vibe Helper 전역 에이전트 12개를 `/Users/hurdoo/coding/archives/kiro-agents-legacy-20260913/`으로 옮겼다. KiroCrew 에이전트는 그대로 두었다.
+- **검증 한계:** unit·integration·패널 테스트로 확인했다. 실제 Kiro에서 에이전트 목록 표시, 권한 규칙의 즉시 적용, 같은 창 연결 뒤 hook·Steering 적재, Steering 0.5.0의 Decision 시점은 모델 크레딧이 필요해 K09 재실측으로 남긴다.
+
 ## 본선: Mac 설치물의 host를 Kiro-native로 전환(0.2.0)
 
 - **맥락:** 프론트 담당자가 본선 구조로 패널을 다듬으려면 설치 가능한 VSIX가 필요하다. 예선 0.1.4 host는 Kiro 1.1.70 설치본 hash와 IDE 내부 비공개 Agent 연결을 전제로 해서 현재 Kiro(1.2.37)에서는 Agent를 실행하지 못한다. Core에는 `managed-kiro` 명령과 Project별 연결 API가 이미 있었지만, 포장된 Core가 그 명령을 거절했다.

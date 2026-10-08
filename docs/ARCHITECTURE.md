@@ -147,7 +147,8 @@ ActivityEvent 수신 (기존 계약)    ◀───── hook 스크립트: st
 Decision·Concept MCP 도구 (기존)  ◀───── .kiro/settings/mcp.json 등록
 Learning Spec (기존 구조)         ─────▶ .kiro/specs/<app>/requirements.md (EARS)
 학습자 요약 생성 (신규 후보)      ─────▶ .kiro/steering/ 의 #[[file:]] 참조 파일
-외부 workspace root 등록 (신규 후보) ◀── 사용자가 연 Kiro 폴더, session_id 매핑
+등록 폴더 경로 정책 (K09)        ◀───── 사용자가 연 빈 Kiro 폴더 등록(local-backend)
+Helper 역할 MCP (기존)            ◀───── .kiro/agents/vibe-helper.json (Helper 탭)
 ```
 
 | Kiro hook | 수집 내용 | provenance |
@@ -160,6 +161,9 @@ Learning Spec (기존 구조)         ─────▶ .kiro/specs/<app>/requi
 - hook 명령은 Node 스크립트 하나로 통일해 로컬 Core에 한 번 POST하고, LLM을 호출하지 않는다.
 - Helper는 프롬프트로 역할을 제한한다. Evidence·State 변경 도구는 Helper와 Builder에 노출하지 않는다.
 - Core는 등록된 workspace root 밖의 경로와 Agent 출처의 이해 근거를 거절한다. redaction 경계는 기존과 같다.
+- Project 폴더는 사용자가 연 빈 폴더(등록) 또는 Core 생성 폴더다. 등록은 local-backend의 private 파일에 두고, Core 경로 정책이 매번 canonical·디렉터리·생성 루트 비중첩을 다시 확인한다.
+- Steering·Helper 에이전트 원문은 `docs/agent-prompts/kiro-steering.md`에 버전과 함께 두고 adapter는 자리만 채운다.
+- Helper 탭이나 패널 Helper의 질문에는 Builder 세션 기록(Kiro 비공개 형식)의 최근 활동을 Agent 출처 기록으로 붙인다. 저장하지 않으며 Evidence가 아니다.
 
 ## 4. 주요 모듈과 책임
 

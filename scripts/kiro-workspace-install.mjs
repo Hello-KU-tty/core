@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import {
   installKiroWorkspace,
   learnerScopeFrom,
+  parseKiroSteeringTemplates,
 } from '../packages/kiro-adapter/dist/kiro-workspace-node.js'
 
 const [workspaceArg, bindingDescriptorArg, hookDescriptorArg] = process.argv.slice(2)
@@ -42,6 +43,9 @@ const { project, learningSpec, currentTask } = restored.data
 const confirmed = learningSpec?.status === 'CONFIRMED' && currentTask
 const installed = await installKiroWorkspace({
   workspace,
+  templates: parseKiroSteeringTemplates(
+    await readFile(join(repository, 'docs/agent-prompts/kiro-steering.md'), 'utf8'),
+  ),
   binding: {
     projectId: binding.projectId,
     taskId: binding.taskId,
