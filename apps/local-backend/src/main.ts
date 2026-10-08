@@ -309,7 +309,11 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
     )
       throw new Error('NATIVE_BINDING_ROLE_REQUIRED')
     if (nativeRole !== '') {
-      if (!coreOnly || (nativeRole !== 'BUILDER' && nativeRole !== 'HELPER'))
+      // Kiro-native start: the Builder binding serves the learner's Kiro chat while CLI Agents
+      // run Discovery, Helper and the Analyst. Otherwise a binding stays core-only.
+      const kiroNativeStart =
+        !coreOnly && !nativeMode && nativeRole === 'BUILDER' && args.includes('--kiro-hooks')
+      if ((!coreOnly && !kiroNativeStart) || (nativeRole !== 'BUILDER' && nativeRole !== 'HELPER'))
         throw new Error('NATIVE_BINDING_ROLE_INVALID')
       const projectId = option('--native-project-id', '')
       const correlationId = option('--native-correlation-id', '')
@@ -391,6 +395,7 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
             guardPath: join(repository, 'packages/kiro-adapter/dist/builder-tool-guard-node.js'),
             executable,
             model,
+            builderInHostChat: args.includes('--kiro-hooks'),
           })
     nativeRelay = nativeMode
       ? new NativeAgentRelay({

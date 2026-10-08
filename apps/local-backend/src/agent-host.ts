@@ -5,7 +5,7 @@ import type { ApplicationService, WorkspacePathPolicy } from '@vibe-helper/appli
 import { projectSessionSnapshotSchema } from '@vibe-helper/contracts'
 import { KiroAcpSession } from '@vibe-helper/kiro-adapter/acp-node'
 import { createRoleBoundMcpHttpHandler } from '@vibe-helper/mcp-server/role-server'
-import { WorkflowError, type AgentInvocation, type WorkflowAgentPort } from '@vibe-helper/runtime'
+import { type AgentInvocation, type WorkflowAgentPort, WorkflowError } from '@vibe-helper/runtime'
 import { guardCommand, privateDirectory } from './private-files.js'
 
 export interface LocalMcpHandler {
@@ -70,6 +70,8 @@ export class LocalAgentHost implements WorkflowAgentPort {
       guardPath: string
       executable: string
       model: string
+      /** Kiro-native mode: the Builder is the learner's own Kiro chat, never a CLI run. */
+      builderInHostChat?: boolean
     },
   ) {}
   setBaseUrl(value: string): void {
@@ -78,6 +80,8 @@ export class LocalAgentHost implements WorkflowAgentPort {
   async invoke(request: AgentInvocation): Promise<{ text: string; stopReason: string }> {
     if (this.#baseUrl === undefined || request.signal.aborted) throw new WorkflowError('CANCELLED')
     const [suffix, role, toolNames] = definitions[request.mode]
+    if (role === 'BUILDER' && this.options.builderInHostChat)
+      throw new WorkflowError('BUILDER_RUNS_IN_HOST_CHAT')
     const original = JSON.parse(
       await readFile(join(this.options.definitionsRoot, `vibe-helper-${suffix}.json`), 'utf8'),
     ) as { prompt: string; toolsSettings?: unknown }
