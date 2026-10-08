@@ -59,8 +59,10 @@ import {
   helperContextSchema,
   helperConversationSummarySchema,
   helperExchangeReceiptSchema,
+  type LearnerProfileView,
   type LearningSpecRevision,
   type LiveProjectContext,
+  learnerProfileViewSchema,
   liveProjectContextSchema,
   type OperationError,
   type PersonalizationBasis,
@@ -85,6 +87,7 @@ import {
   appendEpisodeEvent,
   applyDecision,
   applyMisconceptionProposal,
+  buildLearnerProfile,
   closeEpisode,
   confirmLearningSpec,
   evaluateEvidenceProposal,
@@ -142,6 +145,7 @@ export type UiApplicationResponse =
   | readonly AnalysisJob[]
   | HelperExchangeReceipt
   | ChatMessageReceipt
+  | LearnerProfileView
   | HelperContext
   | ProjectEvidenceTrace
   | PreparedBuilderTaskDescriptor
@@ -445,6 +449,8 @@ export class ApplicationService {
         return this.#recordHelperExchange(request)
       case 'UI_RECORD_CHAT_MESSAGE':
         return this.#recordChatMessage(request)
+      case 'UI_READ_LEARNER_PROFILE':
+        return this.#readLearnerProfile(request)
       case 'UI_RETRY_ANALYSIS':
         return this.#retryAnalysis(request)
       case 'UI_READ_ANALYSIS_JOBS':
@@ -3775,6 +3781,27 @@ export class ApplicationService {
         },
       ),
     )
+  }
+
+  #readLearnerProfile(
+    request: Extract<UiRequest, { kind: 'UI_READ_LEARNER_PROFILE' }>,
+  ): LearnerProfileView {
+    const entries = this.#storage.transaction((repository) =>
+      repository.readRecentConceptLedgers(100),
+    )
+    const profile = buildLearnerProfile({
+      entries,
+      ...(request.maxConcepts === undefined ? {} : { maxConcepts: request.maxConcepts }),
+    })
+    return learnerProfileViewSchema.parse({
+      schemaVersion: 1,
+      correlationId: request.correlationId,
+      profileVersion: profile.version,
+      conceptIds: profile.conceptIds,
+      omittedCount: profile.omittedCount,
+      text: profile.text,
+      digest: sha256(profile.text),
+    })
   }
 
   #recordChatMessage(

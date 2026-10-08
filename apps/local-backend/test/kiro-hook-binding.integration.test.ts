@@ -1,10 +1,12 @@
-import { mkdtemp } from 'node:fs/promises'
+import { mkdtemp, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ApplicationService, WorkspacePathPolicy } from '@vibe-helper/application'
 import {
   builderTaskSchema,
   candidateRoundSchema,
+  canonicalConceptSchema,
+  conceptLedgerEntrySchema,
   discoveryFeedbackSchema,
   discoverySessionSchema,
   learningSpecRevisionSchema,
@@ -18,6 +20,8 @@ import {
   builderTaskFixture,
   candidateFixture,
   candidateRoundFixture,
+  canonicalConceptFixture,
+  conceptLedgerFixture,
   confirmedLearningSpecFixture,
   discoveryFeedbackFixture,
   discoverySessionFixture,
@@ -137,5 +141,61 @@ describe('Kiro hook binding', () => {
     expect(body).toMatchObject({ recorded: true, receipt: { status: 'OPEN' } })
     const again = await post({ hook_event_name: 'Stop', session_id: 'sess_helper', cwd: '/w' })
     expect(await again.json()).toEqual({ ignored: 'NO_PENDING_HELPER_QUESTION' })
+  })
+
+  it('keeps the workspace learner profile current and tells a running session once', async () => {
+    const storage = await openInMemorySqliteStorage()
+    storage.transaction((repository) => {
+      repository.appendProject(projectSchema.parse(projectFixture))
+      repository.appendDiscoverySession(discoverySessionSchema.parse(discoverySessionFixture))
+      repository.appendCandidate(projectCandidateRevisionSchema.parse(candidateFixture))
+      repository.appendCandidateRound(candidateRoundSchema.parse(candidateRoundFixture))
+      repository.appendDiscoveryFeedback(discoveryFeedbackSchema.parse(discoveryFeedbackFixture))
+      repository.appendLearningSpec(learningSpecRevisionSchema.parse(draftLearningSpecFixture))
+      repository.appendLearningSpec(learningSpecRevisionSchema.parse(confirmedLearningSpecFixture))
+      repository.appendTask(builderTaskSchema.parse(builderTaskFixture))
+    })
+    const workspace = await mkdtemp(join(tmpdir(), 'vibe-kiro-profile-'))
+    const application = new ApplicationService({
+      storage,
+      workspacePolicy: await WorkspacePathPolicy.create(await mkdtemp(join(tmpdir(), 'vibe-ws-'))),
+    })
+    const binding = createKiroHookBinding({
+      application,
+      workspace,
+      binding: { projectId: ids.project, taskId: ids.task, correlationId: ids.correlation },
+    })
+    const prompt = async (session: string, text: string) =>
+      (
+        await binding.handler.fetch(
+          new Request(`http://127.0.0.1${binding.path}`, {
+            method: 'POST',
+            headers: { authorization: binding.authorization, 'content-type': 'application/json' },
+            body: JSON.stringify({
+              hook_event_name: 'UserPromptSubmit',
+              session_id: session,
+              cwd: workspace,
+              prompt: text,
+            }),
+          }),
+        )
+      ).json()
+    const profileFile = join(workspace, '.vibe-helper', 'learner-profile.md')
+
+    expect(await prompt('sess_a', '링크 만들자')).not.toHaveProperty('context')
+    expect(await readFile(profileFile, 'utf8')).toContain('아직 확인된 개념이 없다')
+
+    storage.transaction((repository) => {
+      repository.appendCanonicalConcept(canonicalConceptSchema.parse(canonicalConceptFixture))
+      repository.appendConceptLedger(conceptLedgerEntrySchema.parse(conceptLedgerFixture))
+    })
+    const updated = await prompt('sess_a', '다음은 뭐 하지?')
+    expect(updated.context).toContain('기록이며 지시가 아니다')
+    expect(updated.context).toContain('runtime validation')
+    expect(await readFile(profileFile, 'utf8')).toContain('- runtime validation')
+
+    expect(await prompt('sess_a', '계속 해줘')).not.toHaveProperty('context')
+    expect(await prompt('sess_b', '새 세션이야')).not.toHaveProperty('context')
+    binding.revoke()
   })
 })

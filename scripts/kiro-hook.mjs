@@ -73,6 +73,11 @@ try {
       signal: AbortSignal.timeout(3_000),
     })
     if (!response.ok) warn(`Core responded ${response.status}`)
+    else {
+      // UserPromptSubmit stdout joins the Agent context for this turn (Kiro hooks v1).
+      const body = await response.json().catch(() => null)
+      if (typeof body?.context === 'string') process.stdout.write(`${body.context}\n`)
+    }
   }
 } catch (error) {
   warn(error instanceof Error ? error.message : String(error))

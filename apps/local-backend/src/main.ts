@@ -357,6 +357,7 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
       if (nativeRole !== 'BUILDER') throw new Error('KIRO_HOOKS_REQUIRE_BUILDER_BINDING')
       kiroHookBinding = createKiroHookBinding({
         application,
+        ...(nativeWorkspace === undefined ? {} : { workspace: nativeWorkspace }),
         binding: {
           projectId: option('--native-project-id', ''),
           taskId: option('--native-task-id', ''),

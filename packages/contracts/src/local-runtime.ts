@@ -19,6 +19,7 @@ import {
   chatMessageReceiptSchema,
   generatedResultDescriptorSchema,
   helperExchangeReceiptSchema,
+  learnerProfileViewSchema,
   preparedBuilderTaskDescriptorSchema,
   type UiRequest,
   uiRequestSchema,
@@ -134,6 +135,7 @@ export const localResponseSchemas = {
   UI_RETRY_ANALYSIS: analysisJobSchema,
   UI_READ_ANALYSIS_JOBS: analysisJobSchema.array(),
   UI_READ_EVIDENCE_TRACE: projectEvidenceTraceSchema,
+  UI_READ_LEARNER_PROFILE: learnerProfileViewSchema,
   UI_LAUNCH_RESULT: generatedResultDescriptorSchema,
 } as const satisfies Record<UiRequest['kind'], z.ZodType>
 export type LocalUiResponse<K extends UiRequest['kind']> = z.infer<(typeof localResponseSchemas)[K]>

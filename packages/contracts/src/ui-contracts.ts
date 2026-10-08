@@ -215,6 +215,13 @@ export const uiReadEvidenceTraceQuerySchema = z.strictObject({
   conceptId: conceptIdSchema.optional(),
 })
 
+/** Learner-level guidance rendered from Core Concept State, for hosts to place in Agent context. */
+export const uiReadLearnerProfileQuerySchema = z.strictObject({
+  ...uiRequestMetadata,
+  kind: z.literal('UI_READ_LEARNER_PROFILE'),
+  maxConcepts: z.int().min(1).max(100).optional(),
+})
+
 export const uiLaunchResultCommandSchema = z.strictObject({
   ...uiRequestMetadata,
   kind: z.literal('UI_LAUNCH_RESULT'),
@@ -297,6 +304,16 @@ export const chatMessageReceiptSchema = z.strictObject({
     .optional(),
 })
 
+export const learnerProfileViewSchema = z.strictObject({
+  schemaVersion: schemaVersionSchema,
+  correlationId: correlationIdSchema,
+  profileVersion: z.string().regex(/^\d+\.\d+\.\d+$/),
+  conceptIds: z.array(conceptIdSchema).max(100),
+  omittedCount: z.int().nonnegative(),
+  text: z.string().min(1).max(20_000),
+  digest: z.string().regex(/^[0-9a-f]{64}$/),
+})
+
 export const uiRequestSchema = z.discriminatedUnion('kind', [
   uiStartDiscoveryCommandSchema,
   uiRecordDiscoveryFeedbackCommandSchema,
@@ -317,6 +334,7 @@ export const uiRequestSchema = z.discriminatedUnion('kind', [
   uiRetryAnalysisCommandSchema,
   uiReadAnalysisJobsQuerySchema,
   uiReadEvidenceTraceQuerySchema,
+  uiReadLearnerProfileQuerySchema,
   uiLaunchResultCommandSchema,
 ])
 
@@ -325,4 +343,5 @@ export type GeneratedResultDescriptor = z.infer<typeof generatedResultDescriptor
 export type PreparedBuilderTaskDescriptor = z.infer<typeof preparedBuilderTaskDescriptorSchema>
 export type HelperExchangeReceipt = z.infer<typeof helperExchangeReceiptSchema>
 export type ChatMessageReceipt = z.infer<typeof chatMessageReceiptSchema>
+export type LearnerProfileView = z.infer<typeof learnerProfileViewSchema>
 export type BuilderSessionBindingDescriptor = z.infer<typeof builderSessionBindingDescriptorSchema>
