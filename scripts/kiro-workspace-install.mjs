@@ -28,6 +28,40 @@ const binding = JSON.parse(await readFile(bindingDescriptorArg, 'utf8'))
 if (binding.role !== 'BUILDER' || resolve(binding.workspace) !== workspace)
   throw new Error('KIRO_INSTALL_BINDING_MISMATCH')
 
+// The confirmed Learning Spec and current Task, read once from Core.
+const connection = JSON.parse(
+  await readFile(join(dirname(resolve(bindingDescriptorArg)), 'connection.json'), 'utf8'),
+)
+const restored = await fetch(new URL('/api/application', connection.baseUrl), {
+  method: 'POST',
+  headers: { authorization: `Bearer ${connection.token}`, 'content-type': 'application/json' },
+  body: JSON.stringify({
+    protocolVersion: 1,
+    request: {
+      schemaVersion: 1,
+      kind: 'UI_RESTORE_PROJECT_SESSION',
+      correlationId: binding.correlationId,
+      actor: { kind: 'UI' },
+      projectId: binding.projectId,
+      helperConversationLimit: 1,
+    },
+  }),
+}).then((response) => response.json())
+if (!restored.success)
+  throw new Error(`KIRO_SPEC_SOURCE_UNAVAILABLE ${JSON.stringify(restored.error)}`)
+const { project, learningSpec, currentTask } = restored.data
+const learnerScope =
+  learningSpec?.status === 'CONFIRMED'
+    ? {
+        learnerFocus: learningSpec.scope
+          .filter((item) => item.category === 'LEARNER_FOCUS')
+          .map((item) => ({ title: item.title, conceptNames: item.conceptNames })),
+        expectedDecisions: learningSpec.expectedDecisions.map((item) => ({
+          description: item.description,
+        })),
+      }
+    : undefined
+
 const write = async (relative, content) => {
   const target = join(workspace, relative)
   await mkdir(dirname(target), { recursive: true })
@@ -36,11 +70,14 @@ const write = async (relative, content) => {
 const node = process.execPath
 await write(
   KIRO_LEARNER_STEERING_FILE,
-  renderLearnerSteering({
-    projectId: binding.projectId,
-    taskId: binding.taskId,
-    correlationId: binding.correlationId,
-  }),
+  renderLearnerSteering(
+    {
+      projectId: binding.projectId,
+      taskId: binding.taskId,
+      correlationId: binding.correlationId,
+    },
+    learnerScope,
+  ),
 )
 await write(KIRO_HELPER_STEERING_FILE, renderHelperSteering())
 await write(
@@ -79,27 +116,6 @@ await write(
     : '# 학습자 개념 상태 (Vibe Helper)\n\n아직 확인된 개념이 없다. 처음 나오는 개념은 쉬운 말로 설명한다.\n',
 )
 // Kiro Spec from the confirmed Learning Spec and current Task. An existing Spec is never replaced.
-const connection = JSON.parse(
-  await readFile(join(dirname(resolve(bindingDescriptorArg)), 'connection.json'), 'utf8'),
-)
-const restored = await fetch(new URL('/api/application', connection.baseUrl), {
-  method: 'POST',
-  headers: { authorization: `Bearer ${connection.token}`, 'content-type': 'application/json' },
-  body: JSON.stringify({
-    protocolVersion: 1,
-    request: {
-      schemaVersion: 1,
-      kind: 'UI_RESTORE_PROJECT_SESSION',
-      correlationId: binding.correlationId,
-      actor: { kind: 'UI' },
-      projectId: binding.projectId,
-      helperConversationLimit: 1,
-    },
-  }),
-}).then((response) => response.json())
-if (!restored.success)
-  throw new Error(`KIRO_SPEC_SOURCE_UNAVAILABLE ${JSON.stringify(restored.error)}`)
-const { project, learningSpec, currentTask } = restored.data
 let specStatus = 'SKIPPED_NO_CONFIRMED_SPEC'
 if (learningSpec?.status === 'CONFIRMED' && currentTask) {
   const spec = renderKiroSpec({ project, learningSpec, task: currentTask })

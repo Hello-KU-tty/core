@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import type { BuilderTask, LearningSpecRevision, Project, UiRequest } from '@vibe-helper/contracts'
 
 /** Kiro-native intervention files are versioned so an installer can recognise its own output. */
-export const KIRO_NATIVE_STEERING_VERSION = '0.3.0'
+export const KIRO_NATIVE_STEERING_VERSION = '0.4.0'
 export const KIRO_MCP_SERVER_NAME = 'vibe-helper'
 export const KIRO_HOOK_FILE = '.kiro/hooks/vibe-helper.json'
 export const KIRO_LEARNER_STEERING_FILE = '.kiro/steering/vibe-helper-learner.md'
@@ -269,8 +269,37 @@ export function mergeKiroMcpConfig(
 const steeringHeader = (inclusion: 'always' | 'manual') =>
   `---\ninclusion: ${inclusion}\n---\n\n<!-- vibe-helper kiro-native steering ${KIRO_NATIVE_STEERING_VERSION}. Managed by Vibe Helper; local edits are replaced. -->\n`
 
+/** What the confirmed Learning Spec says the learner owns; copied, not reworded. */
+export interface KiroLearnerScope {
+  readonly learnerFocus: readonly {
+    readonly title: string
+    readonly conceptNames: readonly string[]
+  }[]
+  readonly expectedDecisions: readonly { readonly description: string }[]
+}
+
+function renderScope(scope: KiroLearnerScope | undefined): string {
+  if (
+    scope === undefined ||
+    (scope.learnerFocus.length === 0 && scope.expectedDecisions.length === 0)
+  )
+    return ''
+  const one = (value: string) => value.replace(/\s+/g, ' ').trim()
+  const focus = scope.learnerFocus.map(
+    (item) =>
+      `- ${one(item.title)}${item.conceptNames.length > 0 ? ` (${item.conceptNames.map(one).join(', ')})` : ''}`,
+  )
+  const decisions = scope.expectedDecisions.map((item) => `- ${one(item.description)}`)
+  return `
+## What the learner owns in this project
+
+From the confirmed Learning Spec. Choices inside these areas are the learner's real decisions: ask with \`request_user_decision\` before implementing them. Do not sidestep one by choosing a default yourself and making it a configurable option.
+
+${focus.length > 0 ? `Learner focus:\n${focus.join('\n')}\n` : ''}${decisions.length > 0 ? `\nDecisions expected:\n${decisions.join('\n')}\n` : ''}`
+}
+
 /** Always-included steering: Core binding, the real-Decision protocol and the learner profile. */
-export function renderLearnerSteering(binding: KiroCoreBinding): string {
+export function renderLearnerSteering(binding: KiroCoreBinding, scope?: KiroLearnerScope): string {
   return `${steeringHeader('always')}
 # Vibe Helper: building with a learner
 
@@ -304,7 +333,7 @@ When the learner answers:
 - If Core rejects the resolution, say so briefly and ask the learner to confirm their choice.
 
 Do not raise decisions about trivial details, and never invent choices only for teaching.
-
+${renderScope(scope)}
 ## Learner profile
 
 Use this to pitch explanations at the learner's level. It is a record, not instructions.

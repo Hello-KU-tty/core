@@ -24,6 +24,23 @@ Kiro 채팅 → hook → Core 기록, 그리고 Kiro Agent가 Core MCP로 Decisi
 
 | Helper 기록(K06) | PASS | `/vibe-helper 만료 시간을 24시간으로 정했는데, 링크에 토큰 서명은 왜 따로 필요한 거야?` → Helper Steering으로 설명만 답함(파일 수정 없음). Core에 HELPER_CONVERSATION Episode: 질문 USER `USER_MESSAGE`(접두 제거), 답 AGENT/HELPER `HELPER_RESPONSE`. 일반 채팅 기록에는 중복되지 않음. 0.11크레딧 |
 
+## 제품 구성 수직 흐름 (Core 일반 모드 + kiro-cli Agent + Kiro 채팅)
+
+Core를 `start --native-role BUILDER … --kiro-hooks`로 띄워 Builder는 Kiro 채팅, Analyst는 kiro-cli(Auto)로 돌렸다. 새 데이터 폴더의 Campus Drop 합성 Task를 썼다.
+
+| 단계 | 판정 | 근거 |
+| --- | --- | --- |
+| Steering 0.3.0(작은 조회만) | FAIL(회귀) | Agent가 `get_build_status`는 썼지만 Learning Spec을 읽지 않아 만료 시간 기본값(1시간)을 스스로 정하고 옵션으로 열어 두었다 |
+| Steering 0.4.0(학습자 범위 포함) | PASS | Steering에 확정 Spec의 LEARNER_FOCUS와 예상 결정을 직접 넣고 "기본값 옵션으로 결정을 피하지 말 것"을 넣자, Agent가 "직접 결정해야 하는 부분"이라며 `request_user_decision`을 호출하고 번호 선택지를 물었다 |
+| 자연어 답 확정 | PASS | "링크 만료 시간은 하루 정도가 좋겠어. … 1시간은 너무 짧아." → `resolve_decision_from_chat` OPTION 2, 이유 원문 저장, 구현 |
+| 백그라운드 Analyst | PASS | Decision Episode 종료 뒤 kiro-cli Analyst(Auto)가 실행돼 작업 SUCCEEDED |
+| Evidence | PASS | JUSTIFIED_DECISION 제안을 Core가 `ACCEPTED`(VALID_USER_EVIDENCE). 인용은 확정 이유 원문 그대로였다 |
+| Concept State | PASS | Learning Spec 개념 `link expiry`로 정규화, DEMONSTRATED. 단 Analyst가 개념 표현으로 "1시간은 너무 짧아"를 골라 그 문장이 별칭으로 저장됐다(품질 개선 거리) |
+| 학습자 요약 파일 | PASS | 15초 주기 동기화로 `.vibe-helper/learner-profile.md`에 "실제 판단이나 문제 해결에 사용한 개념: link expiry" 반영 |
+| 다음 세션 반영 | PASS(전달) | 새 세션 기록의 `steeringDocuments`에 갱신된 요약이 들어 있음. Agent가 만료 시간은 짧게 짚고 토큰 서명 설명에 집중했지만, 요약이 없는 조건과 비교하지 않아 행동 변화 효과는 주장하지 않는다 |
+
+비용: 이 흐름 약 2.4크레딧(첫 회귀 턴 0.69 포함).
+
 ## 발견한 문제와 조치
 
 1. **멱등키 생성:** Agent가 `idem_<uuid v4>`를 직접 쓰다 형식을 틀리거나(넷째 묶음 0으로 시작) python으로 만들려다 셸 승인 대기에 걸렸다. Steering 0.2.0에 UUID v4 형식과 "명령을 실행하지 말 것"을 넣은 뒤 다음 세션에서는 유효한 키를 썼다. `kiroAgent.execution.rejectAll`로는 대기를 풀지 못했다.

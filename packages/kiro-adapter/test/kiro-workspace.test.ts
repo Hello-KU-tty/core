@@ -144,6 +144,14 @@ describe('Kiro-native workspace adapter', () => {
     expect(learner).toContain('resolve_decision_from_chat')
     expect(learner).toContain('get_build_status')
     expect(learner).toContain('#[[file:.vibe-helper/learner-profile.md]]')
+    expect(learner).not.toContain('What the learner owns')
+    const scoped = renderLearnerSteering(binding, {
+      learnerFocus: [{ title: '만료되는 공유 링크와 접근 토큰', conceptNames: ['link expiry'] }],
+      expectedDecisions: [{ description: '공유 링크를 얼마 동안 열 수 있게 할지 정한다.' }],
+    })
+    expect(scoped).toContain('- 만료되는 공유 링크와 접근 토큰 (link expiry)')
+    expect(scoped).toContain('- 공유 링크를 얼마 동안 열 수 있게 할지 정한다.')
+    expect(scoped).toContain('making it a configurable option')
     const helper = renderHelperSteering()
     expect(helper.startsWith('---\ninclusion: manual\n---')).toBe(true)
     expect(helper).toContain('Do not edit files')
