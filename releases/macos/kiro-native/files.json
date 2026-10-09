@@ -7,7 +7,7 @@
   {
     "name": "extension.vsixmanifest",
     "bytes": 855,
-    "sha256": "cd0b5ea2dd22a1aaeeaca0ff1e26c5b1ba11348cfc1c7a8b6501e0228485226b"
+    "sha256": "07771f8131abee5513a4aa7415b88b143145d16f93492280ea2fb96de91f1c90"
   },
   {
     "name": "extension/dist/extension.js",
@@ -27,7 +27,7 @@
   {
     "name": "extension/package.json",
     "bytes": 1580,
-    "sha256": "3fc63eb1f6995d6c691dd23580901c848f8678230f42039250b9fa0d88c991ab"
+    "sha256": "3201d31b967249bc96f5c7193d505bcec7304308fd84b6fc139dc565a7aa5813"
   },
   {
     "name": "extension/portable/agent-prompts/builder.md",
@@ -51,13 +51,13 @@
   },
   {
     "name": "extension/portable/agent-prompts/kiro-steering.md",
-    "bytes": 8279,
-    "sha256": "aebc57e13448bc260f73eb8a302574a55bff7398b5730602365191bb3ad4ecc0"
+    "bytes": 9262,
+    "sha256": "d70ad030a1e81af5606d23bcc53aa3140d8750094ab9ea05d274fd5a8c44222a"
   },
   {
     "name": "extension/portable/bin/bridge.mjs",
-    "bytes": 1016681,
-    "sha256": "de95714d8c8d0a500209700cb2a43f7ec25ac0e36f4aa5724b621d222b93af4a"
+    "bytes": 1018187,
+    "sha256": "9eaf4d80e75dd73bdb27cb6893b353be8707617dd43d4e8ccc775b3dc2e398d7"
   },
   {
     "name": "extension/portable/bin/client.cjs",
@@ -66,8 +66,8 @@
   },
   {
     "name": "extension/portable/bin/core.mjs",
-    "bytes": 1088321,
-    "sha256": "dafe5a4bb4d09a0d0d8c1d94a8b43e24d14cfd1cbaa292425d581324e16d6292"
+    "bytes": 1090277,
+    "sha256": "7b7781b571007f78d337a7560d992e95daca552c109fd3cbb735c5a7c56743b2"
   },
   {
     "name": "extension/portable/bin/extension.cjs",
@@ -86,8 +86,8 @@
   },
   {
     "name": "extension/portable/bin/kiro-hook.mjs",
-    "bytes": 2673,
-    "sha256": "d1fe29cddfa0ec9139935d9a91dc1a3be9357cc266fd1e0ec14ef37058abbef7"
+    "bytes": 3555,
+    "sha256": "a43c2f357944567fa24e1a99eb195860824b55acd5c0d6d34535f7436921ce62"
   },
   {
     "name": "extension/portable/bin/lifecycle.cjs",
@@ -227,7 +227,7 @@
   {
     "name": "extension/portable/manifest.json",
     "bytes": 10761,
-    "sha256": "494e4cc194bb742d1c5c9814d082fe6a4d2ee910bf78607df2092a86e8b8f796"
+    "sha256": "d8ae0b3de2b4decb2141c877dab96e340b306cd22373a342a5f7d7f8e2df0cca"
   },
   {
     "name": "extension/portable/node_modules/better-sqlite3/lib/binding.js",

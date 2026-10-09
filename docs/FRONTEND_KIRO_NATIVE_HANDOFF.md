@@ -1,9 +1,17 @@
-# 본선 Mac 설치물 0.2.3 (Kiro-native) 프론트 인계
+# 본선 Mac 설치물 0.2.4 (Kiro-native) 프론트 인계
 
-본선 방향([PROJECT_BRIEF §0](../PROJECT_BRIEF.md))에 맞춰 Mac 설치물의 host를 Kiro-native로 바꿨다. 0.2.1은 첫 실사용 체험 피드백(K09)을 반영했고, 0.2.2는 본선 계정 재실측에서 나온 Analyst·Evidence 정책 변경을 더했고, 0.2.3은 Kiro 채팅 Helper 에이전트가 도구를 받지 못하던 문제를 고치고 Helper를 읽기 전용으로 바꿨다. 프론트 담당자가 설치해 패널을 다듬을 수 있는 상태다.
+본선 방향([PROJECT_BRIEF §0](../PROJECT_BRIEF.md))에 맞춰 Mac 설치물의 host를 Kiro-native로 바꿨다. 0.2.1은 첫 실사용 체험 피드백(K09)을 반영했고, 0.2.2는 본선 계정 재실측에서 나온 Analyst·Evidence 정책 변경을 더했고, 0.2.3은 Kiro 채팅 Helper 에이전트가 도구를 받지 못하던 문제를 고치고 Helper를 읽기 전용으로 바꿨고, 0.2.4는 Kiro 연결이 Core 재시작을 넘어 유지되게 하고 끊긴 동안의 학습자 발언을 큐로 보존한다. 프론트 담당자가 설치해 패널을 다듬을 수 있는 상태다.
 
-- 설치 파일: [`releases/macos/kiro-native/builder-helper-agent-panel-0.2.3-darwin-arm64.vsix`](../releases/macos/kiro-native/builder-helper-agent-panel-0.2.3-darwin-arm64.vsix) · 41,537,276 bytes · SHA-256 `b408659c20254ad3088ecc7dea3866efd3eb5dc3c1047eaf3d6a7f6fcedcffb1` · [receipt](../releases/macos/kiro-native/macos-vsix-receipt.json) · [항목별 hash](../releases/macos/kiro-native/files.json)
-- 빌드 출처: backend `7df50ec`(`finals/kiro-native`), frontend `c2c873c`(`program` 저장소 `finals/trial-feedback` 브랜치). 0.2.2(backend `012c664`), 0.2.1(backend `4def349`)과 0.2.0(frontend `e65cd7f`)은 Git 이력에 있다.
+- 설치 파일: [`releases/macos/kiro-native/builder-helper-agent-panel-0.2.4-darwin-arm64.vsix`](../releases/macos/kiro-native/builder-helper-agent-panel-0.2.4-darwin-arm64.vsix) · 41,539,335 bytes · SHA-256 `fd6b55e5c83af4c87a893a7b672d5339bc865b04efeb17617ef43d9ec64e36f2` · [receipt](../releases/macos/kiro-native/macos-vsix-receipt.json) · [항목별 hash](../releases/macos/kiro-native/files.json)
+- 빌드 출처: backend `2b0487a`(`finals/kiro-native`), frontend `c2c873c`(`program` 저장소 `finals/trial-feedback` 브랜치). 0.2.3(backend `7df50ec`), 0.2.2(backend `012c664`), 0.2.1(backend `4def349`)과 0.2.0(frontend `e65cd7f`)은 Git 이력에 있다.
+
+## 0.2.4에서 바뀐 점 (연결 유지와 발언 큐)
+
+- **연결 복원:** Core가 시작할 때 이전에 연결한 Project를 다시 연결해 연결 파일과 작업 폴더의 hook·MCP·에이전트 파일을 새로 쓴다. Kiro를 껐다 켜거나 확장을 업데이트해도 **Open Project in Kiro Chat을 다시 할 필요가 없다.** 폴더가 없어졌으면 만들지 않는다. 권한 규칙은 다시 쓰지 않는다.
+- **bridge가 새 연결을 따라감:** 같은 폴더·Project·역할이면 Builder·Helper MCP가 바뀐 연결을 따라가서 창을 다시 로드하지 않아도 된다. Core가 없는 동안에는 MCP 서버가 실패하지 않고 도구가 `VIBE_HELPER_NOT_CONNECTED`를 돌려주며, 시작 때 Core가 아직 없으면 최대 45초 기다린다.
+- **발언 큐:** hook이 Core에 닿지 못한 학습자 발언을 연결 폴더의 사용자 전용 큐에 남기고, Core가 연결 직후와 hook 요청 때 순서대로 한 번씩 기록한다. 늦게 들어온 발언은 Core가 받은 시각으로 남는다. 끊긴 동안의 Helper 질문은 기록하지 않는다.
+- **Steering 0.5.2:** 도구가 `VIBE_HELPER_NOT_CONNECTED`를 돌려주면 Builder는 Decision 없는 작업만 계속하고 Core가 받기 전에는 묻거나 적용·완료하지 않는다. Helper는 한 번 다시 시도한다.
+- 근거와 보안 판단은 [DECISIONS](DECISIONS.md) "본선: Kiro 연결은 Core가 다시 시작해도 유지하고, 끊긴 동안의 학습자 발언은 큐로 보존". 패널·host 파일은 바뀌지 않았다.
 
 ## 0.2.3에서 바뀐 점 (Helper 에이전트 도구와 읽기 전용)
 
@@ -70,15 +78,24 @@ host API 형식은 [`examples/kiro-panel/src/frontend-host.d.cts`](../examples/k
 
 ## 알려진 제한
 
-- 확장을 업데이트하면 기존 프로젝트의 hook·MCP 명령이 이전 확장 폴더 경로를 가리킨다. 업데이트 뒤에는 그 프로젝트에서 **Open Project in Kiro Chat**을 다시 실행한다.
+- 확장 업데이트 뒤 기존 프로젝트의 hook·MCP 경로는 새 Core가 시작하면서 고친다(0.2.4). 그 전까지 몇 초 동안 Kiro가 옛 경로의 MCP 시작 실패를 표시할 수 있다.
 - 연결은 Project당 하나다. 다시 연결하면 이전 연결 토큰은 폐기된다.
 - Builder 채팅 단계(같은 창 연결 뒤 hook 기록, Steering 0.5.0의 Decision 시점, `/vibe-helper`의 Builder 활동 사용, 허용 규칙으로 Vibe Helper 도구 승인 창 0회)는 0.2.1·Kiro 1.2.37로 본선 계정에서 확인했다([K09 재실측](spikes/KIRO_NATIVE_K09_REMEASURE_20261009.md)). 0.2.3의 Builder Steering 내용은 같고 버전 표기만 0.5.1이다. Kiro 1.2.56에서 Builder 턴은 다시 확인하지 않았다.
-- **연결이 바뀌어도 이미 떠 있는 MCP는 옛 연결을 쓴다.** Core는 연결을 메모리에만 두고 다시 연결하거나 Core가 다시 시작하면 연결 정보를 새로 쓴다. 그런데 Kiro는 MCP 명령·인자가 같으면 이미 띄운 Builder·Helper MCP 프로세스를 다시 시작하지 않아, 다음 도구 호출이 `BRIDGE_BINDING_REVOKED`로 실패한다(1.2.56 실측). Kiro를 껐다 켜면 Core가 새로 떠서 연결이 없어지므로 **Open Project in Kiro Chat**을 다시 실행해야 하고, 그 창에서 MCP가 먼저 떠 있었다면 **Developer: Reload Window**까지 해야 한다. 창 다시 로드는 Core와 연결을 유지한다. 수정 방향은 아직 정하지 않았다(K08).
+- Core가 45초 넘게 뜨지 않으면 Builder·Helper MCP 시작이 실패하고 Kiro의 MCP 재연결이 필요하다. 끊긴 동안 친 학습자 발언은 큐로 보존되지만 Core가 받은 시각으로 기록되고, 끊긴 동안의 Helper 질문은 기록되지 않는다. 큐에는 redaction 전 원문이 Core가 읽을 때까지 사용자 전용 파일로 남는다(최대 1MB·200개).
 - Workspace Trust 화면은 사용자가 직접 거쳤지만 우리 신뢰 안내·다시 로드 알림이 떴는지는 기록하지 못했다. 도구 허용 동의(저장값 `ALLOW`)와 새 창 확인(생성 폴더가 새 창으로 열림)은 기록으로 확인했다.
 - 셸 명령 승인은 그대로 매번 뜬다(K11).
 - Helper 답 수집은 Kiro 세션 기록 파일(비공개 형식)에 기대며, 못 읽으면 안내 문구로 기록한다.
 - Mac 전용이다. Windows에서는 host가 `KIRO_NATIVE_HOST_MAC_ONLY`로 시작하지 않는다.
 - Kiro는 자동 업데이트된다. 1.2.4 → 1.2.37 → 1.2.56(2026-10-09)으로 바뀌었다. Builder 채팅 단계는 1.2.37에서, Helper 탭·hook 기록·도구 허용은 1.2.56에서 확인했다.
+
+## 0.2.4 확인 (2026-10-10)
+
+- 자동 검사: backend `pnpm typecheck`, `pnpm test:unit` 177 통과·3 skip, `pnpm test:integration` 498 통과·8 skip, `scripts/test-macos-package.mjs` 9개 PASS, biome format·lint(소스 경로) 통과. 새 integration: 새 Core의 연결 복원과 없어진 폴더 건너뛰기, 다시 연결 때 회수 표시 없음, 큐의 순서·중복 1회·안전하지 않은 큐 폐기, 실제 hook 스크립트의 큐 쌓기(접속 실패·회수, Stop 제외), 실제 bridge 프로세스의 시작 대기·새 연결 따라가기·연결 없음 결과·다른 폴더 거절.
+- 격리 Kiro 1.2.56 프로필(본선 계정). 화면 조작과 화면 문구 확인은 Codex(`gpt-6-astra`, computer use), 판정은 Kiro 로그·세션 기록·Core SQLite와 화면 문구를 함께 봤다.
+  - **Kiro 재시작 + 0.2.3 위 업데이트:** 직접 다시 연결하지 않았다. 옛 경로 MCP는 01:31:39에 시작 실패, 새 Core가 연결을 복원해 경로를 고친 01:32:05에 Kiro가 두 서버를 다시 연결했다. 화면: `vibe-helper Connected (9 tools)`, `vibe-helper-helper Connected (1 tool)`. Builder `get_build_status`, Helper `get_helper_context` 성공, 학습자 발언 `USER_MESSAGE` 기록, 승인 창 0회.
+  - **열린 창에서 다시 연결:** 창 다시 로드 없이 같은 Builder 탭의 다음 `get_build_status`가 성공(bridge가 새 연결을 따라감).
+  - **Core에 닿지 못한 발언:** hook 연결 파일을 닫힌 포트로 바꾼 상태(Core가 사라진 것과 같은 조건)에서 보낸 발언이 큐(0600)에 남았고 채팅은 막히지 않았다. 다음 연결 때 Core가 한 번 기록하고 큐를 지웠다.
+- 크레딧: 이번 확인 직전 29.39(01:31 기록), 이후 채팅 3턴은 다음 창 로드 때 갱신된다.
 
 ## 0.2.3 확인 (2026-10-09~10)
 
@@ -87,7 +104,7 @@ host API 형식은 [`examples/kiro-panel/src/frontend-host.d.cts`](../examples/k
   - 채팅 모드 목록: Default, Spec, Quick Spec, Bug Fix, Plan, kirocrew 3개(사용자 전역 에이전트), `vibe-helper`.
   - `vibe-helper` 탭: 도구 8개(`toolCount: 8`), `get_helper_context` 성공(정책 `allow`, 승인 창 0회), 파일 검색·목록도 승인 없이 실행. 답은 확정 계획(오프라인 메모장, Task PENDING)을 바탕으로 했다.
   - Core: 질문과 답이 `USER_MESSAGE`·`HELPER_RESPONSE`로 기록.
-  - 도중에 나온 실패 두 가지를 고쳤다(taskId 누락 → `AGENT_RUN_SCOPE_MISMATCH`, 위 0.2.3 항목). 다른 하나(다시 연결 뒤 옛 MCP 프로세스 → `BRIDGE_BINDING_REVOKED`)는 알려진 제한에 남겼다.
+  - 도중에 나온 실패 두 가지를 고쳤다(taskId 누락 → `AGENT_RUN_SCOPE_MISMATCH`, 위 0.2.3 항목). 다른 하나(다시 연결 뒤 옛 MCP 프로세스 → `BRIDGE_BINDING_REVOKED`)는 0.2.4에서 고쳤다.
 - 0.2.2 실측(Kiro 1.2.56, 사용자 클릭): 도구 허용 동의 `ALLOW` 저장, 권한 규칙 `vibe-helper/*`·`vibe-helper-helper/*` 기록, 파일 있는 폴더에서 생성 폴더가 새 창으로 열림, Helper 탭 판별과 Core 기록 동작. Helper 도구는 위 문제로 실패했다.
 - 확인하지 못한 것: Sonnet 5.5 Analyst의 실제 실행(이번 Helper 대화 Episode는 아직 분석되지 않음), Kiro 1.2.56의 Builder 턴.
 - 크레딧: 이 확인 전체에서 계정 사용량 27.39 → 29.08(마지막 Helper 턴 전 기록). Discovery·계획 0.42, Core에 기록된 Helper 대화 4건, Codex가 한글 입력 누락으로 중단하고 다시 보낸 턴 2번을 포함한다.
