@@ -1,17 +1,26 @@
-# 본선 Mac 설치물 0.2.4 (Kiro-native) 프론트 인계
+# 본선 설치물 0.2.5 (Kiro-native, Mac·Windows) 프론트 인계
 
-본선 방향([PROJECT_BRIEF §0](../PROJECT_BRIEF.md))에 맞춰 Mac 설치물의 host를 Kiro-native로 바꿨다. 0.2.1은 첫 실사용 체험 피드백(K09)을 반영했고, 0.2.2는 본선 계정 재실측에서 나온 Analyst·Evidence 정책 변경을 더했고, 0.2.3은 Kiro 채팅 Helper 에이전트가 도구를 받지 못하던 문제를 고치고 Helper를 읽기 전용으로 바꿨고, 0.2.4는 Kiro 연결이 Core 재시작을 넘어 유지되게 하고 끊긴 동안의 학습자 발언을 큐로 보존한다. 프론트 담당자가 설치해 패널을 다듬을 수 있는 상태다.
+본선 방향([PROJECT_BRIEF §0](../PROJECT_BRIEF.md))에 맞춰 Mac 설치물의 host를 Kiro-native로 바꿨다. 0.2.1은 첫 실사용 체험 피드백(K09)을 반영했고, 0.2.2는 본선 계정 재실측에서 나온 Analyst·Evidence 정책 변경을 더했고, 0.2.3은 Kiro 채팅 Helper 에이전트가 도구를 받지 못하던 문제를 고치고 Helper를 읽기 전용으로 바꿨고, 0.2.4는 Kiro 연결이 Core 재시작을 넘어 유지되게 하고 끊긴 동안의 학습자 발언을 큐로 보존하며, 0.2.5는 같은 코드로 Windows x64 설치물을 빌드할 수 있게 했다(Mac은 backend, Windows는 frontend가 빌드). 프론트 담당자가 설치해 패널을 다듬을 수 있는 상태다.
 
-- 설치 파일: [`releases/macos/kiro-native/builder-helper-agent-panel-0.2.4-darwin-arm64.vsix`](../releases/macos/kiro-native/builder-helper-agent-panel-0.2.4-darwin-arm64.vsix) · 41,539,335 bytes · SHA-256 `fd6b55e5c83af4c87a893a7b672d5339bc865b04efeb17617ef43d9ec64e36f2` · [receipt](../releases/macos/kiro-native/macos-vsix-receipt.json) · [항목별 hash](../releases/macos/kiro-native/files.json)
-- 빌드 출처: backend `2b0487a`(`finals/kiro-native`), frontend `c2c873c`(`program` 저장소 `finals/trial-feedback` 브랜치). 0.2.3(backend `7df50ec`), 0.2.2(backend `012c664`), 0.2.1(backend `4def349`)과 0.2.0(frontend `e65cd7f`)은 Git 이력에 있다.
+- 설치 파일: Mac [`releases/macos/kiro-native/builder-helper-agent-panel-0.2.5-darwin-arm64.vsix`](../releases/macos/kiro-native/builder-helper-agent-panel-0.2.5-darwin-arm64.vsix) · 41,540,113 bytes · SHA-256 `fa8b226afddd67f87df416e7efdc97f2bf0d72b095941cb56ae8f62986523844` · [receipt](../releases/macos/kiro-native/macos-vsix-receipt.json) · [항목별 hash](../releases/macos/kiro-native/files.json)
+- Windows 설치물: frontend가 빌드해 `releases/windows/kiro-native/`에 올린다([Windows에서](#windows에서)).
+- 빌드 출처: backend `1f1eea4`(`finals/kiro-native`), frontend `c2c873c`(`program` 저장소 `finals/trial-feedback` 브랜치). 0.2.4(backend `2b0487a`), 0.2.3(backend `7df50ec`), 0.2.2(backend `012c664`), 0.2.1(backend `4def349`)과 0.2.0(frontend `e65cd7f`)은 Git 이력에 있다.
 
 ## 프론트 담당자 빠른 시작
 
 - **코드:** backend `Hello-KU-tty/core`의 `finals/kiro-native` 브랜치(이 문서와 설치 파일), frontend `Hello-KU-tty/program`의 `finals/trial-feedback` 브랜치 `c2c873c`(0.2.4에 들어간 패널).
-- **설치 파일 바로 받기:** [0.2.4 Mac VSIX](https://github.com/Hello-KU-tty/core/raw/refs/heads/finals/kiro-native/releases/macos/kiro-native/builder-helper-agent-panel-0.2.4-darwin-arm64.vsix). 받은 뒤 `shasum -a 256 <파일>`이 위 SHA-256과 같은지 확인한다.
+- **설치 파일 바로 받기:** [0.2.5 Mac VSIX](https://github.com/Hello-KU-tty/core/raw/refs/heads/finals/kiro-native/releases/macos/kiro-native/builder-helper-agent-panel-0.2.5-darwin-arm64.vsix). 받은 뒤 `shasum -a 256 <파일>`이 위 SHA-256과 같은지 확인한다.
 - **Mac(Apple Silicon):** 아래 [설치 전 준비](#설치-전-준비)와 [설치와 사용 흐름](#설치와-사용-흐름)대로 쓴다.
 - **Windows:** frontend가 빌드·확인·업로드한다. 절차는 [Windows에서](#windows에서)에 있다(0.2.5부터).
 - **패널 코드에 필요한 변경:** 0.2.1 이후 host API(`frontend-host.d.cts`), frontend SDK, Core 계약은 바뀌지 않았다. 0.2.2의 Evidence 표시 검토 한 가지만 있다([0.2.2에서 바뀐 점](#022에서-바뀐-점-analystevidence-정책)).
+
+## 0.2.5에서 바뀐 점 (Windows x64 지원)
+
+- host가 macOS와 Windows에서 시작한다. Windows는 kiro-cli를 `Program Files\Kiro-Cli`, 그다음 PATH에서 찾는다.
+- Kiro-native Core는 Kiro 실행 파일이 아니라 실제 Node(PATH의 24.18·24.19 또는 관리 Node)로 돈다. hook·MCP 명령에 Core의 Node 경로가 쓰이기 때문이다.
+- Kiro 작업 폴더 해시, hook 명령 인용(Windows는 cmd.exe), 생성 폴더 터미널 PATH를 Windows에 맞췄다.
+- 포장 스크립트를 하나로 합쳤다. Mac은 `pnpm panel:pack:macos <program>`, Windows는 `pnpm panel:pack:kiro-windows <program>`.
+- macOS 동작은 바뀌지 않았다. 패널·host API 계약도 그대로다.
 
 ## 0.2.4에서 바뀐 점 (연결 유지와 발언 큐)
 
@@ -142,6 +151,12 @@ host API 형식은 [`examples/kiro-panel/src/frontend-host.d.cts`](../examples/k
 - Helper 답 수집은 Kiro 세션 기록 파일(비공개 형식)에 기대며, 못 읽으면 안내 문구로 기록한다.
 - 지원 플랫폼은 Apple Silicon Mac과 Windows x64다. 그 밖의 플랫폼에서는 host가 `KIRO_NATIVE_HOST_PLATFORM_UNSUPPORTED`로 시작하지 않는다. Windows는 실제 기기 실측 전이다.
 - Kiro는 자동 업데이트된다. 1.2.4 → 1.2.37 → 1.2.56(2026-10-09)으로 바뀌었다. Builder 채팅 단계는 1.2.37에서, Helper 탭·hook 기록·도구 허용은 1.2.56에서 확인했다.
+
+## 0.2.5 확인 (2026-10-10)
+
+- 자동 검사: backend `pnpm typecheck`, `pnpm test:unit` 177 통과·3 skip, `pnpm test:integration` 500 통과·8 skip, 패널 CJS 180 통과·2 skip, `scripts/test-macos-package.mjs` 9개 PASS, biome format·lint(소스 경로) 통과. 새 테스트: Windows 작업 폴더 해시·cmd.exe 인용, Windows host의 kiro-cli 위치와 실제 Node 실행, 지원하지 않는 플랫폼 거절, Windows 생성 폴더 터미널 PATH.
+- macOS 격리 Kiro 1.2.56(모델 호출 없음): 0.2.4 위에 설치하고 Kiro를 다시 열자 새 Core가 연결을 복원했고 두 MCP 서버가 다시 연결됐다. hook 명령은 macOS 인용 그대로다.
+- Windows 실측: frontend의 첫 빌드 확인으로 한다(위 [Windows에서](#windows에서)).
 
 ## 0.2.4 확인 (2026-10-10)
 
