@@ -125,11 +125,12 @@ async function kiroVersion(): Promise<string> {
     maxBuffer: 16_384,
   })
   const version = stdout.match(/\b(\d+\.\d+\.\d+)\b/)?.[1]
-  // Verified range: 2.21.1 (preliminary) through the 2.x line checked by the finals ACP probe.
+  // A minimum, not a range: Kiro CLI updates itself, so a newer release must keep working. The ACP
+  // handshake still fails clearly if a future CLI drops what Core uses.
   const [major = 0, minor = 0, patch = 0] = (version ?? '').split('.').map(Number)
-  const atLeastMinimum = minor > 21 || (minor === 21 && patch >= 1)
-  if (version === undefined || major !== 2 || !atLeastMinimum)
-    throw new Error('KIRO_VERSION_NOT_VERIFIED_EXPECT_2_21_1_TO_2_X')
+  const atLeastMinimum = major > 2 || (major === 2 && (minor > 21 || (minor === 21 && patch >= 1)))
+  if (version === undefined || !atLeastMinimum)
+    throw new Error('KIRO_CLI_VERSION_TOO_OLD_NEED_2_21_1')
   return version
 }
 async function doctor(): Promise<void> {
@@ -628,7 +629,7 @@ try {
     )
       throw new Error('PACKAGED_DATA_RESOURCE_OVERLAP')
     await ownedPrivateDirectory(root)
-  } else if (process.versions.node !== '24.19.0') throw new Error('NODE_24_19_0_REQUIRED')
+  } else if (process.versions.node.split('.')[0] !== '24') throw new Error('NODE_24_REQUIRED')
   if (command === 'init') await init()
   else if (command === 'doctor') await doctor()
   else if (command === 'recover') await recover()

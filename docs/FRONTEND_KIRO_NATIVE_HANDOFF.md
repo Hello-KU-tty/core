@@ -67,8 +67,8 @@
 
 ## 설치 전 준비
 
-1. Apple Silicon Mac에 Kiro IDE를 `/Applications/Kiro.app`으로 설치하고 로그인한다.
-2. Kiro CLI를 설치한다(kiro.dev의 Kiro CLI 설치 안내). host는 `~/.local/bin/kiro-cli`, 그다음 `/Applications/Kiro CLI.app/Contents/MacOS/kiro-cli` 순서로 찾는다. 버전은 2.21.1 이상 2.x여야 한다(확인: 2.28.0).
+1. Apple Silicon Mac에 Kiro IDE 최신판을 설치하고 로그인한다(Kiro 버전은 고정하지 않는다).
+2. Kiro CLI를 설치한다(kiro.dev의 Kiro CLI 설치 안내). host는 `~/.local/bin/kiro-cli`, `/Applications/Kiro CLI.app/Contents/MacOS/kiro-cli`, 그다음 PATH 순서로 찾는다. 버전은 최소 2.21.1이고 상한은 없다(확인: 2.28.0).
 3. 터미널에서 `kiro-cli login`. Builder ID 무료 계정과 본선 팀 계정(IAM Identity Center)에서 동작을 확인했다. IDE 로그인과 CLI 로그인은 따로다. 조직 계정은 IDE에서도 로그인해야 MCP가 열린다(로그인 전에는 `mcpEnabled: false`).
 4. 예선 0.1.x를 쓰던 Kiro라면 모든 Kiro 창을 닫았다가 연다. 이전 Core가 끝나기 전에는 `CORE_UPDATE_WAITING_FOR_OWNER_EXIT`로 기다린다. 기존 History(`core-data`)는 그대로 읽힌다.
 
@@ -91,10 +91,12 @@ Kiro를 껐다 켜거나 확장을 업데이트해도 0.2.4부터는 3번을 다
 
 ### 1. 준비 (Windows 11 x64)
 
-- Git, Node.js **24.19.0**(`node -v`로 확인), pnpm **11.13.1**(`npm install -g pnpm@11.13.1`), 기본 PowerShell.
-- Kiro IDE 최신판에 로그인. Kiro CLI 2.x를 Kiro 공식 안내의 PowerShell 설치로 설치한다(기본 위치 `C:\Program Files\Kiro-Cli\`). 새 터미널에서 `kiro-cli login` 후 `kiro-cli whoami`가 성공해야 한다. IDE와 CLI 로그인은 따로다.
+- Git, Node.js **24.x**(`node -v`, 권장 24.19.0), pnpm **11.13.1 이상 11.x**(`npm install -g pnpm`; pnpm 10 이상이면 저장소의 권장 pnpm으로 스스로 바꿔 실행), 기본 PowerShell. Node 메이저는 포장 SQLite 모듈이 Core의 Node 24와 맞아야 해서 24여야 한다. 이 도구들은 빌드하는 사람만 필요하고, 설치물을 쓰는 학습자는 Node·pnpm을 설치하지 않는다.
+- Kiro IDE 최신판에 로그인. Kiro CLI를 Kiro 공식 안내대로 설치한다(최소 2.21.1, 상한 없음). host는 기본 위치 `C:\Program Files\Kiro-Cli\`, 그다음 PATH에서 `kiro-cli.exe`를 찾으므로 다른 위치에 설치해도 된다. 새 터미널에서 `kiro-cli login` 후 `kiro-cli whoami`가 성공해야 한다. IDE와 CLI 로그인은 따로다.
 
 ### 2. 빌드
+
+폴더 위치는 자유다. 아래 `C:\dev\...`는 예시이며 실제 위치로 바꾼다.
 
 ```powershell
 git clone https://github.com/Hello-KU-tty/program C:\dev\program
@@ -111,7 +113,7 @@ pnpm install --frozen-lockfile
 pnpm panel:pack:kiro-windows C:\dev\program
 ```
 
-결과는 `C:\dev\core\dist\windows-vsix-*\`의 `builder-helper-agent-panel-0.2.5-win32-x64.vsix`, `receipt.json`, `files.json`이다. 포장 Core만 따로 보려면 `node scripts\test-portable-core.mjs`(예선 Windows 검사)를 돌린다.
+결과는 `<core 폴더>\dist\windows-vsix-*\`의 `builder-helper-agent-panel-<버전>-win32-x64.vsix`, `receipt.json`, `files.json`이다. 버전은 Mac 설치물과 같은 번호다. 포장 Core만 따로 보려면 `node scripts\test-portable-core.mjs`(예선 Windows 검사)를 돌린다.
 
 ### 3. 설치한 Kiro에서 확인
 
@@ -211,11 +213,12 @@ host API 형식은 [`examples/kiro-panel/src/frontend-host.d.cts`](../examples/k
 
 ## 다시 빌드
 
-backend `finals/kiro-native` checkout에서, Node 24.19.0·pnpm 11.13.1로:
+backend `finals/kiro-native` checkout에서, Node 24.x·pnpm 11.13.1 이상 11.x로(권장 24.19.0·11.13.1):
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm panel:pack:macos <frontend checkout 경로>
+pnpm panel:pack:macos <frontend checkout 경로>        # Apple Silicon Mac
+pnpm panel:pack:kiro-windows <frontend checkout 경로> # Windows x64
 ```
 
 `dist/macos-vsix-*`에 VSIX, receipt와 `files.json`이 생긴다. 프론트 변경을 반영하려면 프론트 checkout을 고친 뒤 같은 명령을 다시 실행한다. `vibeHelper.openInKiro` 명령 등록은 패키징 단계에서 manifest에 더해지므로 프론트 `package.json`에 넣지 않아도 된다.

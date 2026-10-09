@@ -19,16 +19,19 @@ const safeCode = error => /^[A-Z][A-Z0-9_]{0,99}$/.test(error?.code ?? error?.me
   ? error.code ?? error.message : 'FRONTEND_HOST_FAILED'
 // Kiro-native runs on Apple Silicon Mac and Windows x64 (Kiro CLI 2.x runs natively on Windows 11).
 const KIRO_NATIVE_PLATFORMS = new Set(['darwin', 'win32'])
-// Fixed install locations first; on Windows the official installer uses Program Files\Kiro-Cli, and
-// a kiro-cli.exe on PATH is the fallback.
+// Usual install locations first (Windows: the official installer's Program Files\Kiro-Cli; macOS:
+// the install script's ~/.local/bin or the app bundle), then kiro-cli on PATH, so another install
+// location still works.
+const onPath = name => (process.env.PATH ?? process.env.Path ?? '').split(delimiter)
+  .filter(directory => isAbsolute(directory)).map(directory => join(directory, name))
 const kiroCliCandidates = () => process.platform === 'win32'
   ? [
       join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Kiro-Cli', 'kiro-cli.exe'),
       join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Kiro-Cli', 'bin', 'kiro-cli.exe'),
-      ...(process.env.PATH ?? process.env.Path ?? '').split(delimiter)
-        .filter(directory => isAbsolute(directory)).map(directory => join(directory, 'kiro-cli.exe')),
+      ...onPath('kiro-cli.exe'),
     ]
-  : [join(homedir(), '.local/bin/kiro-cli'), '/Applications/Kiro CLI.app/Contents/MacOS/kiro-cli']
+  : [join(homedir(), '.local/bin/kiro-cli'), '/Applications/Kiro CLI.app/Contents/MacOS/kiro-cli',
+      ...onPath('kiro-cli')]
 const BIND_MESSAGES = {
   KIRO_BIND_TASK_NOT_READY: 'Learning Spec을 확정하고 Task가 생긴 뒤에 Kiro에서 열 수 있습니다.',
   KIRO_NATIVE_NOT_ENABLED: '이 Core는 Kiro 채팅 연결을 지원하지 않습니다. 확장을 다시 설치하세요.',

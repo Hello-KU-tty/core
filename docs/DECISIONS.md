@@ -1,5 +1,16 @@
 # 결정 기록
 
+## 본선: 버전은 의존성이 깨지지 않는 범위만 강제하고 Kiro는 최신판 기준
+
+- **맥락:** 예선 때 재현 빌드와 Kiro 내부 비공개 API 의존 때문에 Node 24.19.0·pnpm 11.13.1을 정확히 강제했고, 맞지 않으면 빌드·실행을 거절했다. 본선은 공개 기능과 kiro-cli를 쓰고 사용자가 초보자라, 정확한 버전 강제는 이유 없이 설치와 개발을 막는다. kiro-cli는 스스로 업데이트되는데 Core가 2.x까지만 받아 3.0이 나오면 모두 막힐 구조였다.
+- **결정(사용자 지시, 2026-10-10):**
+  - 개발·빌드: Node 24.x(포장 SQLite 네이티브 모듈이 Core의 Node 24 ABI와 맞아야 함), pnpm 11.13.1 이상 11.x(lockfile, pnpm이 막는 깨진 11.12.0·11.13.0 제외). `.node-version`(24.19.0)과 `packageManager`(pnpm@11.13.1)는 권장값이고, pnpm 10 이상은 `packageManager`의 pnpm으로 스스로 바꿔 실행한다. preflight·`engines`·포장 스크립트·개발용 스크립트를 이 범위로 바꿨다.
+  - 사용자 실행: 사용자가 Node·pnpm을 설치할 필요는 그대로 없다. Core와 생성 앱이 직접 받는 Node 24.19.0·pnpm 11.13.1은 해시 검증 때문에 계속 고정한다. PATH의 Node가 검증 범위(24.18·24.19) 밖이면 거절하지 않고 그 검증된 Node를 받는다.
+  - kiro-cli는 최소 2.21.1만 요구하고 상한을 없앴다(`KIRO_CLI_VERSION_TOO_OLD_NEED_2_21_1`). 앞으로 깨지면 ACP 연결에서 오류로 드러난다.
+  - Kiro IDE는 버전을 고정하지 않고 최신판을 기준으로 한다(본선 host에는 원래 Kiro 버전 검사가 없다). Kiro가 자동 업데이트되면 그 버전에서 다시 확인하고 깨진 것을 고친다. 지금까지 1.2.37·1.2.56에서 확인했다.
+  - kiro-cli 위치도 강제하지 않는다. 기본 설치 위치 다음에 PATH에서 찾는다(macOS·Windows).
+- **이전 결정 대체:** AGENTS.md의 "Node.js 24.19.0, pnpm 11.13.1… preflight를 우회하지 않는다"를 범위 규칙으로 바꿨다. preflight 자체는 계속 지킨다.
+
 ## 본선: 플랫폼 분담과 Kiro-native의 Windows 지원
 
 - **맥락:** 본선에는 Windows 지원이 포함된다. backend는 Mac에서, frontend는 Windows에서 개발한다. 본선 경로는 Kiro 내부 비공개 API 대신 공식 기능(Steering·hook·MCP·사용자 에이전트)과 kiro-cli(2.0부터 Windows 11 기본 지원)를 쓰므로, 막고 있던 것은 Mac 전용으로 둔 host·포장 코드였다.

@@ -10,7 +10,8 @@ import { sourceProvenance } from './source-provenance.mjs'
 // Kiro-native VSIX for the machine it is built on: Apple Silicon Mac or Windows x64. The portable
 // Core holds native modules for that target, so each platform is built on its own OS.
 const target = `${process.platform}-${process.arch}`
-if (!['darwin-arm64', 'win32-x64'].includes(target) || process.version !== 'v24.19.0')
+// Node 24.x: the packaged SQLite native module must match the Core's Node 24 ABI.
+if (!['darwin-arm64', 'win32-x64'].includes(target) || process.versions.node.split('.')[0] !== '24')
   throw new Error('PROGRAM_BUILD_TOOLCHAIN_REQUIRED')
 const mac = target === 'darwin-arm64'
 if (!process.argv[2]) throw new Error('EXPLICIT_FRONTEND_CHECKOUT_REQUIRED')
@@ -37,7 +38,7 @@ const hostCommands = [
 ]
 const pkg = {
   ...product,
-  version: '0.2.5',
+  version: '0.2.6',
   displayName: 'Hello Vibe',
   description: `Kiro-native Vibe Helper for ${mac ? 'Apple Silicon Mac' : 'Windows x64'}: local Core, kiro-cli Agents and Kiro chat hooks.`,
   engines: { vscode: '^1.131.0' },
