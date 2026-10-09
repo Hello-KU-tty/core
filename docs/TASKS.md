@@ -106,7 +106,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 
 - **출처:** 사용자 지시(2026-10-10). 본선에는 Windows 지원이 포함되고, Mac은 backend, Windows는 frontend가 빌드·확인·업로드한다.
 - **backend 몫(완료):** host·Core·hook·bridge의 Windows 지원과 공통 포장 스크립트(`pnpm panel:pack:kiro-windows`), Windows를 흉내 낸 테스트, [핸드오프의 Windows 절차](FRONTEND_KIRO_NATIVE_HANDOFF.md#windows에서).
-- **완료 조건:** frontend가 Windows 11 x64에서 0.2.5 이상 VSIX를 빌드하고 핸드오프의 확인 1~7을 통과해 `releases/windows/kiro-native/`에 올린다. 실패 보고가 오면 backend가 고친다.
+- **완료 조건:** frontend가 Windows 11 x64에서 0.2.5 이상 VSIX를 빌드하고 핸드오프의 확인 1~7을 통과해 `releases/windows/kiro-native/`에 올린다. Windows 문제는 frontend가 PR로 고쳐도 되고(관련 테스트 실행, macOS 영향은 PR에 명시), backend가 검토해 Mac 설치물에도 반영한다. 직접 고치기 어려운 것은 보고하면 backend가 고친다.
 
 ### [ ] K12. 크레딧 사용 측정과 절감
 

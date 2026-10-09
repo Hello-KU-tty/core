@@ -134,7 +134,8 @@ pnpm panel:pack:kiro-windows C:\dev\program
 ### 4. 올리기와 문제 보고
 
 - 확인한 VSIX와 `receipt.json`, `files.json`을 backend 저장소의 `releases/windows/kiro-native/`에 넣어 `finals/kiro-native`에 커밋·푸시한다(또는 PR). 커밋 메시지에 위 확인 1~7의 결과를 적는다.
-- 실패하면 단계 번호, 화면의 오류 코드, Kiro 버전(Help → About), `kiro-cli --version`, Kiro Output 패널의 `Kiro Logs`·`Kiro - MCP Logs`에서 `vibe-helper`가 들어간 줄을 남긴다. 토큰·계정 정보는 붙이지 않는다.
+- Windows 문제는 직접 고쳐도 된다. `finals/kiro-native`에서 브랜치를 따서 PR로 올리고, `pnpm test:unit`, `pnpm test:integration`, `node --test examples/kiro-panel/test/*.test.cjs`를 돌린다. macOS 동작이 바뀌는 변경이면 PR에 적는다. backend가 검토해 Mac 설치물에도 넣는다.
+- 직접 고치기 어려우면 단계 번호, 화면의 오류 코드, Kiro 버전(Help → About), `kiro-cli --version`, Kiro Output 패널의 `Kiro Logs`·`Kiro - MCP Logs`에서 `vibe-helper`가 들어간 줄을 남긴다. 토큰·계정 정보는 붙이지 않는다.
 
 ## 패널에서 다듬을 것
 
