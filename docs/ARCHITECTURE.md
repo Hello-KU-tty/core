@@ -159,7 +159,7 @@ Helper 역할 MCP (기존)            ◀───── .kiro/agents/vibe-helpe
 | `agentStop` | 대화 Episode 경계, 학습자 요약 갱신 예약 | — |
 
 - hook 명령은 Node 스크립트 하나로 통일해 로컬 Core에 한 번 POST하고, LLM을 호출하지 않는다.
-- Helper는 프롬프트로 역할을 제한한다. Evidence·State 변경 도구는 Helper와 Builder에 노출하지 않는다.
+- Helper는 읽기 권한만 가진다. Kiro 채팅 Helper 에이전트는 `tools: ["read", "@vibe-helper-helper"]`로 파일 읽기·검색과 Helper Core 조회만 받는다. `/vibe-helper` 슬래시 턴은 Builder 세션 안이라 프롬프트로만 읽기 전용을 지킨다. Evidence·State 변경 도구는 Helper와 Builder에 노출하지 않는다.
 - Core는 등록된 workspace root 밖의 경로와 Agent 출처의 이해 근거를 거절한다. redaction 경계는 기존과 같다.
 - Project 폴더는 사용자가 연 빈 폴더(등록) 또는 Core 생성 폴더다. 등록은 local-backend의 private 파일에 두고, Core 경로 정책이 매번 canonical·디렉터리·생성 루트 비중첩을 다시 확인한다.
 - Steering·Helper 에이전트 원문은 `docs/agent-prompts/kiro-steering.md`에 버전과 함께 두고 adapter는 자리만 채운다.

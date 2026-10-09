@@ -173,11 +173,12 @@ describe('Kiro-native workspace adapter', () => {
     expect(scoped).not.toContain('{{')
     const helper = renderHelperSteering(templates)
     expect(helper.startsWith('---\ninclusion: manual\n---')).toBe(true)
-    expect(helper).toContain('Do not edit files')
+    expect(helper).toContain('Stay read-only in this turn')
+    expect(helper).toContain('even if the learner asks')
   })
 
-  it('steers decisions to the moment they arise, recorded before they are asked (0.5.0)', () => {
-    expect(templates.version).toBe('0.5.0')
+  it('steers decisions to the moment they arise, recorded before they are asked (since 0.5.0)', () => {
+    expect(templates.version).toBe('0.5.1')
     const scoped = renderLearnerSteering(templates, binding, {
       learnerFocus: [],
       expectedDecisions: [{ description: '메모를 누가 볼 수 있게 할지 정한다.' }],
@@ -214,7 +215,7 @@ describe('Kiro-native workspace adapter', () => {
     )
   })
 
-  it('renders a Helper chat agent with only its own Helper-role Core server', () => {
+  it('renders a read-only Helper chat agent with only its own Helper-role Core server', () => {
     const agent = JSON.parse(
       renderKiroHelperAgent(templates, {
         helperPrompt: '# Helper canonical\n\n{{NOT_A_PLACEHOLDER}} stays literal.',
@@ -225,6 +226,8 @@ describe('Kiro-native workspace adapter', () => {
       }),
     )
     expect(agent.name).toBe(KIRO_HELPER_AGENT_NAME)
+    // Kiro 1.2.56 gives a custom agent no tools at all when `tools` is missing (live K09 check).
+    expect(agent.tools).toEqual(['read', `@${KIRO_HELPER_MCP_SERVER_NAME}`])
     expect(agent.includeMcpJson).toBe(false)
     expect(Object.keys(agent.mcpServers)).toEqual([KIRO_HELPER_MCP_SERVER_NAME])
     expect(agent.mcpServers[KIRO_HELPER_MCP_SERVER_NAME].args).toEqual([
@@ -233,6 +236,8 @@ describe('Kiro-native workspace adapter', () => {
       '/Users/me/memo app',
     ])
     expect(agent.prompt).toContain('`get_helper_context`')
+    expect(agent.prompt).toContain('You cannot edit files or run commands.')
+    expect(agent.prompt).not.toContain('Where it says you are read-only')
     expect(agent.prompt).toContain('{{NOT_A_PLACEHOLDER}} stays literal.')
     expect(agent.prompt).not.toContain('{{HELPER')
     expect(JSON.stringify(agent)).not.toMatch(/Bearer|authorization/i)

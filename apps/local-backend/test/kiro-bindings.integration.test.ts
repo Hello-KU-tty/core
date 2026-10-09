@@ -106,7 +106,7 @@ describe('Kiro binding manager', () => {
     )
     expect(steering).toContain(ids.task)
     expect(steering).toContain('What the learner owns')
-    expect(steering).toContain('steering 0.5.0.')
+    expect(steering).toContain('steering 0.5.1.')
     const agent = await readFile(join(first.workspace, '.kiro/agents/vibe-helper.json'), 'utf8')
     expect(JSON.parse(agent).mcpServers['vibe-helper-helper'].args[1]).toBe(
       join(directory, 'helper-mcp.json'),

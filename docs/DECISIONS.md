@@ -1,5 +1,13 @@
 # 결정 기록
 
+## 본선: Helper는 읽기 권한만
+
+- **맥락:** 0.2.2 실측(Kiro 1.2.56)에서 Kiro 채팅의 `vibe-helper` 에이전트가 Helper Core 도구를 하나도 받지 못했다. 에이전트 파일에 `tools`가 없었고, Kiro는 이때 허용 목록을 빈 배열로 처리한다(로그 `custom_agent.tool_selection toolCount: 1`, 남은 1개는 Kiro의 `disclose_context`). 모델은 `disclose_context`로 서버를 불러오려다 승인 창을 띄웠고 `Item not found`로 끝나 일반 설명으로 답했다. 도구 범위를 정해야 했다.
+- **결정(사용자 승인, 2026-10-09):** Helper는 읽기 권한만 가진다. Kiro 채팅 Helper 에이전트는 `tools: ["read", "@vibe-helper-helper"]`로 Kiro 내장 읽기 도구(파일 읽기, 진단, 검색)와 자기 Helper Core 서버만 받는다. 작업 공간 MCP(Builder 도구)는 계속 빼고(`includeMcpJson: false`), 학습자가 부탁해도 파일 수정과 명령 실행은 하지 않으며 바꿀 것은 Builder 탭에 부탁하게 안내한다(Steering 0.5.1). `/vibe-helper` 슬래시 턴은 Builder 세션 안이라 도구를 뺄 수 없어 같은 규칙을 프롬프트로만 지킨다. 패널 Helper(kiro-cli)는 이미 Core 조회 도구만 쓴다.
+- **이유:** 정식 Helper 원문(`helper.md`)과 제품 명세(`FR-HLP-002`)가 read-only이고, Builder 탭과 같은 파일을 동시에 고치는 위험을 권한으로 막는다. 현재 코드를 읽어야 "현재 코드로 예시"를 줄 수 있어 읽기 도구는 연다.
+- **확인 근거:** 설치된 Kiro 1.2.56 `kiro.kiro-agent` 번들에서 에이전트 `tools`가 허용 목록이 되고, 비어 있으면 도구가 없으며, MCP 도구에 `@<서버>` 태그가, 내장 읽기 도구에 `read` 태그가 붙는 것을 확인했다. 실제 화면 확인은 K09에서 다시 한다.
+- **이전 결정 대체:** "본선: Helper 역할은 프롬프트로 제한하고 상태 권한만 Core가 강제"의 코드·shell 부분(부탁하면 수정 가능)을 대체한다. Evidence·Concept State·Decision 확정을 Core가 강제하는 부분은 그대로다. PROJECT_BRIEF §0, AGENTS.md 설계 불변식, ARCHITECTURE를 함께 고쳤다.
+
 ## 본선: Analyst 기본 모델 Sonnet 5.5(대안 Auto)와 과대 제안의 최대치 저장
 
 - **근거:** 본선 계정에서 같은 16개 사례로 Auto 11/16, Sonnet 5.5 14/16, Opus 5.5 14/16이었다([모델 비교](../tests/eval/results/evidence-analyst-models-kiro-cli.md) 3차). 실측에서도 Auto가 학습자의 실제 판단을 `MEDIUM` 강도에 `DEMONSTRATED`로 제안해 Core가 통째로 거절했고, 학습자의 이유가 Evidence로 남지 않았다([K09 재실측](spikes/KIRO_NATIVE_K09_REMEASURE_20261009.md)).
@@ -67,6 +75,8 @@
 - **영향:** 예선 패널 경로는 fallback으로 보존한다. 기존 코드는 삭제하지 않는다.
 
 ## 본선: Helper 역할은 프롬프트로 제한하고 상태 권한만 Core가 강제
+
+> 코드·shell 부분은 "본선: Helper는 읽기 권한만"(2026-10-09)으로 대체됐다.
 
 - **맥락:** 예선의 Helper read-only 강제는 provenance 분리, Builder와의 동시 수정 방지, Helper가 일을 대신 밀지 않는 제품 역할, Agent의 상태 조작 방지를 위해서였다. 이를 위해 별도 all-deny 세션과 준비 순서가 필요했다.
 - **결정:** Helper의 코드·shell 제한은 프롬프트로 둔다. 사용자가 명시적으로 부탁하면 수정할 수 있다. Evidence·Concept State·Decision 확정은 계속 Core가 강제한다. Helper와 Builder에 해당 도구를 주지 않고, Core는 Agent 출처 입력을 사용자 이해 근거로 받지 않는다. Analyst는 도구 없는 proposal 생성기로 유지한다.

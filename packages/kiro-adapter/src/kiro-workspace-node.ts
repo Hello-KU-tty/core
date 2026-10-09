@@ -529,8 +529,9 @@ export function renderHelperSteering(templates: KiroSteeringTemplates): string {
 }
 
 /**
- * Workspace custom agent for a separate Helper chat tab. It gets only its own Helper-role Core
- * server (not the Builder tools from the workspace MCP file); its role is limited by the prompt.
+ * Workspace custom agent for a separate Helper chat tab. The Helper is read-only: Kiro's read
+ * tools (read-file, diagnostics, search) and its own Helper-role Core server, never the Builder
+ * tools from the workspace MCP file. Kiro gives a custom agent no tools when `tools` is missing.
  */
 export function renderKiroHelperAgent(
   templates: KiroSteeringTemplates,
@@ -551,6 +552,8 @@ export function renderKiroHelperAgent(
       name: KIRO_HELPER_AGENT_NAME,
       description: `Vibe Helper ${templates.version}: answers the learner's questions about the project and the builder's work in a separate tab.`,
       prompt,
+      // `read` is Kiro's read-only built-in tool tag; `@<server>` selects that MCP server's tools.
+      tools: ['read', `@${KIRO_HELPER_MCP_SERVER_NAME}`],
       includeMcpJson: false,
       mcpServers: {
         [KIRO_HELPER_MCP_SERVER_NAME]: {
