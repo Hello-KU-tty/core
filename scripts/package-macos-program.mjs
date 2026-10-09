@@ -32,7 +32,7 @@ const hostCommands = [
 ]
 const pkg = {
   ...product,
-  version: '0.2.1',
+  version: '0.2.2',
   displayName: 'Hello Vibe',
   description:
     'Kiro-native Vibe Helper for Apple Silicon Mac: local Core, kiro-cli Agents and Kiro chat hooks.',
