@@ -51,3 +51,30 @@
 - Sonnet 4.5는 두 실행의 사례별 판정이 15/16 같아 실행 간 변동이 작았다(11/16 → 12/16).
 - Auto는 가장 높고 Sonnet보다 싸다. Auto의 실패 2개는 held-out의 future_plan_after_light_hint와 actual_performed_application이다.
 - Auto는 서버가 작업마다 모델을 고르므로 시간이 지나면 동작이 바뀔 수 있다. 판정이 Core 규칙으로 걸러지므로 잘못된 이해 판정 위험은 제한되지만, 본선 전에 같은 평가를 다시 돌려 확인한다.
+
+## 3차: 본선 팀 계정(2026-10-09)
+
+본선 계정(IAM Identity Center)의 kiro-cli 2.28.0에서 같은 16개 사례·판정 코드로 다시 돌렸다. 이 계정에서는 Claude Opus 5.5·Sonnet 5.5·Opus 5, GPT-5.6 등 무료 계정에 없던 모델이 열린다. 모델당 1회 실행이다.
+
+| 모델 | 배율(표시) | source-first | held-out | 합계 | 형식 오류 | 시간 중앙값 | 실제 크레딧(16회) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| auto | 1.00x | 6/8 | 5/8 | 11/16 | 1 | 15.6초 | 2.16 |
+| **claude-sonnet-5.5** | 1.30x | 7/8 | 7/8 | **14/16** | 0 | 14.0초 | 3.96 |
+| claude-opus-5.5 | 2.00x | 7/8 | 7/8 | 14/16 | 0 | 21.1초 | 5.42 |
+
+사례별(source-first/held-out, P 통과, F 기대 불일치, S 형식 오류):
+
+| 사례 | auto | Sonnet 5.5 | Opus 5.5 |
+| --- | --- | --- | --- |
+| request_only | P/P | P/P | P/P |
+| future_plan_after_light_hint | P/S | P/P | P/P |
+| own_explanation_independent | P/P | P/P | P/P |
+| actual_reasoned_choice | F/F | P/P | P/P |
+| actual_performed_application | F/P | F/F | F/F |
+| directly_led_repeat | P/P | P/P | P/P |
+| independent_future_prediction | P/F | P/P | P/P |
+| bare_recommendation_without_user_words | P/P | P/P | P/P |
+
+- Auto는 무료 계정 2차(14/16)보다 낮은 11/16이었다. 서버가 고르는 모델이 계정·시점에 따라 바뀐다는 위험이 실제로 나타났다.
+- Sonnet 5.5와 Opus 5.5는 같은 사례에서 같은 판정을 냈고(14/16, 형식 오류 0), 둘 다 `actual_performed_application`만 놓쳤다. Sonnet 5.5가 Opus 5.5보다 싸고(사례당 약 0.25 대 0.34크레딧) 빠르다.
+- 두 5.5 모델은 "Experimental preview"로 표시돼 있어 바뀌거나 내려갈 수 있다. 고정 대안은 Sonnet 4.5다.
