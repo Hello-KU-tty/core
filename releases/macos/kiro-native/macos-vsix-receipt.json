@@ -2,7 +2,7 @@
   "file": "builder-helper-agent-panel-0.2.4-darwin-arm64.vsix",
   "version": "0.2.4",
   "hostMode": "KIRO_NATIVE",
-  "publicationStatus": "LOCAL_COMMIT_NOT_PUSHED",
+  "publicationStatus": "PUSHED_TO_BRANCH",
   "target": "darwin-arm64",
   "bytes": 41539335,
   "sha256": "fd6b55e5c83af4c87a893a7b672d5339bc865b04efeb17617ef43d9ec64e36f2",
@@ -14,5 +14,6 @@
   "buildBackendCommit": "2b0487a9c1d390a205219a2577b6272a8e81057d",
   "workingTreeNote": "The backend checkout had uncommitted release edits and the learner's untracked feedback notes, all outside the build inputs.",
   "changedFromPrevious": "Against 0.2.3: Core bundle (connection restore at start, prompt queue drain), bridge (follows Project bindings, waits for Core), hook runner (delivery ID, prompt queue), Kiro steering source 0.5.2, portable manifest and the two version fields.",
-  "liveCheck": "Isolated Kiro 1.2.56 profile on the finals account: after closing Kiro and installing over 0.2.3, the new Core restored the Project connection without Open Project or a window reload; Builder and Helper tools worked, a rebind in the open window was followed without a reload, and a prompt sent while the hook could not reach Core was queued and recorded once on the next bind. See docs/FRONTEND_KIRO_NATIVE_HANDOFF.md."
+  "liveCheck": "Isolated Kiro 1.2.56 profile on the finals account: after closing Kiro and installing over 0.2.3, the new Core restored the Project connection without Open Project or a window reload; Builder and Helper tools worked, a rebind in the open window was followed without a reload, and a prompt sent while the hook could not reach Core was queued and recorded once on the next bind. See docs/FRONTEND_KIRO_NATIVE_HANDOFF.md.",
+  "publishedBranch": "Hello-KU-tty/core finals/kiro-native"
 }
