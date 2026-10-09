@@ -1,9 +1,17 @@
-# 본선 Mac 설치물 0.2.1 (Kiro-native) 프론트 인계
+# 본선 Mac 설치물 0.2.2 (Kiro-native) 프론트 인계
 
-본선 방향([PROJECT_BRIEF §0](../PROJECT_BRIEF.md))에 맞춰 Mac 설치물의 host를 Kiro-native로 바꿨다. 0.2.1은 첫 실사용 체험 피드백(K09)을 반영했다. 프론트 담당자가 설치해 패널을 다듬을 수 있는 상태다.
+본선 방향([PROJECT_BRIEF §0](../PROJECT_BRIEF.md))에 맞춰 Mac 설치물의 host를 Kiro-native로 바꿨다. 0.2.1은 첫 실사용 체험 피드백(K09)을 반영했고, 0.2.2는 본선 계정 재실측에서 나온 Analyst·Evidence 정책 변경을 더했다. 프론트 담당자가 설치해 패널을 다듬을 수 있는 상태다.
 
-- 설치 파일: [`releases/macos/kiro-native/builder-helper-agent-panel-0.2.1-darwin-arm64.vsix`](../releases/macos/kiro-native/builder-helper-agent-panel-0.2.1-darwin-arm64.vsix) · 41,536,528 bytes · SHA-256 `bea07d49ed29dc4a4435b0c53fe95b9aef4b1d4400fe613cd6a942b537c5d5af` · [receipt](../releases/macos/kiro-native/macos-vsix-receipt.json) · [항목별 hash](../releases/macos/kiro-native/files.json)
-- 빌드 출처: backend `4def349`(`finals/kiro-native`), frontend `c2c873c`(`program` 저장소 `finals/trial-feedback` 브랜치, 로컬 commit). 0.2.0(frontend `e65cd7f`)은 Git 이력에 있다.
+- 설치 파일: [`releases/macos/kiro-native/builder-helper-agent-panel-0.2.2-darwin-arm64.vsix`](../releases/macos/kiro-native/builder-helper-agent-panel-0.2.2-darwin-arm64.vsix) · 41,536,823 bytes · SHA-256 `c313136d0126df9e266516ae02ea6495547028fa48dedb9fb0ae1aa597326670` · [receipt](../releases/macos/kiro-native/macos-vsix-receipt.json) · [항목별 hash](../releases/macos/kiro-native/files.json)
+- 빌드 출처: backend `012c664`(`finals/kiro-native`), frontend `c2c873c`(`program` 저장소 `finals/trial-feedback` 브랜치). 0.2.1(backend `4def349`)과 0.2.0(frontend `e65cd7f`)은 Git 이력에 있다.
+
+## 0.2.2에서 바뀐 점 (Analyst·Evidence 정책)
+
+패널·host·hook·Steering 파일은 0.2.1과 같다. 74개 항목 중 Core 묶음(`portable/bin/core.mjs`), 그 hash를 담은 `portable/manifest.json`, 버전 표기 2곳만 다르다. 근거와 위험은 [DECISIONS](DECISIONS.md)의 "본선: Analyst 기본 모델 Sonnet 5.5(대안 Auto)와 과대 제안의 최대치 저장"에 있다.
+
+- **Analyst 모델:** kiro-cli Analyst가 `claude-sonnet-5.5`를 먼저 쓰고, kiro-cli가 "모델을 쓸 수 없음"으로 거절할 때만 `auto`로 넘어간다. 거절된 모델은 그 Core 프로세스 동안 다시 시도하지 않는다. Discovery·Helper 모델은 바뀌지 않았다.
+- **과대 제안:** Analyst가 정책상 최대보다 높은 Concept State를 제안하면 거절하지 않고 정책 최대치로 받는다. Core는 상태를 올리지 않는다. 결정 설명(`explanation`)이 "…supporting `<받은 상태>`, the policy maximum; the Analyst proposed `<제안 상태>`." 형식이 되고, 원래 제안(`maximumSupportedState`)은 그대로 남는다.
+- **패널 영향:** `OVERSTATED_MAXIMUM_STATE` 거절은 이제 상태를 붙인 모순(CONTRADICTION) 제안에서만 나온다. Evidence 화면이 이 사유 코드를 "과대 판정으로 버림"으로 보여 주고 있다면, 같은 사례가 이제 `ACCEPTED`(`VALID_USER_EVIDENCE`)로 오므로 받은 상태와 제안 상태가 다를 때 낮춰 받았다는 표시를 검토한다.
 
 ## 0.2.1에서 바뀐 점 (체험 피드백 K09)
 
@@ -28,7 +36,7 @@
 
 1. Apple Silicon Mac에 Kiro IDE를 `/Applications/Kiro.app`으로 설치하고 로그인한다.
 2. Kiro CLI를 설치한다(kiro.dev의 Kiro CLI 설치 안내). host는 `~/.local/bin/kiro-cli`, 그다음 `/Applications/Kiro CLI.app/Contents/MacOS/kiro-cli` 순서로 찾는다. 버전은 2.21.1 이상 2.x여야 한다(확인: 2.28.0).
-3. 터미널에서 `kiro-cli login`. Builder ID 무료 계정으로 동작을 확인했다. IDE 로그인과 CLI 로그인은 따로다.
+3. 터미널에서 `kiro-cli login`. Builder ID 무료 계정과 본선 팀 계정(IAM Identity Center)에서 동작을 확인했다. IDE 로그인과 CLI 로그인은 따로다. 조직 계정은 IDE에서도 로그인해야 MCP가 열린다(로그인 전에는 `mcpEnabled: false`).
 4. 예선 0.1.x를 쓰던 Kiro라면 모든 Kiro 창을 닫았다가 연다. 이전 Core가 끝나기 전에는 `CORE_UPDATE_WAITING_FOR_OWNER_EXIT`로 기다린다. 기존 History(`core-data`)는 그대로 읽힌다.
 
 ## 설치와 사용 흐름
@@ -37,7 +45,7 @@
 2. **Agent Panel**에서 학습 목표를 넣고 Discovery → 후보 선택 → Learning Spec 확정까지 기존 화면대로 진행한다.
 3. 명령 팔레트 **Vibe Helper: Open Project in Kiro Chat** → Project를 고르면 Core가 Project 폴더(빈 현재 폴더 또는 생성 폴더)에 Steering·hook·MCP 설정·Helper 에이전트·Kiro Spec을 쓴다. 현재 폴더면 그대로, 생성 폴더면 새 Kiro 창으로 연다.
 4. Kiro 채팅에서 **새 세션(+)**을 열고 만들기 시작한다(hook은 세션 시작 때 적용된다). Agent는 Core MCP 도구로 Task 상태를 읽고, 학습자가 정해야 할 것은 번호 선택지로 묻는다. 학습자가 채팅으로 답하면 Agent가 원문을 인용해 기록하고 Core가 인용을 검증한다.
-5. 학습자 발언은 hook으로 Core에 Evidence 원천(USER)으로 쌓인다. Decision이 끝나면 Analyst(kiro-cli, Auto)가 분석하고, Core가 Concept State를 갱신해 `.vibe-helper/learner-profile.md`에 쓴다. 이 요약은 **새 채팅 세션부터** Agent에 반영된다(Steering은 세션 시작 때 고정).
+5. 학습자 발언은 hook으로 Core에 Evidence 원천(USER)으로 쌓인다. Decision이 끝나면 Analyst(kiro-cli, Sonnet 5.5, 쓸 수 없으면 Auto)가 분석하고, Core가 Concept State를 갱신해 `.vibe-helper/learner-profile.md`에 쓴다. 이 요약은 **새 채팅 세션부터** Agent에 반영된다(Steering은 세션 시작 때 고정).
 6. Helper는 새 채팅 탭에서 `vibe-helper` 에이전트를 고르거나, 채팅에서 `/vibe-helper 질문`으로 부른다. 답은 Helper Episode로 기록된다.
 
 ## 패널에서 다듬을 것
@@ -56,11 +64,19 @@ host API 형식은 [`examples/kiro-panel/src/frontend-host.d.cts`](../examples/k
 
 - 확장을 업데이트하면 기존 프로젝트의 hook·MCP 명령이 이전 확장 폴더 경로를 가리킨다. 업데이트 뒤에는 그 프로젝트에서 **Open Project in Kiro Chat**을 다시 실행한다.
 - 연결은 Project당 하나다. 다시 연결하면 이전 연결 토큰은 폐기된다.
-- 0.2.1의 채팅 단계(같은 창 연결 뒤 hook으로 기록되는지, Steering 0.5.0의 Decision 시점, Helper 탭이 Builder 활동을 쓰는지, 허용 규칙이 승인 창을 없애는지)는 모델 크레딧이 필요해 아직 확인하지 않았다(K09).
-- Workspace Trust 화면과 도구 허용 확인 창은 실제 화면으로 보지 않았다. 아래 검증은 격리 프로필에서 trust를 끄고 했다.
+- 채팅 단계(같은 창 연결 뒤 hook 기록, Steering 0.5.0의 Decision 시점, Helper 탭의 Builder 활동 사용, 허용 규칙으로 Vibe Helper 도구 승인 창 0회)는 0.2.1로 본선 계정에서 확인했다([K09 재실측](spikes/KIRO_NATIVE_K09_REMEASURE_20261009.md)). 0.2.2는 이 부분의 파일이 같다.
+- Workspace Trust 화면, 도구 허용 확인 창, 새 창 확인 창과 채팅 모드 목록에서 `vibe-helper`를 고르는 조작은 실제 화면으로 보지 않았다(사용자 클릭 확인 대기, K09). 아래 자동 확인은 격리 프로필에서 trust를 끄고 했다.
+- 셸 명령 승인은 그대로 매번 뜬다(K11).
 - Helper 답 수집은 Kiro 세션 기록 파일(비공개 형식)에 기대며, 못 읽으면 안내 문구로 기록한다.
 - Mac 전용이다. Windows에서는 host가 `KIRO_NATIVE_HOST_MAC_ONLY`로 시작하지 않는다.
-- Kiro는 자동 업데이트된다. 이번 작업 중에도 1.2.4에서 1.2.37로 바뀌었고, hook 동작은 1.2.37에서 다시 확인했다.
+- Kiro는 자동 업데이트된다. 1.2.4 → 1.2.37 → 1.2.56(2026-10-09)으로 바뀌었다. hook 적재와 채팅 단계는 1.2.37에서 확인했고, 1.2.56에서는 0.2.2 설치·Core 연결까지 확인했다.
+
+## 0.2.2 확인 (2026-10-09)
+
+- 자동 검사: backend `pnpm typecheck`, `pnpm test:unit` 177 통과·3 skip, `pnpm test:integration` 493 통과·8 skip(모델 순서와 "쓸 수 없음" 거절 처리, 정책 최대치 저장 포함), `scripts/test-macos-package.mjs` 9개 PASS. biome format·lint는 소스 경로(`apps packages scripts tests examples agents`)로 통과했다. 저장소 전체 `biome format .`은 사용자 실험 폴더 `.local-experiments/kiro-native-recovery/biome.json`의 중첩 설정 때문에 시작하지 못한다(그 폴더는 건드리지 않음).
+- 포장 확인: 0.2.1과 항목별 hash를 비교해 Core 묶음·manifest·버전 표기 4개만 다름을 확인했다. Core 묶음에 Analyst 모델 순서와 정책 최대치 설명 문구가 들어 있다(0.2.1 묶음에는 없음).
+- 격리 Kiro **1.2.56** 프로필(kiro-cli 2.28.0, 본선 계정)에 0.2.1 위로 설치: 기존 Core 데이터로 `CORE_CONNECTED`·`WORKER_READY`·`helperMode: KIRO_CLI`. 이어서 처음 보는 학습 목표(Personal Need 없음)로 Discovery 미리보기 10개(30초), 후보 선택·계획 생성(36초), 확정·Task 준비가 이 Core로 진행됐다. 창을 닫으면 Core가 26초 뒤 스스로 끝났다.
+- 남은 확인: 신뢰·도구 허용·새 창 확인 창과 모드 목록의 `vibe-helper` 선택(사용자 클릭), Sonnet 5.5 Analyst의 실제 실행.
 
 ## 0.2.1 확인 (2026-10-09, 모델 호출 없음)
 

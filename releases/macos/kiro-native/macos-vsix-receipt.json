@@ -1,17 +1,18 @@
 {
-  "file": "builder-helper-agent-panel-0.2.1-darwin-arm64.vsix",
-  "version": "0.2.1",
+  "file": "builder-helper-agent-panel-0.2.2-darwin-arm64.vsix",
+  "version": "0.2.2",
   "hostMode": "KIRO_NATIVE",
   "publicationStatus": "LOCAL_COMMIT_NOT_PUSHED",
   "target": "darwin-arm64",
-  "bytes": 41536528,
-  "sha256": "bea07d49ed29dc4a4435b0c53fe95b9aef4b1d4400fe613cd6a942b537c5d5af",
+  "bytes": 41536823,
+  "sha256": "c313136d0126df9e266516ae02ea6495547028fa48dedb9fb0ae1aa597326670",
   "files": 74,
   "fileInventory": "files.json",
   "frontendVersion": "0.0.18",
   "buildFrontendCommit": "c2c873c27b5563037853236aa402cd1b97910929",
-  "buildFrontendBranch": "finals/trial-feedback (local, not on the frontend remote)",
-  "buildBackendCommit": "4def349453ddc6b6e1137d3c7160041ee3cdce4e",
+  "buildFrontendBranch": "finals/trial-feedback",
+  "buildBackendCommit": "012c664f472ed55fa62dfd732c7be36693ae6cbf",
   "workingTreeNote": "The backend checkout had one untracked file outside the build inputs (the learner's feedback notes).",
-  "liveCheck": "Installed in an isolated Kiro 1.2.37 profile without model calls; see docs/FRONTEND_KIRO_NATIVE_HANDOFF.md. Chat-level checks wait for model credits (K09)."
+  "changedFromPrevious": "Against 0.2.1 only extension/portable/bin/core.mjs (Analyst model order and Evidence policy cap, c7a9cdc), extension/portable/manifest.json and the two version fields differ; the other 70 entries have the same hashes.",
+  "liveCheck": "Installed over 0.2.1 in an isolated Kiro 1.2.56 profile: Core connected on the existing data, and a new Discovery, plan and Task ran through it; see docs/FRONTEND_KIRO_NATIVE_HANDOFF.md."
 }
