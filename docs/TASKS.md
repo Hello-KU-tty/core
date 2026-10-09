@@ -90,13 +90,14 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - **완료 조건:** 관련 unit·integration·패널 테스트, VSIX 재생성, 실제 Kiro 재실측. 재실측에는 6 적용 뒤 신뢰·hook·Steering 적재 시점(7)을 다시 보는 것을 포함한다(모델 크레딧 필요).
 - **진행:** 코드·문서 반영과 0.2.1 VSIX 완료(backend `0cd52c8`·`4def349`, frontend `program` `finals/trial-feedback` `c2c873c`). 자동 검사 통과(backend unit 177·integration 489, 패널 CJS 179, frontend 811, Mac 패키지 9). 패널 화면은 Chrome 1280px·360px로 확인. 모델 호출 없는 격리 Kiro 확인: 빈 현재 폴더 연결, 다시 로드 없이 Builder MCP 연결과 `vibe-helper` 에이전트 등록, 새 채팅 세션에서 hook 2개 적재. 본선 계정 재실측(2026-10-09, [재실측 기록](spikes/KIRO_NATIVE_K09_REMEASURE_20261009.md)): 처음 보는 목표·Personal Need로 Discovery부터 Task 완료까지 진행. 현재 폴더 연결, hook 기록, 환경 확인, 작업 맥락 기록, 구현이 닿은 시점의 Decision 하나와 기록 후 질문, 첫 시도 확정, Vibe Helper 도구 11회 실패 0·승인 0, 다른 탭 Helper의 진행 중 Builder 활동 사용을 확인(계정 사용량 27.03). Analyst 과대 판정 문제는 기본 모델 Sonnet 5.5(대안 Auto)와 정책 최대치 저장으로 처리했다(DECISIONS). 이 변경을 담은 0.2.2 VSIX(backend `012c664`, 0.2.1과 Core 묶음만 다름)를 만들어 격리 Kiro 1.2.56에 설치하고 Core 연결, 처음 보는 목표(Personal Need 없음)의 Discovery부터 Task 준비까지 확인했다. 남은 것: 모드 목록에서 `vibe-helper` 에이전트를 고르는 화면 조작, 신뢰·동의·새 창 확인 창의 실제 화면(사용자 클릭, 테스트 프로필·폴더·Project 준비 완료), Sonnet 5.5 Analyst 실제 실행.
 
-### [>] K10. Kiro 채팅 Builder 워크플로 재설계
+### [~] K10. Kiro 채팅 Builder 워크플로 재설계
 
 - **출처:** 체험 피드백 10. Vibe Helper 도구 호출 25번 중 9번 실패(형식 3, 순서 3, 인용 글자 깨짐 1, 모드 2). 학습자의 실제 이유가 Decision 기록 전 발언이라 버려져 판단 근거 Evidence가 하나도 남지 않았다.
 - **진행 방식:** 현재 Builder 도구·순서·Core 검증 규칙을 한 장으로 정리해 사용자에게 보여 주고, 사용자가 재설계한다. 정리 전에는 Core Builder 계약을 바꾸지 않는다.
 - **검토 거리(초안):** Kiro 채팅용 도구 수와 입력 축소(식별자·버전·멱등키를 서버가 채움), 이유 인용을 글자 복사 대신 hook이 받은 메시지 ID로, Decision 요청 직전 발언의 근거 인정 여부, 작업 맥락과 완료 단계 자동화.
+- **진행:** 현재 상태 한 장 정리 완료(2026-10-09, backend `012c664`·Steering 0.5.0 기준): [Builder 워크플로 정리](spikes/KIRO_NATIVE_BUILDER_WORKFLOW_20261009.md). Core Builder 계약은 바꾸지 않았다. 다음은 사용자의 재설계.
 
-### [ ] K11. 셸 명령 자동 허용 정책
+### [>] K11. 셸 명령 자동 허용 정책
 
 - **출처:** 체험 피드백 13. Autopilot에서도 셸 명령은 매번 확인했다(16번, 모두 이번만 허용).
 - **검토 거리:** Kiro 권한 규칙(명령 앞부분 기준 항상 허용, 작업 공간 범위)과 우리가 미리 넣을 수 있는 범위, 위험 낮은 명령 목록, 사용자 동의와 끄기, 공개 문서가 아닌 내부 형식 의존 위험.
