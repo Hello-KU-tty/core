@@ -104,7 +104,8 @@ async function loadBinding() {
       : (fileInfo.mode & 0o077) !== 0)
   )
     throw new Error('BRIDGE_DESCRIPTOR_UNSAFE')
-  const binding = JSON.parse(await readFile(file, 'utf8'))
+  const raw = await readFile(file, 'utf8')
+  const binding = JSON.parse(raw)
   if (binding?.status === 'REVOKED') throw new Error('BRIDGE_BINDING_NOT_READY')
   if (
     (binding.lifecycle !== undefined && binding.lifecycle !== 'PROJECT') ||
@@ -145,7 +146,7 @@ async function loadBinding() {
     endpoint.hash
   )
     throw new Error('BRIDGE_ENDPOINT_INVALID')
-  return { binding, file, endpoint, canonical }
+  return { binding, file, endpoint, canonical, raw }
 }
 
 async function connectCore({ binding, endpoint }) {
@@ -196,6 +197,9 @@ async function start() {
     }
   }
   let { binding } = loaded
+  // The descriptor text last validated. Unchanged text needs no new check (on Windows each check
+  // inspects the file's ACL through PowerShell).
+  let validatedRaw = loaded.raw
   let { client } = connection
   const { listed } = connection
   lifecycle.stage('CORE_CONNECTED')
@@ -233,12 +237,18 @@ async function start() {
     // Each call re-reads the descriptor. A run binding must stay exactly the same. A Project
     // binding may be rewritten for the same folder, Project and role (a new Core after a restart
     // or a rebind); the bridge then follows it, and waits while no Core is connected.
-    let latest
-    try {
-      latest = (await loadBinding()).binding
-    } catch (error) {
-      if (binding.lifecycle === 'PROJECT' && notReady(error)) return notConnectedResult()
-      throw new Error('BRIDGE_BINDING_REVOKED')
+    let latest = binding
+    let latestRaw = validatedRaw
+    const current = await readFile(resolve(descriptorPath), 'utf8').catch(() => null)
+    if (current !== validatedRaw) {
+      try {
+        const loaded = await loadBinding()
+        latest = loaded.binding
+        latestRaw = loaded.raw
+      } catch (error) {
+        if (binding.lifecycle === 'PROJECT' && notReady(error)) return notConnectedResult()
+        throw new Error('BRIDGE_BINDING_REVOKED')
+      }
     }
     const sameScope =
       latest.role === binding.role &&
@@ -279,6 +289,7 @@ async function start() {
       binding = latest
       await receipt({ event: 'PROJECT_BINDING_FOLLOWED', role: binding.role })
     }
+    validatedRaw = latestRaw
     const rawArguments = request.params.arguments ?? {}
     let envelope
     try {

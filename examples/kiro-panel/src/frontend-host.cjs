@@ -8,19 +8,27 @@ const vscode = require('vscode')
 const { execFile } = require('node:child_process')
 const { access, constants, mkdir, realpath } = require('node:fs/promises')
 const { homedir } = require('node:os')
-const { join, relative, isAbsolute, sep } = require('node:path')
+const { delimiter, join, relative, isAbsolute, sep } = require('node:path')
 const { connectLocalCore, readLocalConnection } = require('@vibe-helper/frontend-client/node')
 const { createCoreLifecycle } = require('./core-lifecycle.cjs')
 const { createCoreConnectionManager, READ_ONLY_UI_KINDS } = require('./core-connection.cjs')
 const { createNativeWorkerHandle } = require('./native-worker-handle.cjs')
-const { prepareMacProjectTerminal } = require('./mac-terminal-environment.cjs')
+const { prepareProjectTerminal } = require('./project-terminal-environment.cjs')
 
 const safeCode = error => /^[A-Z][A-Z0-9_]{0,99}$/.test(error?.code ?? error?.message ?? '')
   ? error.code ?? error.message : 'FRONTEND_HOST_FAILED'
-const KIRO_CLI_CANDIDATES = [
-  join(homedir(), '.local/bin/kiro-cli'),
-  '/Applications/Kiro CLI.app/Contents/MacOS/kiro-cli',
-]
+// Kiro-native runs on Apple Silicon Mac and Windows x64 (Kiro CLI 2.x runs natively on Windows 11).
+const KIRO_NATIVE_PLATFORMS = new Set(['darwin', 'win32'])
+// Fixed install locations first; on Windows the official installer uses Program Files\Kiro-Cli, and
+// a kiro-cli.exe on PATH is the fallback.
+const kiroCliCandidates = () => process.platform === 'win32'
+  ? [
+      join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Kiro-Cli', 'kiro-cli.exe'),
+      join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Kiro-Cli', 'bin', 'kiro-cli.exe'),
+      ...(process.env.PATH ?? process.env.Path ?? '').split(delimiter)
+        .filter(directory => isAbsolute(directory)).map(directory => join(directory, 'kiro-cli.exe')),
+    ]
+  : [join(homedir(), '.local/bin/kiro-cli'), '/Applications/Kiro CLI.app/Contents/MacOS/kiro-cli']
 const BIND_MESSAGES = {
   KIRO_BIND_TASK_NOT_READY: 'Learning Spec을 확정하고 Task가 생긴 뒤에 Kiro에서 열 수 있습니다.',
   KIRO_NATIVE_NOT_ENABLED: '이 Core는 Kiro 채팅 연결을 지원하지 않습니다. 확장을 다시 설치하세요.',
@@ -39,7 +47,7 @@ const inside = (parent, child) => {
 }
 
 async function findKiroCli() {
-  for (const candidate of KIRO_CLI_CANDIDATES) {
+  for (const candidate of kiroCliCandidates()) {
     try { await access(candidate, constants.X_OK); return await realpath(candidate) } catch {}
   }
   throw new Error('KIRO_CLI_NOT_INSTALLED')
@@ -51,7 +59,7 @@ const kiroCliLoggedIn = executable => new Promise(resolve => {
 })
 
 async function createFrontendHost(context) {
-  if (process.platform !== 'darwin') throw new Error('KIRO_NATIVE_HOST_MAC_ONLY')
+  if (!KIRO_NATIVE_PLATFORMS.has(process.platform)) throw new Error('KIRO_NATIVE_HOST_PLATFORM_UNSUPPORTED')
   const api = require(join(context.extensionPath, 'portable/bin/runtime.cjs'))
   await mkdir(context.globalStorageUri.fsPath, { recursive: true })
   const storagePath = await realpath(context.globalStorageUri.fsPath)
@@ -62,8 +70,10 @@ async function createFrontendHost(context) {
       if (!kiroCli) throw new Error('KIRO_CLI_NOT_INSTALLED')
       return ['--kiro-cli', kiroCli]
     },
+    // Core writes its own Node into Kiro hook and MCP commands, so it must run on a real Node, not
+    // on Kiro's executable with ELECTRON_RUN_AS_NODE (that command would open Kiro instead).
     selectRuntime: signal => api.selectCoreRuntime({ resourceRoot,
-      privateRoot: join(storagePath, 'core-tools'), kiroExecutable: process.execPath, signal }),
+      privateRoot: join(storagePath, 'core-tools'), signal }),
   })
   const connectionFile = join(storagePath, 'core-data/connection.json')
   const workspacesRoot = join(storagePath, 'core-data/workspaces')
@@ -106,7 +116,7 @@ async function createFrontendHost(context) {
         // Generated Project folders get the packaged Node/pnpm in their terminals,
         // which Kiro chat also uses for shell commands.
         if (!terminalPrepared && vscode.workspace.isTrusted) {
-          await prepareMacProjectTerminal(vscode, context, ready, api)
+          await prepareProjectTerminal(vscode, context, ready, api)
           terminalPrepared = true
         }
         if (!await kiroCliLoggedIn(kiroCli)) throw new Error('KIRO_CLI_LOGIN_REQUIRED')

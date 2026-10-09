@@ -58,7 +58,7 @@ it('portable Kiro-native frontend host bundles without the IDE-internal worker o
   const result = await compile('examples/kiro-panel/src/frontend-host.cjs')
   expect(typeof result.exports.createFrontendHost).toBe('function')
   expect(result.inputs).toContain('examples/kiro-panel/src/core-lifecycle.cjs')
-  expect(result.inputs).toContain('examples/kiro-panel/src/mac-terminal-environment.cjs')
+  expect(result.inputs).toContain('examples/kiro-panel/src/project-terminal-environment.cjs')
   // Off-chat Agents run in Core through kiro-cli; no private Kiro Agent connection is shipped.
   expect(
     result.inputs.some((input) => /native-worker\.cjs|kiro-native-host[/\\]/.test(input)),

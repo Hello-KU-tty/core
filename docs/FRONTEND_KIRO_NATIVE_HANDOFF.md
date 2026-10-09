@@ -10,7 +10,7 @@
 - **코드:** backend `Hello-KU-tty/core`의 `finals/kiro-native` 브랜치(이 문서와 설치 파일), frontend `Hello-KU-tty/program`의 `finals/trial-feedback` 브랜치 `c2c873c`(0.2.4에 들어간 패널).
 - **설치 파일 바로 받기:** [0.2.4 Mac VSIX](https://github.com/Hello-KU-tty/core/raw/refs/heads/finals/kiro-native/releases/macos/kiro-native/builder-helper-agent-panel-0.2.4-darwin-arm64.vsix). 받은 뒤 `shasum -a 256 <파일>`이 위 SHA-256과 같은지 확인한다.
 - **Mac(Apple Silicon):** 아래 [설치 전 준비](#설치-전-준비)와 [설치와 사용 흐름](#설치와-사용-흐름)대로 쓴다.
-- **Windows:** 0.2.x는 아직 실행되지 않는다. 할 수 있는 일과 필요한 것은 [Windows에서](#windows에서)에 있다.
+- **Windows:** frontend가 빌드·확인·업로드한다. 절차는 [Windows에서](#windows에서)에 있다(0.2.5부터).
 - **패널 코드에 필요한 변경:** 0.2.1 이후 host API(`frontend-host.d.cts`), frontend SDK, Core 계약은 바뀌지 않았다. 0.2.2의 Evidence 표시 검토 한 가지만 있다([0.2.2에서 바뀐 점](#022에서-바뀐-점-analystevidence-정책)).
 
 ## 0.2.4에서 바뀐 점 (연결 유지와 발언 큐)
@@ -76,9 +76,16 @@ Kiro를 껐다 켜거나 확장을 업데이트해도 0.2.4부터는 3번을 다
 
 ## Windows에서
 
-**현재 상태:** Kiro-native 설치물(0.2.x)은 Apple Silicon Mac 전용이다. Windows에 설치하면 확장이 시작할 때 `KIRO_NATIVE_HOST_MAC_ONLY`로 멈추고 Core를 띄우지 않는다. 예선 Windows 설치물 0.0.18([WINDOWS_VSIX](WINDOWS_VSIX.md))은 Kiro IDE 1.1.70 전용이라 현재 Kiro(1.2.x)에서는 Agent를 실행하지 못하므로 본선 확인에 쓰지 않는다.
+**분담:** Mac 설치물은 backend가, Windows 설치물은 frontend가 빌드·확인·업로드한다([DECISIONS](DECISIONS.md) "본선: 플랫폼 분담"). 0.2.5부터 Kiro-native host·Core·hook·MCP bridge가 Windows x64를 지원한다. 본선 경로는 Kiro 내부 비공개 API 대신 공식 기능(Steering·hook·MCP·사용자 에이전트)과 kiro-cli를 쓰므로 frontend 코드는 그대로 빌드한다. 예선 Windows 설치물 0.0.18([WINDOWS_VSIX](WINDOWS_VSIX.md))은 Kiro 1.1.70 전용이라 본선 확인에 쓰지 않는다.
 
-**Windows에서 할 수 있는 것:** 패널 코드는 플랫폼과 무관하게 개발·검사할 수 있다. 같은 명령을 예선 때 Windows에서 확인했고, 이 브랜치(`c2c873c`)는 2026-10-10 Mac에서 typecheck와 테스트 811개 통과를 다시 확인했다(Windows에서는 다시 돌리지 않음). PowerShell에서(경로는 실제 위치로 바꾼다):
+**Windows에서 확인된 범위:** Windows 분기(kiro-cli 위치, Kiro 작업 폴더 해시의 소문자·슬래시 정규화, cmd.exe용 hook 명령 인용, 생성 폴더 터미널 PATH, 실제 Node로 Core 실행)는 Windows를 흉내 낸 테스트와 Kiro 1.2.56 코드로 확인했다. 실제 Windows 기기에서는 아직 돌려 보지 않았다. 아래 확인이 첫 실측이다.
+
+### 1. 준비 (Windows 11 x64)
+
+- Git, Node.js **24.19.0**(`node -v`로 확인), pnpm **11.13.1**(`npm install -g pnpm@11.13.1`), 기본 PowerShell.
+- Kiro IDE 최신판에 로그인. Kiro CLI 2.x를 Kiro 공식 안내의 PowerShell 설치로 설치한다(기본 위치 `C:\Program Files\Kiro-Cli\`). 새 터미널에서 `kiro-cli login` 후 `kiro-cli whoami`가 성공해야 한다. IDE와 CLI 로그인은 따로다.
+
+### 2. 빌드
 
 ```powershell
 git clone https://github.com/Hello-KU-tty/program C:\dev\program
@@ -87,13 +94,30 @@ git checkout finals/trial-feedback
 npm ci --ignore-scripts
 npm run typecheck
 npm test
-npm run build
+
+git clone https://github.com/Hello-KU-tty/core C:\dev\core
+Set-Location C:\dev\core
+git checkout finals/kiro-native
+pnpm install --frozen-lockfile
+pnpm panel:pack:kiro-windows C:\dev\program
 ```
 
-- host와 맞추는 기준은 backend의 [`examples/kiro-panel/src/frontend-host.d.cts`](../examples/kiro-panel/src/frontend-host.d.cts)다. 프론트의 `vendor/frontend-host` 타입을 이 파일로 갱신하고, 아래 [패널에서 다듬을 것](#패널에서-다듬을-것)의 상태·오류 코드(`KIRO_CLI_NOT_INSTALLED`, `KIRO_CLI_LOGIN_REQUIRED`, `BUILDER_RUNS_IN_HOST_CHAT`, `KIRO_BIND_TASK_NOT_READY`)를 처리한다.
-- 실제 Kiro에서 Discovery부터 채팅 Decision·Helper까지 보려면 지금은 Mac에서 0.2.4를 설치해야 한다. Windows에서 그 흐름을 돌려 볼 방법은 아직 없다.
+결과는 `C:\dev\core\dist\windows-vsix-*\`의 `builder-helper-agent-panel-0.2.5-win32-x64.vsix`, `receipt.json`, `files.json`이다. 포장 Core만 따로 보려면 `node scripts\test-portable-core.mjs`(예선 Windows 검사)를 돌린다.
 
-**Windows 지원에 필요한 것(결정 전):** Windows용 kiro-cli의 설치 위치·로그인·MCP 동작 확인(확인하지 않음), Kiro-native host의 Windows 포장(현재 포장 스크립트는 `darwin-arm64` 전용), hook·MCP 명령의 Windows 경로와 인용, 생성 폴더 터미널 환경, Windows 기기에서의 실측.
+### 3. 설치한 Kiro에서 확인
+
+1. Extensions(`Ctrl+Shift+X`) → `…` → **Install from VSIX…** → 다시 로드. Agent Panel이 Core에 연결된다. kiro-cli를 못 찾으면 `KIRO_CLI_NOT_INSTALLED`(이때 `where.exe kiro-cli` 결과를 남긴다), 로그인이 없으면 `KIRO_CLI_LOGIN_REQUIRED`.
+2. 빈 폴더를 열고 신뢰한다. Agent Panel에서 학습 목표 → 후보 선택 → 계획 확정.
+3. `Ctrl+Shift+P` → **Vibe Helper: Open Project in Kiro Chat** → Project 선택. 같은 창에 연결되고 `.kiro\hooks\vibe-helper.json`, `.kiro\agents\vibe-helper.json`, `.kiro\settings\mcp.json`이 생긴다. Kiro의 MCP 서버 목록에 `vibe-helper Connected (9 tools)`가 보여야 한다.
+4. Kiro 채팅 새 세션에서 "Vibe Helper 도구로 작업 상태만 확인해서 한 줄로 알려줘. 코드는 만들지 마." → 답에 Task 상태(PENDING 등)가 나온다.
+5. 새 채팅 탭에서 에이전트 목록의 `vibe-helper`를 고르고 질문한다 → 확정 계획을 바탕으로 답하고 승인 창이 뜨지 않는다.
+6. Kiro를 완전히 종료했다가 같은 폴더를 다시 열고 4를 반복한다. Open Project를 다시 하지 않아도 동작해야 한다.
+7. Agent Panel의 History에서 4·5의 학습자 발언이 기록됐는지 본다.
+
+### 4. 올리기와 문제 보고
+
+- 확인한 VSIX와 `receipt.json`, `files.json`을 backend 저장소의 `releases/windows/kiro-native/`에 넣어 `finals/kiro-native`에 커밋·푸시한다(또는 PR). 커밋 메시지에 위 확인 1~7의 결과를 적는다.
+- 실패하면 단계 번호, 화면의 오류 코드, Kiro 버전(Help → About), `kiro-cli --version`, Kiro Output 패널의 `Kiro Logs`·`Kiro - MCP Logs`에서 `vibe-helper`가 들어간 줄을 남긴다. 토큰·계정 정보는 붙이지 않는다.
 
 ## 패널에서 다듬을 것
 
@@ -116,7 +140,7 @@ host API 형식은 [`examples/kiro-panel/src/frontend-host.d.cts`](../examples/k
 - Workspace Trust 화면은 사용자가 직접 거쳤지만 우리 신뢰 안내·다시 로드 알림이 떴는지는 기록하지 못했다. 도구 허용 동의(저장값 `ALLOW`)와 새 창 확인(생성 폴더가 새 창으로 열림)은 기록으로 확인했다.
 - 셸 명령 승인은 그대로 매번 뜬다(K11).
 - Helper 답 수집은 Kiro 세션 기록 파일(비공개 형식)에 기대며, 못 읽으면 안내 문구로 기록한다.
-- Mac 전용이다. Windows에서는 host가 `KIRO_NATIVE_HOST_MAC_ONLY`로 시작하지 않는다.
+- 지원 플랫폼은 Apple Silicon Mac과 Windows x64다. 그 밖의 플랫폼에서는 host가 `KIRO_NATIVE_HOST_PLATFORM_UNSUPPORTED`로 시작하지 않는다. Windows는 실제 기기 실측 전이다.
 - Kiro는 자동 업데이트된다. 1.2.4 → 1.2.37 → 1.2.56(2026-10-09)으로 바뀌었다. Builder 채팅 단계는 1.2.37에서, Helper 탭·hook 기록·도구 허용은 1.2.56에서 확인했다.
 
 ## 0.2.4 확인 (2026-10-10)

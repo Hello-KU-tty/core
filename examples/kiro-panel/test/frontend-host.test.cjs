@@ -16,6 +16,7 @@ function harness({ trusted = true, installed = true, loggedIn = true, fail = fal
   const commands = new Map(), executed = [], messages = [], fetches = [], whoami = [], dialogs = []
   const globalState = new Map(consent ? [['vibeHelper.coreToolsConsent', consent]] : [])
   let lifecycleOptions
+  const runtimeCalls = []
   const code = readFileSync(join(__dirname, '../src/frontend-host.cjs'), 'utf8')
   const rawClient = { health: async () => ({}),
     listProjects: async () => ({ projects: [{ project: { id: projectId, title: 'Campus Drop', learningGoal: 'goal' },
@@ -58,14 +59,16 @@ function harness({ trusted = true, installed = true, loggedIn = true, fail = fal
         if (!installed) throw new Error('ENOENT')
       }, constants: { X_OK: 1 } },
     'node:os': { homedir: () => '/Users/synthetic' },
-    'node:path': require('node:path'),
+    'node:path': platform === 'win32' ? require('node:path').win32 : require('node:path'),
+    [require('node:path')[platform === 'win32' ? 'win32' : 'posix'].join('/extension', 'portable/bin/runtime.cjs')]: {
+      selectCoreRuntime: async options => { runtimeCalls.push(options); return {} } },
     '@vibe-helper/frontend-client/node': {
       readLocalConnection: async () => ({ baseUrl: 'http://127.0.0.1:1', token: 'synthetic-secret' }) },
     './core-lifecycle.cjs': { createCoreLifecycle: options => { lifecycleOptions = options; return lifecycle } },
     './core-connection.cjs': { ...require('../src/core-connection.cjs'),
       createCoreConnectionManager: () => ({ client: rawClient, onDidRotate() {}, dispose() {} }) },
     './native-worker-handle.cjs': require('../src/native-worker-handle.cjs'),
-    './mac-terminal-environment.cjs': { prepareMacProjectTerminal: async () => { terminals++ } },
+    './project-terminal-environment.cjs': { prepareProjectTerminal: async () => { terminals++ } },
   }
   const module = { exports: {} }
   const queue = [...binds]
@@ -79,7 +82,7 @@ function harness({ trusted = true, installed = true, loggedIn = true, fail = fal
     globalState: { get: key => globalState.get(key), update: async (key, value) => { globalState.set(key, value) } } }
   return { create: () => module.exports.createFrontendHost(context),
     grantTrust() { modules.vscode.workspace.isTrusted = true; trustListener?.() },
-    lifecycleOptions: () => lifecycleOptions, commands, executed, messages, fetches, whoami, dialogs, globalState,
+    lifecycleOptions: () => lifecycleOptions, runtimeCalls, commands, executed, messages, fetches, whoami, dialogs, globalState,
     opened: () => executed.filter(item => item.name === 'vscode.openFolder'),
     counters: () => ({ stopped, starts, mutations, terminals }) }
 }
@@ -105,6 +108,23 @@ test('host runs Core as managed-kiro with the installed kiro-cli and becomes rea
   assert.equal(h.commands.has('vibeHelper.openInKiro'), false)
   await assert.rejects(host.prepare(), /FRONTEND_HOST_STOPPED/)
   await assert.rejects(host.client.startRun({}), /FRONTEND_HOST_STOPPED/)
+})
+
+test('Windows host finds kiro-cli in Program Files and runs Core on a real Node, not Kiro', async () => {
+  const h = harness({ platform: 'win32' }), host = await h.create()
+  await host.prepare()
+  assert.equal(h.lifecycleOptions().launchArgs()[1], 'C:\\Program Files\\Kiro-Cli\\kiro-cli.exe')
+  assert.equal(host.getStatus().native, 'WORKER_READY')
+  await h.lifecycleOptions().selectRuntime(undefined)
+  assert.equal(h.runtimeCalls.length, 1)
+  assert.equal('kiroExecutable' in h.runtimeCalls[0], false)
+  await host.dispose()
+})
+
+test('host refuses platforms other than Mac and Windows before starting anything', async () => {
+  const h = harness({ platform: 'linux' })
+  await assert.rejects(h.create(), /KIRO_NATIVE_HOST_PLATFORM_UNSUPPORTED/)
+  assert.equal(h.counters().starts, 0)
 })
 
 test('missing kiro-cli fails before any Core launch without a mock transport', async () => {

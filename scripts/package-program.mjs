@@ -3,11 +3,16 @@ import { join, resolve } from 'node:path'
 import { build } from 'esbuild'
 import { inventory } from '../examples/frontend-handoff/archive.mjs'
 import { loadCoreResources } from '../packages/runtime/dist/portable-core.js'
+import { archive as archiveWindows } from '../examples/frontend-handoff/archive.mjs'
 import { archiveMacos } from './archive-macos.mjs'
 import { sourceProvenance } from './source-provenance.mjs'
 
-if (process.platform !== 'darwin' || process.arch !== 'arm64' || process.version !== 'v24.19.0')
-  throw new Error('MAC_BUILD_TOOLCHAIN_REQUIRED')
+// Kiro-native VSIX for the machine it is built on: Apple Silicon Mac or Windows x64. The portable
+// Core holds native modules for that target, so each platform is built on its own OS.
+const target = `${process.platform}-${process.arch}`
+if (!['darwin-arm64', 'win32-x64'].includes(target) || process.version !== 'v24.19.0')
+  throw new Error('PROGRAM_BUILD_TOOLCHAIN_REQUIRED')
+const mac = target === 'darwin-arm64'
 if (!process.argv[2]) throw new Error('EXPLICIT_FRONTEND_CHECKOUT_REQUIRED')
 const program = await realpath(resolve(process.argv[2]))
 const sources = {
@@ -16,10 +21,10 @@ const sources = {
 }
 const product = JSON.parse(await readFile(join(program, 'package.json'), 'utf8'))
 if (product.name !== 'builder-helper-agent-panel') throw new Error('PROGRAM_CHECKOUT_REQUIRED')
-const portable = await loadCoreResources(resolve('dist/portable-core-darwin-arm64'))
-if (portable.manifest.target !== 'darwin-arm64') throw new Error('MAC_PACKAGE_TARGET_INVALID')
+const portable = await loadCoreResources(resolve(`dist/portable-core-${target}`))
+if (portable.manifest.target !== target) throw new Error('PROGRAM_PACKAGE_TARGET_INVALID')
 await mkdir(resolve('dist'), { recursive: true })
-const output = await mkdtemp(resolve('dist/macos-vsix-'))
+const output = await mkdtemp(resolve(`dist/${mac ? 'macos' : 'windows'}-vsix-`))
 const stage = join(output, 'stage')
 const extension = join(stage, 'extension')
 await mkdir(extension, { recursive: true })
@@ -32,10 +37,9 @@ const hostCommands = [
 ]
 const pkg = {
   ...product,
-  version: '0.2.4',
+  version: '0.2.5',
   displayName: 'Hello Vibe',
-  description:
-    'Kiro-native Vibe Helper for Apple Silicon Mac: local Core, kiro-cli Agents and Kiro chat hooks.',
+  description: `Kiro-native Vibe Helper for ${mac ? 'Apple Silicon Mac' : 'Windows x64'}: local Core, kiro-cli Agents and Kiro chat hooks.`,
   engines: { vscode: '^1.131.0' },
   contributes: {
     ...product.contributes,
@@ -77,11 +81,11 @@ const xml = (value) =>
   String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;')
 await writeFile(
   join(stage, '[Content_Types].xml'),
-  `<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="json" ContentType="application/json"/><Default Extension="js" ContentType="application/javascript"/><Default Extension="vsixmanifest" ContentType="text/xml"/>${['cjs', 'mjs', 'node', 'sql', 'md', 'svg', 'png', 'html'].map((ext) => `<Default Extension="${ext}" ContentType="application/octet-stream"/>`).join('')}<Override PartName="/extension/portable/bin/node" ContentType="application/octet-stream"/></Types>`,
+  `<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="json" ContentType="application/json"/><Default Extension="js" ContentType="application/javascript"/><Default Extension="vsixmanifest" ContentType="text/xml"/>${['cjs', 'mjs', 'node', 'sql', 'md', 'svg', 'png', 'html'].map((ext) => `<Default Extension="${ext}" ContentType="application/octet-stream"/>`).join('')}${mac ? '<Override PartName="/extension/portable/bin/node" ContentType="application/octet-stream"/>' : ''}</Types>`,
 )
 await writeFile(
   join(stage, 'extension.vsixmanifest'),
-  `<?xml version="1.0"?><PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011"><Metadata><Identity Language="en-US" Id="${xml(pkg.name)}" Version="${xml(pkg.version)}" Publisher="${xml(pkg.publisher)}" TargetPlatform="darwin-arm64"/><DisplayName>${xml(pkg.displayName)}</DisplayName><Description xml:space="preserve">${xml(pkg.description)}</Description><Properties><Property Id="Microsoft.VisualStudio.Code.Engine" Value="^1.131.0"/><Property Id="Microsoft.VisualStudio.Code.TargetPlatform" Value="darwin-arm64"/></Properties></Metadata><Installation><InstallationTarget Id="Microsoft.VisualStudio.Code"/></Installation><Dependencies/><Assets><Asset Type="Microsoft.VisualStudio.Code.Manifest" Path="extension/package.json" Addressable="true"/></Assets></PackageManifest>`,
+  `<?xml version="1.0"?><PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011"><Metadata><Identity Language="en-US" Id="${xml(pkg.name)}" Version="${xml(pkg.version)}" Publisher="${xml(pkg.publisher)}" TargetPlatform="${target}"/><DisplayName>${xml(pkg.displayName)}</DisplayName><Description xml:space="preserve">${xml(pkg.description)}</Description><Properties><Property Id="Microsoft.VisualStudio.Code.Engine" Value="^1.131.0"/><Property Id="Microsoft.VisualStudio.Code.TargetPlatform" Value="${target}"/></Properties></Metadata><Installation><InstallationTarget Id="Microsoft.VisualStudio.Code"/></Installation><Dependencies/><Assets><Asset Type="Microsoft.VisualStudio.Code.Manifest" Path="extension/package.json" Addressable="true"/></Assets></PackageManifest>`,
 )
 const files = await inventory(stage)
 for (const item of files) {
@@ -90,19 +94,19 @@ for (const item of files) {
       item.name,
     )
   )
-    throw new Error('MAC_PACKAGE_PRIVATE_FILE_DENIED')
+    throw new Error('PROGRAM_PACKAGE_PRIVATE_FILE_DENIED')
   const bytes = await readFile(join(stage, item.name))
   if (bytes.includes(Buffer.from(resolve('.'))) || bytes.includes(Buffer.from(program)))
-    throw new Error('MAC_PACKAGE_DEVELOPER_PATH_LEAK')
+    throw new Error('PROGRAM_PACKAGE_DEVELOPER_PATH_LEAK')
 }
-const path = join(output, `${pkg.name}-${pkg.version}-darwin-arm64.vsix`)
-const archive = await archiveMacos(stage, path)
+const path = join(output, `${pkg.name}-${pkg.version}-${target}.vsix`)
+const archive = mac ? await archiveMacos(stage, path) : await archiveWindows(stage, path)
 const report = {
   file: path,
   version: pkg.version,
   frontendVersion: product.version,
   sources,
-  target: 'darwin-arm64',
+  target,
   bytes: archive.bytes,
   sha256: archive.sha256,
   files: files.length,

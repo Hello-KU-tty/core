@@ -102,6 +102,12 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - **출처:** 체험 피드백 13. Autopilot에서도 셸 명령은 매번 확인했다(16번, 모두 이번만 허용).
 - **검토 거리:** Kiro 권한 규칙(명령 앞부분 기준 항상 허용, 작업 공간 범위)과 우리가 미리 넣을 수 있는 범위, 위험 낮은 명령 목록, 사용자 동의와 끄기, 공개 문서가 아닌 내부 형식 의존 위험.
 
+### [ ] K13. Windows 설치물 (frontend 담당)
+
+- **출처:** 사용자 지시(2026-10-10). 본선에는 Windows 지원이 포함되고, Mac은 backend, Windows는 frontend가 빌드·확인·업로드한다.
+- **backend 몫(완료):** host·Core·hook·bridge의 Windows 지원과 공통 포장 스크립트(`pnpm panel:pack:kiro-windows`), Windows를 흉내 낸 테스트, [핸드오프의 Windows 절차](FRONTEND_KIRO_NATIVE_HANDOFF.md#windows에서).
+- **완료 조건:** frontend가 Windows 11 x64에서 0.2.5 이상 VSIX를 빌드하고 핸드오프의 확인 1~7을 통과해 `releases/windows/kiro-native/`에 올린다. 실패 보고가 오면 backend가 고친다.
+
 ### [ ] K12. 크레딧 사용 측정과 절감
 
 - **출처:** 체험 피드백 15. 채팅 18.16크레딧 중 10.13은 앱 전체 구현 한 턴(모델 호출 46번)이었고, Vibe Helper 처리 몫은 약 4~5크레딧으로 추정했다.

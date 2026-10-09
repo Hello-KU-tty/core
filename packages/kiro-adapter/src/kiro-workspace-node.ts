@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { join } from 'node:path'
+import { join, posix, win32 } from 'node:path'
 
 import type { BuilderTask, LearningSpecRevision, Project, UiRequest } from '@vibe-helper/contracts'
 
@@ -222,8 +222,25 @@ export function lastAssistantReply(messagesJsonl: string): string | null {
 }
 
 /** Kiro's per-workspace folder name: the first 16 hex characters of SHA-256 over the root path. */
-export function kiroWorkspaceHash(workspaceRoot: string): string {
-  return createHash('sha256').update(workspaceRoot).digest('hex').slice(0, 16)
+export function kiroWorkspaceHash(
+  workspaceRoot: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  // Same normalization as Kiro (1.2.56) before hashing a single workspace root: absolute, forward
+  // slashes, POSIX-normalized, no trailing slash except a drive root, lower case on Windows.
+  const path = platform === 'win32' ? win32 : posix
+  const absolute = (
+    path.isAbsolute(workspaceRoot) ? workspaceRoot : path.resolve(workspaceRoot)
+  ).replaceAll('\\', '/')
+  const unc = platform === 'win32' && absolute.startsWith('//')
+  let normalized = posix.normalize(absolute)
+  if (unc && !normalized.startsWith('//')) normalized = `/${normalized}`
+  if (normalized.length > 1) {
+    const trimmed = normalized.replace(/\/+$/, '')
+    if (trimmed.length > 0 && !/^[A-Za-z]:$/.test(trimmed)) normalized = trimmed
+  }
+  if (platform === 'win32') normalized = normalized.toLowerCase()
+  return createHash('sha256').update(normalized).digest('hex').slice(0, 16)
 }
 
 /** Folder holding every Kiro chat session record of one workspace (private format). */
@@ -375,13 +392,24 @@ export interface KiroCommandPaths {
   readonly hookDescriptor: string
 }
 
-function shellArgument(value: string): string {
+// Kiro runs a command hook through the platform shell (Node `shell: true`): sh on macOS, cmd.exe
+// on Windows, where backslashes are literal and a path cannot contain a double quote.
+function shellArgument(value: string, platform: NodeJS.Platform): string {
+  if (platform === 'win32') {
+    if (/["%\r\n]/.test(value)) throw new TypeError('KIRO_HOOK_PATH_UNSUPPORTED')
+    return `"${value}"`
+  }
   return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`
 }
 
 /** Kiro hooks v1 file. Hooks only report to Core; they never block or rewrite the learner prompt. */
-export function renderKiroHooksConfig(paths: KiroCommandPaths): unknown {
-  const command = `${shellArgument(paths.nodeExecutable)} ${shellArgument(paths.hookScript)} ${shellArgument(paths.hookDescriptor)}`
+export function renderKiroHooksConfig(
+  paths: KiroCommandPaths,
+  platform: NodeJS.Platform = process.platform,
+): unknown {
+  const command = [paths.nodeExecutable, paths.hookScript, paths.hookDescriptor]
+    .map((value) => shellArgument(value, platform))
+    .join(' ')
   return {
     version: 'v1',
     hooks: [

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { conversationIdSchema, uiRequestSchema } from '@vibe-helper/contracts'
 import { describe, expect, it } from 'vitest'
@@ -11,6 +12,7 @@ import {
   kiroPermissionsFile,
   kiroSessionAgentMode,
   kiroSessionTranscriptPath,
+  kiroWorkspaceHash,
   lastAssistantReply,
   mergeKiroMcpConfig,
   mergeKiroPermissionRules,
@@ -96,13 +98,55 @@ describe('Kiro-native workspace adapter', () => {
     ).toThrow()
   })
 
+  it('hashes a workspace root the way Kiro names its per-workspace folders', () => {
+    const sha = (value: string) => createHash('sha256').update(value).digest('hex').slice(0, 16)
+    expect(kiroWorkspaceHash('/Users/me/memo app', 'darwin')).toBe(sha('/Users/me/memo app'))
+    expect(kiroWorkspaceHash('/Users/me/memo app/', 'darwin')).toBe(sha('/Users/me/memo app'))
+    // Windows: forward slashes and lower case, whatever casing the folder URI or realpath has.
+    for (const root of [
+      'C:\\Users\\Me\\Memo App\\',
+      'c:\\users\\me\\memo app',
+      'C:/Users/Me/Memo App',
+    ])
+      expect(kiroWorkspaceHash(root, 'win32')).toBe(sha('c:/users/me/memo app'))
+    expect(kiroWorkspaceHash('C:\\', 'win32')).toBe(sha('c:/'))
+  })
+
+  it('quotes hook paths for cmd.exe on Windows without doubling backslashes', () => {
+    const config = renderKiroHooksConfig(
+      {
+        nodeExecutable: 'C:\\Users\\Me\\AppData\\Local\\node.exe',
+        hookScript: 'C:\\Users\\Me\\.kiro\\extensions\\vibe\\kiro-hook.mjs',
+        hookDescriptor: 'C:\\Users\\Me Kim\\AppData\\hook.json',
+      },
+      'win32',
+    ) as { hooks: { action: { command: string } }[] }
+    expect(config.hooks[0]?.action.command).toBe(
+      '"C:\\Users\\Me\\AppData\\Local\\node.exe" "C:\\Users\\Me\\.kiro\\extensions\\vibe\\kiro-hook.mjs" "C:\\Users\\Me Kim\\AppData\\hook.json"',
+    )
+    // cmd.exe would expand %NAME% even inside quotes.
+    expect(() =>
+      renderKiroHooksConfig(
+        {
+          nodeExecutable: 'C:\\a\\node.exe',
+          hookScript: 'C:\\%TEMP%\\h.mjs',
+          hookDescriptor: 'C:\\h.json',
+        },
+        'win32',
+      ),
+    ).toThrow('KIRO_HOOK_PATH_UNSUPPORTED')
+  })
+
   it('renders a non-blocking UserPromptSubmit hook with quoted paths', () => {
     expect(
-      renderKiroHooksConfig({
-        nodeExecutable: '/opt/node/bin/node',
-        hookScript: '/Users/a b/vibe/kiro-hook.mjs',
-        hookDescriptor: '/Users/a b/.data/kiro-hook.json',
-      }),
+      renderKiroHooksConfig(
+        {
+          nodeExecutable: '/opt/node/bin/node',
+          hookScript: '/Users/a b/vibe/kiro-hook.mjs',
+          hookDescriptor: '/Users/a b/.data/kiro-hook.json',
+        },
+        'darwin',
+      ),
     ).toEqual({
       version: 'v1',
       hooks: [
