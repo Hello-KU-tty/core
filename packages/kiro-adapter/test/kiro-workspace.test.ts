@@ -178,7 +178,7 @@ describe('Kiro-native workspace adapter', () => {
   })
 
   it('steers decisions to the moment they arise, recorded before they are asked (since 0.5.0)', () => {
-    expect(templates.version).toBe('0.5.1')
+    expect(templates.version).toBe('0.5.2')
     const scoped = renderLearnerSteering(templates, binding, {
       learnerFocus: [],
       expectedDecisions: [{ description: '메모를 누가 볼 수 있게 할지 정한다.' }],

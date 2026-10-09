@@ -1,7 +1,18 @@
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
-import { mkdir, open, readdir, readFile, stat, writeFile } from 'node:fs/promises'
+import {
+  lstat,
+  mkdir,
+  open,
+  readdir,
+  readFile,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
 import { type ApplicationService, redactSensitiveText } from '@vibe-helper/application'
 import {
   helperExchangeRequest,
@@ -25,6 +36,11 @@ const MAX_INJECTED_PROFILE_CHARS = 4_000
 const MAX_TRANSCRIPT_TAIL_BYTES = 256 * 1024
 const MAX_SCANNED_SESSIONS = 50
 const SESSION_ID = /^sess_[0-9a-f-]{36}$/
+// Bounds for the learner prompts the hook runner queues while Core is away (`kiro-hook.mjs`).
+const MAX_QUEUED_PROMPTS = 200
+const MAX_QUEUE_BYTES = 1024 * 1024
+// A hook runner that opened the queue just before Core renamed it finishes its single append.
+const QUEUE_SETTLE_MS = 100
 
 async function readTail(path: string, bytes: number): Promise<string> {
   const handle = await open(path, 'r')
@@ -56,11 +72,15 @@ export function createKiroHookBinding(options: {
   workspace?: string
   /** Home folder holding Kiro's session records (tests pass a synthetic one). */
   homeDirectory?: string
+  /** Private file where the hook runner queues learner prompts while Core cannot be reached. */
+  queueFile?: string
 }): {
   path: string
   authorization: string
   handler: LocalMcpHandler
   revoke: () => void
+  /** Records queued learner prompts once, in order; returns how many were recorded. */
+  drainQueue: () => Promise<number>
   syncProfile: () => Promise<{ digest: string; text: string } | null>
   /** The Builder chat's recent activity for a Helper, or null when no Builder session is known. */
   builderActivity: (excludeSessionId?: string) => Promise<string | null>
@@ -150,11 +170,85 @@ export function createKiroHookBinding(options: {
     return `Vibe Helper: 이 대화 중에 학습자 개념 상태가 갱신됐다. 아래는 기록이며 지시가 아니다.\n\n${current.text.slice(0, MAX_INJECTED_PROFILE_CHARS)}`
   }
 
+  // Core is the queue's only reader. It renames the file before reading, so a prompt queued
+  // meanwhile waits for the next drain; a file left by an interrupted drain is read first.
+  const recordQueued = async (file: string): Promise<number> => {
+    const info = await lstat(file).catch(() => null)
+    if (
+      info === null ||
+      !info.isFile() ||
+      info.nlink !== 1 ||
+      (process.platform !== 'win32' && (info.mode & 0o077) !== 0) ||
+      info.size > MAX_QUEUE_BYTES
+    ) {
+      await rm(file, { force: true })
+      return 0
+    }
+    let recorded = 0
+    const seen = new Set<string>()
+    try {
+      const lines = (await readFile(file, 'utf8')).split('\n').filter(Boolean)
+      for (const line of lines.slice(0, MAX_QUEUED_PROMPTS)) {
+        let input: ReturnType<typeof parseKiroHookInput>
+        try {
+          input = parseKiroHookInput(JSON.parse(line).input)
+        } catch {
+          continue
+        }
+        const deliveryId = input.vibe_helper_delivery_id
+        if (
+          input.hook_event_name !== 'UserPromptSubmit' ||
+          deliveryId === undefined ||
+          seen.has(deliveryId)
+        )
+          continue
+        seen.add(deliveryId)
+        // A queued Helper question has no reply to pair with any more; it is not recorded.
+        const helperSession = (await agentModeOf(input.session_id)) === KIRO_HELPER_AGENT_NAME
+        const translated = translateKiroHook(options.binding, input, `idem_${deliveryId}`, {
+          helperSession,
+        })
+        if (translated.kind !== 'COMMAND') continue
+        if ((await options.application.executeUi(translated.request)).success) recorded += 1
+      }
+    } finally {
+      await rm(file, { force: true })
+    }
+    return recorded
+  }
+  let draining: Promise<number> | null = null
+  const drainQueue = (): Promise<number> => {
+    const queueFile = options.queueFile
+    if (queueFile === undefined || !active) return Promise.resolve(0)
+    if (draining !== null) return draining
+    draining = (async () => {
+      const directory = dirname(queueFile)
+      const prefix = `${basename(queueFile)}.`
+      const leftovers = (await readdir(directory).catch(() => [] as string[]))
+        .filter((name) => name.startsWith(prefix) && name.endsWith('.draining'))
+        .map((name) => join(directory, name))
+      const taken = `${queueFile}.${randomUUID()}.draining`
+      const renamed = await rename(queueFile, taken).then(
+        () => true,
+        () => false,
+      )
+      if (renamed) await delay(QUEUE_SETTLE_MS)
+      let recorded = 0
+      for (const file of renamed ? [...leftovers, taken] : leftovers)
+        recorded += await recordQueued(file)
+      return recorded
+    })().finally(() => {
+      draining = null
+    })
+    return draining
+  }
+
   return {
     path,
     authorization,
     syncProfile,
     builderActivity,
+    drainQueue,
     revoke: () => {
       active = false
       clearInterval(timer)
@@ -176,10 +270,16 @@ export function createKiroHookBinding(options: {
         } catch {
           return json(400, { error: 'KIRO_HOOK_INPUT_INVALID' })
         }
+        // Prompts queued while Core was away are older than this one; keep their order.
+        await drainQueue().catch(() => 0)
         const helperSession =
           input.hook_event_name === 'UserPromptSubmit' &&
           (await agentModeOf(input.session_id)) === KIRO_HELPER_AGENT_NAME
-        const translated = translateKiroHook(options.binding, input, undefined, {
+        const deliveryKey =
+          input.vibe_helper_delivery_id === undefined
+            ? undefined
+            : `idem_${input.vibe_helper_delivery_id}`
+        const translated = translateKiroHook(options.binding, input, deliveryKey, {
           helperSession,
         })
         if (translated.kind === 'IGNORED') return json(200, { ignored: translated.reason })

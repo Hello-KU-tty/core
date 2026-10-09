@@ -1,4 +1,16 @@
-import { mkdir, mkdtemp, readFile, realpath, utimes, writeFile } from 'node:fs/promises'
+import { execFile } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
+import { createServer } from 'node:net'
+import {
+  chmod,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  realpath,
+  utimes,
+  writeFile,
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ApplicationService, WorkspacePathPolicy } from '@vibe-helper/application'
@@ -34,7 +46,11 @@ import {
 } from '../../../packages/contracts/test/fixtures.js'
 import { createKiroHookBinding } from '../src/kiro-hook-binding.js'
 
-const setup = async (paths: { workspace?: string; homeDirectory?: string } = {}) => {
+const repository = new URL('../../../', import.meta.url).pathname
+
+const setup = async (
+  paths: { workspace?: string; homeDirectory?: string; queueFile?: string } = {},
+) => {
   const storage = await openInMemorySqliteStorage()
   storage.transaction((repository) => {
     repository.appendProject(projectSchema.parse(projectFixture))
@@ -274,5 +290,129 @@ describe('Kiro hook binding', () => {
     const restarted = await setup({ workspace, homeDirectory })
     expect(await restarted.binding.builderActivity()).toContain('메모 API 만들어줘')
     restarted.binding.revoke()
+  })
+
+  it('records prompts queued while Core was away once and in order, then removes the queue', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'vibe-kiro-queue-'))
+    const queueFile = join(directory, 'hook-queue.jsonl')
+    const { binding, post, userMessages } = await setup({ queueFile })
+    const prompt = (deliveryId: string, text: string) => ({
+      hook_event_name: 'UserPromptSubmit',
+      session_id: 'sess_queue-test',
+      cwd: '/w',
+      prompt: text,
+      vibe_helper_delivery_id: deliveryId,
+    })
+    const first = randomUUID()
+    const second = randomUUID()
+    await writeFile(
+      queueFile,
+      [
+        { input: prompt(first, '먼저 보낸 말') },
+        { input: prompt(second, '그다음 말') },
+        // The same prompt queued twice (a timed-out send that did reach Core) is recorded once.
+        { input: prompt(first, '먼저 보낸 말') },
+        { input: { hook_event_name: 'Stop', session_id: 'sess_queue-test', cwd: '/w' } },
+        { input: { hook_event_name: 'UserPromptSubmit', session_id: 's', cwd: '/w', prompt: 'x' } },
+      ]
+        .map((entry) => JSON.stringify(entry))
+        .concat('not json')
+        .join('\n'),
+      { mode: 0o600 },
+    )
+    expect(await binding.drainQueue()).toBe(2)
+    expect(userMessages().map((event) => event.payload)).toMatchObject([
+      { redactedExcerpt: '먼저 보낸 말' },
+      { redactedExcerpt: '그다음 말' },
+    ])
+    await expect(lstat(queueFile)).rejects.toThrow()
+    // The live request that Core already recorded keeps the same delivery ID: still one record.
+    expect((await post(prompt(first, '먼저 보낸 말'))).status).toBe(200)
+    expect(userMessages()).toHaveLength(2)
+
+    // A queue written before the next live prompt is recorded ahead of it.
+    await writeFile(
+      queueFile,
+      `${JSON.stringify({ input: prompt(randomUUID(), '끊긴 동안') })}\n`,
+      {
+        mode: 0o600,
+      },
+    )
+    await post(prompt(randomUUID(), '다시 연결된 뒤'))
+    expect(userMessages().map((event) => event.payload.redactedExcerpt)).toEqual([
+      '먼저 보낸 말',
+      '그다음 말',
+      '끊긴 동안',
+      '다시 연결된 뒤',
+    ])
+
+    // A queue other users could read is discarded without recording.
+    await writeFile(queueFile, `${JSON.stringify({ input: prompt(randomUUID(), '노출') })}\n`)
+    await chmod(queueFile, 0o644)
+    expect(await binding.drainQueue()).toBe(0)
+    await expect(lstat(queueFile)).rejects.toThrow()
+    expect(userMessages()).toHaveLength(4)
+    binding.revoke()
+  })
+
+  it('the hook runner queues a learner prompt it cannot deliver, and only prompts', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'vibe-kiro-runner-'))
+    const descriptor = join(directory, 'hook.json')
+    const queueFile = join(directory, 'hook-queue.jsonl')
+    // A port with nothing listening: the Core this descriptor names is gone.
+    const port = await new Promise<number>((done) => {
+      const probe = createServer().listen(0, '127.0.0.1', () => {
+        const address = probe.address()
+        probe.close(() => done(typeof address === 'object' && address ? address.port : 0))
+      })
+    })
+    await writeFile(
+      descriptor,
+      JSON.stringify({
+        projectId: ids.project,
+        taskId: ids.task,
+        url: `http://127.0.0.1:${port}/hooks/kiro-${randomUUID()}`,
+        authorization: `Bearer ${'a'.repeat(64)}`,
+      }),
+      { mode: 0o600 },
+    )
+    const run = (input: unknown) => {
+      const child = execFile(process.execPath, [
+        join(repository, 'scripts/kiro-hook.mjs'),
+        descriptor,
+      ])
+      child.stdin?.end(JSON.stringify(input))
+      return new Promise<void>((done) => child.once('exit', () => done()))
+    }
+    await run({
+      hook_event_name: 'UserPromptSubmit',
+      session_id: 'sess_r',
+      cwd: '/w',
+      prompt: '첫 말',
+    })
+    await writeFile(descriptor, JSON.stringify({ status: 'REVOKED' }), { mode: 0o600 })
+    await run({
+      hook_event_name: 'UserPromptSubmit',
+      session_id: 'sess_r',
+      cwd: '/w',
+      prompt: '둘째 말',
+    })
+    await run({ hook_event_name: 'Stop', session_id: 'sess_r', cwd: '/w' })
+    expect((await lstat(queueFile)).mode & 0o077).toBe(0)
+    const queued = (await readFile(queueFile, 'utf8'))
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line))
+    expect(queued.map((entry) => entry.input.prompt)).toEqual(['첫 말', '둘째 말'])
+    for (const entry of queued)
+      expect(entry.input.vibe_helper_delivery_id).toMatch(/^[0-9a-f-]{36}$/)
+
+    const { binding, userMessages } = await setup({ queueFile })
+    expect(await binding.drainQueue()).toBe(2)
+    expect(userMessages().map((event) => event.payload.redactedExcerpt)).toEqual([
+      '첫 말',
+      '둘째 말',
+    ])
+    binding.revoke()
   })
 })

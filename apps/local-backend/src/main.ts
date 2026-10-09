@@ -530,6 +530,9 @@ async function start(
     listeningBaseUrl = baseUrl
     localAgents?.setBaseUrl(baseUrl)
     nativeRelay?.setBaseUrl(baseUrl)
+    // Before hosts see this Core: Kiro hooks and MCP bridges already running in Project folders
+    // read the rewritten descriptors, and prompts they queued meanwhile are recorded.
+    await kiroBindings?.restore()
     const nextDescriptorPath = `${descriptorPath}.${instanceId}.tmp`
     await writeFile(
       nextDescriptorPath,

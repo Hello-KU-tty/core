@@ -59,23 +59,50 @@ async function setup() {
   const policy = await WorkspacePathPolicy.create(workspaceRoot, {
     registeredWorkspace: (projectId) => registry.get(projectId),
   })
-  const handlers = new Map<string, LocalMcpHandler>()
-  const manager = new KiroBindingManager({
-    application: new ApplicationService({ storage, workspacePolicy: policy }),
-    policy,
-    root,
-    handlers,
-    baseUrl: () => 'http://127.0.0.1:47831',
-    nodeExecutable: '/opt/node/bin/node',
-    bridgeScript: '/opt/vibe/bridge.mjs',
-    hookScript: '/opt/vibe/kiro-hook.mjs',
-    registry,
-    steeringTemplate: join(repository, 'docs/agent-prompts/kiro-steering.md'),
-    helperPrompt: join(repository, 'docs/agent-prompts/helper.md'),
-    homeDirectory: home,
-  })
+  const application = new ApplicationService({ storage, workspacePolicy: policy })
+  // One Core process: a later call stands for the next Core on the same data (a restart).
+  const startCore = (baseUrl: string) => {
+    const handlers = new Map<string, LocalMcpHandler>()
+    const manager = new KiroBindingManager({
+      application,
+      policy,
+      root,
+      handlers,
+      baseUrl: () => baseUrl,
+      nodeExecutable: '/opt/node/bin/node',
+      bridgeScript: '/opt/vibe/bridge.mjs',
+      hookScript: '/opt/vibe/kiro-hook.mjs',
+      registry,
+      steeringTemplate: join(repository, 'docs/agent-prompts/kiro-steering.md'),
+      helperPrompt: join(repository, 'docs/agent-prompts/helper.md'),
+      homeDirectory: home,
+    })
+    return { handlers, manager }
+  }
+  const { handlers, manager } = startCore('http://127.0.0.1:47831')
   const generated = join(workspaceRoot, 'projects', ids.project)
-  return { base, root, home, handlers, manager, policy, registry, registryFile, generated }
+  return {
+    base,
+    root,
+    home,
+    handlers,
+    manager,
+    policy,
+    registry,
+    registryFile,
+    generated,
+    startCore,
+  }
+}
+
+const descriptors = async (root: string) => {
+  const directory = join(root, 'kiro-bindings', ids.project)
+  const read = async (name: string) => JSON.parse(await readFile(join(directory, name), 'utf8'))
+  return {
+    builder: await read('builder-mcp.json'),
+    helper: await read('helper-mcp.json'),
+    hook: await read('hook.json'),
+  }
 }
 
 describe('Kiro binding manager', () => {
@@ -106,7 +133,7 @@ describe('Kiro binding manager', () => {
     )
     expect(steering).toContain(ids.task)
     expect(steering).toContain('What the learner owns')
-    expect(steering).toContain('steering 0.5.1.')
+    expect(steering).toContain('steering 0.5.2.')
     const agent = await readFile(join(first.workspace, '.kiro/agents/vibe-helper.json'), 'utf8')
     expect(JSON.parse(agent).mcpServers['vibe-helper-helper'].args[1]).toBe(
       join(directory, 'helper-mcp.json'),
@@ -224,5 +251,52 @@ describe('Kiro binding manager', () => {
       'ALREADY_ALLOWED',
     )
     manager.close()
+  })
+
+  it('rewrites descriptors in place on a rebind and keeps them for the next Core', async () => {
+    const { root, handlers, manager } = await setup()
+    await manager.bind(ids.project)
+    const before = await descriptors(root)
+    await manager.bind(ids.project)
+    // Nothing marks the descriptors revoked first, so a late write cannot undo the new binding.
+    await new Promise((done) => setTimeout(done, 50))
+    const after = await descriptors(root)
+    for (const descriptor of [after.builder, after.helper, after.hook]) {
+      expect(descriptor.status).toBeUndefined()
+      expect(handlers.has(new URL(descriptor.url).pathname)).toBe(true)
+    }
+    expect(after.builder).toMatchObject({ lifecycle: 'PROJECT', role: 'BUILDER' })
+    expect(after.helper).toMatchObject({ lifecycle: 'PROJECT', role: 'HELPER' })
+    expect(after.builder.url).not.toBe(before.builder.url)
+    manager.close()
+    // Core stopping leaves the descriptors for the next Core to rewrite; hooks queue meanwhile.
+    expect((await descriptors(root)).builder).toEqual(after.builder)
+  })
+
+  it('a new Core restores the Project connection, and leaves a removed folder alone', async () => {
+    const { root, manager, generated, startCore } = await setup()
+    await manager.bind(ids.project)
+    manager.close()
+    await writeFile(
+      join(generated, '.kiro/settings/mcp.json'),
+      JSON.stringify({ mcpServers: { other: { command: 'x' } } }),
+    )
+
+    const next = startCore('http://127.0.0.1:47999')
+    expect(await next.manager.restore()).toEqual([ids.project])
+    expect(next.handlers.size).toBe(3)
+    const restored = await descriptors(root)
+    for (const descriptor of [restored.builder, restored.helper, restored.hook])
+      expect(descriptor.url).toMatch(/^http:\/\/127\.0\.0\.1:47999\//)
+    // The workspace files point at the current install again; other MCP servers are kept.
+    const mcp = JSON.parse(await readFile(join(generated, '.kiro/settings/mcp.json'), 'utf8'))
+    expect(Object.keys(mcp.mcpServers).sort()).toEqual(['other', 'vibe-helper'])
+    next.manager.close()
+
+    await rm(generated, { recursive: true, force: true })
+    const third = startCore('http://127.0.0.1:48001')
+    expect(await third.manager.restore()).toEqual([])
+    expect(third.handlers.size).toBe(0)
+    await expect(lstat(generated)).rejects.toThrow()
   })
 })

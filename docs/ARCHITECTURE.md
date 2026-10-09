@@ -164,6 +164,7 @@ Helper 역할 MCP (기존)            ◀───── .kiro/agents/vibe-helpe
 - Project 폴더는 사용자가 연 빈 폴더(등록) 또는 Core 생성 폴더다. 등록은 local-backend의 private 파일에 두고, Core 경로 정책이 매번 canonical·디렉터리·생성 루트 비중첩을 다시 확인한다.
 - Steering·Helper 에이전트 원문은 `docs/agent-prompts/kiro-steering.md`에 버전과 함께 두고 adapter는 자리만 채운다.
 - Helper 탭이나 패널 Helper의 질문에는 Builder 세션 기록(Kiro 비공개 형식)의 최근 활동을 Agent 출처 기록으로 붙인다. 저장하지 않으며 Evidence가 아니다.
+- Kiro 연결은 Project 단위로 Core 재시작을 넘어 유지한다. Core는 시작할 때 연결 기록이 있는 Project를 다시 연결해 연결 파일을 새로 쓰고, bridge는 같은 폴더·역할의 바뀐 연결을 따라간다. Core에 닿지 못한 학습자 발언은 hook이 사용자 전용 큐에 남기고, Core가 연결 직후와 hook 요청 때 순서대로 한 번씩 기록한다(DECISIONS 2026-10-10).
 
 ## 4. 주요 모듈과 책임
 

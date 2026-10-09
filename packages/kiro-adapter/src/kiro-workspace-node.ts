@@ -25,7 +25,14 @@ export interface KiroHookInput {
   readonly prompt?: string
   /** Added by the Vibe Helper hook runner on Stop: the Agent's reply for the finished turn. */
   readonly vibe_helper_reply?: string
+  /**
+   * Added by the Vibe Helper hook runner to a learner prompt. A prompt queued while Core was away
+   * keeps its ID, so a late delivery and an earlier one that did reach Core record it once.
+   */
+  readonly vibe_helper_delivery_id?: string
 }
+
+const DELIVERY_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 
 /** Validates the fields Vibe Helper reads; other Kiro fields are ignored. */
 export function parseKiroHookInput(value: unknown): KiroHookInput {
@@ -40,9 +47,11 @@ export function parseKiroHookInput(value: unknown): KiroHookInput {
   }
   const prompt = record.prompt
   const reply = record.vibe_helper_reply
+  const delivery = record.vibe_helper_delivery_id
   if (
     (prompt !== undefined && typeof prompt !== 'string') ||
-    (reply !== undefined && typeof reply !== 'string')
+    (reply !== undefined && typeof reply !== 'string') ||
+    (delivery !== undefined && (typeof delivery !== 'string' || !DELIVERY_ID.test(delivery)))
   ) {
     throw new TypeError('KIRO_HOOK_INPUT_INVALID')
   }
@@ -52,6 +61,7 @@ export function parseKiroHookInput(value: unknown): KiroHookInput {
     cwd: text('cwd', 4_096),
     ...(prompt === undefined ? {} : { prompt }),
     ...(reply === undefined ? {} : { vibe_helper_reply: reply }),
+    ...(delivery === undefined ? {} : { vibe_helper_delivery_id: delivery }),
   }
 }
 

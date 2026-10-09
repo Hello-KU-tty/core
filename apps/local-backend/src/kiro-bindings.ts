@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { readFile, rename, writeFile } from 'node:fs/promises'
+import { readdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { ApplicationService, WorkspacePathPolicy } from '@vibe-helper/application'
@@ -38,6 +38,8 @@ export interface KiroBindResult {
   readonly coreTools: 'WRITTEN' | 'ALREADY_ALLOWED' | 'UNRECOGNIZED' | 'NOT_REQUESTED'
 }
 
+const PROJECT_ID = /^project_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+
 async function writePrivateJson(path: string, value: unknown): Promise<void> {
   // A fresh file each time keeps 0600 and a single link, as the bridge and hook runner require.
   const next = `${path}.${randomUUID()}.tmp`
@@ -75,7 +77,28 @@ export class KiroBindingManager {
     return this.#active.get(projectId)?.builderActivity() ?? Promise.resolve(null)
   }
 
-  async bind(projectId: string, request: KiroBindRequest = {}): Promise<KiroBindResult> {
+  /**
+   * Core start: binds again every Project that had a Kiro connection, so hooks and MCP bridges
+   * already pointing at the private descriptors reach this Core without the learner reconnecting.
+   * Folders that no longer exist are left alone. Returns the Project IDs that were bound.
+   */
+  async restore(): Promise<readonly string[]> {
+    const names = await readdir(join(this.options.root, 'kiro-bindings')).catch(
+      () => [] as string[],
+    )
+    const restored: string[] = []
+    for (const projectId of names.filter((name) => PROJECT_ID.test(name)).sort()) {
+      const result = await this.bind(projectId, {}, { restoring: true }).catch(() => null)
+      if (result !== null) restored.push(projectId)
+    }
+    return restored
+  }
+
+  async bind(
+    projectId: string,
+    request: KiroBindRequest = {},
+    mode: { readonly restoring?: boolean } = {},
+  ): Promise<KiroBindResult> {
     const restored = await this.options.application.executeUi({
       schemaVersion: 1,
       kind: 'UI_RESTORE_PROJECT_SESSION',
@@ -109,8 +132,20 @@ export class KiroBindingManager {
       snapshot.project,
       task.correlationId,
     )
+    // A restore never recreates a Project folder the learner removed.
+    if (
+      mode.restoring === true &&
+      !(await stat(workspace).then(
+        (info) => info.isDirectory(),
+        () => false,
+      ))
+    )
+      throw new Error('KIRO_RESTORE_FOLDER_MISSING')
+    // The new descriptors below replace the old ones in place; nothing marks them revoked first,
+    // so a bridge or hook never reads a stale revocation written after the new binding.
     this.#active.get(projectId)?.revoke()
     const scope = { projectId, taskId: task.id, correlationId: task.correlationId }
+    const directory = await privateDirectory(join(this.options.root, 'kiro-bindings', projectId))
     const builder = createNativeCoreBinding({
       application: this.options.application,
       role: 'BUILDER',
@@ -125,13 +160,13 @@ export class KiroBindingManager {
       application: this.options.application,
       binding: scope,
       workspace,
+      queueFile: join(directory, 'hook-queue.jsonl'),
       ...(this.options.homeDirectory === undefined
         ? {}
         : { homeDirectory: this.options.homeDirectory }),
     })
     for (const binding of [builder, helper, hook])
       this.options.handlers.set(binding.path, binding.handler)
-    const directory = await privateDirectory(join(this.options.root, 'kiro-bindings', projectId))
     const bindingDescriptor = join(directory, 'builder-mcp.json')
     const helperDescriptor = join(directory, 'helper-mcp.json')
     const hookDescriptor = join(directory, 'hook.json')
@@ -141,6 +176,8 @@ export class KiroBindingManager {
     ] as const)
       await writePrivateJson(file, {
         role,
+        // Project connections outlive one Core: a bridge follows the rewritten descriptor.
+        lifecycle: 'PROJECT',
         ...scope,
         workspace,
         toolNames: binding.toolNames,
@@ -167,6 +204,8 @@ export class KiroBindingManager {
       helperAgent: { helperPrompt, helperDescriptor },
     })
     await hook.syncProfile().catch(() => null)
+    // Learner prompts queued while no Core was connected are recorded as soon as one is.
+    await hook.drainQueue().catch(() => 0)
     const coreTools = request.allowCoreTools
       ? await allowKiroCoreTools({
           homeDirectory: this.options.homeDirectory ?? homedir(),
@@ -176,13 +215,13 @@ export class KiroBindingManager {
     this.#active.set(projectId, {
       taskId: task.id,
       builderActivity: () => hook.builderActivity(),
+      // Descriptors stay: their tokens die with these handlers, and a later bind or a restore by
+      // the next Core rewrites them. Hooks queue and bridges wait until then.
       revoke: () => {
         for (const binding of [builder, helper, hook]) {
           binding.revoke()
           this.options.handlers.delete(binding.path)
         }
-        for (const file of [bindingDescriptor, helperDescriptor, hookDescriptor])
-          void writePrivateJson(file, { status: 'REVOKED' }).catch(() => {})
       },
     })
     return {

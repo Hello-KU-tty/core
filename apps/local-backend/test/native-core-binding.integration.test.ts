@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto'
-import { mkdtemp, realpath, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
@@ -379,6 +379,160 @@ describe('experimental native Core binding', () => {
     } finally {
       await client.close()
       await binding.handler.close()
+      await runtime.close()
+      server.closeAllConnections()
+      await new Promise<void>((done) => server.close(() => done()))
+      storage.close()
+    }
+  })
+
+  it('a Project bridge follows a rewritten descriptor, waits while Core is away and keeps its folder', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'vibe-native-project-bridge-'))
+    const storage = await openInMemorySqliteStorage()
+    storage.transaction((repository) => {
+      repository.appendProject(projectSchema.parse(projectFixture))
+      repository.appendDiscoverySession(discoverySessionSchema.parse(discoverySessionFixture))
+      repository.appendCandidate(projectCandidateRevisionSchema.parse(candidateFixture))
+      repository.appendCandidateRound(candidateRoundSchema.parse(candidateRoundFixture))
+      repository.appendDiscoveryFeedback(discoveryFeedbackSchema.parse(discoveryFeedbackFixture))
+      repository.appendLearningSpec(learningSpecRevisionSchema.parse(draftLearningSpecFixture))
+      repository.appendLearningSpec(learningSpecRevisionSchema.parse(confirmedLearningSpecFixture))
+      repository.appendTask(builderTaskSchema.parse(builderTaskFixture))
+    })
+    const application = new ApplicationService({
+      storage,
+      workspacePolicy: await WorkspacePathPolicy.create(root),
+    })
+    const runtime = new WorkflowRuntime({
+      application,
+      agents: {
+        invoke: async () => {
+          throw new Error('NATIVE_AGENT_NOT_ATTACHED')
+        },
+      },
+      instanceId: randomUUID(),
+    })
+    const handlers = new Map()
+    const server = createLocalServer({
+      application,
+      runtime,
+      token: randomBytes(32).toString('hex'),
+      instanceId: randomUUID(),
+      mcpHandlers: handlers,
+      runStartDisabledCode: 'NATIVE_RUNTIME_NOT_ATTACHED',
+    })
+    await new Promise<void>((done) => server.listen(0, '127.0.0.1', done))
+    const address = server.address()
+    if (!address || typeof address === 'string') throw new Error('LISTEN_FAILED')
+    // Each binding stands for one Core's connection to the same Project folder and role.
+    const connect = () => {
+      const binding = createNativeCoreBinding({
+        application,
+        role: 'HELPER',
+        projectId: ids.project,
+        correlationId: ids.correlation,
+        taskId: ids.task,
+      })
+      handlers.set(binding.path, binding.handler)
+      return binding
+    }
+    await privateDirectory(root)
+    const workspace = await realpath(root)
+    const other = join(workspace, 'other-folder')
+    await mkdir(other)
+    const descriptorFile = join(workspace, 'helper-mcp.json')
+    const write = (
+      binding: ReturnType<typeof connect> | null,
+      overrides: Record<string, unknown> = {},
+    ) =>
+      writeFile(
+        descriptorFile,
+        JSON.stringify(
+          binding === null
+            ? { status: 'REVOKED' }
+            : {
+                role: 'HELPER',
+                lifecycle: 'PROJECT',
+                projectId: ids.project,
+                taskId: ids.task,
+                correlationId: ids.correlation,
+                workspace,
+                toolNames: binding.toolNames,
+                url: `http://127.0.0.1:${address.port}${binding.path}`,
+                authorization: binding.authorization,
+                ...overrides,
+              },
+        ),
+        { mode: 0o600 },
+      )
+    const args = {
+      schemaVersion: 1,
+      kind: 'HELPER_GET_CONTEXT',
+      actor: { kind: 'AGENT', role: 'HELPER' },
+      projectId: ids.project,
+      taskId: ids.task,
+      correlationId: ids.correlation,
+      question: 'What is this project about?',
+      relatedConceptNames: [],
+    }
+    const codeOf = (result: Awaited<ReturnType<Client['callTool']>>) => {
+      const text = result.content?.find((item) => item.type === 'text')
+      return text && text.type === 'text' ? JSON.parse(text.text).code : null
+    }
+    // Kiro starts the bridge before the Core that restores this connection.
+    await write(null)
+    const stdio = new Client({ name: 'native-project-bridge-test', version: '0.1.0' })
+    const opened = stdio.connect(
+      new StdioClientTransport({
+        command: process.execPath,
+        args: [resolve('scripts/native-core-stdio-bridge.mjs'), descriptorFile, workspace],
+        stderr: 'pipe',
+      }),
+    )
+    try {
+      await new Promise((done) => setTimeout(done, 1500))
+      const first = connect()
+      await write(first)
+      await opened
+      expect((await stdio.listTools()).tools.map((tool) => tool.name)).toEqual([
+        'get_helper_context',
+      ])
+      expect(
+        (await stdio.callTool({ name: 'get_helper_context', arguments: args })).isError,
+      ).not.toBe(true)
+
+      // The next Core rewrites the descriptor for the same folder: the running bridge follows.
+      first.revoke()
+      handlers.delete(first.path)
+      const second = connect()
+      await write(second)
+      expect(
+        (await stdio.callTool({ name: 'get_helper_context', arguments: args })).isError,
+      ).not.toBe(true)
+
+      // While no Core is connected the tool says so instead of failing the MCP server.
+      second.revoke()
+      handlers.delete(second.path)
+      const away = await stdio.callTool({ name: 'get_helper_context', arguments: args })
+      expect(away.isError).toBe(true)
+      expect(codeOf(away)).toBe('VIBE_HELPER_NOT_CONNECTED')
+      await write(null)
+      expect(codeOf(await stdio.callTool({ name: 'get_helper_context', arguments: args }))).toBe(
+        'VIBE_HELPER_NOT_CONNECTED',
+      )
+      const third = connect()
+      await write(third)
+      expect(
+        (await stdio.callTool({ name: 'get_helper_context', arguments: args })).isError,
+      ).not.toBe(true)
+
+      // Another folder is never followed.
+      await write(third, { workspace: other })
+      await expect(stdio.callTool({ name: 'get_helper_context', arguments: args })).rejects.toThrow(
+        'BRIDGE_BINDING_REVOKED',
+      )
+    } finally {
+      await stdio.close()
       await runtime.close()
       server.closeAllConnections()
       await new Promise<void>((done) => server.close(() => done()))
