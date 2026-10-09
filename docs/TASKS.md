@@ -69,7 +69,9 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - **완료 조건:** Helper 대화가 HELPER_CONVERSATION Episode로 묶이고 다음 개인화에 반영됨을 실제 흐름으로 확인.
 - **진행:** `/vibe-helper 질문`(manual Steering 슬래시 명령)을 hook이 Helper 질문으로 보관하고, 턴이 끝나는 Stop hook에서 hook 실행기가 Kiro 세션 기록의 마지막 Agent 답을 읽어 붙인다. Core는 기존 `UI_RECORD_HELPER_EXCHANGE`로 질문(USER)과 답 요약(AGENT/HELPER, 240자)을 HELPER_CONVERSATION Episode에 기록한다. Helper 질문은 일반 채팅 Evidence로 중복 기록하지 않는다. 실제 Kiro에서 확인(0.11크레딧). 남은 것: Helper Episode 종료 시점(현재는 Decision 확정·Task 완료 때 닫힘), `inclusion: auto` 자동 진입의 첫 승인 UX, 세션 기록 형식이 바뀔 때의 fallback(답 미확보 시 안내 문구로 기록).
 
-### [ ] K07. 포스터 핵심 장면 확보
+### [-] K07. 포스터 핵심 장면 확보
+
+- **보류(2026-10-09):** 포스터는 팀원과 함께 완성하므로 이 작업 목록에서 뺀다. 포스터 기간에는 K09 마무리와 K10~K12, K08을 진행한다.
 
 - **기한:** 10/11 포스터 사전 제출.
 - **범위:** Kiro 채팅의 사용자 발언 → hook → Evidence → 학습자 요약 갱신 → 다음 대화 변화 중 실측된 범위를 한 장면으로 캡처한다. 실측되지 않은 부분은 목표 구조로 구분해 표시한다.
@@ -88,7 +90,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - **완료 조건:** 관련 unit·integration·패널 테스트, VSIX 재생성, 실제 Kiro 재실측. 재실측에는 6 적용 뒤 신뢰·hook·Steering 적재 시점(7)을 다시 보는 것을 포함한다(모델 크레딧 필요).
 - **진행:** 코드·문서 반영과 0.2.1 VSIX 완료(backend `0cd52c8`·`4def349`, frontend `program` `finals/trial-feedback` `c2c873c`). 자동 검사 통과(backend unit 177·integration 489, 패널 CJS 179, frontend 811, Mac 패키지 9). 패널 화면은 Chrome 1280px·360px로 확인. 모델 호출 없는 격리 Kiro 확인: 빈 현재 폴더 연결, 다시 로드 없이 Builder MCP 연결과 `vibe-helper` 에이전트 등록, 새 채팅 세션에서 hook 2개 적재. 본선 계정 재실측(2026-10-09, [재실측 기록](spikes/KIRO_NATIVE_K09_REMEASURE_20261009.md)): 처음 보는 목표·Personal Need로 Discovery부터 Task 완료까지 진행. 현재 폴더 연결, hook 기록, 환경 확인, 작업 맥락 기록, 구현이 닿은 시점의 Decision 하나와 기록 후 질문, 첫 시도 확정, Vibe Helper 도구 11회 실패 0·승인 0, 다른 탭 Helper의 진행 중 Builder 활동 사용을 확인(계정 사용량 27.03). Analyst 과대 판정 문제는 기본 모델 Sonnet 5.5(대안 Auto)와 정책 최대치 저장으로 처리했다(DECISIONS). 남은 것: 모드 목록에서 `vibe-helper` 에이전트를 고르는 화면 조작, 신뢰·동의·새 창 확인 창의 실제 화면, 이 변경을 담은 VSIX 재생성.
 
-### [ ] K10. Kiro 채팅 Builder 워크플로 재설계
+### [>] K10. Kiro 채팅 Builder 워크플로 재설계
 
 - **출처:** 체험 피드백 10. Vibe Helper 도구 호출 25번 중 9번 실패(형식 3, 순서 3, 인용 글자 깨짐 1, 모드 2). 학습자의 실제 이유가 Decision 기록 전 발언이라 버려져 판단 근거 Evidence가 하나도 남지 않았다.
 - **진행 방식:** 현재 Builder 도구·순서·Core 검증 규칙을 한 장으로 정리해 사용자에게 보여 주고, 사용자가 재설계한다. 정리 전에는 Core Builder 계약을 바꾸지 않는다.
