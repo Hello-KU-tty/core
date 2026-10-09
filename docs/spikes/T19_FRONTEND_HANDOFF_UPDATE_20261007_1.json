@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "kitVersion": "2026.10.07.1",
+  "previousKitVersion": "2026.09.30.1",
+  "scope": "Current Windows machine; Core contracts and actual frontend/HTTP/SSE/SQLite with synthetic Agents. No native model quality claim.",
+  "environment": { "node": "24.19.0", "pnpm": "11.13.1", "modelCalls": 0 },
+  "backendChangesIncluded": [
+    "Keep the Builder turn running after a tool permission denial: denial rows use Core's TOOL shape and a failed display delivery no longer aborts the job (f3abfae)"
+  ],
+  "pnpmCheck": {
+    "result": "PASS",
+    "unit": { "passed": 179, "skipped": 1 },
+    "integration": { "passed": 416, "skipped": 10 },
+    "eval": { "passed": 43 },
+    "campusDrop": { "passed": 3 },
+    "smoke": { "passed": 6 },
+    "e2e": { "passed": 12 },
+    "nativeCjs": { "passed": 174, "skipped": 1 }
+  },
+  "followUpConsumer": {
+    "result": "PASS",
+    "provenance": "CARRIED_FROM_2026.09.30.1_NOT_RERUN",
+    "builderRuns": 3,
+    "helperRuns": 3,
+    "cases": ["repeat after completion", "duplicate submit", "old report preservation", "existing workspace preservation", "reload without mutation"]
+  },
+  "frontendCandidate": {
+    "version": "0.0.19",
+    "targetedRegression": "NOT_RUN",
+    "fullValidation": "PENDING_NEW_KIT_APPLICATION"
+  },
+  "promptEvaluation": {
+    "version": "1.3.12",
+    "fixture": "tests/eval/fixtures/prompt-regressions/builder-v1.3.12-continuous-work.json",
+    "scope": "Mechanical prompt rules and synthetic contract regressions; native model quality NOT_ASSERTED"
+  },
+  "notVerified": ["Separate Windows PC", "Unsupported Kiro/Agent versions", "Full native model vertical flow for 0.0.19", "Native model denial-continuation check on Windows"]
+}
