@@ -7,7 +7,7 @@
   {
     "name": "extension.vsixmanifest",
     "bytes": 855,
-    "sha256": "4d9d1997f289cd681e6db978aca0d42d0e1803c3dab2293f0f15ffb5b71225af"
+    "sha256": "c1a36895ffd3b2ab78d2c37ed67ad3360b6fa7574d6923479b543056d100a001"
   },
   {
     "name": "extension/dist/extension.js",
@@ -27,7 +27,7 @@
   {
     "name": "extension/package.json",
     "bytes": 1580,
-    "sha256": "7f8252a29cbf66bf1c29329c39b621d37010450bba48c88d7fe31260d2e1dc6a"
+    "sha256": "fec68198432cd9c8789faf42de52a8be035d68bb9702635281a08945dd0a21b2"
   },
   {
     "name": "extension/portable/agent-prompts/builder.md",
@@ -66,18 +66,18 @@
   },
   {
     "name": "extension/portable/bin/core.mjs",
-    "bytes": 1090734,
-    "sha256": "c3c8af3a5a401dab303e48c5538b6dcfa2b074457dab9f455b12f97005aaf26e"
+    "bytes": 1090735,
+    "sha256": "75936f3ec2abeedabba13bee032989184923e4e343ca85dfd389063359bce054"
   },
   {
     "name": "extension/portable/bin/extension.cjs",
-    "bytes": 464656,
-    "sha256": "2fc814f5b41e030fb37e0b771c4ddb50167ea4e1a37fe7e66bfce7de7d6f88db"
+    "bytes": 464686,
+    "sha256": "8f32276cf9f95c2e61be6903b56dc24a330e939c483ff0e9b2dea7afddfb17b9"
   },
   {
     "name": "extension/portable/bin/frontend-host.cjs",
-    "bytes": 422055,
-    "sha256": "85b4bb70d655ee69d39b43414ff9faaeef1955e394fbd6fbd27abf1edbf47eb9"
+    "bytes": 422085,
+    "sha256": "673b5f8f32fe44e5cf2aa03d036d28f5b7f34e6bdfe873c69d4dfb3d6f79c4c4"
   },
   {
     "name": "extension/portable/bin/guard.mjs",
@@ -227,7 +227,7 @@
   {
     "name": "extension/portable/manifest.json",
     "bytes": 10761,
-    "sha256": "3f60149c6f20c4fb2534be60b06683440f3667f287d0777bad4a850e6ccd8938"
+    "sha256": "b9eab5189c82edf549dda8fb87f81a86502ca989c727c36d1043b11e149a8050"
   },
   {
     "name": "extension/portable/node_modules/better-sqlite3/lib/binding.js",
