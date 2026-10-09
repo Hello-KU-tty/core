@@ -81,7 +81,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 
 - **기한:** 10/18 본선.
 - **범위:** Discovery부터 다음 개인화까지 새 구조의 수직 흐름, 기존 패널 경로 fallback, 설치 경험, 발표 데모. Windows 0.0.19 반영(권한 거부 수정)은 Windows 호스트 작업으로 별도 판단한다.
-- **완료 조건:** `pnpm check`와 실제 Kiro 흐름 기록, 알려진 한계 문서화.
+- **완료 조건:** `pnpm check`와 실제 Kiro 흐름 기록, 알려진 한계 문서화. 데모에 쓸 Kiro 버전에서 확인 루틴(재시작 후 연결 복원, Builder 도구, Helper 탭, hook 기록)을 통과하고, 데모 기기의 Kiro 자동 업데이트를 끈다(DECISIONS "버전은 의존성이 깨지지 않는 범위만").
 
 ### [~] K09. 첫 실사용 체험 피드백 반영
 
