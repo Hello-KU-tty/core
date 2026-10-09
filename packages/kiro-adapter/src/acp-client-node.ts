@@ -12,11 +12,25 @@ export type KiroAcpErrorCode =
   | 'PROTOCOL_INVALID'
   | 'REQUEST_TIMEOUT'
   | 'RPC_ERROR'
+  /** The account cannot use the requested model (a free account asking for a preview model). */
+  | 'MODEL_UNAVAILABLE'
   | 'IDENTITY_MISMATCH'
   | 'MODEL_MISMATCH'
   | 'TURN_BUSY'
   | 'CANCELLED'
   | 'OUTPUT_TOO_LARGE'
+
+// kiro-cli 2.28 reports an unusable model only in the prompt error text. The text is matched, never
+// forwarded.
+const MODEL_UNAVAILABLE_TEXT = /\bThe model '[^']{1,100}' is not available\b/
+
+function modelUnavailable(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false
+  const { data, message } = error as { data?: unknown; message?: unknown }
+  return [data, message].some(
+    (text) => typeof text === 'string' && MODEL_UNAVAILABLE_TEXT.test(text.slice(0, 2_000)),
+  )
+}
 
 export class KiroAcpError extends Error {
   constructor(readonly code: KiroAcpErrorCode) {
@@ -407,7 +421,10 @@ export class KiroAcpSession {
     if (request === undefined) return
     clearTimeout(request.timer)
     this.#pending.delete(message.id)
-    if ('error' in message) request.reject(new KiroAcpError('RPC_ERROR'))
+    if ('error' in message)
+      request.reject(
+        new KiroAcpError(modelUnavailable(message.error) ? 'MODEL_UNAVAILABLE' : 'RPC_ERROR'),
+      )
     else if ('result' in message) request.resolve(message.result)
     else request.reject(new KiroAcpError('PROTOCOL_INVALID'))
   }

@@ -430,8 +430,11 @@ async function start(
                 ? { DISCOVERY: option('--discovery-model', '') }
                 : {}),
               ...(option('--helper-model', '') ? { HELPER: option('--helper-model', '') } : {}),
-              // Measured best on the fixed Analyst corpus (tests/eval/results/evidence-analyst-models-kiro-cli.md).
-              EVIDENCE_ANALYST: option('--analyst-model', 'auto'),
+              // Best on the fixed Analyst corpus with the finals account; accounts without the
+              // preview model fall back to Auto (tests/eval/results/evidence-analyst-models-kiro-cli.md).
+              EVIDENCE_ANALYST: option('--analyst-model', '')
+                ? option('--analyst-model', '')
+                : ['claude-sonnet-5.5', 'auto'],
             },
           })
     nativeRelay = nativeMode

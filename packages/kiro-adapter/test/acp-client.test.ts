@@ -253,6 +253,25 @@ describe('Kiro ACP lifecycle and fail-closed protocol', () => {
     expect(peer.child.kill).toHaveBeenCalledTimes(process.platform === 'win32' ? 1 : 2)
   })
 
+  it('names an unusable model without forwarding the provider text', async () => {
+    const peer = createPeer({ holdPrompt: true })
+    const session = await connect()
+    const turn = session.prompt('Synthetic prompt')
+    const prompt = peer.received.find((message) => message.method === 'session/prompt')
+    peer.send({
+      id: prompt?.id,
+      error: {
+        code: -32603,
+        message: 'Internal error',
+        data: "Encountered an error in the response stream: The model 'claude-sonnet-5.5' is not available. Please use '/model' to select a different model and try again.",
+      },
+    })
+    await expect(turn).rejects.toMatchObject({
+      code: 'MODEL_UNAVAILABLE',
+      message: 'Kiro ACP: MODEL_UNAVAILABLE',
+    })
+  })
+
   it('times out a silent peer and terminates it', async () => {
     const peer = createPeer({ holdPrompt: true })
     const session = await connect()

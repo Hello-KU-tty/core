@@ -397,11 +397,43 @@ describe('Evidence acceptance policy', () => {
     expect(result.decision.reasonCode).toBe('INSUFFICIENT_EVIDENCE')
   })
 
-  it('rejects an Analyst maximum above the deterministic signal cap', () => {
+  it('keeps an overstated Analyst maximum at the deterministic signal cap', () => {
     const result = evaluate({
       ...evidenceProposalFixture,
       signal: 'REPHRASE',
       maximumSupportedState: 'DEMONSTRATED',
+    })
+    expect(result.outcome).toBe('ACCEPTED')
+    if (result.outcome !== 'ACCEPTED') return
+    expect(result.decision.reasonCode).toBe('VALID_USER_EVIDENCE')
+    expect(result.decision.explanation).toContain('policy maximum')
+    expect(result.evidence).toMatchObject({ supportsState: 'EXPLAINED' })
+  })
+
+  it('caps a MEDIUM justified decision at EXPLAINED instead of rejecting it', () => {
+    // The live K09 case: the Analyst paired MEDIUM strength with DEMONSTRATED.
+    const result = evaluate(
+      { ...reasonedDecisionProposal, strength: 'MEDIUM', maximumSupportedState: 'DEMONSTRATED' },
+      {
+        episode: { ...episodeFixture, eventIds: [reasonedDecisionEvent.id] },
+        events: [reasonedDecisionEvent],
+        decisionResolutions: [decisionResolutionFixture],
+      },
+    )
+    expect(result.outcome).toBe('ACCEPTED')
+    if (result.outcome !== 'ACCEPTED') return
+    expect(result.evidence).toMatchObject({
+      signal: 'JUSTIFIED_DECISION',
+      supportsState: 'EXPLAINED',
+    })
+    expect(result.decision.explanation).toContain('the Analyst proposed DEMONSTRATED')
+  })
+
+  it('still rejects a contradiction that claims a Concept State', () => {
+    const result = evaluate({
+      ...evidenceProposalFixture,
+      signal: 'CONTRADICTION',
+      maximumSupportedState: 'EXPLAINED',
     })
     expect(result.outcome).toBe('REJECTED')
     expect(result.decision.reasonCode).toBe('OVERSTATED_MAXIMUM_STATE')
@@ -413,9 +445,11 @@ describe('Evidence acceptance policy', () => {
       signal: 'TRANSFER',
       maximumSupportedState: 'TRANSFERRED',
     }
+    // Without a demonstration elsewhere, TRANSFERRED is kept at the DEMONSTRATED cap.
     const withoutBaseline = evaluate(transferProposal)
-    expect(withoutBaseline.outcome).toBe('REJECTED')
-    expect(withoutBaseline.decision.reasonCode).toBe('OVERSTATED_MAXIMUM_STATE')
+    expect(withoutBaseline.outcome).toBe('ACCEPTED')
+    if (withoutBaseline.outcome !== 'ACCEPTED') return
+    expect(withoutBaseline.evidence).toMatchObject({ supportsState: 'DEMONSTRATED' })
 
     const priorDemonstration = { ...acceptedEvidenceFixture, taskId: previousTaskId }
     const transferred = evaluate(transferProposal, {

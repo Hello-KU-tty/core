@@ -1,5 +1,14 @@
 # 결정 기록
 
+## 본선: Analyst 기본 모델 Sonnet 5.5(대안 Auto)와 과대 제안의 최대치 저장
+
+- **근거:** 본선 계정에서 같은 16개 사례로 Auto 11/16, Sonnet 5.5 14/16, Opus 5.5 14/16이었다([모델 비교](../tests/eval/results/evidence-analyst-models-kiro-cli.md) 3차). 실측에서도 Auto가 학습자의 실제 판단을 `MEDIUM` 강도에 `DEMONSTRATED`로 제안해 Core가 통째로 거절했고, 학습자의 이유가 Evidence로 남지 않았다([K09 재실측](spikes/KIRO_NATIVE_K09_REMEASURE_20261009.md)).
+- **결정(사용자 승인, 2026-10-09):**
+  - Analyst 기본 모델을 `claude-sonnet-5.5`로 하고, 그 모델을 쓸 수 없는 계정(개인 무료 계정 등)에서는 `auto`로 넘어간다. kiro-cli가 프롬프트 단계에서 "모델을 쓸 수 없음"으로 거절할 때만 다음 후보로 다시 시도하고, 그 모델은 프로세스가 끝날 때까지 건너뛴다. 다른 오류는 재시도하지 않는다. `--analyst-model`을 주면 그 모델만 쓴다. 공급자 오류 문구는 밖으로 내보내지 않는다.
+  - Analyst가 정책상 최대보다 높은 상태를 제안하면 거절하지 않고 정책 최대치로 낮춰 받는다. Core는 상태를 올리지 않으며, 낮췄다는 사실은 결정 설명과 원래 제안(`maximumSupportedState`)으로 남는다. 상태를 붙인 모순(CONTRADICTION) 제안은 앞뒤가 맞지 않으므로 계속 거절한다.
+- **위험:** Sonnet 5.5는 preview 모델이라 바뀌거나 내려갈 수 있다. 그때는 Auto로 넘어가며 품질이 낮아질 수 있다. 낮춰 받기는 과대 판정을 덜 버리는 대신, Analyst가 강도를 과하게 매긴 경우도 정책 최대치까지는 Evidence로 남긴다.
+- **이전 결정 대체:** "Evidence Analyst 기본 모델은 Auto"(무료 계정 평가 기준)를 대체한다.
+
 ## 본선: 첫 실사용 체험 피드백 반영(K09)
 
 - **맥락:** 사용자가 0.2.0으로 처음부터 직접 써 본 뒤 피드백 15건을 남겼다. 확인한 원인은 [첫 체험 기록](spikes/KIRO_NATIVE_FIRST_TRIAL_20261009.md)에 있다.
