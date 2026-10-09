@@ -7,7 +7,7 @@
   {
     "name": "extension.vsixmanifest",
     "bytes": 855,
-    "sha256": "5182b3db006c829b9ff5b546cffe225a795034507c13c61b6156f36a1ba40086"
+    "sha256": "cd0b5ea2dd22a1aaeeaca0ff1e26c5b1ba11348cfc1c7a8b6501e0228485226b"
   },
   {
     "name": "extension/dist/extension.js",
@@ -27,7 +27,7 @@
   {
     "name": "extension/package.json",
     "bytes": 1580,
-    "sha256": "1a5a16808c0a275205c63b56e51aba8e6bfddd637d936b2e61baa8f1c6929e67"
+    "sha256": "3fc63eb1f6995d6c691dd23580901c848f8678230f42039250b9fa0d88c991ab"
   },
   {
     "name": "extension/portable/agent-prompts/builder.md",
@@ -51,8 +51,8 @@
   },
   {
     "name": "extension/portable/agent-prompts/kiro-steering.md",
-    "bytes": 7372,
-    "sha256": "0b6861ab4ca32025a194fa5b18e0d60a1d3a86db1f2f8eed3d1fa5d83afdeb36"
+    "bytes": 8279,
+    "sha256": "aebc57e13448bc260f73eb8a302574a55bff7398b5730602365191bb3ad4ecc0"
   },
   {
     "name": "extension/portable/bin/bridge.mjs",
@@ -66,8 +66,8 @@
   },
   {
     "name": "extension/portable/bin/core.mjs",
-    "bytes": 1088184,
-    "sha256": "94a7ca611ce390c5551ab858d3aca5eda01da96ddcca85d959f30dd635bb17b7"
+    "bytes": 1088321,
+    "sha256": "dafe5a4bb4d09a0d0d8c1d94a8b43e24d14cfd1cbaa292425d581324e16d6292"
   },
   {
     "name": "extension/portable/bin/extension.cjs",
@@ -227,7 +227,7 @@
   {
     "name": "extension/portable/manifest.json",
     "bytes": 10761,
-    "sha256": "bccaad1319aa1d93fdb8784fb973fc4ccac39c19b6bbe52b5b752f20174fbf59"
+    "sha256": "494e4cc194bb742d1c5c9814d082fe6a4d2ee910bf78607df2092a86e8b8f796"
   },
   {
     "name": "extension/portable/node_modules/better-sqlite3/lib/binding.js",

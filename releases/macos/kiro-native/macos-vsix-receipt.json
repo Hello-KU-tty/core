@@ -1,18 +1,18 @@
 {
-  "file": "builder-helper-agent-panel-0.2.2-darwin-arm64.vsix",
-  "version": "0.2.2",
+  "file": "builder-helper-agent-panel-0.2.3-darwin-arm64.vsix",
+  "version": "0.2.3",
   "hostMode": "KIRO_NATIVE",
   "publicationStatus": "LOCAL_COMMIT_NOT_PUSHED",
   "target": "darwin-arm64",
-  "bytes": 41536823,
-  "sha256": "c313136d0126df9e266516ae02ea6495547028fa48dedb9fb0ae1aa597326670",
+  "bytes": 41537276,
+  "sha256": "b408659c20254ad3088ecc7dea3866efd3eb5dc3c1047eaf3d6a7f6fcedcffb1",
   "files": 74,
   "fileInventory": "files.json",
   "frontendVersion": "0.0.18",
   "buildFrontendCommit": "c2c873c27b5563037853236aa402cd1b97910929",
   "buildFrontendBranch": "finals/trial-feedback",
-  "buildBackendCommit": "012c664f472ed55fa62dfd732c7be36693ae6cbf",
-  "workingTreeNote": "The backend checkout had one untracked file outside the build inputs (the learner's feedback notes).",
-  "changedFromPrevious": "Against 0.2.1 only extension/portable/bin/core.mjs (Analyst model order and Evidence policy cap, c7a9cdc), extension/portable/manifest.json and the two version fields differ; the other 70 entries have the same hashes.",
-  "liveCheck": "Installed over 0.2.1 in an isolated Kiro 1.2.56 profile: Core connected on the existing data, and a new Discovery, plan and Task ran through it; see docs/FRONTEND_KIRO_NATIVE_HANDOFF.md."
+  "buildBackendCommit": "7df50ec8408ff380b863e7dafac0527c18b7fd25",
+  "workingTreeNote": "The backend checkout had uncommitted release and handoff edits and the learner's untracked feedback notes, all outside the build inputs.",
+  "changedFromPrevious": "Against 0.2.2: the Core bundle (Helper agent tools and Core scope), the Kiro steering source (0.5.1, read-only Helper), the portable manifest and the two version fields.",
+  "liveCheck": "Isolated Kiro 1.2.56 profile on the finals account: in a vibe-helper chat tab the agent had 8 tools, called get_helper_context without an approval prompt and answered from the project plan; see docs/FRONTEND_KIRO_NATIVE_HANDOFF.md."
 }
