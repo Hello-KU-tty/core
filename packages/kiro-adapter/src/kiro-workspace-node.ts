@@ -541,10 +541,15 @@ export function renderKiroHelperAgent(
     readonly bridgeScript: string
     readonly helperDescriptor: string
     readonly workspace: string
+    /** The Helper Core server accepts only this Project, Task and correlation. */
+    readonly binding: KiroCoreBinding
   },
 ): string {
   const prompt = fill(templates.helperAgent, {
     HELPER_MCP_SERVER: KIRO_HELPER_MCP_SERVER_NAME,
+    PROJECT_ID: options.binding.projectId,
+    TASK_ID: options.binding.taskId,
+    CORRELATION_ID: options.binding.correlationId,
     HELPER_PROMPT: options.helperPrompt.replaceAll('\r\n', '\n').trim(),
   })
   return `${JSON.stringify(
@@ -750,6 +755,7 @@ export async function installKiroWorkspace(
         bridgeScript: options.bridgeScript,
         helperDescriptor: options.helperAgent.helperDescriptor,
         workspace: options.workspace,
+        binding: options.binding,
       }),
     )
   await write(

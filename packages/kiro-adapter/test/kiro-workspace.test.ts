@@ -223,6 +223,7 @@ describe('Kiro-native workspace adapter', () => {
         bridgeScript: '/x/bridge.mjs',
         helperDescriptor: '/private/helper-mcp.json',
         workspace: '/Users/me/memo app',
+        binding,
       }),
     )
     expect(agent.name).toBe(KIRO_HELPER_AGENT_NAME)
@@ -236,6 +237,10 @@ describe('Kiro-native workspace adapter', () => {
       '/Users/me/memo app',
     ])
     expect(agent.prompt).toContain('`get_helper_context`')
+    // The Helper Core server rejects a call whose taskId is missing (AGENT_RUN_SCOPE_MISMATCH).
+    expect(agent.prompt).toContain(`taskId \`${binding.taskId}\``)
+    expect(agent.prompt).toContain(`projectId \`${binding.projectId}\``)
+    expect(agent.prompt).toContain(`correlationId \`${binding.correlationId}\``)
     expect(agent.prompt).toContain('You cannot edit files or run commands.')
     expect(agent.prompt).not.toContain('Where it says you are read-only')
     expect(agent.prompt).toContain('{{NOT_A_PLACEHOLDER}} stays literal.')
