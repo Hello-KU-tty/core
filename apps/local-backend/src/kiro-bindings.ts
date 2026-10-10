@@ -153,6 +153,7 @@ export class KiroBindingManager {
     const builder = createNativeCoreBinding({
       application: this.options.application,
       role: 'BUILDER',
+      surface: 'KIRO_CHAT',
       ...scope,
     })
     const helper = createNativeCoreBinding({

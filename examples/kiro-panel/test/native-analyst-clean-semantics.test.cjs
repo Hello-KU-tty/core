@@ -45,7 +45,8 @@ test('runs eight same-input baseline cells only with the explicit comparison pro
 
 test('freezes new paired inputs after both prompts and never embeds oracle concepts', async () => {
   const baseline = await readFile(join(__dirname, '../../../tests/eval/fixtures/prompt-regressions/evidence-analyst-v1.0.7-canonical.md'), 'utf8')
-  const candidate = await readFile(join(__dirname, '../../../docs/agent-prompts/evidence-analyst.md'), 'utf8')
+  // The v1.0.8 text is archived since canonical moved to v1.1.0 (K10).
+  const candidate = await readFile(join(__dirname, '../../../tests/eval/fixtures/prompt-regressions/evidence-analyst-v1.0.8-canonical.md'), 'utf8')
   assert.equal(createHash('sha256').update(baseline).digest('hex'), pairedUnseen.frozenPromptSha256['1.0.7'])
   assert.equal(createHash('sha256').update(candidate).digest('hex'), pairedUnseen.frozenPromptSha256['1.0.8'])
   assert.equal(pairedUnseen.modelRunStatus, 'NOT_RUN')

@@ -89,3 +89,29 @@ export function findExplicitOptionMentions(
   }
   return request.options.map((option) => option.id).filter((id) => mentioned.has(id))
 }
+
+// A reply that opens with one option number as the answer: "2번", "2번, 이유", "2번으로 해줘",
+// "2번이요", "2번 할게". A negation or comparison right after the number ("1번 말고", "1번은
+// 별로", "1번보다") is not an answer, and neither is "2번이 낫나?".
+const CLEAR_OPTION_ANSWER =
+  /^\s*(?:(?:옵션|option)\s*)?([1-6])\s*번(?:째)?(?:\s*(?:으로|로))?(?:\s*(?:이요|요|할게요?|할래요?|갈게요?|가자|해\s*줘|해요?|선택))?(?!\s*(?:말고|빼고|대신|보다|아니|별로|싫|은|는))\s*(?:$|[,.!~]|\s)/iu
+const BARE_OPTION_ANSWER = /^\s*([1-6])\s*[.!]?\s*$/u
+
+/**
+ * The option a learner's reply clearly answers with, or undefined when the reply is not a plain
+ * numbered answer (wavering, negation, comparison, a question, or two different numbers).
+ * Core rejects a Builder record only against such a clear answer (K10); every other reply is
+ * left to the Builder's reading and its one-sentence confirmation in chat.
+ */
+export function findClearOptionAnswer(
+  request: Pick<DecisionRequest, 'options'>,
+  reply: string,
+): string | undefined {
+  const match = CLEAR_OPTION_ANSWER.exec(reply) ?? BARE_OPTION_ANSWER.exec(reply)
+  if (match === null) return undefined
+  const option = request.options[Number(match[1]) - 1]
+  if (option === undefined) return undefined
+  const mentioned = findExplicitOptionMentions(request, [reply])
+  if (mentioned.some((id) => id !== option.id)) return undefined
+  return option.id
+}

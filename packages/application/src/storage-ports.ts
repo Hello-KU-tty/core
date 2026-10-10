@@ -1,7 +1,7 @@
 import type {
   AcceptedEvidence,
-  AnalysisJob,
   ActivityEvent,
+  AnalysisJob,
   AuditRecord,
   BaselineResult,
   BuilderTask,
@@ -18,9 +18,9 @@ import type {
   DiscoveryFeedback,
   DiscoverySession,
   Episode,
+  EvaluationRun,
   EvidenceDecision,
   EvidenceProposal,
-  EvaluationRun,
   LearningSpecRevision,
   LiveProjectContext,
   MisconceptionIssue,
@@ -198,6 +198,15 @@ export interface PersistenceRepository {
   ): Episode | null
   /** True only after a Helper answer was durably recorded for this exact turn. */
   hasHelperResponseForCorrelation(projectId: string, taskId: string, correlationId: string): boolean
+  /**
+   * A Task's chat events (learner messages, Helper replies, Builder chat turns) at or after
+   * `since`, in activity order. `helperTab` marks events of a Helper conversation Episode.
+   */
+  readTaskChatEvents(
+    projectId: string,
+    taskId: string,
+    since: string,
+  ): readonly { readonly event: ActivityEvent; readonly helperTab: boolean }[]
   nextActivitySequence(projectId: string): number
   readRecentEpisodeAggregatesForProject(
     projectId: string,

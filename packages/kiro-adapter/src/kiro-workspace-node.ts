@@ -151,6 +151,31 @@ export function translateKiroHook(
   }
 }
 
+/**
+ * The Builder's reply at the end of a Builder chat turn (K10). Core keeps it as Agent-authored
+ * context so the Analyst can tell what the learner was answering; it is never user Evidence.
+ */
+export function builderChatTurnRequest(
+  binding: KiroCoreBinding,
+  sessionId: string,
+  reply: string,
+  idempotencyKey: string = `idem_${randomUUID()}`,
+): Extract<UiRequest, { kind: 'UI_RECORD_BUILDER_CHAT_TURN' }> | null {
+  const text = reply.trim().slice(0, MAX_CHAT_MESSAGE_CHARS)
+  if (text.length === 0) return null
+  return {
+    schemaVersion: 1,
+    kind: 'UI_RECORD_BUILDER_CHAT_TURN',
+    correlationId: binding.correlationId,
+    actor: { kind: 'UI' },
+    idempotencyKey,
+    projectId: binding.projectId,
+    taskId: binding.taskId,
+    conversationId: kiroConversationId(sessionId),
+    reply: text,
+  }
+}
+
 /** Builds the Helper exchange for a `/vibe-helper` question once its turn has stopped. */
 export function helperExchangeRequest(
   binding: KiroCoreBinding,

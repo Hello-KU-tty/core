@@ -36,8 +36,8 @@ if (builderPrompt.match(/^> Prompt version: `([^`]+)`$/m)?.[1] !== '1.3.12') {
 if (helperPrompt.match(/^> Prompt version: `([^`]+)`$/m)?.[1] !== '1.2.0') {
   throw new TypeError('Helper prompt version mismatch: expected 1.2.0')
 }
-if (analystPrompt.match(/^> Prompt version: `([^`]+)`$/m)?.[1] !== '1.0.8') {
-  throw new TypeError('Evidence Analyst prompt version mismatch: expected 1.0.8')
+if (analystPrompt.match(/^> Prompt version: `([^`]+)`$/m)?.[1] !== '1.1.0') {
+  throw new TypeError('Evidence Analyst prompt version mismatch: expected 1.1.0')
 }
 
 function sectionStart(heading) {

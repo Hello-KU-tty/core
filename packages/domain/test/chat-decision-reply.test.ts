@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { findExplicitOptionMentions, parseChatDecisionReply } from '../src/index.ts'
+import {
+  findClearOptionAnswer,
+  findExplicitOptionMentions,
+  parseChatDecisionReply,
+} from '../src/index.ts'
 
 const request = {
   options: [
@@ -92,5 +96,39 @@ describe('findExplicitOptionMentions', () => {
     [['9번'], []],
   ])('finds explicit numbered choices in %j', (messages, expected) => {
     expect(findExplicitOptionMentions(request, messages)).toEqual(expected)
+  })
+})
+
+describe('findClearOptionAnswer', () => {
+  it('reads a reply that opens with one option number as the answer', () => {
+    for (const [reply, option] of [
+      ['2번', 'decision_option_24h'],
+      ['2번, 토큰 커지는 게 싫어서', 'decision_option_24h'],
+      ['2번으로 해줘', 'decision_option_24h'],
+      ['2번이요', 'decision_option_24h'],
+      ['2번 할게 토큰 때문에', 'decision_option_24h'],
+      ['3번째로 갈게요', 'decision_option_7d'],
+      ['1', 'decision_option_1h'],
+    ] as const) {
+      expect(findClearOptionAnswer(request, reply), reply).toBe(option)
+    }
+  })
+
+  it('leaves wavering, negation, comparison and questions to the Builder', () => {
+    for (const reply of [
+      '1번보다 2번이 낫네 아닌가 1번이 나은가? 아니다 2번이 낫네',
+      '1번은 별로야',
+      '1번 말고',
+      '1번 말고 2번',
+      '2번… 아 아니다 1번',
+      '3번은 너무 복잡하고 2번으로',
+      '2번이 낫나?',
+      '1번이랑 2번 차이가 뭐야?',
+      '2시간이면 충분해',
+      '하루짜리로 하자',
+      '9번',
+    ]) {
+      expect(findClearOptionAnswer(request, reply), reply).toBeUndefined()
+    }
   })
 })

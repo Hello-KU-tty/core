@@ -1,4 +1,4 @@
-// Development evaluation (K05): does the Kiro Agent map a learner's chat reply to an open Decision
+// Development evaluation (K05, K10 tools): does the Kiro Agent map a learner's chat reply to an open Decision
 // correctly, and does it refrain when the reply is not a choice? It needs a running core-only
 // backend with a Builder binding, the Kiro probe extension inbox, and real model credits.
 // Judgement uses only Core resolution fields and Kiro session tool calls, never text search.
@@ -44,53 +44,23 @@ async function tool(name, args) {
   if (result.isError) throw new Error(`${name} failed: ${JSON.stringify(result.structuredContent)}`)
   return result.structuredContent
 }
-const builderTask = () =>
-  tool('get_builder_task', {
-    schemaVersion: 1,
-    kind: 'BUILDER_GET_TASK',
-    correlationId: scope.correlationId,
-    actor: { kind: 'AGENT', role: 'BUILDER' },
-    projectId: scope.projectId,
-    taskId: scope.taskId,
-  })
-
+// K10: the harness asks through the same Kiro chat Builder tools the Agent uses.
 async function openDecision() {
-  const context = await builderTask()
-  const receipt = await tool('request_user_decision', {
-    schemaVersion: 1,
-    ...scope,
-    idempotencyKey: idem(),
-    expectedTaskRevision: context.task.revision,
-    expectedContextVersion: context.liveContext?.contextVersion ?? 0,
-    decision: {
-      category: 'PRODUCT_BEHAVIOR',
-      question: fixture.decision.question,
-      reasonRequiredNow: '링크 생성 코드를 쓰기 전에 만료 정책이 필요하다.',
-      options: fixture.decision.options.map((label, index) => ({
-        key: `option_${index + 1}`,
-        label,
-        description: `링크를 ${label} 동안 연다.`,
-        impacts: [`${label} 뒤에는 링크가 막힌다.`],
-        tradeoffs: [index === 0 ? '받는 시간이 빠듯하다.' : '유출되면 더 오래 노출된다.'],
-      })),
-      recommendedOptionKey: `option_${fixture.decision.recommendedOptionNumber}`,
-      recommendationRationale: '공용 PC에서 바로 옮기는 용도라 짧게 여는 편이 안전하다.',
-      relatedConceptNames: ['link expiry'],
-      sourceReferences: [],
-      independentWorkCanContinue: true,
-    },
-    context: {
-      stage: '공유 링크 구현 전',
-      currentGoal: '만료되는 공유 링크를 만든다.',
-      recentChanges: ['만료 정책 Decision을 열었다.'],
-      activeConceptNames: ['link expiry'],
-      relatedFiles: [],
-      nextActions: ['학습자의 선택을 기다린다.'],
-    },
+  const receipt = await tool('ask_choice', {
+    category: 'PRODUCT_BEHAVIOR',
+    question: fixture.decision.question,
+    whyNow: '링크 생성 코드를 쓰기 전에 만료 정책이 필요하다.',
+    options: fixture.decision.options.map((label, index) => ({
+      label,
+      description: `링크를 ${label} 동안 연다.`,
+      tradeoffs: [index === 0 ? '받는 시간이 빠듯하다.' : '유출되면 더 오래 노출된다.'],
+    })),
+    recommended: fixture.decision.recommendedOptionNumber,
+    recommendationReason: '공용 PC에서 바로 옮기는 용도라 짧게 여는 편이 안전하다.',
+    blocksWork: false,
+    concepts: ['link expiry'],
   })
-  const after = await builderTask()
-  const decision = after.decisionRequests.find((item) => item.id === receipt.decisionId)
-  return { decisionId: receipt.decisionId, options: decision?.options ?? [] }
+  return { decisionId: receipt.decisionId }
 }
 
 const inbox = join(probeLogs, 'inbox.jsonl')
@@ -128,35 +98,53 @@ async function readTurn(sessionId) {
     .flatMap((payload) => payload.promptTurnSummaries.map((turn) => turn.usage))
     .reduce((sum, value) => sum + value, 0)
   const pending = payloads.find((payload) => payload.type === 'pending_interaction')
-  const done = payloads.some((payload) => payload.type === 'usage_summary')
+  const summaries = payloads.filter((payload) => payload.type === 'usage_summary').length
   const says = payloads
     .filter((payload) => payload.type === 'assistant' && payload.operationType === 'Say')
     .map((payload) => payload.content)
-  return { calls, usage, pending: pending?.question ?? null, done, lastSay: says.at(-1) ?? '' }
+  return { calls, usage, pending: pending?.question ?? null, summaries, lastSay: says.at(-1) ?? '' }
 }
 
-async function resolutionOf(decisionId) {
+async function query(sql) {
   const directory = await mkdtemp(join(tmpdir(), 'vibe-eval-db-'))
   for (const suffix of ['', '-wal', '-shm'])
     await copyFile(
       join(coreRoot, 'data', `vibe-helper.sqlite${suffix}`),
       join(directory, `vibe-helper.sqlite${suffix}`),
     ).catch(() => {})
-  const rows = execFileSync(
-    'sqlite3',
-    [
-      '-json',
-      join(directory, 'vibe-helper.sqlite'),
-      `select payload_json from decision_resolutions where decision_id = '${decisionId.replace(/[^a-z0-9_-]/g, '')}'`,
-    ],
-    { encoding: 'utf8' },
-  )
-  const parsed = rows.trim() ? JSON.parse(rows) : []
-  return parsed.length === 0 ? null : JSON.parse(parsed[0].payload_json)
+  const rows = execFileSync('sqlite3', ['-json', join(directory, 'vibe-helper.sqlite'), sql], {
+    encoding: 'utf8',
+  })
+  return (rows.trim() ? JSON.parse(rows) : []).map((row) => JSON.parse(row.payload_json))
+}
+const taskFilter = `task_id = '${scope.taskId.replace(/[^a-z0-9_-]/g, '')}'`
+const decisionsOfTask = () =>
+  query(`select payload_json from decision_requests where ${taskFilter} order by requested_at`)
+const resolutionsOfTask = () =>
+  query(`select payload_json from decision_resolutions where ${taskFilter} order by resolved_at`)
+const latestContext = async () =>
+  (
+    await query(
+      `select versions.payload_json from live_contexts heads join live_context_versions versions on versions.context_id = heads.id and versions.context_version = heads.head_version where heads.${taskFilter}`,
+    )
+  )[0] ?? null
+
+// The learner's latest choice for a question: a changed choice reopens it as a new Decision.
+async function resolutionOf(decisionId) {
+  const decisions = await decisionsOfTask()
+  let current = decisions.find((item) => item.id === decisionId)
+  for (let step = 0; current && step < decisions.length; step++) {
+    const next = decisions.find((item) => item.replacesDecisionId === current.id)
+    if (!next) break
+    current = next
+  }
+  if (!current) return null
+  const resolution = (await resolutionsOfTask()).find((item) => item.decisionId === current.id)
+  return resolution ? { resolution, decision: current } : null
 }
 
-// Closes every Decision left open or unapplied (the harness's and any the Agent opened), so the
-// next case starts with no pending Decision. Synthetic evaluation data only.
+// Resolves every Decision still waiting (the harness's and any the Agent opened), so the next
+// case starts with no question open. Synthetic evaluation data only.
 async function closeOpenDecision(decision, context) {
   const response = await fetch(new URL('/api/application', connection.baseUrl), {
     method: 'POST',
@@ -176,7 +164,7 @@ async function closeOpenDecision(decision, context) {
           projectId: scope.projectId,
           taskId: scope.taskId,
           correlationId: decision.correlationId,
-          expectedContextVersion: context.liveContext?.contextVersion ?? 0,
+          expectedContextVersion: context?.contextVersion ?? 0,
           selectionKind: 'RECOMMENDATION',
           selectedOptionId: decision.recommendedOptionId,
           helperUsed: false,
@@ -191,69 +179,42 @@ async function closeOpenDecision(decision, context) {
 }
 
 async function cleanup() {
-  let context = await builderTask()
-  const resolvedIds = () => new Set(context.decisionResolutions.map((item) => item.decisionId))
-  for (const decision of context.decisionRequests.filter((item) => !resolvedIds().has(item.id))) {
-    await closeOpenDecision(decision, context)
-    context = await builderTask()
-  }
-  const appliedIds = new Set(context.decisionApplications.map((item) => item.decisionId))
-  for (const decision of context.decisionRequests.filter((item) => !appliedIds.has(item.id))) {
-    context = await builderTask()
-    await tool('apply_decision_result', {
-      schemaVersion: 1,
-      ...scope,
-      decisionId: decision.id,
-      idempotencyKey: idem(),
-      expectedTaskRevision: context.task.revision,
-      expectedContextVersion: context.liveContext?.contextVersion ?? 0,
-      appliedResult: 'Evaluation harness closed this synthetic Decision without implementing it.',
-      sourceReferences: [],
-      context: {
-        stage: '평가 사례 정리',
-        currentGoal: '만료되는 공유 링크를 만든다.',
-        recentChanges: ['평가용 Decision을 정리했다.'],
-        activeConceptNames: ['link expiry'],
-        relatedFiles: [],
-        nextActions: ['다음 평가 사례'],
-      },
-    })
-  }
+  const resolved = new Set((await resolutionsOfTask()).map((item) => item.decisionId))
+  for (const decision of (await decisionsOfTask()).filter((item) => !resolved.has(item.id)))
+    await closeOpenDecision(decision, await latestContext())
 }
 
-function judge(expect, resolution, options) {
+function judge(expect, recorded) {
   if (!expect.resolve)
     return {
-      pass: resolution === null,
-      reason: resolution ? 'resolved an unclear reply' : 'asked instead',
+      pass: recorded === null,
+      reason: recorded ? 'recorded a reply that needed a question first' : 'asked instead',
     }
-  if (resolution === null) return { pass: false, reason: 'did not record a clear choice' }
+  if (recorded === null) return { pass: false, reason: 'did not record a clear choice' }
+  const { resolution, decision } = recorded
+  if (expect.linked && !(resolution.chatSource?.linkedMessages?.length > 0))
+    return { pass: false, reason: 'learner words were not linked' }
   if (expect.custom) {
     const pass = resolution.selectionKind === 'CUSTOM'
-    return {
-      pass,
-      reason: pass ? 'custom proposal quoted' : `recorded ${resolution.selectionKind}`,
-    }
+    return { pass, reason: pass ? 'custom idea recorded' : `recorded ${resolution.selectionKind}` }
   }
-  const selected = options.findIndex((option) => option.id === resolution.selectedOptionId) + 1
+  const selected =
+    decision.options.findIndex((option) => option.id === resolution.selectedOptionId) + 1
   if (selected !== expect.optionNumber)
     return { pass: false, reason: `recorded option ${selected}` }
-  if (expect.rationaleRequired && !resolution.rationale)
-    return { pass: false, reason: 'choice right but learner reason not quoted' }
-  return {
-    pass: true,
-    reason: `option ${selected}${resolution.rationale ? ' with quoted reason' : ''}`,
-  }
+  if (expect.changed && decision.replacesDecisionId === undefined)
+    return { pass: false, reason: 'change not recorded as a new choice' }
+  return { pass: true, reason: `option ${selected}` }
 }
 
 if (process.env.VIBE_EVAL_DRY_RUN === '1') {
   // Harness self-check without Kiro or model credits: open one Decision, then close it.
   await cleanup()
-  const { decisionId, options } = await openDecision()
+  const { decisionId } = await openDecision()
   await cleanup()
   const closed = await resolutionOf(decisionId)
   process.stdout.write(
-    `${JSON.stringify({ dryRun: true, decisionId, options: options.length, closedBy: closed?.selectionKind ?? null })}\n`,
+    `${JSON.stringify({ dryRun: true, decisionId, closedBy: closed?.resolution.selectionKind ?? null })}\n`,
   )
   await mcp.close()
   process.exit(0)
@@ -270,31 +231,46 @@ for (const testCase of fixture.cases) {
     results.push({ id: testCase.id, skipped: 'CREDIT_BUDGET' })
     continue
   }
-  const { decisionId, options } = await openDecision()
+  const { decisionId } = await openDecision()
   const created = await probe('kiroAgent.sessions.create')
   const sessionId = created.result.sessionId
-  await probe(
-    'kiroAgent.sessions.sendPrompt',
-    [sessionId, `${testCase.message} (지금은 코드 작성은 하지 말아줘.)`],
-    false,
-  )
-  let turn = await readTurn(sessionId)
-  for (let attempt = 0; attempt < 60 && !turn.done && !turn.pending; attempt++) {
-    await delay(3_000)
-    turn = await readTurn(sessionId)
+  const turns = []
+  for (const message of testCase.messages ?? [testCase.message]) {
+    await probe(
+      'kiroAgent.sessions.sendPrompt',
+      [sessionId, `${message} (지금은 코드 작성은 하지 말아줘.)`],
+      false,
+    )
+    // Each prompt adds one usage summary when its turn ends.
+    let turn = await readTurn(sessionId)
+    for (
+      let attempt = 0;
+      attempt < 60 && turn.summaries <= turns.length && !turn.pending;
+      attempt++
+    ) {
+      await delay(3_000)
+      turn = await readTurn(sessionId)
+    }
+    turns.push(turn)
+    if (turn.pending) break
   }
+  const turn = turns.at(-1)
   spent += turn.usage
-  const resolution = await resolutionOf(decisionId)
-  const verdict = judge(testCase.expect, resolution, options)
+  const recorded = await resolutionOf(decisionId)
+  const verdict = judge(testCase.expect, recorded)
   results.push({
     id: testCase.id,
     pass: verdict.pass,
     reason: verdict.reason,
-    resolution: resolution && {
-      selectionKind: resolution.selectionKind,
-      option: options.findIndex((option) => option.id === resolution.selectedOptionId) + 1,
-      rationale: resolution.rationale ?? null,
-      customProposal: resolution.customProposal ?? null,
+    resolution: recorded && {
+      selectionKind: recorded.resolution.selectionKind,
+      option:
+        recorded.decision.options.findIndex(
+          (option) => option.id === recorded.resolution.selectedOptionId,
+        ) + 1,
+      changed: recorded.decision.replacesDecisionId !== undefined,
+      linkedMessages: recorded.resolution.chatSource?.linkedMessages?.length ?? 0,
+      customProposal: recorded.resolution.customProposal ?? null,
     },
     coreToolCalls: turn.calls,
     pendingApproval: turn.pending,

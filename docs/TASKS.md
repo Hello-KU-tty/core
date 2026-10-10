@@ -95,7 +95,8 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - **출처:** 체험 피드백 10. Vibe Helper 도구 호출 25번 중 9번 실패(형식 3, 순서 3, 인용 글자 깨짐 1, 모드 2). 학습자의 실제 이유가 Decision 기록 전 발언이라 버려져 판단 근거 Evidence가 하나도 남지 않았다.
 - **진행 방식:** 현재 Builder 도구·순서·Core 검증 규칙을 한 장으로 정리해 사용자에게 보여 주고, 사용자가 재설계한다. 정리 전에는 Core Builder 계약을 바꾸지 않는다.
 - **검토 거리(초안):** Kiro 채팅용 도구 수와 입력 축소(식별자·버전·멱등키를 서버가 채움), 이유 인용을 글자 복사 대신 hook이 받은 메시지 ID로, Decision 요청 직전 발언의 근거 인정 여부, 작업 맥락과 완료 단계 자동화.
-- **진행:** 현재 상태 한 장 정리 완료(2026-10-09, backend `012c664`·Steering 0.5.0 기준): [Builder 워크플로 정리](spikes/KIRO_NATIVE_BUILDER_WORKFLOW_20261009.md). Core Builder 계약은 바꾸지 않았다. 다음은 사용자의 재설계.
+- **완료 조건:** Kiro 채팅 도구 계약과 Core 연결·판정 규칙의 unit·integration 테스트, Analyst 평가 기존 16개 회귀 없음과 놓침 사례, 채팅 Decision 평가 재실행, 실제 Kiro에서 Builder·Helper 탭 흐름 1회, VSIX 재생성.
+- **진행:** 현재 상태 한 장 정리 완료(2026-10-09, backend `012c664`·Steering 0.5.0 기준): [Builder 워크플로 정리](spikes/KIRO_NATIVE_BUILDER_WORKFLOW_20261009.md). 재설계 결정(2026-10-10, 사용자 승인): DECISIONS "Kiro 채팅 Builder 워크플로 재설계(K10)"와 [발언 예시·도구 계약](spikes/KIRO_NATIVE_BUILDER_REDESIGN_20261010.md). PROJECT_BRIEF §0 Builder 문장을 고쳤다. 구현은 K11과 겹치지 않게 worktree `finals/k10-builder-redesign`에서 한다. 구현·자동 검사 완료(2026-10-10): Kiro 채팅 도구 5개(`check_progress`·`save_progress`·`ask_choice`·`save_choice`·`finish_task`, 입력 schema 29.1KB→5.0KB), 학습자 발언 연결(요청 전·Helper 탭), 선택 바꾸기(새 Decision, 마이그레이션 없음), 좁힌 번호 검사, 완료 사전 검증·`CHANGED_BY_DECISION`, Builder 채팅 턴 기록, Evidence 정책, Steering 0.6.0, Analyst 1.1.0. typecheck 0, unit 177, integration 519, eval 45, 패널 CJS 182. Analyst 1.1.0 평가 완료(2026-10-11, Sonnet 5.5): K10 11개 1차 10/11, 형식 오탐 1개를 Core 인용 규칙으로 고친 뒤 통과, 기존 16개 회귀 15/16(1.0.8은 14/16), 9.01크레딧([결과](../tests/eval/results/evidence-analyst-v1.1.0-k10.md)). 남은 것: K11과 합친 VSIX, 채팅 Decision 평가 13개, 실제 Kiro 흐름.
 
 ### [~] K11. 셸 명령 자동 허용 정책
 

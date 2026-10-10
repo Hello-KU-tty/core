@@ -15,6 +15,7 @@ import { basename, dirname, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { type ApplicationService, redactSensitiveText } from '@vibe-helper/application'
 import {
+  builderChatTurnRequest,
   helperExchangeRequest,
   KIRO_HELPER_AGENT_NAME,
   type KiroCoreBinding,
@@ -299,15 +300,20 @@ export function createKiroHookBinding(options: {
           })
         }
         if (translated.kind === 'COMMAND') builderSessionId = input.session_id
-        const coreRequest =
-          translated.kind === 'COMMAND'
-            ? translated.request
-            : (() => {
-                const pending = pendingHelperQuestions.get(translated.sessionId)
-                if (pending === undefined) return null
-                pendingHelperQuestions.delete(translated.sessionId)
-                return helperExchangeRequest(options.binding, pending, translated.reply)
-              })()
+        const turnEndRequest = async () => {
+          if (translated.kind === 'COMMAND') return translated.request
+          const pending = pendingHelperQuestions.get(translated.sessionId)
+          if (pending !== undefined) {
+            pendingHelperQuestions.delete(translated.sessionId)
+            return helperExchangeRequest(options.binding, pending, translated.reply)
+          }
+          // A Builder turn ended: keep its reply as Agent context (K10). A Helper tab whose
+          // question was lost (Core restarted mid-turn) is not a Builder turn.
+          if (translated.reply === null) return null
+          if ((await agentModeOf(translated.sessionId)) === KIRO_HELPER_AGENT_NAME) return null
+          return builderChatTurnRequest(options.binding, translated.sessionId, translated.reply)
+        }
+        const coreRequest = await turnEndRequest()
         if (coreRequest === null) return json(200, { ignored: 'NO_PENDING_HELPER_QUESTION' })
         const result = await options.application.executeUi(coreRequest)
         if (!result.success) return json(409, { error: result.error.code })

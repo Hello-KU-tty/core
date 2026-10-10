@@ -1,0 +1,247 @@
+{
+  "promptVersion": "1.1.0",
+  "kind": "K10_CHAT_DECISION_EVIDENCE",
+  "containsPersonalData": false,
+  "redactionStatus": "VERIFIED_REDACTED",
+  "fixtureProvenance": "SYNTHETIC_KIRO_CHAT_TRANSCRIPT",
+  "claimBoundary": "Synthetic Kiro chat Decisions recorded through the real Core K10 chat commands, then judged by the real Core Evidence policy. Seven cases check that brief or contextual learner answers are not dropped (the false negatives K10 targets); four guard cases check that Agent-led repeats, bare acknowledgements and a corrected misconception do not overstate understanding. Topics differ from the K10 design examples. This measures Analyst prompt compliance under Core policy, not human learning.",
+  "cases": [
+    {
+      "id": "tradeoff_reason",
+      "decision": {
+        "category": "PRODUCT_BEHAVIOR",
+        "question": "할 일 알림을 어떻게 보여 줄까요?",
+        "options": [
+          { "label": "앱 안 배지만", "description": "앱을 열면 배지로 알립니다. 서버가 필요 없습니다." },
+          { "label": "푸시 알림", "description": "앱을 닫아도 알립니다. 알림 서버 설정이 필요합니다." }
+        ],
+        "recommended": 1
+      },
+      "steps": [
+        { "after": "question", "tab": "BUILDER", "text": "1번, 서버 없이 되는 게 좋아" }
+      ],
+      "answer": { "choice": 1 },
+      "expected": { "minimumState": "EXPLAINED", "maximumState": "EXPLAINED", "misconception": false }
+    },
+    {
+      "id": "own_situation_reason",
+      "decision": {
+        "category": "DATA_MODEL",
+        "question": "사진 업로드 크기를 제한할까요?",
+        "options": [
+          { "label": "5MB 제한", "description": "큰 파일을 거절해 저장 공간을 아낍니다." },
+          { "label": "제한 없음", "description": "원본을 그대로 저장합니다." }
+        ],
+        "recommended": 1
+      },
+      "steps": [
+        {
+          "after": "question",
+          "tab": "BUILDER",
+          "text": "1번. 동아리 사진은 다 폰으로 찍은 거라 한 장에 5MB를 넘을 일이 거의 없어"
+        }
+      ],
+      "answer": { "choice": 1 },
+      "expected": { "minimumState": "EXPLAINED", "maximumState": "DEMONSTRATED", "misconception": false }
+    },
+    {
+      "id": "reason_before_question",
+      "decision": {
+        "category": "RETENTION_DELETION",
+        "question": "채팅 메시지를 얼마나 보관할까요?",
+        "options": [
+          { "label": "계속 보관", "description": "지난 대화를 언제든 다시 봅니다." },
+          { "label": "7일 뒤 삭제", "description": "오래된 메시지를 자동으로 지웁니다." }
+        ],
+        "recommended": 1
+      },
+      "steps": [
+        {
+          "after": "start",
+          "tab": "BUILDER",
+          "text": "이 채팅은 약속 잡을 때만 쓰는 거라 지난 메시지는 금방 필요 없어져"
+        },
+        { "after": "question", "tab": "BUILDER", "text": "그럼 2번" }
+      ],
+      "answer": { "choice": 2 },
+      "expected": { "minimumState": "EXPLAINED", "maximumState": "DEMONSTRATED", "misconception": false }
+    },
+    {
+      "id": "helper_tab_reason",
+      "decision": {
+        "category": "SECURITY_PRIVACY",
+        "question": "비밀번호 재설정 링크를 얼마 동안 열 수 있게 할까요?",
+        "options": [
+          { "label": "15분", "description": "짧게 열어 두고 지나면 다시 요청합니다." },
+          { "label": "24시간", "description": "하루 동안 아무 때나 열 수 있습니다." }
+        ],
+        "recommended": 1
+      },
+      "steps": [
+        {
+          "after": "question",
+          "tab": "HELPER",
+          "text": "링크가 오래 살아 있으면 메일이 털렸을 때 그 링크로 비밀번호를 바꿀 수 있으니까 짧은 게 낫지 않아?",
+          "reply": "짧으면 그런 위험이 줄지만 늦게 연 사용자는 다시 요청해야 합니다."
+        },
+        { "after": "question", "tab": "BUILDER", "text": "1번으로 할게" }
+      ],
+      "answer": { "choice": 1 },
+      "expected": { "minimumState": "EXPLAINED", "maximumState": "DEMONSTRATED", "misconception": false }
+    },
+    {
+      "id": "concept_not_named",
+      "decision": {
+        "category": "API_CONTRACT",
+        "question": "게시글 목록을 어떻게 불러올까요?",
+        "options": [
+          { "label": "한 번에 전부", "description": "모든 글을 한 번에 받아 옵니다." },
+          { "label": "20개씩 나눠서", "description": "처음 20개만 받고 스크롤하면 더 받아 옵니다." }
+        ],
+        "recommended": 2
+      },
+      "steps": [
+        {
+          "after": "question",
+          "tab": "BUILDER",
+          "text": "2번. 글이 수천 개 쌓이면 처음 여는 데 한참 걸릴 테니까"
+        }
+      ],
+      "answer": { "choice": 2 },
+      "expected": { "minimumState": "EXPLAINED", "maximumState": "DEMONSTRATED", "misconception": false }
+    },
+    {
+      "id": "short_contextual_reference",
+      "decision": {
+        "category": "ARCHITECTURE",
+        "question": "공지사항 데이터를 어떻게 가져올까요?",
+        "options": [
+          { "label": "매번 서버에서", "description": "화면을 열 때마다 서버에 묻습니다." },
+          { "label": "5분 저장", "description": "받은 내용을 브라우저에 5분 동안 저장해 둡니다." }
+        ],
+        "recommended": 1
+      },
+      "steps": [
+        { "after": "start", "tab": "BUILDER", "text": "공지사항은 하루에 한 번 바뀔까 말까야" },
+        {
+          "after": "question",
+          "tab": "AGENT",
+          "text": "1번은 항상 최신이지만 요청이 많고, 2번은 요청이 줄지만 최대 5분 늦게 보일 수 있어요. 어느 쪽이 좋을까요?"
+        },
+        { "after": "question", "tab": "BUILDER", "text": "아까 말한 대로 자주 안 바뀌니까 2번" }
+      ],
+      "answer": { "choice": 2 },
+      "expected": { "minimumState": "EXPLAINED", "maximumState": "DEMONSTRATED", "misconception": false }
+    },
+    {
+      "id": "own_design",
+      "decision": {
+        "category": "AUTHORIZATION",
+        "question": "공유한 파일을 누가 열 수 있게 할까요?",
+        "options": [
+          { "label": "링크가 있으면 누구나", "description": "링크만 알면 로그인 없이 엽니다." },
+          { "label": "로그인한 사람만", "description": "앱에 로그인해야 엽니다." }
+        ],
+        "recommended": 2
+      },
+      "steps": [
+        {
+          "after": "question",
+          "tab": "BUILDER",
+          "text": "둘 다 말고, 링크로 누구나 열 수 있게 하되 7일이 지나면 그 링크는 막히게 하자"
+        },
+        { "after": "question", "tab": "AGENT", "text": "그렇게 7일 만료 링크로 갈까요?" },
+        { "after": "question", "tab": "BUILDER", "text": "응" }
+      ],
+      "answer": { "choice": "custom", "customSummary": "Anyone with the link, expiring after 7 days." },
+      "expected": { "minimumState": "EXPLAINED", "maximumState": "DEMONSTRATED", "misconception": false }
+    },
+    {
+      "id": "guard_agent_led_conclusion",
+      "decision": {
+        "category": "AUTHENTICATION",
+        "question": "로그인 기능을 넣을까요?",
+        "options": [
+          { "label": "로그인 없음", "description": "기기에만 저장합니다." },
+          { "label": "이메일 로그인", "description": "여러 기기에서 같은 데이터를 봅니다." }
+        ],
+        "recommended": 1
+      },
+      "steps": [
+        {
+          "after": "question",
+          "tab": "AGENT",
+          "text": "이 앱은 혼자 한 기기에서만 쓰니까 로그인 없이 가는 게 맞아요. 그게 더 단순하니까요."
+        },
+        { "after": "question", "tab": "BUILDER", "text": "ㅇㅇ 혼자 쓰니까 1번" }
+      ],
+      "answer": { "choice": 1 },
+      "expected": { "minimumState": "NONE", "maximumState": "NONE", "misconception": false }
+    },
+    {
+      "id": "guard_acknowledgement",
+      "decision": {
+        "category": "PRODUCT_BEHAVIOR",
+        "question": "다크 모드를 넣을까요?",
+        "options": [
+          { "label": "시스템 설정 따름", "description": "기기 설정에 맞춰 바뀝니다." },
+          { "label": "직접 켜고 끄기", "description": "앱 안 버튼으로 바꿉니다." }
+        ],
+        "recommended": 1
+      },
+      "steps": [{ "after": "question", "tab": "BUILDER", "text": "응 추천대로" }],
+      "answer": { "choice": "recommended" },
+      "expected": { "minimumState": "NONE", "maximumState": "NONE", "misconception": false }
+    },
+    {
+      "id": "guard_corrected_misconception",
+      "decision": {
+        "category": "SECURITY_PRIVACY",
+        "question": "주문 금액을 어디서 계산할까요?",
+        "options": [
+          { "label": "브라우저에서", "description": "화면에서 바로 계산해 빠릅니다." },
+          { "label": "서버에서", "description": "서버가 다시 계산해 금액 조작을 막습니다." }
+        ],
+        "recommended": 2
+      },
+      "steps": [
+        {
+          "after": "question",
+          "tab": "BUILDER",
+          "text": "1번. 브라우저 코드는 사용자가 못 바꾸니까 거기서 계산해도 돼"
+        },
+        {
+          "after": "question",
+          "tab": "AGENT",
+          "text": "브라우저 코드는 사용자가 바꿀 수 있어서 금액을 조작할 수 있어요. 그래도 1번으로 갈까요?"
+        },
+        { "after": "question", "tab": "BUILDER", "text": "아 그럼 2번. 조작하면 안 되니까" }
+      ],
+      "answer": { "choice": 2 },
+      "expected": { "minimumState": "NONE", "maximumState": "EXPLAINED", "misconception": true }
+    },
+    {
+      "id": "changed_choice_reason",
+      "decision": {
+        "category": "DATA_MODEL",
+        "question": "가계부 항목을 누가 쓸 수 있게 할까요?",
+        "options": [
+          { "label": "나만", "description": "한 사람만 기록합니다." },
+          { "label": "가족 공유", "description": "여러 명이 같은 가계부에 기록합니다." }
+        ],
+        "recommended": 1
+      },
+      "steps": [
+        { "after": "question", "tab": "BUILDER", "text": "1번" },
+        { "save": { "choice": 1 } },
+        {
+          "after": "choice",
+          "tab": "BUILDER",
+          "text": "아 역시 2번으로 바꿀래, 다음 달부터 동생이랑 같이 쓰기로 했거든"
+        }
+      ],
+      "answer": { "choice": 2 },
+      "expected": { "minimumState": "EXPLAINED", "maximumState": "DEMONSTRATED", "misconception": false }
+    }
+  ]
+}

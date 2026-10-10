@@ -4,6 +4,7 @@ import {
   acceptedEvidenceSchema,
   type CanonicalConcept,
   type ConceptState,
+  type DecisionRequest,
   type DecisionResolution,
   type Episode,
   type EvidenceDecision,
@@ -32,6 +33,8 @@ export interface EvaluateEvidenceProposalInput {
   readonly episodeRevision: number
   readonly events: readonly ActivityEvent[]
   readonly decisionResolutions: readonly DecisionResolution[]
+  /** The Task's Decision requests; a chat-resolved choice may name the Concept (K10). */
+  readonly decisionRequests?: readonly DecisionRequest[]
   readonly concept: CanonicalConcept
   readonly existingProposalIds: readonly string[]
   readonly priorAcceptedEvidence: readonly AcceptedEvidence[]
@@ -56,6 +59,20 @@ const STATE_RANK: Readonly<Record<ConceptState, number>> = {
   EXPLAINED: 1,
   DEMONSTRATED: 2,
   TRANSFERRED: 3,
+}
+
+// A reason the learner gave across messages ("...하루에 한 번 바뀔까 말까야 / 아까 말한 대로
+// 자주 안 바뀌니까 2번") may be quoted as verbatim parts joined by " / ", " … " or " | " (K10).
+const EXCERPT_JOINER = /\s+(?:\/|…|\.{3}|\|)\s+/u
+
+/** True when the excerpt, or every joined part of it, occurs verbatim in one of the texts. */
+function quotedIn(texts: readonly string[], excerpt: string): boolean {
+  if (texts.some((text) => text.includes(excerpt))) return true
+  const parts = excerpt
+    .split(EXCERPT_JOINER)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+  return parts.length > 1 && parts.every((part) => texts.some((text) => text.includes(part)))
 }
 
 function rawDirectSources(input: unknown): readonly unknown[] {
@@ -297,16 +314,48 @@ export function evaluateEvidenceProposal(
       'A direct user Evidence source is not present in the Episode.',
     )
   }
+  // A Decision resolved from Kiro chat (K10) links the learner's own messages, from both tabs and
+  // from before the question, instead of a quoted rationale. The learner may answer without
+  // naming the Concept ("1번, 혼자 쓸 거라서"): the chosen option can then name it, while the
+  // quoted Evidence itself must still be the learner's words.
+  const citedDecisionResolutions = proposal.userEvidenceSources.flatMap((source) => {
+    if (source.kind !== 'USER_DECISION') return []
+    const event = findSourceEvent(source, episodeEvents)
+    if (event?.payload.type !== 'DECISION_RESOLVED') return []
+    const decisionPayload = event.payload
+    const resolution = input.decisionResolutions.find(
+      (candidate) =>
+        candidate.id === decisionPayload.resolutionId &&
+        candidate.decisionId === decisionPayload.decisionId &&
+        candidate.projectId === proposal.projectId &&
+        candidate.taskId === proposal.taskId &&
+        candidate.correlationId === proposal.correlationId,
+    )
+    return [{ event, decisionPayload, resolution }]
+  })
+  const linkedChatResolutions = citedDecisionResolutions.flatMap(({ resolution }) =>
+    resolution !== undefined && (resolution.chatSource?.linkedMessages?.length ?? 0) > 0
+      ? [resolution]
+      : [],
+  )
+  const chosenOptionTexts = linkedChatResolutions.flatMap((resolution) => {
+    const option = input.decisionRequests
+      ?.find((request) => request.id === resolution.decisionId)
+      ?.options.find((candidate) => candidate.id === resolution.selectedOptionId)
+    return option === undefined ? [] : [option.label, option.description]
+  })
+  const namesConcept = (texts: readonly string[]) =>
+    [...texts, ...chosenOptionTexts].some((text) =>
+      text.includes(proposal.concept.originalExpression),
+    )
   const citedMessageExcerpts = proposal.userEvidenceSources.flatMap((source) => {
     const event = findSourceEvent(source, episodeEvents)
     return event?.payload.type === 'USER_MESSAGE' ? [event.payload.redactedExcerpt] : []
   })
   if (
     citedMessageExcerpts.length > 0 &&
-    (!citedMessageExcerpts.some((excerpt) =>
-      excerpt.includes(proposal.concept.originalExpression),
-    ) ||
-      !citedMessageExcerpts.some((excerpt) => excerpt.includes(proposal.redactedEvidenceExcerpt)))
+    (!namesConcept(citedMessageExcerpts) ||
+      !quotedIn(citedMessageExcerpts, proposal.redactedEvidenceExcerpt))
   ) {
     return rejectEvidence(
       input,
@@ -315,32 +364,15 @@ export function evaluateEvidenceProposal(
     )
   }
   if (proposal.signal === 'JUSTIFIED_DECISION') {
-    const citedDecisionContexts = proposal.userEvidenceSources.flatMap((source) => {
-      if (source.kind !== 'USER_DECISION') return []
-      const event = findSourceEvent(source, episodeEvents)
-      return event?.payload.type === 'DECISION_RESOLVED'
-        ? [{ event, decisionPayload: event.payload }]
-        : []
-    })
-    if (citedDecisionContexts.length === 0) {
+    if (citedDecisionResolutions.length === 0) {
       return rejectEvidence(
         input,
         'INSUFFICIENT_EVIDENCE',
         'A justified Decision requires a directly cited user Decision.',
       )
     }
-    const matchingResolutionContexts = citedDecisionContexts.flatMap(
-      ({ event, decisionPayload }) => {
-        const resolution = input.decisionResolutions.find(
-          (candidate) =>
-            candidate.id === decisionPayload.resolutionId &&
-            candidate.decisionId === decisionPayload.decisionId &&
-            candidate.projectId === proposal.projectId &&
-            candidate.taskId === proposal.taskId &&
-            candidate.correlationId === proposal.correlationId,
-        )
-        return resolution === undefined ? [] : [{ event, decisionPayload, resolution }]
-      },
+    const matchingResolutionContexts = citedDecisionResolutions.flatMap((context) =>
+      context.resolution === undefined ? [] : [{ ...context, resolution: context.resolution }],
     )
     if (matchingResolutionContexts.length === 0) {
       return rejectEvidence(
@@ -351,7 +383,8 @@ export function evaluateEvidenceProposal(
     }
     const reasonedResolutionContexts = matchingResolutionContexts.filter(
       ({ decisionPayload, resolution }) =>
-        decisionPayload.rationaleProvided && resolution.rationale !== undefined,
+        (decisionPayload.rationaleProvided && resolution.rationale !== undefined) ||
+        linkedChatResolutions.includes(resolution),
     )
     if (reasonedResolutionContexts.length === 0) {
       return rejectEvidence(
@@ -360,24 +393,30 @@ export function evaluateEvidenceProposal(
         'A justified Decision requires stored user-authored rationale.',
       )
     }
-    // A chat-resolved Decision also counts the learner's own cited chat messages in this
-    // Episode: the rationale quote is short, while the topic is usually earlier in the message.
+    // A chat-resolved Decision also counts the learner's own chat messages it cites or links in
+    // this Episode: the rationale is usually in a message, not a separate field.
     const citedDecisionTexts = reasonedResolutionContexts
-      .flatMap(({ resolution }) => [
-        resolution.rationale,
-        resolution.customProposal,
-        ...episodeEvents.flatMap((event) =>
-          event.actor.kind === 'USER' &&
-          event.payload.type === 'USER_MESSAGE' &&
-          resolution.chatSource?.userMessageIds.includes(event.payload.messageId)
-            ? [event.payload.redactedExcerpt]
-            : [],
-        ),
-      ])
+      .flatMap(({ resolution }) => {
+        const messageIds = new Set([
+          ...(resolution.chatSource?.userMessageIds ?? []),
+          ...(resolution.chatSource?.linkedMessages ?? []).map((message) => message.messageId),
+        ])
+        return [
+          resolution.rationale,
+          resolution.customProposal,
+          ...episodeEvents.flatMap((event) =>
+            event.actor.kind === 'USER' &&
+            event.payload.type === 'USER_MESSAGE' &&
+            messageIds.has(event.payload.messageId)
+              ? [event.payload.redactedExcerpt]
+              : [],
+          ),
+        ]
+      })
       .filter((text): text is string => text !== undefined)
     if (
-      !citedDecisionTexts.some((text) => text.includes(proposal.concept.originalExpression)) ||
-      !citedDecisionTexts.some((text) => text.includes(proposal.redactedEvidenceExcerpt))
+      !namesConcept(citedDecisionTexts) ||
+      !quotedIn(citedDecisionTexts, proposal.redactedEvidenceExcerpt)
     ) {
       return rejectEvidence(
         input,
@@ -387,16 +426,44 @@ export function evaluateEvidenceProposal(
     }
   }
   if (
-    proposal.userEvidenceSources.some((source) => {
-      if (source.kind !== 'USER_DECISION') return false
-      const event = findSourceEvent(source, episodeEvents)
-      return event?.payload.type === 'DECISION_RESOLVED' && !event.payload.rationaleProvided
-    })
+    citedDecisionResolutions.some(
+      ({ decisionPayload, resolution }) =>
+        !decisionPayload.rationaleProvided &&
+        (resolution === undefined || !linkedChatResolutions.includes(resolution)),
+    )
   ) {
     return rejectEvidence(
       input,
       'INSUFFICIENT_EVIDENCE',
       'A Decision accepted without user-authored rationale cannot support understanding.',
+    )
+  }
+  // One learner message supports one Concept once, even when several Episodes contain it
+  // (a linked Decision message is also in its Task or Helper Episode).
+  const evidenceKind =
+    proposal.signal === 'CONTRADICTION' ? 'MISCONCEPTION_SIGNAL' : 'USER_UNDERSTANDING'
+  const citedMessageKeys = new Set(
+    proposal.userEvidenceSources.flatMap((source) =>
+      source.kind === 'USER_MESSAGE' ? [`${source.conversationId}:${source.messageId}`] : [],
+    ),
+  )
+  if (
+    citedMessageKeys.size > 0 &&
+    input.priorAcceptedEvidence.some(
+      (evidence) =>
+        evidence.conceptId === input.concept.id &&
+        evidence.kind === evidenceKind &&
+        evidence.userEvidenceSources.some(
+          (source) =>
+            source.kind === 'USER_MESSAGE' &&
+            citedMessageKeys.has(`${source.conversationId}:${source.messageId}`),
+        ),
+    )
+  ) {
+    return rejectEvidence(
+      input,
+      'DUPLICATE_USER_SOURCE',
+      'This learner message already supports accepted Evidence for the same Concept.',
     )
   }
 

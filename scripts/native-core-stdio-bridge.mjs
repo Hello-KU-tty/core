@@ -52,6 +52,12 @@ const ROLE_TOOLS = {
     'apply_decision_result',
     'resolve_decision_from_chat',
     'complete_task',
+    // Kiro chat Builder surface (K10); a binding uses one surface, never both.
+    'check_progress',
+    'save_progress',
+    'ask_choice',
+    'save_choice',
+    'finish_task',
   ],
   HELPER: ['get_helper_context'],
 }

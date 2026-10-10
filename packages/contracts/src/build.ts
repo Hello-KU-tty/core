@@ -3,6 +3,7 @@ import { z } from 'zod'
 import {
   completionReportIdSchema,
   contextRefreshRequestIdSchema,
+  conversationIdSchema,
   correlationIdSchema,
   decisionApplicationIdSchema,
   decisionCategorySchema,
@@ -299,11 +300,23 @@ export const decisionRequestSchema = z
     relatedConceptNames: z.array(labelSchema).max(12),
     sourceReferences: z.array(contextualSourceReferenceSchema).max(30),
     independentWorkCanContinue: z.boolean(),
+    /**
+     * Set when the learner changed an earlier choice in chat: Core reopens the same question as
+     * this Decision and resolves it with the new choice, keeping the earlier one as history.
+     */
+    replacesDecisionId: decisionIdSchema.optional(),
     requestedAt: utcTimestampSchema,
     source: z.strictObject({ kind: z.literal('AGENT'), role: z.literal('BUILDER') }),
     redactionStatus: redactionStatusSchema,
   })
   .superRefine((request, context) => {
+    if (request.replacesDecisionId === request.id) {
+      context.addIssue({
+        code: 'custom',
+        path: ['replacesDecisionId'],
+        message: 'A Decision cannot replace itself',
+      })
+    }
     const optionIds = new Set(request.options.map((option) => option.id))
     if (optionIds.size !== request.options.length) {
       context.addIssue({
@@ -321,10 +334,25 @@ export const decisionRequestSchema = z
     }
   })
 
+/**
+ * A learner message Core linked to a chat-resolved Decision. `tab` says where the learner wrote
+ * it; `timing` is relative to when the question was first asked.
+ */
+export const decisionLinkedMessageSchema = z.strictObject({
+  conversationId: conversationIdSchema,
+  messageId: messageIdSchema,
+  tab: z.enum(['BUILDER', 'HELPER']),
+  timing: z.enum(['BEFORE_REQUEST', 'AFTER_REQUEST']),
+})
+
 /** Present only when the Builder mapped the learner's own chat messages to this resolution. */
 export const decisionChatSourceSchema = z.strictObject({
   mappedBy: z.literal('BUILDER'),
   userMessageIds: z.array(messageIdSchema).min(1).max(5),
+  /** Kiro chat (K10): every learner message Core linked, Builder and Helper tabs, at most 20. */
+  linkedMessages: z.array(decisionLinkedMessageSchema).max(20).optional(),
+  /** Kiro chat (K10): the Builder's own summary of a custom idea. Agent-authored, not Evidence. */
+  builderSummary: nonEmptyTextSchema.optional(),
 })
 
 export const decisionResolutionSchema = z
@@ -460,11 +488,21 @@ export const taskCompletionReportSchema = z.strictObject({
   expectedTaskRevision: entityRevisionSchema,
   implementedFeatures: z.array(nonEmptyTextSchema).min(1).max(40),
   acceptanceResults: z.array(
-    z.strictObject({
-      criterionKey: z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/),
-      status: z.enum(['PASSED', 'FAILED']),
-      evidence: z.array(contextualSourceReferenceSchema).max(20),
-    }),
+    z
+      .strictObject({
+        criterionKey: z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/),
+        // CHANGED_BY_DECISION: the learner's own Decision changed this criterion (FR-BLD-007).
+        status: z.enum(['PASSED', 'FAILED', 'CHANGED_BY_DECISION']),
+        evidence: z.array(contextualSourceReferenceSchema).max(20),
+        decisionId: decisionIdSchema.optional(),
+      })
+      .refine(
+        (result) => (result.status === 'CHANGED_BY_DECISION') === (result.decisionId !== undefined),
+        {
+          path: ['decisionId'],
+          message: 'Only a criterion changed by a Decision names that Decision',
+        },
+      ),
   ),
   validationResults: z.array(validationResultSchema).max(40),
   conceptUsage: z.array(conceptUsageReportSchema).max(30),

@@ -4,6 +4,7 @@ import {
   activityEventFixture,
   canonicalConceptFixture,
   codeReferenceFixture,
+  decisionRequestFixture,
   decisionResolutionFixture,
   episodeFixture,
   evidenceProposalFixture,
@@ -17,6 +18,8 @@ import {
 } from '../src/index.ts'
 
 const previousTaskId = 'task_00000000-0000-4000-8000-000000000051'
+const priorMessageId = 'message_00000000-0000-4000-8000-000000000053'
+const otherConceptId = 'concept_00000000-0000-4000-8000-000000000054'
 const observationEvidenceId = 'evidence_00000000-0000-4000-8000-000000000052'
 const misconceptionIssueId = 'misconception_00000000-0000-4000-8000-000000000053'
 const resolutionProposalId = 'evidence_proposal_00000000-0000-4000-8000-000000000054'
@@ -451,7 +454,14 @@ describe('Evidence acceptance policy', () => {
     if (withoutBaseline.outcome !== 'ACCEPTED') return
     expect(withoutBaseline.evidence).toMatchObject({ supportsState: 'DEMONSTRATED' })
 
-    const priorDemonstration = { ...acceptedEvidenceFixture, taskId: previousTaskId }
+    // A demonstration in an earlier Task cites the learner's message from that Task.
+    const priorDemonstration = {
+      ...acceptedEvidenceFixture,
+      taskId: previousTaskId,
+      userEvidenceSources: [
+        { kind: 'USER_MESSAGE', conversationId: ids.conversation, messageId: priorMessageId },
+      ],
+    }
     const transferred = evaluate(transferProposal, {
       priorAcceptedEvidence: [priorDemonstration],
     })
@@ -461,6 +471,24 @@ describe('Evidence acceptance policy', () => {
       kind: 'USER_UNDERSTANDING',
       supportsState: 'TRANSFERRED',
     })
+  })
+
+  it('accepts one learner message once per Concept even when several Episodes contain it', () => {
+    // K10: a linked Decision message is also in its Task or Helper Episode.
+    const rephrase = {
+      ...evidenceProposalFixture,
+      signal: 'REPHRASE',
+      maximumSupportedState: 'EXPLAINED',
+    }
+    expect(evaluate(rephrase).outcome).toBe('ACCEPTED')
+    const again = evaluate(rephrase, { priorAcceptedEvidence: [acceptedEvidenceFixture] })
+    expect(again.outcome).toBe('REJECTED')
+    expect(again.decision.reasonCode).toBe('DUPLICATE_USER_SOURCE')
+    // The same message for a different Concept is not a duplicate.
+    const otherConcept = evaluate(rephrase, {
+      priorAcceptedEvidence: [{ ...acceptedEvidenceFixture, conceptId: otherConceptId }],
+    })
+    expect(otherConcept.outcome).toBe('ACCEPTED')
   })
 
   it('rejects stale, duplicate and unresolved direct references with explicit reasons', () => {
@@ -474,6 +502,134 @@ describe('Evidence acceptance policy', () => {
     ).toBe('DUPLICATE_PROPOSAL')
     expect(evaluate(evidenceProposalFixture, { events: [] }).decision.reasonCode).toBe(
       'INVALID_REFERENCE',
+    )
+  })
+})
+
+describe('Evidence from a Decision resolved in Kiro chat (K10)', () => {
+  const beforeQuestion = {
+    ...activityEventFixture,
+    id: 'event_00000000-0000-4000-8000-000000000071',
+    sequence: 1,
+    payload: {
+      ...activityEventFixture.payload,
+      messageId: 'message_00000000-0000-4000-8000-000000000072',
+      redactedExcerpt: '프로바이더가 필드를 바꿔도 앱이 조용히 틀리게 보여주면 안 돼',
+    },
+  } as const
+  const reply = {
+    ...activityEventFixture,
+    id: 'event_00000000-0000-4000-8000-000000000073',
+    sequence: 3,
+    payload: { ...activityEventFixture.payload, redactedExcerpt: '그럼 1번' },
+  } as const
+  const resolved = {
+    ...reasonedDecisionEvent,
+    sequence: 4,
+    payload: { ...reasonedDecisionEvent.payload, rationaleProvided: false },
+  } as const
+  const { rationale: _rationale, ...withoutRationale } = decisionResolutionFixture
+  const chatResolution = {
+    ...withoutRationale,
+    chatSource: {
+      mappedBy: 'BUILDER',
+      userMessageIds: [ids.userMessage],
+      linkedMessages: [
+        {
+          conversationId: ids.conversation,
+          messageId: beforeQuestion.payload.messageId,
+          tab: 'BUILDER',
+          timing: 'BEFORE_REQUEST',
+        },
+        {
+          conversationId: ids.conversation,
+          messageId: ids.userMessage,
+          tab: 'BUILDER',
+          timing: 'AFTER_REQUEST',
+        },
+      ],
+    },
+  } as const
+  const proposal = {
+    ...evidenceProposalFixture,
+    // The learner never named the Concept; the chosen option does.
+    concept: { ...evidenceProposalFixture.concept, originalExpression: 'Reject unknown fields' },
+    userEvidenceSources: [
+      { kind: 'USER_DECISION', decisionId: ids.decision },
+      {
+        kind: 'USER_MESSAGE',
+        conversationId: ids.conversation,
+        messageId: beforeQuestion.payload.messageId,
+      },
+    ],
+    promptDependence: 'LIGHT_HINT',
+    redactedEvidenceExcerpt: '앱이 조용히 틀리게 보여주면 안 돼',
+  } as const
+  const chatEvaluate = (
+    candidate: unknown,
+    overrides: Partial<Parameters<typeof evaluateEvidenceProposal>[0]> = {},
+  ) =>
+    evaluate(candidate, {
+      episode: { ...episodeFixture, eventIds: [beforeQuestion.id, reply.id, resolved.id] },
+      events: [beforeQuestion, reply, resolved],
+      decisionResolutions: [chatResolution],
+      decisionRequests: [decisionRequestFixture],
+      ...overrides,
+    })
+
+  it("accepts the learner's reason from before the question, named by the chosen option", () => {
+    const result = chatEvaluate(proposal)
+    expect(result.outcome).toBe('ACCEPTED')
+    if (result.outcome !== 'ACCEPTED') return
+    expect(result.evidence).toMatchObject({
+      signal: 'JUSTIFIED_DECISION',
+      supportsState: 'DEMONSTRATED',
+    })
+  })
+
+  it("accepts a reason quoted across linked messages when every part is the learner's", () => {
+    const both = {
+      ...proposal,
+      userEvidenceSources: [
+        ...proposal.userEvidenceSources,
+        { kind: 'USER_MESSAGE', conversationId: ids.conversation, messageId: ids.userMessage },
+      ],
+    }
+    const joined = chatEvaluate({
+      ...both,
+      redactedEvidenceExcerpt: '앱이 조용히 틀리게 보여주면 안 돼 / 그럼 1번',
+    })
+    expect(joined.outcome).toBe('ACCEPTED')
+    // A joined part that is not the learner's words keeps the whole quote out.
+    expect(
+      chatEvaluate({
+        ...both,
+        redactedEvidenceExcerpt: '앱이 조용히 틀리게 보여주면 안 돼 / Keep the parser strict.',
+      }).decision.reasonCode,
+    ).toBe('INVALID_REFERENCE')
+  })
+
+  it("still requires the learner's own words as the quoted Evidence", () => {
+    expect(
+      chatEvaluate({ ...proposal, redactedEvidenceExcerpt: 'Keep the parser strict.' }).decision
+        .reasonCode,
+    ).toBe('INVALID_REFERENCE')
+    // Only the chosen option can name the Concept, not the one the learner passed over.
+    expect(
+      chatEvaluate({
+        ...proposal,
+        concept: { ...proposal.concept, originalExpression: 'Retain unknown fields' },
+      }).decision.reasonCode,
+    ).toBe('INVALID_REFERENCE')
+  })
+
+  it('keeps a bare choice with no linked words or rationale from supporting a state', () => {
+    const { chatSource: _chatSource, ...bare } = chatResolution
+    // Even with the Concept in the learner's words, a choice without linked words is bare.
+    const ownWords = { ...proposal, concept: { ...proposal.concept, originalExpression: '필드' } }
+    expect(chatEvaluate(ownWords).outcome).toBe('ACCEPTED')
+    expect(chatEvaluate(ownWords, { decisionResolutions: [bare] }).decision.reasonCode).toBe(
+      'INSUFFICIENT_EVIDENCE',
     )
   })
 })

@@ -1641,7 +1641,7 @@ describe('T13 Evidence Analyst prompt regression', () => {
     expect(fixture.claimBoundary).toContain(
       'does not prove live model compliance or human learning',
     )
-    expect(prompt).toContain('Prompt version: `1.0.8`')
+    expect(prompt).toContain('Prompt version: `1.1.0`')
     expect(prompt).toContain('미래 계획·조건부 해결책·Agent 지시는 수행이 아니다')
     expect(prompt).toContain('구조화된 `USER_DECISION` 근거')
     expect(prompt).toContain('자연어 자기 보고라는 provenance 한계')
@@ -1840,7 +1840,7 @@ describe('T13 Evidence Analyst prompt regression', () => {
       }),
     )
     expect(fixture.claimBoundary).toContain('does not retcon the v1.0.6 fixture')
-    expect(prompt).toContain('Prompt version: `1.0.8`')
+    expect(prompt).toContain('Prompt version: `1.1.0`')
     expect(prompt).toContain('발화 시점에 아직 관찰하지 않은')
     expect(prompt).toContain('일반 조건·정의나 이미 확인한 과거 관찰')
 
@@ -1896,11 +1896,12 @@ describe('T13 Evidence Analyst prompt regression', () => {
     )
   })
 
-  it('withholds unverifiable prior-Agent claims and separates tentative plans from actual choices', async () => {
+  it('bounds unverifiable prior-Agent claims at EXPLAINED and separates tentative plans from actual choices', async () => {
     const fixture = (await loadInput(
-      'tests/eval/fixtures/prompt-regressions/evidence-analyst-v1.0.5-application-dependence.json',
+      'tests/eval/fixtures/prompt-regressions/evidence-analyst-v1.1.0-application-dependence.json',
     )) as {
       readonly promptVersion: string
+      readonly revisesFixture: string
       readonly containsPersonalData: boolean
       readonly redactionStatus: string
       readonly liveNativeResult: string
@@ -1925,12 +1926,13 @@ describe('T13 Evidence Analyst prompt regression', () => {
       'utf8',
     )
     expect(fixture).toMatchObject({
-      promptVersion: '1.0.5',
+      promptVersion: '1.1.0',
+      revisesFixture: 'evidence-analyst-v1.0.5-application-dependence.json',
       containsPersonalData: false,
       redactionStatus: 'VERIFIED_REDACTED',
       liveNativeResult: 'PENDING',
     })
-    expect(prompt).toContain('Prompt version: `1.0.8`')
+    expect(prompt).toContain('Prompt version: `1.1.0`')
     expect(prompt).toContain('실제로 선택한 이유 있는 제품·기술 방향')
     expect(prompt).toContain('그 답이 방향만 제시했는지 이미 결론을 제공했는지 확인할 수 없다')
     expect(prompt).toContain('같은 Task에서 방금 들은 설명을 바로 사용한 것은 Transfer가 아니다')
@@ -1941,10 +1943,16 @@ describe('T13 Evidence Analyst prompt regression', () => {
       if (item.providedAgentReply !== null)
         expect(item.providedAgentReply.length).toBeGreaterThan(0)
     }
+    // K10: an unverifiable reliance is bounded at EXPLAINED, not dropped.
+    expect(prompt).toContain('그렇다고 통째로 보류하지는 마라')
     expect(fixture.cases.find((item) => item.id === 'unavailable_prior_answer')).toMatchObject({
       providedAgentReply: null,
       referencesPriorAgent: true,
-      expected: { stateSupportingProposalCount: 0 },
+      expected: {
+        stateSupportingProposalCount: 1,
+        allowedPromptDependence: ['LIGHT_HINT'],
+        allowedMaximumSupportedStates: ['EXPLAINED'],
+      },
     })
     expect(
       fixture.cases.find((item) => item.id === 'visible_direct_repeat')?.expected,
@@ -2055,7 +2063,7 @@ describe('T13 Evidence Analyst prompt regression', () => {
       'utf8',
     )
     expect(fixture).toMatchObject({ promptVersion: '1.0.2', containsPersonalData: false })
-    expect(prompt).toContain('Prompt version: `1.0.8`')
+    expect(prompt).toContain('Prompt version: `1.1.0`')
     expect(prompt).toContain('최대 120자')
     expect(fixture.longUserMessage.length).toBeGreaterThan(120)
 
@@ -2124,7 +2132,7 @@ describe('T13 Evidence Analyst prompt regression', () => {
     )
     expect(fixture).toMatchObject({ promptVersion: '1.0.3', containsPersonalData: false })
     expect(fixture.userMessage).toContain(fixture.conceptPhrase)
-    expect(prompt).toContain('Prompt version: `1.0.8`')
+    expect(prompt).toContain('Prompt version: `1.1.0`')
     expect(prompt).toContain('`concept.originalExpression`은 생략할 수 없는')
 
     const proposal = {

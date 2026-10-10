@@ -191,6 +191,20 @@ export const uiRecordChatMessageCommandSchema = z.strictObject({
   message: nonEmptyTextSchema,
 })
 
+/**
+ * The Builder's reply at the end of a Kiro chat turn, read by the user-side hook runner from the
+ * Kiro session record (K10). Core stores it as Agent-authored context, never as user Evidence.
+ */
+export const uiRecordBuilderChatTurnCommandSchema = z.strictObject({
+  ...uiRequestMetadata,
+  kind: z.literal('UI_RECORD_BUILDER_CHAT_TURN'),
+  idempotencyKey: idempotencyKeySchema,
+  projectId: projectIdSchema,
+  taskId: taskIdSchema.optional(),
+  conversationId: conversationIdSchema,
+  reply: nonEmptyTextSchema,
+})
+
 export const uiRetryAnalysisCommandSchema = z.strictObject({
   ...uiRequestMetadata,
   kind: z.literal('UI_RETRY_ANALYSIS'),
@@ -331,6 +345,7 @@ export const uiRequestSchema = z.discriminatedUnion('kind', [
   uiPrepareBuilderSessionQuerySchema,
   uiRecordHelperExchangeCommandSchema,
   uiRecordChatMessageCommandSchema,
+  uiRecordBuilderChatTurnCommandSchema,
   uiRetryAnalysisCommandSchema,
   uiReadAnalysisJobsQuerySchema,
   uiReadEvidenceTraceQuerySchema,

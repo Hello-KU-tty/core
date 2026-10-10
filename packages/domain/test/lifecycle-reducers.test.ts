@@ -21,6 +21,7 @@ import {
   applyDecision,
   closeEpisode,
   confirmLearningSpec,
+  linkEpisodeChatEvents,
   openDecision,
   planBuilderTask,
   planFinalUpgradeTask,
@@ -629,5 +630,92 @@ describe('Episode close reducer', () => {
     }
     expect(JSON.stringify(closeEpisode(input))).toBe(JSON.stringify(closeEpisode(input)))
     expect(timestamp).toBe(activityEventFixture.occurredAt)
+  })
+})
+
+describe('Decision Episode chat links (K10)', () => {
+  const at = (minutes: number) => new Date(Date.parse(timestamp) + minutes * 60_000).toISOString()
+  const message = (id: number, minutes: number, extra: Record<string, unknown> = {}) => ({
+    ...activityEventFixture,
+    id: `event_00000000-0000-4000-8000-${String(800 + id).padStart(12, '0')}`,
+    sequence: id,
+    occurredAt: at(minutes),
+    conversationId: undefined,
+    payload: {
+      ...activityEventFixture.payload,
+      messageId: `message_00000000-0000-4000-8000-${String(800 + id).padStart(12, '0')}`,
+    },
+    ...extra,
+  })
+  const requested = {
+    ...activityEventFixture,
+    id: 'event_00000000-0000-4000-8000-000000000890',
+    sequence: 5,
+    occurredAt: at(10),
+    conversationId: undefined,
+    decisionId: ids.decision,
+    actor: { kind: 'AGENT', role: 'BUILDER' },
+    payload: { type: 'DECISION_REQUESTED', decisionId: ids.decision },
+    sourceReferences: [],
+  } as const
+  const open = {
+    ...episodeFixture,
+    conversationId: undefined,
+    status: 'OPEN',
+    eventIds: [requested.id],
+    startedAt: at(10),
+    endedAt: undefined,
+    closeReason: undefined,
+  } as const
+
+  it('links older learner messages in activity order and starts the Episode at the earliest', () => {
+    const before = message(2, 5)
+    const after = message(7, 12, { decisionId: ids.decision })
+    const result = linkEpisodeChatEvents({
+      current: open,
+      currentEvents: [requested],
+      events: [after, before],
+    })
+    expect(result.outcome).toBe('APPLIED')
+    if (result.outcome !== 'APPLIED') return
+    expect(result.value.eventIds).toEqual([before.id, requested.id, after.id])
+    expect(result.value.startedAt).toBe(at(5))
+    expect(result.value.revision).toBe(open.revision + 1)
+    // The linked Episode still closes under the ordinary close rules.
+    const closed = closeEpisode({
+      current: result.value,
+      proposed: {
+        ...result.value,
+        revision: result.value.revision + 1,
+        status: 'PENDING_ANALYSIS',
+        endedAt: at(20),
+        closeReason: 'User resolved the Decision.',
+      },
+      events: [before, requested, after],
+    })
+    expect(closed.outcome).toBe('APPLIED')
+    expect(
+      linkEpisodeChatEvents({
+        current: result.value,
+        currentEvents: [before, requested, after],
+        events: [before],
+      }).outcome,
+    ).toBe('NO_OP')
+  })
+
+  it('refuses messages of another Decision, Task or correlation, and non-chat events', () => {
+    for (const event of [
+      message(2, 5, { decisionId: 'decision_00000000-0000-4000-8000-000000000899' }),
+      message(2, 5, { taskId: 'task_00000000-0000-4000-8000-000000000898' }),
+      message(2, 5, { correlationId: 'corr_00000000-0000-4000-8000-000000000897' }),
+      { ...requested, id: 'event_00000000-0000-4000-8000-000000000896', sequence: 2 },
+    ]) {
+      const result = linkEpisodeChatEvents({
+        current: open,
+        currentEvents: [requested],
+        events: [event],
+      })
+      expect(result.outcome).toBe('REJECTED')
+    }
   })
 })

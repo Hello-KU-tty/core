@@ -1,5 +1,33 @@
 # 결정 기록
 
+## 본선: Kiro 채팅 Builder 워크플로 재설계(K10)
+
+- **맥락:** 첫 체험에서 Vibe Helper 도구 호출 25번 중 9번이 실패했고(멱등키 형식·필수 필드 3, 순서 2, 인용 한글 깨짐 1, 요청 전 발언 인용 1, 도구 없는 모드 2), 학습자의 실제 이유가 Decision 요청 전 발언이라 판단 근거 Evidence가 하나도 남지 않았다([Builder 워크플로 정리](spikes/KIRO_NATIVE_BUILDER_WORKFLOW_20261009.md)). 판정 규칙에도 실제 이해를 놓치는 곳이 있었다. 개념 표현이 학습자 말에 글자 그대로 있어야 했고, 선택지 장단점을 이유로 대면 DIRECTLY_LED가 됐으며, Analyst가 Builder 채팅 발언을 보지 못해 맥락 지칭을 보류했다.
+- **원칙(사용자 결정, 2026-10-10):** 근거 문장은 학습자 말이어야 한다. 다만 학습자는 Agent가 알아들을 만큼만 말할 수 있으므로 맥락과 함께 읽고, 이해한 것을 이해 못 했다고 판정하는 것도 큰 문제로 본다. 증명이 부족하면 0 대신 낮은 단계로 인정한다. 끝까지 지키는 선은 셋이다. Agent 출력·확인 응답·클릭만으로는 올리지 않는다. Decision 요청(선택 변경이면 직전 확정) 뒤 Builder 탭에 학습자 발언이 없으면 기록하지 않는다. 학습자가 명시한 번호와 어긋난 기록은 거절한다.
+- **결정(사용자 승인, 2026-10-10):**
+  1. **Kiro 채팅 전용 도구:** Kiro 채팅 Builder 연결에 도구 5개 `check_progress`, `save_progress`, `ask_choice`, `save_choice`, `finish_task`를 둔다. Kiro는 MCP `title`을 쓰지 않고 `@vibe-helper/<이름>`을 화면에 띄우므로 이름 자체를 쉬운 영어로 정했다(사용자 결정). 식별자, schema 버전, 명령 봉투, 멱등키, expected 버전은 연결과 쓰기 직전 Core 상태로 채운다. Agent 재시도는 키 대신 도구별 "같은 내용" 기준(같은 메모, 같은 열린 질문, 같은 선택, 이미 완료)으로 막는다. 내용 해시 키는 1→2→1 같은 선택 변경을 막으므로 쓰지 않는다. 예선 패널 경로 도구와 Core 명령은 그대로다.
+  2. **답 기록:** Builder는 고른 안(번호, 추천, 직접 낸 안의 요약)만 보낸다. 이유·원문 인용 필드는 없애고, Core가 4의 범위에 있는 학습자 발언을 서버 쪽 메시지 ID로 Decision에 연결한다. 직접 낸 안은 Builder 요약(AGENT 출처)과 연결된 학습자 원문을 함께 둔다.
+  3. **선택 바꾸기:** 확정 뒤 학습자가 마음을 바꾸면 같은 `save_choice`로 새 선택을 기록한다. Core는 같은 질문을 새 Decision(`replacesDecisionId`)으로 열고 한 트랜잭션에서 학습자 선택으로 확정한다. 확정 기록은 Decision당 하나라는 DB 제약(`decision_resolutions.decision_id` UNIQUE)을 바꾸지 않아 사용자 로컬 DB 마이그레이션이 없다. 이전 선택은 이력으로 남고, 바뀐 Decision은 활성 목록·완료 검사에서 빠진다. 학습자 쪽 동작은 합의한 대로 추가 확인 없이 한 번이다.
+  4. **연결 범위:** 직전 Decision 확정 이후(첫 Decision이면 Task 시작 이후)부터 지금까지, 같은 Task의 Builder 탭 발언과 Helper 탭 학습자 발언이다. 요청 전 발언은 감점하지 않는다. 선택 기록은 Builder 탭에서만 하고, Helper 탭에서 선택을 말하면 Helper가 Builder 탭에 말하도록 안내한다.
+  5. **맥락·완료 자동화:** Kiro 채팅 도구의 첫 쓰기에서 Core가 대기 중 Task를 시작하고 `TASK_STARTED`를 기록한다(첫 PLAN 메모가 있으면 그 내용으로). `finish_task`는 보고를 먼저 전부 검증한 뒤 Decision 적용 기록, `TASK_COMPLETED` 맥락, 완료를 차례로 쓴다. 검증에서 거절되면 아무것도 쓰지 않아 Builder가 기준을 맞추는 작업을 이어 간다(완료 검사 엄격도는 유지, 사용자 결정). 학습자 Decision이 바꾼 수락 기준은 `CHANGED_BY_DECISION`(그 Task의 확정 Decision ID 필수)으로 통과 대신 받는다. Spec에 없는 개념은 기록하지 않고 응답의 `ignoredConcepts`로 알린다.
+  6. **판정 기준(Analyst 1.1.0, Evidence 정책):**
+     - 짧은 답은 Decision 선택지·앞 발언·Agent 발언을 맥락으로 읽는다.
+     - 개념 표현은 학습자 말이나 고른 선택지 문구에서 가져올 수 있고(Core가 출처 확인), Evidence 인용은 학습자 말이어야 한다.
+     - 선택지 장단점 중 하나를 골라 이유를 대면 LIGHT_HINT·MEDIUM(최대 EXPLAINED)이고, 선택지에 없는 자기 사정이나 결과를 붙이면 STRONG(DEMONSTRATED 후보)이다. 직접 낸 설계는 이유를 따로 말하지 않아도 근거가 된다.
+     - DIRECTLY_LED는 Agent가 이 프로젝트에 맞는 결론까지 준 뒤 따라 말한 경우로 좁힌다.
+     - Builder 채팅 발언과 Helper 답 요약은 AGENT 출처 맥락으로 Analyst에 주고 Evidence로 쓰지 않는다. Builder 기록을 못 읽으면 보류 대신 최대 EXPLAINED로 판단한다.
+     - 같은 발언에서 같은 개념의 Evidence는 한 번만 받는다.
+     - 인용은 여러 발언의 조각을 ` / `·` … `·` | `로 이어 붙여도, 각 조각이 인용한 학습자 발언에 글자 그대로 있으면 받는다(평가에서 찾은 형식 오탐, 2026-10-11).
+  7. **번호 모순 검사:** 마지막 Builder 탭 학습자 발언이 번호 하나로 시작하는 분명한 답(`2번`, `2번, 이유`, `2번으로 해줘`, `2번이요`, `2번 할게`)일 때만 검사한다. 부정·비교(`1번 말고`, `1번은 별로`, `1번보다`), 망설임, 질문, 번호 둘 이상은 Builder 해석과 "N번으로 갈게요" 확인 문장에 맡긴다. 이전 규칙은 "1번은 별로야"에서 Builder가 2번을 기록하면 거절하는 오탐이 있었다(사용자 결정).
+  8. **오해 다시 확인(Steering):** 학습자의 이유가 사실과 다르고 그 차이가 선택을 바꿀 만하거나 보안·데이터 손실·비용 문제로 이어지면, Builder는 기록하지 않고 바로잡는 사실을 한두 문장으로 말한 뒤 다시 묻는다. 듣고도 원래 선택을 유지하면 따른다. 선택은 맞고 이유 일부만 틀리면 되묻지 않고, 같은 턴에 한 문장으로 바로잡은 뒤 기록하고 작업을 이어 간다. 어느 쪽이든 오해 issue는 Analyst가 연다. 정정 직후 고쳐 말한 것은 EXPLAINED까지 인정하고, issue는 나중에 도움 없이 맞게 쓸 때 닫힌다.
+- **예시:** 발언 23개의 처리 표는 [K10 재설계 예시](spikes/KIRO_NATIVE_BUILDER_REDESIGN_20261010.md)에 있다.
+- **위험:** 과대 판정이 늘 수 있다. 완충은 오해 issue, 8의 다시 확인, Agent 발언을 맥락으로 보면서 줄어드는 과대 판정(예시 13·14)이다. Builder 세션 기록은 Kiro 비공개 형식이다(Helper가 이미 의존). 8은 Builder의 실시간 판단에 기댄다. 범위가 넓어져 무관한 발언도 연결되지만 Analyst는 그 발언을 Decision 근거로 쓰지 않는다.
+- **검증 계획:** Analyst 평가 기존 16개 회귀 없음과 놓침 사례 약 10개(처음 보는 주제, 특정 문구 하드코딩 금지), 채팅 Decision 평가(다시 확인·선택 바꾸기 포함) 재실행, 실제 Kiro에서 Builder·Helper 탭 흐름 1회.
+- **이전 결정 대체:** "채팅 Decision 확정과 생성 workspace 재사용"의 학습자 원문 인용 필수·요청 이후 범위("확정 뒤 번복은 새 Decision"은 유지하되, Core가 같은 질문을 다시 열고 학습자의 새 답으로 바로 확정한다), "채팅 확정 Decision의 판단 근거 Evidence"의 확정 이유 필수 조건, "2026-09-15 JUSTIFIED_DECISION Evidence의 저장된 사용자 이유 검증"의 rationale 필수를 채팅 경로에서 연결된 학습자 원문으로 대체한다. UI(패널) 경로의 규칙은 그대로다. PROJECT_BRIEF §0 Builder 문장과 ARCHITECTURE 도구 설명을 함께 고쳤다.
+- **구현(worktree `finals/k10-builder-redesign`):** 계약 `kiro-chat.ts`(도구 입력·Core 명령·응답), `DecisionRequest.replacesDecisionId`, `DecisionChatSource.linkedMessages`·`builderSummary`, 완료 보고 `CHANGED_BY_DECISION`, Activity `BUILDER_CHAT_TURN`과 `UI_RECORD_BUILDER_CHAT_TURN`. Core 명령 `BUILDER_CHAT_*` 5개, domain `findClearOptionAnswer`·`linkEpisodeChatEvents`(오래된 발언을 순서대로 붙이고 Episode 시작을 당김, 다른 Decision·Task·correlation 거절)·`validateCompletionReport`, Evidence 정책의 연결 발언·선택지 개념 표현·`DUPLICATE_USER_SOURCE`. 저장소 `readTaskChatEvents`(마이그레이션 없음). MCP `surface: 'KIRO_CHAT'`, stdio bridge 허용 목록, Stop hook의 Builder 턴 기록. Steering 0.6.0, Analyst 1.1.0(1.0.8 원문은 `tests/eval/fixtures/prompt-regressions/evidence-analyst-v1.0.8-canonical.md`로 보관). Agent가 보는 입력 schema는 5개 합쳐 약 5.0KB다(이전 9개는 29.1KB).
+- **검증(2026-10-10, Node 24.19.0):** typecheck 오류 0, unit 177 통과·3 skip, integration 519 통과·8 skip(새 Core 통합 8개, MCP 1개, hook 1개, domain 단위 포함), eval 45 통과·1 skip(실제 모델), 패널 CJS 182 통과·2 skip, 바꾼 파일 Biome 통과. Analyst 1.1.0 평가(2026-10-11, Sonnet 5.5, [결과](../tests/eval/results/evidence-analyst-v1.1.0-k10.md)): K10 사례 11개 중 1차 10개 통과(놓침 6/7, 과대 방지 4/4), 실패 1개는 여러 발언을 이어 붙인 인용을 Core가 거절한 형식 문제라 위 인용 규칙으로 고친 뒤 통과. 기존 16개 회귀 15/16(1.0.8은 14/16). 9.01크레딧.
+- **상태:** 구현·자동 검사·Analyst 평가 완료. 남은 것: K11과 합친 VSIX, 채팅 Decision 평가 13개, 실제 Kiro Builder·Helper 탭 흐름.
+
 ## 본선: 개발 명령 미리 승인(K11)
 
 - **맥락:** 첫 체험에서 Autopilot을 켜도 셸 명령을 16번 모두 물었다. Autopilot은 파일 변경을 바로 적용할지만 정하고, 명령 확인은 Kiro 권한 규칙이 정한다. 권한 규칙 형식(`capability: shell`, 명령 앞부분을 `*`로 맞추는 `match`·`exclude`, 거부 > 묻기 > 허용)은 [Kiro 공식 문서](https://kiro.dev/docs/permissions/)에 있고, 폴더 범위 파일은 `~/.kiro/workspace-roots/<폴더 해시>/permissions.yaml`이다.

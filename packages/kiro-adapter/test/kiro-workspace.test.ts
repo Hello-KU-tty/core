@@ -198,13 +198,22 @@ describe('Kiro-native workspace adapter', () => {
     )
   })
 
-  it('binds the learner steering to one Core scope and keeps Helper mode manual', () => {
+  it('names the Kiro chat tools without Core identifiers and keeps Helper mode manual', () => {
     const learner = renderLearnerSteering(templates, binding)
     expect(learner.startsWith('---\ninclusion: always\n---')).toBe(true)
     expect(learner).toContain(`steering ${templates.version}.`)
-    for (const value of Object.values(binding)) expect(learner).toContain(value)
-    expect(learner).toContain('resolve_decision_from_chat')
-    expect(learner).toContain('get_build_status')
+    // K10: the Builder MCP binding carries the scope; the Agent never copies IDs or keys.
+    for (const value of Object.values(binding)) expect(learner).not.toContain(value)
+    expect(learner).not.toMatch(/idempotencyKey|expectedTaskRevision|idem_/)
+    for (const tool of [
+      'check_progress',
+      'save_progress',
+      'ask_choice',
+      'save_choice',
+      'finish_task',
+    ])
+      expect(learner).toContain(`\`${tool}\``)
+    expect(learner).not.toContain('resolve_decision_from_chat')
     expect(learner).toContain('#[[file:.vibe-helper/learner-profile.md]]')
     expect(learner).not.toContain('{{')
     expect(learner).not.toContain('What the learner owns')
@@ -223,7 +232,7 @@ describe('Kiro-native workspace adapter', () => {
   })
 
   it('steers decisions to the moment they arise, recorded before they are asked (since 0.5.0)', () => {
-    expect(templates.version).toBe('0.5.2')
+    expect(templates.version).toBe('0.6.0')
     const scoped = renderLearnerSteering(templates, binding, {
       learnerFocus: [],
       expectedDecisions: [{ description: '메모를 누가 볼 수 있게 할지 정한다.' }],
@@ -236,12 +245,25 @@ describe('Kiro-native workspace adapter', () => {
     expect(scoped.indexOf('Record it first')).toBeLessThan(
       scoped.indexOf('In chat, list the options'),
     )
-    expect(scoped).toContain('Call `update_build_context` right after `start_task`')
-    expect(scoped).toContain('checkpoint `TASK_COMPLETED`, before `complete_task`')
+    expect(scoped).toContain('Save your plan when you start')
+    expect(scoped).toContain('keep working until the criteria pass')
     // Measure the environment instead of assuming one package manager.
     expect(scoped).toContain('Before the first build step')
     expect(scoped).toContain('Build with what is installed')
     expect(scoped).not.toMatch(/use pnpm|use npm/i)
+  })
+
+  it('reads short chat answers in context and re-asks only for a misconception that matters (0.6.0)', () => {
+    const learner = renderLearnerSteering(templates, binding)
+    expect(learner).toContain('Read the answer in context')
+    expect(learner).toContain('do not quote or paraphrase them into the call')
+    // A wrong fact that would change the fitting option, or a security, data-loss or cost
+    // problem, is corrected before recording; a partly wrong reason is corrected in the same reply.
+    expect(learner.indexOf('do not record yet')).toBeGreaterThan(0)
+    expect(learner).toContain(
+      'correct that part in one sentence in the same reply and keep working',
+    )
+    expect(learner).toContain('call `save_choice` again with the new choice')
   })
 
   it('fails closed on a missing, duplicated or unfilled steering template', () => {

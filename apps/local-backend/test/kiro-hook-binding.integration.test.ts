@@ -1,6 +1,5 @@
 import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { createServer } from 'node:net'
 import {
   chmod,
   lstat,
@@ -11,6 +10,7 @@ import {
   utimes,
   writeFile,
 } from 'node:fs/promises'
+import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ApplicationService, WorkspacePathPolicy } from '@vibe-helper/application'
@@ -93,7 +93,18 @@ const setup = async (
         ?.events.filter((event) => event.payload.type === 'USER_MESSAGE') ?? []
     )
   }
-  return { binding, post, userMessages }
+  const builderTurns = () => {
+    const episode = storage.repository.readOpenEpisode(ids.project, 'BUILD_TASK', {
+      taskId: ids.task,
+    })
+    if (episode === null) return []
+    return (
+      storage.repository
+        .readEpisodeHistory(ids.project, episode.id)
+        ?.events.filter((event) => event.payload.type === 'BUILDER_CHAT_TURN') ?? []
+    )
+  }
+  return { binding, post, userMessages, builderTurns }
 }
 
 describe('Kiro hook binding', () => {
@@ -161,6 +172,39 @@ describe('Kiro hook binding', () => {
     expect(body).toMatchObject({ recorded: true, receipt: { status: 'OPEN' } })
     const again = await post({ hook_event_name: 'Stop', session_id: 'sess_helper', cwd: '/w' })
     expect(await again.json()).toEqual({ ignored: 'NO_PENDING_HELPER_QUESTION' })
+  })
+
+  it("keeps the Builder's reply at the end of a Builder turn as Agent context (K10)", async () => {
+    const { binding, post, userMessages, builderTurns } = await setup()
+    await post({
+      hook_event_name: 'UserPromptSubmit',
+      session_id: 'sess_builder',
+      cwd: '/w',
+      prompt: '메모 목록부터 만들어 줘',
+    })
+    const stop = await post({
+      hook_event_name: 'Stop',
+      session_id: 'sess_builder',
+      cwd: '/w',
+      vibe_helper_reply: '메모 목록 API를 만들었어요.\n\n다음은 조회 권한을 정해야 해요.',
+    })
+    expect(await stop.json()).toMatchObject({ recorded: true })
+    expect(userMessages()).toHaveLength(1)
+    expect(builderTurns()).toMatchObject([
+      {
+        actor: { kind: 'AGENT', role: 'BUILDER' },
+        conversationId: kiroConversationId('sess_builder'),
+        payload: {
+          type: 'BUILDER_CHAT_TURN',
+          summary: '메모 목록 API를 만들었어요. 다음은 조회 권한을 정해야 해요.',
+        },
+      },
+    ])
+    // A turn with no reply on record adds nothing.
+    const empty = await post({ hook_event_name: 'Stop', session_id: 'sess_builder', cwd: '/w' })
+    expect(await empty.json()).toEqual({ ignored: 'NO_PENDING_HELPER_QUESTION' })
+    expect(builderTurns()).toHaveLength(1)
+    binding.revoke()
   })
 
   it('keeps the workspace learner profile current and tells a running session once', async () => {

@@ -123,7 +123,12 @@ describe('Kiro binding manager', () => {
       expect(info.mode & 0o077).toBe(0)
     }
     const descriptor = JSON.parse(await readFile(join(directory, 'builder-mcp.json'), 'utf8'))
-    expect(descriptor).toMatchObject({ role: 'BUILDER', workspace: first.workspace })
+    expect(descriptor).toMatchObject({
+      role: 'BUILDER',
+      workspace: first.workspace,
+      taskId: ids.task,
+      toolNames: ['check_progress', 'save_progress', 'ask_choice', 'save_choice', 'finish_task'],
+    })
     expect(descriptor.url).toMatch(/^http:\/\/127\.0\.0\.1:47831\/mcp\/native-/)
     const helper = JSON.parse(await readFile(join(directory, 'helper-mcp.json'), 'utf8'))
     expect(helper).toMatchObject({ role: 'HELPER', toolNames: ['get_helper_context'] })
@@ -131,9 +136,11 @@ describe('Kiro binding manager', () => {
       join(first.workspace, '.kiro/steering/vibe-helper-learner.md'),
       'utf8',
     )
-    expect(steering).toContain(ids.task)
+    // K10: the scope lives in the private MCP descriptor; the steering names tools, not IDs.
+    expect(steering).not.toContain(ids.task)
+    expect(steering).toContain('`save_choice`')
     expect(steering).toContain('What the learner owns')
-    expect(steering).toContain('steering 0.5.2.')
+    expect(steering).toContain('steering 0.6.0.')
     const agent = await readFile(join(first.workspace, '.kiro/agents/vibe-helper.json'), 'utf8')
     expect(JSON.parse(agent).mcpServers['vibe-helper-helper'].args[1]).toBe(
       join(directory, 'helper-mcp.json'),
@@ -156,8 +163,16 @@ describe('Kiro binding manager', () => {
     expect(registry.get(ids.project)).toBe(folder)
     expect((await lstat(registryFile)).mode & 0o077).toBe(0)
     expect(await readFile(join(folder, '.kiro/steering/vibe-helper-learner.md'), 'utf8')).toContain(
-      ids.project,
+      '`check_progress`',
     )
+    expect(
+      JSON.parse(
+        await readFile(
+          join(base, 'core', 'kiro-bindings', ids.project, 'builder-mcp.json'),
+          'utf8',
+        ),
+      ),
+    ).toMatchObject({ projectId: ids.project, workspace: folder })
     // Work in the folder does not block rebinding the same Project to it.
     await writeFile(join(folder, 'index.ts'), 'export {}\n')
     expect(await manager.bind(ids.project, { workspace: folder })).toMatchObject({

@@ -44,6 +44,11 @@ import {
   discoverySubmitLearningSpecToolInputSchema,
   helperGetContextQuerySchema,
   helperRequestContextRefreshCommandSchema,
+  kiroChatAskChoiceToolInputSchema,
+  kiroChatCheckProgressToolInputSchema,
+  kiroChatFinishTaskToolInputSchema,
+  kiroChatSaveChoiceToolInputSchema,
+  kiroChatSaveProgressToolInputSchema,
 } from '@vibe-helper/contracts'
 import { z } from 'zod'
 
@@ -247,9 +252,77 @@ export const ROLE_TOOL_CATALOG: Readonly<Record<AgentRole, readonly RoleToolDefi
   ],
 }
 
+interface KiroChatToolDefinition extends RoleToolDefinition {
+  readonly command: (input: Record<string, unknown>) => Record<string, unknown>
+}
+
+function withoutToolPurpose(input: Record<string, unknown>): Record<string, unknown> {
+  const { __tool_use_purpose: _ignored, ...rest } = input
+  return rest
+}
+
+/**
+ * The Builder tools of the learner's own Kiro chat (K10). Kiro shows each call as
+ * `@vibe-helper/<name>`, so the names are plain words. The Agent sends only what it decided;
+ * the binding supplies identity and Core reads versions at write time.
+ */
+export const KIRO_CHAT_BUILDER_TOOLS: readonly KiroChatToolDefinition[] = [
+  {
+    name: 'check_progress',
+    title: 'Check progress',
+    description:
+      'Read the task, its acceptance criteria and the choices still open with numbered options. Call it when you start and whenever you need the decisionId of an open choice.',
+    inputSchema: kiroChatCheckProgressToolInputSchema,
+    readOnly: true,
+    command: () => ({ kind: 'BUILDER_CHAT_CHECK_PROGRESS' }),
+  },
+  {
+    name: 'save_progress',
+    title: 'Save progress',
+    description:
+      "Save a short progress note that the learner's helper tab reads: your plan, a change of direction, a new plan after an error, or the start of a test run.",
+    inputSchema: kiroChatSaveProgressToolInputSchema,
+    readOnly: false,
+    command: (input) => ({ kind: 'BUILDER_CHAT_SAVE_PROGRESS', note: withoutToolPurpose(input) }),
+  },
+  {
+    name: 'ask_choice',
+    title: 'Ask the learner to choose',
+    description:
+      'Record a real product or technical choice the learner should make, before you ask it in chat. Give 2 to 4 options in the order you will show them (numbered from 1) and your recommendation. Then ask in chat and wait for the learner.',
+    inputSchema: kiroChatAskChoiceToolInputSchema,
+    readOnly: false,
+    command: (input) => ({ kind: 'BUILDER_CHAT_ASK_CHOICE', choice: withoutToolPurpose(input) }),
+  },
+  {
+    name: 'save_choice',
+    title: "Save the learner's choice",
+    description:
+      'Record the learner\'s answer after they reply in this chat: the option number, "recommended", or "custom" with a short summary of their own idea. Vibe Helper links the learner\'s own words, so do not quote them. Call it again if the learner changes their mind.',
+    inputSchema: kiroChatSaveChoiceToolInputSchema,
+    readOnly: false,
+    command: (input) => ({ kind: 'BUILDER_CHAT_SAVE_CHOICE', answer: withoutToolPurpose(input) }),
+  },
+  {
+    name: 'finish_task',
+    title: 'Finish the task',
+    description:
+      'Finish the task when every acceptance criterion passes and you ran at least one check. Say how each chosen option was built. If it is rejected, keep working until the criteria pass.',
+    inputSchema: kiroChatFinishTaskToolInputSchema,
+    readOnly: false,
+    command: (input) => ({ kind: 'BUILDER_CHAT_FINISH_TASK', report: withoutToolPurpose(input) }),
+  },
+]
+
+export const KIRO_CHAT_BUILDER_TOOL_NAMES: readonly string[] = KIRO_CHAT_BUILDER_TOOLS.map(
+  (tool) => tool.name,
+)
+
 export interface RoleBoundMcpServerOptions {
   readonly role: AgentRole
   readonly application: ApplicationService
+  /** `KIRO_CHAT`: the Builder tools of the learner's Kiro chat; requires a Task binding. */
+  readonly surface?: 'KIRO_CHAT'
   readonly toolNames?: readonly string[]
   /** Optional local-runtime scope. Crew retains its existing caller boundary. */
   readonly binding?: {
@@ -766,11 +839,84 @@ async function completeTaskFromTool(options: RoleBoundMcpServerOptions, input: u
   )
 }
 
+function toolResult(result: Awaited<ReturnType<ApplicationService['executeAgent']>>) {
+  const payload = toJsonObject(result.success ? result.data : result.error)
+  return {
+    content: [{ type: 'text' as const, text: JSON.stringify(payload) }],
+    structuredContent: payload,
+    ...(result.success ? {} : { isError: true }),
+  }
+}
+
+/** Registers the Kiro chat Builder tools; every call is scoped to the binding's Task. */
+function registerKiroChatTools(server: McpServer, options: RoleBoundMcpServerOptions): void {
+  const binding = options.binding
+  if (options.role !== 'BUILDER' || binding?.taskId === undefined) {
+    throw new TypeError('KIRO_CHAT_SURFACE_REQUIRES_BUILDER_TASK_BINDING')
+  }
+  const taskId = binding.taskId
+  const selected = options.toolNames === undefined ? null : new Set(options.toolNames)
+  if (
+    selected !== null &&
+    [...selected].some((name) => !KIRO_CHAT_BUILDER_TOOL_NAMES.includes(name))
+  )
+    throw new TypeError('Unknown Kiro chat MCP tool selection')
+  for (const tool of KIRO_CHAT_BUILDER_TOOLS.filter(
+    (candidate) => selected === null || selected.has(candidate.name),
+  )) {
+    server.registerTool(
+      tool.name,
+      {
+        title: tool.title,
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+        annotations: {
+          readOnlyHint: tool.readOnly,
+          destructiveHint: false,
+          idempotentHint: tool.readOnly,
+          openWorldHint: false,
+        },
+      },
+      async (input) => {
+        if (!binding.isActive()) {
+          return toolResult({
+            success: false,
+            error: createOperationError({
+              category: 'PERMISSION',
+              code: 'AGENT_RUN_SCOPE_MISMATCH',
+              disposition: 'PERMANENT',
+              correlationId: binding.correlationId,
+              message: 'This Vibe Helper connection is no longer active.',
+            }),
+          })
+        }
+        const parsed = tool.inputSchema.parse(input) as Record<string, unknown>
+        return toolResult(
+          await options.application.executeAgent('BUILDER', {
+            schemaVersion: 1,
+            correlationId: binding.correlationId,
+            actor: { kind: 'AGENT', role: 'BUILDER' },
+            projectId: binding.projectId,
+            taskId,
+            ...(tool.readOnly ? {} : { idempotencyKey: `idem_${randomUUID()}` }),
+            ...tool.command(parsed),
+          }),
+        )
+      },
+    )
+  }
+}
+
 export function createRoleBoundMcpServer(options: RoleBoundMcpServerOptions): McpServer {
   const server = new McpServer({
     name: `vibe-helper-${options.role.toLowerCase().replace('_', '-')}`,
     version: '0.0.0',
   })
+
+  if (options.surface === 'KIRO_CHAT') {
+    registerKiroChatTools(server, options)
+    return server
+  }
 
   const roleTools = ROLE_TOOL_CATALOG[options.role]
   const selectedToolNames = options.toolNames === undefined ? null : new Set(options.toolNames)
