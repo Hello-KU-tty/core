@@ -7,7 +7,12 @@ import { promisify } from 'node:util'
 
 // Official nodejs.org v24.19.0 SHASUMS256.txt; archive remains for reproducibility.
 export async function macNodeDistribution() {
-  if (process.platform !== 'darwin' || process.arch !== 'arm64' || process.version !== 'v24.19.0')
+  // Any Node 24.x may build; the bundled Node is always the official v24.19.0 archive below.
+  if (
+    process.platform !== 'darwin' ||
+    process.arch !== 'arm64' ||
+    process.versions.node.split('.')[0] !== '24'
+  )
     throw new Error('MAC_BUILD_TOOLCHAIN_REQUIRED')
   const name = 'node-v24.19.0-darwin-arm64'
   const expected = '8294b7aa9b03997481c06babf1e8b270c859358f27da57a11509afe537ac381d'

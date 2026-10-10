@@ -7,7 +7,7 @@ import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 import { build } from 'esbuild'
 
-if (process.version !== 'v24.19.0') throw new Error('PINNED_NODE_REQUIRED')
+if (process.versions.node.split('.')[0] !== '24') throw new Error('NODE_24_REQUIRED')
 const program = resolve(process.argv[2] ?? '')
 const pkg = JSON.parse(await readFile(join(program, 'package.json'), 'utf8'))
 if (pkg.name !== 'builder-helper-agent-panel') throw new Error('PROGRAM_CHECKOUT_REQUIRED')

@@ -52,4 +52,4 @@ Core 연결 실패는 명령 팔레트(`Ctrl+Shift+P`)의 **Vibe Helper: Retry C
 
 - 모든 Kiro 창을 정상 종료한 뒤 0.0.18을 설치하고 기존 프로젝트를 다시 열었다. 완료 상태의 Builder·Helper 입력 활성화, 기존 완료 보고, 연결 정상과 과거 권한 경고 제거를 확인했다. 설치된 프론트 번들·portable 파일 hash도 검증했다.
 
-자동화 검증의 모델 호출은 0회다. **설치 후 실제 모델로 Discovery→Builder→Helper 전체 흐름을 완주한 결과와 다른 PC 실측은 아직 없다.** 모든 Builder 오류가 해결됐다는 뜻은 아니다. 상세 변경과 재현 명령은 [지속 대화 검증 기록](CONTINUOUS_BUILDER_20260930.md)을 참고한다.
+자동화 검증의 모델 호출은 0회다. **설치 후 실제 모델로 Discovery→Builder→Helper 전체 흐름을 완주한 결과와 다른 PC 실측은 아직 없다.** 모든 Builder 오류가 해결됐다는 뜻은 아니다. 상세 변경과 재현 명령은 [지속 대화 검증 기록](archive/preliminary/CONTINUOUS_BUILDER_20260930.md)을 참고한다.

@@ -1,10 +1,10 @@
 # IDE-only frontend 구현 가이드
 
-> 2026-09-26 현재 시작점은 [Windows 프론트 연결 가이드](FRONTEND_WINDOWS_QUICKSTART.md)다. UI 독립 host·실행 자산·`program` 적용 패치를 제공하며 현재 PC에서 실제 프론트 native 흐름을 검증했다. [결과와 범위](FRONTEND_HANDOFF_RESULTS_20260926.md). 아래 macOS 전용·Windows 미지원 설명은 당시 기록이다.
+> 2026-09-26 현재 시작점은 [Windows 프론트 연결 가이드](FRONTEND_WINDOWS_QUICKSTART.md)다. UI 독립 host·실행 자산·`program` 적용 패치를 제공하며 현재 PC에서 실제 프론트 native 흐름을 검증했다. [결과와 범위](archive/preliminary/FRONTEND_HANDOFF_RESULTS_20260926.md). 아래 macOS 전용·Windows 미지원 설명은 당시 기록이다.
 
-최종 판정일: 2026-09-16 KST. 이 문서는 새 frontend 작업의 기술 front door다. 시간순 실측과 예외는 [historical handoff](FRONTEND_IDE_HANDOFF_20260915.md), 최종 판단은 [cutover verdict](spikes/T19_NATIVE_IDE_CUTOVER_VERDICT_20260916.md)를 따른다.
+최종 판정일: 2026-09-16 KST. 이 문서는 새 frontend 작업의 기술 front door다. 시간순 실측과 예외는 [historical handoff](archive/preliminary/FRONTEND_IDE_HANDOFF_20260915.md), 최종 판단은 [cutover verdict](spikes/T19_NATIVE_IDE_CUTOVER_VERDICT_20260916.md)를 따른다.
 
-> 2026-09-23 제품 요구 갱신: Windows가 주 사용 환경이며 제품 확장 설치만으로 Core·native worker까지 자동 준비해야 한다. 다음 작업은 [Windows 인계](WINDOWS_EXTENSION_HANDOFF_20260923.md)와 T19-W1부터 따른다. 아래 macOS exact pin·수동 `core:native`·connection 경로 설정은 기존 개발 baseline의 재현 방법이며 최종 사용자 설치 UX가 아니다. Windows native·자동 lifecycle은 아직 미구현/미검증이며 이 요구 갱신만으로 fail-closed를 해제하지 않는다.
+> 2026-09-23 제품 요구 갱신: Windows가 주 사용 환경이며 제품 확장 설치만으로 Core·native worker까지 자동 준비해야 한다. 다음 작업은 [Windows 인계](archive/preliminary/WINDOWS_EXTENSION_HANDOFF_20260923.md)와 T19-W1부터 따른다. 아래 macOS exact pin·수동 `core:native`·connection 경로 설정은 기존 개발 baseline의 재현 방법이며 최종 사용자 설치 UX가 아니다. Windows native·자동 lifecycle은 아직 미구현/미검증이며 이 요구 갱신만으로 fail-closed를 해제하지 않는다.
 
 ## 개발 배경과 방향
 
@@ -361,7 +361,7 @@ PR에서 반드시 추가하거나 유지할 test:
 | 목적 | source |
 | --- | --- |
 | 최종 GO/NO-GO와 bounded evidence | [cutover verdict](spikes/T19_NATIVE_IDE_CUTOVER_VERDICT_20260916.md) |
-| 시간순 실측, 오류·취소·Evidence 한계 | [historical frontend handoff](FRONTEND_IDE_HANDOFF_20260915.md) |
+| 시간순 실측, 오류·취소·Evidence 한계 | [historical frontend handoff](archive/preliminary/FRONTEND_IDE_HANDOFF_20260915.md) |
 | 전체 제품/frontend 계약 | [frontend integration](FRONTEND_INTEGRATION.md) |
 | native adapter 책임 | [native IDE adapter contract](spikes/T19_NATIVE_IDE_ADAPTER_CONTRACT_20260915.md) |
 | request/response schemas | [ui-contracts.ts](../packages/contracts/src/ui-contracts.ts) |

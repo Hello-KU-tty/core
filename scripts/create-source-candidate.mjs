@@ -243,7 +243,7 @@ async function repositorySnapshot(side, source, destination) {
 }
 
 export async function createSourceCandidate(backend, frontend) {
-  if (process.version !== 'v24.19.0') throw new Error('PINNED_NODE_REQUIRED')
+  if (process.versions.node.split('.')[0] !== '24') throw new Error('NODE_24_REQUIRED')
   const parent = await realpath(await mkdtemp(join(tmpdir(), 'vibe-helper-source-candidate-')))
   const root = join(parent, 'source')
   await mkdir(root, { mode: 0o700 })
@@ -291,7 +291,7 @@ scope and limitations. Preserve LICENSE/notice files when distributing dependenc
 this candidate contains lockfiles and the project's own vendored SDK, not installed
 third-party dependency trees. Nothing here grants a new redistribution license.
 
-Select Node 24.19.0 and pnpm 11.13.1; do not bypass preflight.
+Use Node 24.x and pnpm 11.13.1 or a later 11.x (24.19.0 and 11.13.1 recommended).
 In backend: pnpm install --frozen-lockfile; pnpm check; pnpm panel:build.
 In frontend: npm ci --ignore-scripts; npm run typecheck; npm test; npm run build.
 Then from backend: node scripts/test-program-consumer.mjs ../frontend.

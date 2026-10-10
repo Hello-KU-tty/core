@@ -181,13 +181,19 @@ function acceptEvidence(
   proposal: EvidenceProposal,
   supportsState?: Exclude<ConceptState, 'OBSERVED'>,
 ): EvidenceEvaluationResult {
+  const capped =
+    supportsState !== undefined &&
+    proposal.maximumSupportedState !== null &&
+    proposal.maximumSupportedState !== supportsState
   const decision = makeDecision(
     input,
     'ACCEPTED',
     'VALID_USER_EVIDENCE',
     supportsState === undefined
       ? 'Accepted a user-authored contradiction as a misconception signal without changing Concept State.'
-      : `Accepted user-authored Evidence supporting ${supportsState}.`,
+      : capped
+        ? `Accepted user-authored Evidence supporting ${supportsState}, the policy maximum; the Analyst proposed ${proposal.maximumSupportedState}.`
+        : `Accepted user-authored Evidence supporting ${supportsState}.`,
   )
   const common = {
     schemaVersion: 1 as const,
@@ -354,8 +360,20 @@ export function evaluateEvidenceProposal(
         'A justified Decision requires stored user-authored rationale.',
       )
     }
+    // A chat-resolved Decision also counts the learner's own cited chat messages in this
+    // Episode: the rationale quote is short, while the topic is usually earlier in the message.
     const citedDecisionTexts = reasonedResolutionContexts
-      .flatMap(({ resolution }) => [resolution.rationale, resolution.customProposal])
+      .flatMap(({ resolution }) => [
+        resolution.rationale,
+        resolution.customProposal,
+        ...episodeEvents.flatMap((event) =>
+          event.actor.kind === 'USER' &&
+          event.payload.type === 'USER_MESSAGE' &&
+          resolution.chatSource?.userMessageIds.includes(event.payload.messageId)
+            ? [event.payload.redactedExcerpt]
+            : [],
+        ),
+      ])
       .filter((text): text is string => text !== undefined)
     if (
       !citedDecisionTexts.some((text) => text.includes(proposal.concept.originalExpression)) ||
@@ -364,7 +382,7 @@ export function evaluateEvidenceProposal(
       return rejectEvidence(
         input,
         'INVALID_REFERENCE',
-        'Quoted Evidence and the original Concept expression must occur in the cited user Decision rationale or custom proposal.',
+        'Quoted Evidence and the original Concept expression must occur in the cited user Decision rationale, custom proposal or cited chat message.',
       )
     }
   }
@@ -419,12 +437,13 @@ export function evaluateEvidenceProposal(
       'Evidence is too weak or too prompt-dependent to support a Concept State.',
     )
   }
-  if (STATE_RANK[proposal.maximumSupportedState] > STATE_RANK[maximum]) {
-    return rejectEvidence(
-      input,
-      'OVERSTATED_MAXIMUM_STATE',
-      `Evidence policy permits at most ${maximum}.`,
-    )
-  }
-  return acceptEvidence(input, proposal, proposal.maximumSupportedState)
+  // An overstated Analyst maximum keeps the learner's Evidence at the deterministic policy
+  // maximum instead of discarding it (finals decision, 2026-10-09). Core never raises a state.
+  return acceptEvidence(
+    input,
+    proposal,
+    STATE_RANK[proposal.maximumSupportedState] > STATE_RANK[maximum]
+      ? maximum
+      : proposal.maximumSupportedState,
+  )
 }

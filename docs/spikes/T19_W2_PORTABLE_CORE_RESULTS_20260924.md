@@ -1,6 +1,6 @@
 # T19-W2 Windows portable Core 결과
 
-> 2026-09-24 · **W2 완료**, W3 다음 착수. [계획](../T19_W2_PORTABLE_CORE_PLAN.md), [adapter 인계](../T19_W2_PORTABLE_CORE_HANDOFF.md), [sanitized receipt](T19_W2_PORTABLE_RECEIPTS_20260924.json).
+> 2026-09-24 · **W2 완료**, W3 다음 착수. [계획](../archive/preliminary/T19_W2_PORTABLE_CORE_PLAN.md), [adapter 인계](../archive/preliminary/T19_W2_PORTABLE_CORE_HANDOFF.md), [sanitized receipt](T19_W2_PORTABLE_RECEIPTS_20260924.json).
 > W2는 Core/bridge 배포 자산과 runtime 준비 검증이다. Windows native Agent 전체 기능, 확장 자동 연결과 clean 설치 완료를 뜻하지 않는다. 이번 모델 호출은 **0회**다.
 
 ## 구현과 실측

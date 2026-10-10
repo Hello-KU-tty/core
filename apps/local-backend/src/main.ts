@@ -25,10 +25,13 @@ import {
 import { openSqliteStorage } from '@vibe-helper/storage-sqlite'
 import { LocalAgentHost } from './agent-host.js'
 import { HostLeases } from './host-leases.js'
+import { KiroBindingManager } from './kiro-bindings.js'
+import { createKiroHookBinding } from './kiro-hook-binding.js'
 import { NativeAgentRelay } from './native-agent-relay.js'
 import { createNativeCoreBinding } from './native-core-binding.js'
 import { privateDirectory } from './private-files.js'
 import { createLocalServer } from './server.js'
+import { WorkspaceRegistry } from './workspace-registry.js'
 
 const execute = promisify(execFile)
 declare const __VIBE_PACKAGED_CORE__: boolean
@@ -48,12 +51,16 @@ const allowed = new Set([
   '--port',
   '--kiro-cli',
   '--model',
+  '--discovery-model',
+  '--helper-model',
+  '--analyst-model',
   '--live',
   '--native-role',
   '--native-project-id',
   '--native-correlation-id',
   '--native-task-id',
   '--native-tools',
+  '--kiro-hooks',
 ])
 function option(name: string, fallback: string): string {
   const index = args.indexOf(name)
@@ -65,7 +72,7 @@ function option(name: string, fallback: string): string {
 for (let index = 0; index < args.length; index++) {
   const value = args[index]
   if (value === undefined || !allowed.has(value)) throw new Error('UNKNOWN_OPTION')
-  if (value !== '--live') index++
+  if (value !== '--live' && value !== '--kiro-hooks') index++
 }
 const root = resolve(option('--root', join(repository, '.data/local')))
 const executable = option('--kiro-cli', process.platform === 'win32' ? 'kiro-cli.exe' : 'kiro-cli')
@@ -118,7 +125,12 @@ async function kiroVersion(): Promise<string> {
     maxBuffer: 16_384,
   })
   const version = stdout.match(/\b(\d+\.\d+\.\d+)\b/)?.[1]
-  if (version !== '2.21.1') throw new Error('KIRO_VERSION_NOT_VERIFIED_EXPECT_2_21_1')
+  // A minimum, not a range: Kiro CLI updates itself, so a newer release must keep working. The ACP
+  // handshake still fails clearly if a future CLI drops what Core uses.
+  const [major = 0, minor = 0, patch = 0] = (version ?? '').split('.').map(Number)
+  const atLeastMinimum = major > 2 || (major === 2 && (minor > 21 || (minor === 21 && patch >= 1)))
+  if (version === undefined || !atLeastMinimum)
+    throw new Error('KIRO_CLI_VERSION_TOO_OLD_NEED_2_21_1')
   return version
 }
 async function doctor(): Promise<void> {
@@ -203,12 +215,17 @@ async function recover(): Promise<void> {
     throw error
   }
 }
-async function start(coreOnly = false, nativeMode = false, managed = false): Promise<void> {
+async function start(
+  coreOnly = false,
+  nativeMode = false,
+  managed = false,
+  kiroNative = false,
+): Promise<void> {
   if (!managed) await initialized()
   if (!coreOnly && !nativeMode) await kiroVersion()
   if (
     macProductProtocol &&
-    (!nativeMode ||
+    ((!nativeMode && !kiroNative) ||
       process.versions.node !== '24.19.0' ||
       process.env.VIBE_NATIVE_SINGLE_WINDOW_BUILTIN_H === '1')
   )
@@ -243,8 +260,12 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
   let nativeWorkspace: string | undefined
   const nativeBindingFile = join(root, `native-mcp-${instanceId}.json`)
   let nativeBindingFileWritten = false
+  let kiroHookBinding: ReturnType<typeof createKiroHookBinding> | undefined
+  const kiroHookFile = join(root, `kiro-hook-${instanceId}.json`)
+  let kiroHookFileWritten = false
   let runtime: WorkflowRuntime | undefined
   let nativeRelay: NativeAgentRelay | undefined
+  let kiroBindings: KiroBindingManager | undefined
   let result: ResultRuntimeSupervisor | undefined
   let server: ReturnType<typeof createLocalServer> | undefined
   let closing = false
@@ -257,10 +278,14 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
     // Revoke Agent authority and stop owned children before closing persistence.
     await runtime?.close()
     await nativeRelay?.close()
+    kiroBindings?.close()
     nativeBinding?.revoke()
     await nativeBinding?.handler.close()
     if (nativeBindingFileWritten)
       await writeFile(nativeBindingFile, JSON.stringify({ status: 'REVOKED' }), { mode: 0o600 })
+    kiroHookBinding?.revoke()
+    if (kiroHookFileWritten)
+      await writeFile(kiroHookFile, JSON.stringify({ status: 'REVOKED' }), { mode: 0o600 })
     await result?.close()
     if (server?.listening) {
       server.closeAllConnections()
@@ -287,10 +312,19 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
       dataDirectory: join(root, 'data'),
       ...(resources ? { migrationsDirectory: resources.migrationsDirectory } : {}),
     })
-    const policy = await WorkspacePathPolicy.create(
-      join(root, 'workspaces'),
-      packaged ? { prepareNewWorkspace: privateDirectory } : {},
-    )
+    // Kiro-native Projects may live in the learner's own empty folder, registered at bind time.
+    const workspaceRegistry = kiroNative
+      ? await WorkspaceRegistry.open({
+          file: join(root, 'registered-workspaces.json'),
+          coreRoot: root,
+        })
+      : undefined
+    const policy = await WorkspacePathPolicy.create(join(root, 'workspaces'), {
+      ...(packaged ? { prepareNewWorkspace: privateDirectory } : {}),
+      ...(workspaceRegistry
+        ? { registeredWorkspace: (projectId: string) => workspaceRegistry.get(projectId) }
+        : {}),
+    })
     const application = new ApplicationService({ storage, workspacePolicy: policy })
     const nativeRole = option('--native-role', '')
     if (
@@ -301,7 +335,11 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
     )
       throw new Error('NATIVE_BINDING_ROLE_REQUIRED')
     if (nativeRole !== '') {
-      if (!coreOnly || (nativeRole !== 'BUILDER' && nativeRole !== 'HELPER'))
+      // Kiro-native start: the Builder binding serves the learner's Kiro chat while CLI Agents
+      // run Discovery, Helper and the Analyst. Otherwise a binding stays core-only.
+      const kiroNativeStart =
+        !coreOnly && !nativeMode && nativeRole === 'BUILDER' && args.includes('--kiro-hooks')
+      if ((!coreOnly && !kiroNativeStart) || (nativeRole !== 'BUILDER' && nativeRole !== 'HELPER'))
         throw new Error('NATIVE_BINDING_ROLE_INVALID')
       const projectId = option('--native-project-id', '')
       const correlationId = option('--native-correlation-id', '')
@@ -332,6 +370,18 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
         ...(option('--native-tools', '')
           ? { toolNames: option('--native-tools', '').split(',') }
           : {}),
+      })
+    }
+    if (args.includes('--kiro-hooks')) {
+      if (nativeRole !== 'BUILDER') throw new Error('KIRO_HOOKS_REQUIRE_BUILDER_BINDING')
+      kiroHookBinding = createKiroHookBinding({
+        application,
+        ...(nativeWorkspace === undefined ? {} : { workspace: nativeWorkspace }),
+        binding: {
+          projectId: option('--native-project-id', ''),
+          taskId: option('--native-task-id', ''),
+          correlationId: option('--native-correlation-id', ''),
+        },
       })
     }
     let projectTools: Promise<ProjectToolchain> | undefined
@@ -372,6 +422,21 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
             guardPath: join(repository, 'packages/kiro-adapter/dist/builder-tool-guard-node.js'),
             executable,
             model,
+            builderInHostChat: kiroNative || args.includes('--kiro-hooks'),
+            promptDirectory: resources?.promptDirectory ?? join(repository, 'docs/agent-prompts'),
+            helperSupplement: (projectId: string) =>
+              kiroBindings?.builderActivity(projectId) ?? Promise.resolve(null),
+            roleModels: {
+              ...(option('--discovery-model', '')
+                ? { DISCOVERY: option('--discovery-model', '') }
+                : {}),
+              ...(option('--helper-model', '') ? { HELPER: option('--helper-model', '') } : {}),
+              // Best on the fixed Analyst corpus with the finals account; accounts without the
+              // preview model fall back to Auto (tests/eval/results/evidence-analyst-models-kiro-cli.md).
+              EVIDENCE_ANALYST: option('--analyst-model', '')
+                ? option('--analyst-model', '')
+                : ['claude-sonnet-5.5', 'auto'],
+            },
           })
     nativeRelay = nativeMode
       ? new NativeAgentRelay({
@@ -425,6 +490,24 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
     // Keep the live CLI handler map: LocalAgentHost registers each run after startup.
     const mcpHandlers = agents.handlers
     if (nativeBinding) mcpHandlers.set(nativeBinding.path, nativeBinding.handler)
+    if (kiroHookBinding) mcpHandlers.set(kiroHookBinding.path, kiroHookBinding.handler)
+    let listeningBaseUrl = ''
+    if (kiroNative && workspaceRegistry) {
+      const promptDirectory = resources?.promptDirectory ?? join(repository, 'docs/agent-prompts')
+      kiroBindings = new KiroBindingManager({
+        application,
+        policy,
+        root,
+        handlers: mcpHandlers,
+        baseUrl: () => listeningBaseUrl,
+        nodeExecutable: process.execPath,
+        bridgeScript: resources?.bridge ?? join(repository, 'scripts/native-core-stdio-bridge.mjs'),
+        hookScript: resources?.kiroHook ?? join(repository, 'scripts/kiro-hook.mjs'),
+        registry: workspaceRegistry,
+        steeringTemplate: join(promptDirectory, 'kiro-steering.md'),
+        helperPrompt: join(promptDirectory, 'helper.md'),
+      })
+    }
     server = createLocalServer({
       application,
       runtime,
@@ -436,6 +519,7 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
       ...(coreOnly ? { runStartDisabledCode: 'NATIVE_RUNTIME_NOT_ATTACHED' as const } : {}),
       isClosing: () => closing,
       resultLauncher: result,
+      ...(kiroBindings ? { kiroBindings } : {}),
     })
     await new Promise<void>((done, reject) => {
       server?.once('error', reject)
@@ -444,8 +528,12 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
     const address = server.address()
     if (address === null || typeof address === 'string') throw new Error('LISTEN_FAILED')
     const baseUrl = `http://127.0.0.1:${address.port}`
+    listeningBaseUrl = baseUrl
     localAgents?.setBaseUrl(baseUrl)
     nativeRelay?.setBaseUrl(baseUrl)
+    // Before hosts see this Core: Kiro hooks and MCP bridges already running in Project folders
+    // read the rewritten descriptors, and prompts they queued meanwhile are recorded.
+    await kiroBindings?.restore()
     const nextDescriptorPath = `${descriptorPath}.${instanceId}.tmp`
     await writeFile(
       nextDescriptorPath,
@@ -474,6 +562,19 @@ async function start(coreOnly = false, nativeMode = false, managed = false): Pro
         { mode: 0o600, flag: 'wx' },
       )
       nativeBindingFileWritten = true
+    }
+    if (kiroHookBinding) {
+      await writeFile(
+        kiroHookFile,
+        JSON.stringify({
+          projectId: option('--native-project-id', ''),
+          taskId: option('--native-task-id', ''),
+          url: `${baseUrl}${kiroHookBinding.path}`,
+          authorization: kiroHookBinding.authorization,
+        }),
+        { mode: 0o600, flag: 'wx' },
+      )
+      kiroHookFileWritten = true
     }
     if (!coreOnly) runtime.startAnalystWorker()
     for (const signal of ['SIGINT', 'SIGTERM'] as const)
@@ -517,7 +618,7 @@ try {
     currentCoreRuntime()
     resources = await loadCoreResources(resolve(dirname(fileURLToPath(import.meta.url)), '..'))
     if (!args.includes('--root')) throw new Error('PACKAGED_PRIVATE_ROOT_REQUIRED')
-    if (!['init', 'native', 'managed', 'core-only', 'recover'].includes(command))
+    if (!['init', 'native', 'managed', 'managed-kiro', 'core-only', 'recover'].includes(command))
       throw new Error('PACKAGED_COMMAND_UNSUPPORTED')
     const assetPath = resources.root.toLowerCase()
     const dataPath = root.toLowerCase()
@@ -528,7 +629,7 @@ try {
     )
       throw new Error('PACKAGED_DATA_RESOURCE_OVERLAP')
     await ownedPrivateDirectory(root)
-  } else if (process.versions.node !== '24.19.0') throw new Error('NODE_24_19_0_REQUIRED')
+  } else if (process.versions.node.split('.')[0] !== '24') throw new Error('NODE_24_REQUIRED')
   if (command === 'init') await init()
   else if (command === 'doctor') await doctor()
   else if (command === 'recover') await recover()
@@ -536,6 +637,8 @@ try {
   else if (command === 'core-only') await start(true)
   else if (command === 'native') await start(false, true)
   else if (command === 'managed' && packaged) await start(false, true, true)
+  else if (command === 'kiro-native' && !packaged) await start(false, false, false, true)
+  else if (command === 'managed-kiro' && packaged) await start(false, false, true, true)
   else throw new Error('UNKNOWN_COMMAND')
 } catch (error) {
   // Diagnostics do not print provider stderr, absolute credential paths or raw payloads.

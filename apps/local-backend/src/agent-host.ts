@@ -3,9 +3,9 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { ApplicationService, WorkspacePathPolicy } from '@vibe-helper/application'
 import { projectSessionSnapshotSchema } from '@vibe-helper/contracts'
-import { KiroAcpSession } from '@vibe-helper/kiro-adapter/acp-node'
+import { KiroAcpError, KiroAcpSession } from '@vibe-helper/kiro-adapter/acp-node'
 import { createRoleBoundMcpHttpHandler } from '@vibe-helper/mcp-server/role-server'
-import { WorkflowError, type AgentInvocation, type WorkflowAgentPort } from '@vibe-helper/runtime'
+import { type AgentInvocation, type WorkflowAgentPort, WorkflowError } from '@vibe-helper/runtime'
 import { guardCommand, privateDirectory } from './private-files.js'
 
 export interface LocalMcpHandler {
@@ -61,6 +61,8 @@ const definitions = {
 export class LocalAgentHost implements WorkflowAgentPort {
   readonly handlers = new Map<string, LocalMcpHandler>()
   #baseUrl: string | undefined
+  // Models this account could not use, skipped for the rest of the process.
+  readonly #unavailableModels = new Set<string>()
   constructor(
     readonly options: {
       application: ApplicationService
@@ -70,6 +72,25 @@ export class LocalAgentHost implements WorkflowAgentPort {
       guardPath: string
       executable: string
       model: string
+      /**
+       * Per-role models; roles without one use `model`. A list is tried in order: a model the
+       * account cannot use (for example a preview model on a free account) falls to the next.
+       */
+      roleModels?: Partial<
+        Record<'DISCOVERY' | 'BUILDER' | 'HELPER' | 'EVIDENCE_ANALYST', string | readonly string[]>
+      >
+      /** Kiro-native mode: the Builder is the learner's own Kiro chat, never a CLI run. */
+      builderInHostChat?: boolean
+      /**
+       * Canonical role prompts (docs/agent-prompts or the packaged copy). When set, a non-Builder
+       * role uses its canonical prompt instead of the older generated Agent JSON prompt.
+       */
+      promptDirectory?: string
+      /**
+       * Kiro-native: the learner's Builder chat activity for a Helper run, added to the question
+       * as a labeled record. Agent-authored; never learner Evidence.
+       */
+      helperSupplement?: (projectId: string) => Promise<string | null>
     },
   ) {}
   setBaseUrl(value: string): void {
@@ -78,11 +99,36 @@ export class LocalAgentHost implements WorkflowAgentPort {
   async invoke(request: AgentInvocation): Promise<{ text: string; stopReason: string }> {
     if (this.#baseUrl === undefined || request.signal.aborted) throw new WorkflowError('CANCELLED')
     const [suffix, role, toolNames] = definitions[request.mode]
-    const original = JSON.parse(
-      await readFile(join(this.options.definitionsRoot, `vibe-helper-${suffix}.json`), 'utf8'),
-    ) as { prompt: string; toolsSettings?: unknown }
+    if (role === 'BUILDER' && this.options.builderInHostChat)
+      throw new WorkflowError('BUILDER_RUNS_IN_HOST_CHAT')
+    const canonicalFile = {
+      DISCOVERY: 'discovery.md',
+      HELPER: 'helper.md',
+      EVIDENCE_ANALYST: 'evidence-analyst.md',
+    }[role as 'DISCOVERY' | 'HELPER' | 'EVIDENCE_ANALYST']
+    const original =
+      this.options.promptDirectory !== undefined && canonicalFile !== undefined
+        ? {
+            prompt: (
+              await readFile(join(this.options.promptDirectory, canonicalFile), 'utf8')
+            ).replaceAll('\r\n', '\n'),
+          }
+        : (JSON.parse(
+            await readFile(
+              join(this.options.definitionsRoot, `vibe-helper-${suffix}.json`),
+              'utf8',
+            ),
+          ) as { prompt: string; toolsSettings?: unknown })
     if (typeof original.prompt !== 'string' || original.prompt.length < 100)
       throw new WorkflowError('AGENT_DEFINITION_INVALID')
+    const configured = this.options.roleModels?.[role] ?? this.options.model
+    const candidates = typeof configured === 'string' ? [configured] : [...configured]
+    if (candidates.length === 0) throw new WorkflowError('AGENT_MODEL_REQUIRED')
+    // Keep the last candidate even if it failed before, so a run always has a model to try.
+    const models = [
+      ...candidates.slice(0, -1).filter((model) => !this.#unavailableModels.has(model)),
+      ...candidates.slice(-1),
+    ]
     const unique = randomUUID()
     const name = `vibe-helper-local-${suffix}-${unique}`
     let cwd = await privateDirectory(join(this.options.agentRoot, unique))
@@ -158,7 +204,7 @@ export class LocalAgentHost implements WorkflowAgentPort {
           name,
           description: `Local ${role} run`,
           prompt: original.prompt,
-          model: this.options.model,
+          model: models[0],
           includeMcpJson: false,
           resources: [],
           tools: toolList,
@@ -186,22 +232,40 @@ export class LocalAgentHost implements WorkflowAgentPort {
         }),
         { mode: 0o600, flag: 'wx' },
       )
-      session = await KiroAcpSession.connect({
-        executable: this.options.executable,
-        cwd,
-        agent: name,
-        model: this.options.model,
-        onEvent: request.onEvent,
-        signal: request.signal,
-        // Keep package-manager cache writes out of the developer's global cache.
-        environment:
-          role === 'BUILDER'
-            ? { ...process.env, NPM_CONFIG_CACHE: join(cwd, '.vibe-helper', 'npm-cache') }
-            : process.env,
-        turnTimeoutMs: role === 'BUILDER' ? 600_000 : 240_000,
-      })
-      if (request.signal.aborted) throw new WorkflowError('CANCELLED')
-      return await session.prompt(request.message)
+      const supplement =
+        role === 'HELPER'
+          ? await this.options.helperSupplement?.(request.projectId).catch(() => null)
+          : null
+      for (const [index, model] of models.entries()) {
+        session = await KiroAcpSession.connect({
+          executable: this.options.executable,
+          cwd,
+          agent: name,
+          // The flag overrides the definition's model, so a fallback reuses the same Agent file.
+          model,
+          onEvent: request.onEvent,
+          signal: request.signal,
+          // Keep package-manager cache writes out of the developer's global cache.
+          environment:
+            role === 'BUILDER'
+              ? { ...process.env, NPM_CONFIG_CACHE: join(cwd, '.vibe-helper', 'npm-cache') }
+              : process.env,
+          turnTimeoutMs: role === 'BUILDER' ? 600_000 : 240_000,
+        })
+        if (request.signal.aborted) throw new WorkflowError('CANCELLED')
+        try {
+          return await session.prompt(
+            supplement ? `${request.message}\n\n${supplement}` : request.message,
+          )
+        } catch (error) {
+          // Only an unusable model is retried: the provider refused before running the turn.
+          if (!(error instanceof KiroAcpError && error.code === 'MODEL_UNAVAILABLE')) throw error
+          this.#unavailableModels.add(model)
+          await session.close()
+          if (index === models.length - 1) throw error
+        }
+      }
+      throw new WorkflowError('AGENT_MODEL_UNAVAILABLE')
     } finally {
       active = false
       request.signal.removeEventListener('abort', revoke)

@@ -46,6 +46,13 @@ export function createLocalServer(options: {
   resultLauncher?: {
     launch(value: ReturnType<typeof generatedResultDescriptorSchema.parse>): Promise<unknown>
   }
+  /** Kiro-native mode: connect a Project folder to the learner's Kiro chat. */
+  kiroBindings?: {
+    bind(
+      projectId: string,
+      request: { workspace?: string; allowCoreTools?: boolean },
+    ): Promise<unknown>
+  }
 }) {
   if (!/^[0-9a-f]{64}$/.test(options.token)) throw new TypeError('LOCAL_TOKEN_INVALID')
   const server = createServer((request, response) => {
@@ -93,7 +100,8 @@ export function createLocalServer(options: {
       return
     }
     const url = new URL(request.url ?? '/', `http://${expectedHost}`)
-    if (url.pathname.startsWith('/mcp/')) {
+    // Per-binding handlers (MCP runs and Kiro hooks) carry their own bearer authority.
+    if (url.pathname.startsWith('/mcp/') || url.pathname.startsWith('/hooks/')) {
       const handler = options.mcpHandlers.get(url.pathname)
       if (handler === undefined || url.search) {
         json(response, 404, { error: 'MCP_RUN_NOT_FOUND' })
@@ -244,6 +252,54 @@ export function createLocalServer(options: {
         json(response, 200, await options.runtime.cancel(runId))
         return
       }
+    }
+    if (url.pathname === '/api/kiro/bind' && request.method === 'POST' && !url.search) {
+      if (options.kiroBindings === undefined) {
+        json(response, 404, { error: 'KIRO_NATIVE_NOT_ENABLED' })
+        return
+      }
+      if (request.headers['content-type']?.split(';')[0] !== 'application/json') {
+        json(response, 415, { error: 'JSON_REQUIRED' })
+        return
+      }
+      const input: unknown = JSON.parse((await body(request)).toString('utf8'))
+      const field = (name: string): unknown =>
+        typeof input === 'object' && input !== null && name in input
+          ? (input as Record<string, unknown>)[name]
+          : undefined
+      const projectId = field('projectId')
+      const workspace = field('workspace')
+      const allowCoreTools = field('allowCoreTools')
+      if (
+        typeof input !== 'object' ||
+        input === null ||
+        Object.keys(input).some(
+          (key) => !['protocolVersion', 'projectId', 'workspace', 'allowCoreTools'].includes(key),
+        ) ||
+        field('protocolVersion') !== LOCAL_PROTOCOL_VERSION ||
+        typeof projectId !== 'string' ||
+        !/^project_[0-9a-f-]{36}$/.test(projectId) ||
+        (workspace !== undefined &&
+          (typeof workspace !== 'string' || workspace.length === 0 || workspace.length > 4096)) ||
+        (allowCoreTools !== undefined && typeof allowCoreTools !== 'boolean')
+      ) {
+        json(response, 400, { error: 'KIRO_BIND_REQUEST_INVALID' })
+        return
+      }
+      try {
+        const data = await options.kiroBindings.bind(projectId, {
+          ...(workspace === undefined ? {} : { workspace }),
+          ...(allowCoreTools === undefined ? {} : { allowCoreTools }),
+        })
+        json(response, 200, { success: true, data })
+      } catch (error) {
+        const code =
+          error instanceof Error && /^[A-Z][A-Z0-9_]{0,99}$/.test(error.message)
+            ? error.message
+            : 'KIRO_BIND_FAILED'
+        json(response, 409, { success: false, error: code })
+      }
+      return
     }
     if (
       request.method !== 'POST' ||

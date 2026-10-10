@@ -84,27 +84,46 @@ function collectReferencePaths(value: unknown, paths: string[]): void {
   for (const child of Object.values(record)) collectReferencePaths(child, paths)
 }
 
+/** A host-registered Project folder, already validated by the host adapter when registered. */
+export type RegisteredWorkspaceLookup = (projectId: string) => string | undefined
+
 export class WorkspacePathPolicy {
   readonly generatedWorkspaceRoot: string
   readonly #prepareNewWorkspace: ((path: string) => Promise<unknown>) | undefined
+  readonly #registeredWorkspace: RegisteredWorkspaceLookup | undefined
 
   private constructor(
     generatedWorkspaceRoot: string,
     prepareNewWorkspace?: (path: string) => Promise<unknown>,
+    registeredWorkspace?: RegisteredWorkspaceLookup,
   ) {
     this.generatedWorkspaceRoot = generatedWorkspaceRoot
     this.#prepareNewWorkspace = prepareNewWorkspace
+    this.#registeredWorkspace = registeredWorkspace
   }
 
   static async create(
     generatedWorkspaceRoot: string,
-    options: { prepareNewWorkspace?: (path: string) => Promise<unknown> } = {},
+    options: {
+      prepareNewWorkspace?: (path: string) => Promise<unknown>
+      /** Registered Project folders outside the generated root (the learner's own empty folder). */
+      registeredWorkspace?: RegisteredWorkspaceLookup
+    } = {},
   ): Promise<WorkspacePathPolicy> {
     const normalized = resolve(generatedWorkspaceRoot)
     if (!isAbsolute(generatedWorkspaceRoot) || normalized === parse(normalized).root) {
       throw new TypeError('Generated workspace root must be an explicit non-root absolute path')
     }
-    return new WorkspacePathPolicy(await realpath(normalized), options.prepareNewWorkspace)
+    return new WorkspacePathPolicy(
+      await realpath(normalized),
+      options.prepareNewWorkspace,
+      options.registeredWorkspace,
+    )
+  }
+
+  /** True when the path is inside the generated root, as opposed to a registered folder. */
+  isGeneratedWorkspace(path: string): boolean {
+    return isWithin(this.generatedWorkspaceRoot, path, false)
   }
 
   projectWorkspacePath(projectId: string): string {
@@ -135,6 +154,26 @@ export class WorkspacePathPolicy {
   }
 
   async resolveProjectWorkspace(project: Project, correlationId: string): Promise<string> {
+    const registered = this.#registeredWorkspace?.(project.id)
+    if (registered !== undefined) {
+      // The registered path is stored canonical. A later symlink swap or removal fails closed.
+      const canonical = await realpath(registered).catch(() => undefined)
+      const metadata = canonical === undefined ? undefined : await stat(canonical)
+      if (
+        !isAbsolute(registered) ||
+        canonical !== registered ||
+        metadata?.isDirectory() !== true ||
+        isWithin(this.generatedWorkspaceRoot, canonical, true) ||
+        isWithin(canonical, this.generatedWorkspaceRoot, true)
+      ) {
+        throw this.#permissionError(
+          correlationId,
+          'REGISTERED_WORKSPACE_UNAVAILABLE',
+          'The registered Project folder is missing, moved or no longer canonical.',
+        )
+      }
+      return canonical
+    }
     if (project.generatedWorkspacePath === undefined) {
       throw this.#permissionError(
         correlationId,

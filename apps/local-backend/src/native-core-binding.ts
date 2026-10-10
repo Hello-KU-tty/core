@@ -15,11 +15,13 @@ const NATIVE_TOOLS: Partial<Record<AgentRole, readonly string[]>> = {
   ],
   BUILDER: [
     'get_builder_task',
+    'get_build_status',
     'start_task',
     'update_build_context',
     'request_user_decision',
     'get_decision_result',
     'apply_decision_result',
+    'resolve_decision_from_chat',
     'complete_task',
   ],
   HELPER: ['get_helper_context'],

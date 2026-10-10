@@ -54,11 +54,15 @@ async function compile(entry: string) {
   return { exports: module.exports, inputs }
 }
 
-it('portable frontend host bundles the new classifier and installation guard without a live host', async () => {
+it('portable Kiro-native frontend host bundles without the IDE-internal worker or a live host', async () => {
   const result = await compile('examples/kiro-panel/src/frontend-host.cjs')
   expect(typeof result.exports.createFrontendHost).toBe('function')
   expect(result.inputs).toContain('examples/kiro-panel/src/core-lifecycle.cjs')
-  expect(result.inputs).toContain('examples/kiro-native-host/native-rpc-error.cjs')
+  expect(result.inputs).toContain('examples/kiro-panel/src/project-terminal-environment.cjs')
+  // Off-chat Agents run in Core through kiro-cli; no private Kiro Agent connection is shipped.
+  expect(
+    result.inputs.some((input) => /native-worker\.cjs|kiro-native-host[/\\]/.test(input)),
+  ).toBe(false)
 })
 
 it('portable runtime bundle exports the exact installation identity used by its Core owner', async () => {

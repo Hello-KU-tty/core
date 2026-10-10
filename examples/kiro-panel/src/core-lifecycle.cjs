@@ -14,6 +14,9 @@ const alive = pid => {
 
 function createCoreLifecycle(options) {
   const { api, connect, selectRuntime, storagePath } = options
+  // `managed` is the IDE-internal runner; `managed-kiro` runs off-chat Agents through kiro-cli.
+  const managedCommand = options.command ?? 'managed'
+  if (!['managed', 'managed-kiro'].includes(managedCommand)) throw new Error('CORE_COMMAND_INVALID')
   const dataRoot = join(storagePath, 'core-data')
   const connectionFile = join(dataRoot, 'connection.json')
   const listeners = new Set()
@@ -54,12 +57,13 @@ function createCoreLifecycle(options) {
     } catch (error) { if (error.code === 'ENOENT') return null; throw error }
   }
   function launch(command) {
+    const extra = command === managedCommand ? options.launchArgs?.() ?? [] : []
     const child = spawn(selected.runtime.executable,
-      [...selected.runtime.args, selected.resources.core, command, '--root', dataRoot, '--port', '0'],
+      [...selected.runtime.args, selected.resources.core, command, '--root', dataRoot, '--port', '0', ...extra],
       { cwd: selected.resources.root, env: api.runtimeEnvironment(selected.runtime),
         // Managed Core belongs to all leased hosts, not this extension host's
         // process group. Lease expiry still bounds its lifetime after host exit.
-        detached: command === 'managed', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe', 'ipc'] })
+        detached: command === managedCommand, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe', 'ipc'] })
     const entry = { child, exited: false, failure: null }
     let pending = ''
     child.stdout.on('data', data => {
@@ -156,7 +160,7 @@ function createCoreLifecycle(options) {
           if (recoveries.length >= 2) throw new Error('CORE_CRASH_RETRY_REQUIRED')
           recoveries.push(Date.now())
         }
-        owned = launch('managed')
+        owned = launch(managedCommand)
         launched = true
       }
       if (owned?.exited && owned.failure && owned.failure !== 'BACKEND_LOCKED_USE_RECOVER_AFTER_PROCESS_EXIT')

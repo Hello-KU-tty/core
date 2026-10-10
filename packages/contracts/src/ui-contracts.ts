@@ -10,14 +10,16 @@ import {
   conversationIdSchema,
   correlationIdSchema,
   decisionIdSchema,
+  discoverySessionIdSchema,
   entityRevisionSchema,
   episodeIdSchema,
+  eventIdSchema,
   idempotencyKeySchema,
-  discoverySessionIdSchema,
   learningSpecIdSchema,
+  messageIdSchema,
   nonEmptyTextSchema,
-  projectIdSchema,
   personalizationTraceIdSchema,
+  projectIdSchema,
   relativePosixPathSchema,
   schemaVersionSchema,
   shortTextSchema,
@@ -175,6 +177,20 @@ export const uiRecordHelperExchangeCommandSchema = z.strictObject({
   closeConversation: z.boolean(),
 })
 
+/**
+ * A message the learner typed into the host coding chat (for example Kiro), forwarded by the
+ * user-side host adapter. Core stores it as user-authored Activity for later Evidence analysis.
+ */
+export const uiRecordChatMessageCommandSchema = z.strictObject({
+  ...uiRequestMetadata,
+  kind: z.literal('UI_RECORD_CHAT_MESSAGE'),
+  idempotencyKey: idempotencyKeySchema,
+  projectId: projectIdSchema,
+  taskId: taskIdSchema.optional(),
+  conversationId: conversationIdSchema,
+  message: nonEmptyTextSchema,
+})
+
 export const uiRetryAnalysisCommandSchema = z.strictObject({
   ...uiRequestMetadata,
   kind: z.literal('UI_RETRY_ANALYSIS'),
@@ -197,6 +213,13 @@ export const uiReadEvidenceTraceQuerySchema = z.strictObject({
   kind: z.literal('UI_READ_EVIDENCE_TRACE'),
   projectId: projectIdSchema,
   conceptId: conceptIdSchema.optional(),
+})
+
+/** Learner-level guidance rendered from Core Concept State, for hosts to place in Agent context. */
+export const uiReadLearnerProfileQuerySchema = z.strictObject({
+  ...uiRequestMetadata,
+  kind: z.literal('UI_READ_LEARNER_PROFILE'),
+  maxConcepts: z.int().min(1).max(100).optional(),
 })
 
 export const uiLaunchResultCommandSchema = z.strictObject({
@@ -265,6 +288,32 @@ export const helperExchangeReceiptSchema = z.strictObject({
   status: z.enum(['OPEN', 'PENDING_ANALYSIS']),
 })
 
+export const chatMessageReceiptSchema = z.strictObject({
+  schemaVersion: schemaVersionSchema,
+  correlationId: correlationIdSchema,
+  conversationId: conversationIdSchema,
+  messageId: messageIdSchema,
+  eventId: eventIdSchema,
+  episode: z
+    .strictObject({
+      id: episodeIdSchema,
+      revision: entityRevisionSchema,
+      type: z.enum(['BUILD_TASK', 'FINAL_UPGRADE', 'DECISION']),
+      decisionId: decisionIdSchema.optional(),
+    })
+    .optional(),
+})
+
+export const learnerProfileViewSchema = z.strictObject({
+  schemaVersion: schemaVersionSchema,
+  correlationId: correlationIdSchema,
+  profileVersion: z.string().regex(/^\d+\.\d+\.\d+$/),
+  conceptIds: z.array(conceptIdSchema).max(100),
+  omittedCount: z.int().nonnegative(),
+  text: z.string().min(1).max(20_000),
+  digest: z.string().regex(/^[0-9a-f]{64}$/),
+})
+
 export const uiRequestSchema = z.discriminatedUnion('kind', [
   uiStartDiscoveryCommandSchema,
   uiRecordDiscoveryFeedbackCommandSchema,
@@ -281,9 +330,11 @@ export const uiRequestSchema = z.discriminatedUnion('kind', [
   uiOpenHelperQuerySchema,
   uiPrepareBuilderSessionQuerySchema,
   uiRecordHelperExchangeCommandSchema,
+  uiRecordChatMessageCommandSchema,
   uiRetryAnalysisCommandSchema,
   uiReadAnalysisJobsQuerySchema,
   uiReadEvidenceTraceQuerySchema,
+  uiReadLearnerProfileQuerySchema,
   uiLaunchResultCommandSchema,
 ])
 
@@ -291,4 +342,6 @@ export type UiRequest = z.infer<typeof uiRequestSchema>
 export type GeneratedResultDescriptor = z.infer<typeof generatedResultDescriptorSchema>
 export type PreparedBuilderTaskDescriptor = z.infer<typeof preparedBuilderTaskDescriptorSchema>
 export type HelperExchangeReceipt = z.infer<typeof helperExchangeReceiptSchema>
+export type ChatMessageReceipt = z.infer<typeof chatMessageReceiptSchema>
+export type LearnerProfileView = z.infer<typeof learnerProfileViewSchema>
 export type BuilderSessionBindingDescriptor = z.infer<typeof builderSessionBindingDescriptorSchema>

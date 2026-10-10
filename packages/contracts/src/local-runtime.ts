@@ -1,7 +1,6 @@
 import { z } from 'zod'
-
+import { commandReceiptSchema, helperContextSchema } from './agent-contracts.js'
 import { analysisJobSchema } from './analysis.js'
-import { helperContextSchema, commandReceiptSchema } from './agent-contracts.js'
 import { projectEvidenceTraceSchema } from './personalization.js'
 import {
   candidateIdSchema,
@@ -17,11 +16,13 @@ import {
 } from './primitives.js'
 import {
   builderSessionBindingDescriptorSchema,
-  preparedBuilderTaskDescriptorSchema,
-  helperExchangeReceiptSchema,
+  chatMessageReceiptSchema,
   generatedResultDescriptorSchema,
-  uiRequestSchema,
+  helperExchangeReceiptSchema,
+  learnerProfileViewSchema,
+  preparedBuilderTaskDescriptorSchema,
   type UiRequest,
+  uiRequestSchema,
 } from './ui-contracts.js'
 import { projectHistorySchema, projectSessionSnapshotSchema } from './ui-session.js'
 
@@ -130,9 +131,11 @@ export const localResponseSchemas = {
   UI_OPEN_HELPER: helperContextSchema,
   UI_PREPARE_BUILDER_SESSION: builderSessionBindingDescriptorSchema,
   UI_RECORD_HELPER_EXCHANGE: helperExchangeReceiptSchema,
+  UI_RECORD_CHAT_MESSAGE: chatMessageReceiptSchema,
   UI_RETRY_ANALYSIS: analysisJobSchema,
   UI_READ_ANALYSIS_JOBS: analysisJobSchema.array(),
   UI_READ_EVIDENCE_TRACE: projectEvidenceTraceSchema,
+  UI_READ_LEARNER_PROFILE: learnerProfileViewSchema,
   UI_LAUNCH_RESULT: generatedResultDescriptorSchema,
 } as const satisfies Record<UiRequest['kind'], z.ZodType>
 export type LocalUiResponse<K extends UiRequest['kind']> = z.infer<(typeof localResponseSchemas)[K]>

@@ -129,6 +129,87 @@ describe('Evidence acceptance policy', () => {
     expect(result.decision.reasonCode).toBe('INVALID_REFERENCE')
   })
 
+  describe('chat-resolved Decisions', () => {
+    const chatMessageId = 'message_00000000-0000-4000-8000-000000000071'
+    const chatMessageEvent = {
+      ...activityEventFixture,
+      id: 'event_00000000-0000-4000-8000-000000000072',
+      decisionId: ids.decision,
+      payload: {
+        type: 'USER_MESSAGE' as const,
+        conversationId: ids.conversation,
+        messageId: chatMessageId,
+        redactedExcerpt: '아까 공유 링크 만료 시간 말인데 하루로 하자. 집에서 받을 때도 있어서',
+      },
+      sourceReferences: [
+        {
+          kind: 'USER_MESSAGE' as const,
+          conversationId: ids.conversation,
+          messageId: chatMessageId,
+        },
+      ],
+    }
+    const chatResolution = {
+      ...decisionResolutionFixture,
+      rationale: '집에서 받을 때도 있어서',
+      chatSource: { mappedBy: 'BUILDER' as const, userMessageIds: [chatMessageId] },
+    }
+    const chatProposal = {
+      ...reasonedDecisionProposal,
+      concept: { ...reasonedDecisionProposal.concept, originalExpression: '공유 링크 만료 시간' },
+      redactedEvidenceExcerpt: '공유 링크 만료 시간 말인데 하루로 하자',
+    }
+    const episode = {
+      ...episodeFixture,
+      eventIds: [chatMessageEvent.id, reasonedDecisionEvent.id],
+    }
+
+    it('accepts quotes from the learner chat message the resolution cites', () => {
+      const result = evaluate(chatProposal, {
+        episode,
+        events: [chatMessageEvent, reasonedDecisionEvent],
+        decisionResolutions: [chatResolution],
+      })
+      expect(result.outcome).toBe('ACCEPTED')
+    })
+
+    it('keeps rejecting the same quotes when the resolution has no chat source', () => {
+      const { chatSource: _ignored, ...uiResolution } = chatResolution
+      const result = evaluate(chatProposal, {
+        episode,
+        events: [chatMessageEvent, reasonedDecisionEvent],
+        decisionResolutions: [uiResolution],
+      })
+      expect(result.outcome).toBe('REJECTED')
+      expect(result.decision.reasonCode).toBe('INVALID_REFERENCE')
+    })
+
+    it('rejects when the cited chat message is not part of the Episode', () => {
+      const result = evaluate(chatProposal, {
+        episode: { ...episodeFixture, eventIds: [reasonedDecisionEvent.id] },
+        events: [chatMessageEvent, reasonedDecisionEvent],
+        decisionResolutions: [chatResolution],
+      })
+      expect(result.outcome).toBe('REJECTED')
+      expect(result.decision.reasonCode).toBe('INVALID_REFERENCE')
+    })
+
+    it('rejects a reordered quote that is not verbatim in the learner message', () => {
+      const result = evaluate(
+        {
+          ...chatProposal,
+          redactedEvidenceExcerpt: '하루로 하자. 아까 공유 링크 만료 시간 말인데',
+        },
+        {
+          episode,
+          events: [chatMessageEvent, reasonedDecisionEvent],
+          decisionResolutions: [chatResolution],
+        },
+      )
+      expect(result.outcome).toBe('REJECTED')
+    })
+  })
+
   it('rejects JUSTIFIED_DECISION when its quotes are absent from the stored user reason', () => {
     const result = evaluate(
       {
@@ -316,11 +397,43 @@ describe('Evidence acceptance policy', () => {
     expect(result.decision.reasonCode).toBe('INSUFFICIENT_EVIDENCE')
   })
 
-  it('rejects an Analyst maximum above the deterministic signal cap', () => {
+  it('keeps an overstated Analyst maximum at the deterministic signal cap', () => {
     const result = evaluate({
       ...evidenceProposalFixture,
       signal: 'REPHRASE',
       maximumSupportedState: 'DEMONSTRATED',
+    })
+    expect(result.outcome).toBe('ACCEPTED')
+    if (result.outcome !== 'ACCEPTED') return
+    expect(result.decision.reasonCode).toBe('VALID_USER_EVIDENCE')
+    expect(result.decision.explanation).toContain('policy maximum')
+    expect(result.evidence).toMatchObject({ supportsState: 'EXPLAINED' })
+  })
+
+  it('caps a MEDIUM justified decision at EXPLAINED instead of rejecting it', () => {
+    // The live K09 case: the Analyst paired MEDIUM strength with DEMONSTRATED.
+    const result = evaluate(
+      { ...reasonedDecisionProposal, strength: 'MEDIUM', maximumSupportedState: 'DEMONSTRATED' },
+      {
+        episode: { ...episodeFixture, eventIds: [reasonedDecisionEvent.id] },
+        events: [reasonedDecisionEvent],
+        decisionResolutions: [decisionResolutionFixture],
+      },
+    )
+    expect(result.outcome).toBe('ACCEPTED')
+    if (result.outcome !== 'ACCEPTED') return
+    expect(result.evidence).toMatchObject({
+      signal: 'JUSTIFIED_DECISION',
+      supportsState: 'EXPLAINED',
+    })
+    expect(result.decision.explanation).toContain('the Analyst proposed DEMONSTRATED')
+  })
+
+  it('still rejects a contradiction that claims a Concept State', () => {
+    const result = evaluate({
+      ...evidenceProposalFixture,
+      signal: 'CONTRADICTION',
+      maximumSupportedState: 'EXPLAINED',
     })
     expect(result.outcome).toBe('REJECTED')
     expect(result.decision.reasonCode).toBe('OVERSTATED_MAXIMUM_STATE')
@@ -332,9 +445,11 @@ describe('Evidence acceptance policy', () => {
       signal: 'TRANSFER',
       maximumSupportedState: 'TRANSFERRED',
     }
+    // Without a demonstration elsewhere, TRANSFERRED is kept at the DEMONSTRATED cap.
     const withoutBaseline = evaluate(transferProposal)
-    expect(withoutBaseline.outcome).toBe('REJECTED')
-    expect(withoutBaseline.decision.reasonCode).toBe('OVERSTATED_MAXIMUM_STATE')
+    expect(withoutBaseline.outcome).toBe('ACCEPTED')
+    if (withoutBaseline.outcome !== 'ACCEPTED') return
+    expect(withoutBaseline.evidence).toMatchObject({ supportsState: 'DEMONSTRATED' })
 
     const priorDemonstration = { ...acceptedEvidenceFixture, taskId: previousTaskId }
     const transferred = evaluate(transferProposal, {

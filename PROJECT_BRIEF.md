@@ -1,27 +1,24 @@
 # Vibe Helper 프로젝트 브리프
 
-> Mac 보완 게시 승인: 사용자가 Mac0.1.3·관련 Core 수정·개발자 ZIP·문서를 기존 `Hello-KU-tty/core`에 `@hurdooagent` 권한으로 push하는 방식을 확인·승인했다. 아래 과거 push 금지는 이 범위에서 해제한다. Windows0.0.18 설치물·program 저장소·영상과 GitHub 조직/저장소 설정은 변경하지 않는다. 다운로드 경로를 유지하고 버전·hash·검증 범위를 명시한다.
-
-> 실제 검증 재개 승인: 사용자가 이전에 제시한 격리 합성 폴더의 신뢰와 계정 누적2,000크레딧 이내 사용을 승인했다. Mac0.1.2 설치본으로 검증하며 시작·생성 프로젝트 폴더만 신뢰하고 profile/계정 저장 영역은 신뢰하지 않는다. 후속 승인으로 기존 Kiro 창은 정상 종료할 수 있으며, 저장하지 않은 변경·기존 자료 보존, 초과 과금 비활성·push 금지를 유지한다.
-
-> 복구 보완 승인: 후속 감사의 Mac 업그레이드·이동된 프로젝트 복구, 설치본 native 검증, 제출 문서 정합성과 조직 소개 초안을 보완한다. 이번 결과는 로컬 commit까지만 수행하고 push·GitHub 설정/게시 변경은 하지 않는다. 실제 모델 검증은 현재 사용량과 정확한 합성 workspace Trust 승인을 확인한 경우에만 진행한다.
-
-> 상태: 구현 전 승인된 입력 브리프
-> 후속 승인: MVP/Task 완료는 Builder·Helper 대화의 종료가 아니다. 사용자는 같은 프로젝트에서 실행·설명·수정 요청을 계속 보낼 수 있다. 완료 기록과 workspace를 보존한 후속 작업, 정확한 도구 거부 표시를 구현·검증하고 새 VSIX의 Kiro 재시작 적용과 기존 GitHub 저장소 게시까지 수행한다.
-> 2026-09-29 후속 승인: 사용자가 실행 환경 변경 후 기록된 Node/pnpm 재사용과 도우미 중복 답변 요약의 개선 또는 제거를 요청했다. 실제 Helper 답변·사용자 질문·내부 Evidence 기록은 유지하며, UI의 중복 요약 영역을 제거한다.
-> 게시 승인: 사용자가 원격 최신 상태와 로컬 Mac 작업을 통합하고 Mac VSIX·개발자 ZIP·양쪽 README를 갱신한 뒤 commit/push하도록 승인했다. 후속 지시에 따라 공개 frontend 0.0.18(a61d408)과 대응 Core(7b35217)를 기준으로 한다. 기존 다운로드 URL은 유지하되 변경 버전·출처·검증 범위는 공개한다. 사용자 확인에 따른 실제 사용 인터뷰는 정성 근거이며 정량 학습 효과로 확대하지 않는다. 영상은 별도 담당 작업으로 보존한다.
-> 2026-09-29 Mac 배포 승인: 사용자가 Mac 배포용 VSIX 생성을 요청했다. Windows VSIX는 Windows에서 별도로 만든다. 우선 darwin-arm64/Kiro 1.1.70의 설치 자산·Core 자동 기동을 구현하고 실제 검증 범위를 명시한다. Intel Mac과 공개 게시를 포함하지 않는다.
-> 2026-09-29 제출 준비 후속: 사용자가 최신 프론트 인계를 기준으로 남은 작업 수행을 요청했다. 기존 승인된 Windows 제품 요구 안에서 현 PC의 kit 갱신·프론트 기능 회귀·설치 후보와 제출 자료를 준비한다. 9/28 Mac 작업의 Windows 제외는 당시 실행 한도이며, 이번 자동 검사/설치를 실제 native 업그레이드·사람 평가 완료로 확대하지 않는다.
-> 2026-09-29 유지보수 승인: 프론트 B7~B11 보완에 포함해 broken pnpm 11.12.0 개발·생성 앱 pin을 11.13.1로 교체한다. Node 24.19.0·frozen install·권한 경계는 유지하며 과거 도구 실측 기록은 당시 사실로 보존한다.
-> 작성 기준일: 2026-08-24
-> 범위 갱신: 2026-09-07 사용자 승인으로 T19에 자체 Kiro IDE 패널의 Discovery·Spec·Builder·Helper·History 실제 연결과 frontend 로컬 실행 인계를 포함한다.
-> 실험 승인: 2026-09-12 사용자는 별도 worktree에서 Kiro IDE 내장 Agent를 실행기로 쓰는 T19-N 실험을 승인했다. 기존 CLI/Crew 경로와 T19 Windows 완료 gate는 유지하며, 내장 경로의 지원·권한·Core 연결·stream·중지는 실측 전 제품 기능으로 간주하지 않는다.
-> 수직 흐름 승인: 2026-09-12 사용자는 같은 분리 worktree에서 native Discovery부터 Builder 파일·Decision, Helper, 사용자 Evidence·Episode·Analyst와 다음 개인화까지 실제 Core 상태로 검증하도록 승인했다. 사람의 선택·발언은 명시적 합성 UI 입력으로만 대체하고 Agent 작성물로 이해 상태를 올리지 않는다. 기존 CLI/Crew 기본 경로와 Windows gate는 유지한다.
-> 4시간 전환 판단 승인: 2026-09-15 사용자는 09:58~13:58 UTC 동안 득실 중심의 최소 실제 검증을 끝낸 뒤 IDE-only frontend 개발 전환·인계를 판단하도록 승인했다. 안전·데이터·provenance 경계는 유지하고 기존 CLI 코드는 즉시 삭제하지 않는다. 미실행 Windows·장기 안정성·정밀 CLI 비교는 미지원/미검증으로 분리하며, 실제 안전 또는 동작 실패는 전환 판단에서 숨기지 않는다. [4시간 계획](docs/spikes/T19_NATIVE_IDE_ONLY_4H_CUTOVER_PLAN_20260915.md)을 따른다.
-> 제품 설치 요구 갱신: 2026-09-23 사용자는 Windows 중심 실사용과 Kiro 확장 설치만으로 Core backend까지 자동 작동하는 경험을 필수로 명확히 했다. 기존 런타임 재사용과 필요한 도구의 조건부 자동 준비 방향을 승인했다. 다음 개발은 native recovery 기준에서 분기한 Windows 브랜치로 이어가며, 요구 승인과 Windows 실행 검증은 구분한다. [Windows 인계](docs/WINDOWS_EXTENSION_HANDOFF_20260923.md)를 따른다.
-> 제출 준비 재개: 2026-09-28 사용자는 백엔드와 별도 `vibe-helper-frontend` checkout을 함께 수정해 최종 제출을 준비하도록 승인했다. 프론트 변경은 기능 동작·성능 보완에 필요한 최소 범위로 제한하고 기존 디자인·흐름을 유지한다. 이번 작업에서는 Windows 전용 작업과 호환성 검증을 제외하며 macOS에서 실제 프론트를 연결해 검증한다. Windows 제품 요구 자체를 삭제하거나 Mac 결과를 Windows PASS로 표시하지 않는다. 중대한 Mac 호환성 장애는 사용자에게 보고한다.
+> 상태: 예선 제출 완료, 본선 준비 중. 본선 방향은 아래 §0과 `docs/DECISIONS.md`의 Kiro-native 전환 결정을 따른다.
+> 예선 기간의 누적 승인 메모는 [승인 이력](docs/archive/preliminary/APPROVAL_HISTORY.md)으로 옮겼다.
 > 출처: 사용자가 승인한 [PROJECT_SPEC.md](PROJECT_SPEC.md)와 합의된 Agent Prompt
 > 주의: 제품명은 아직 확정되지 않았으며 `Vibe Helper`, `BuildWhy`는 작업명이다.
+
+## 0. 본선 방향: Kiro-native 개입
+
+> 본선 준비 중 사용자가 승인한 방향이다. 이 절과 충돌하는 아래 예선 기준 문장은 이 절을 따른다. 세부 근거는 [DECISIONS](docs/DECISIONS.md)의 본선 결정 세 건에 있다. 아래 구조의 실제 동작은 [K01 spike](docs/TASKS.md) 결과로 확정한다.
+
+- **원래 구상으로 복귀:** 사용자는 평소처럼 Kiro 자체 채팅·Spec·task 실행으로 바이브코딩하고, Vibe Helper는 Kiro의 Spec 파일, Steering, MCP, Hook과 확장 패널로 그 흐름에 개입한다. 예선의 "패널 안에서 Builder를 직접 운영하는 별도 바이브코딩 환경"은 본선 fallback으로 남긴다.
+- **Builder:** 사용자가 쓰는 Kiro Agent다. Vibe Helper는 Steering으로 행동을 조정하고 hook으로 Activity를 관찰하며, 실제 Decision은 Core Builder MCP `request_user_decision`으로 Kiro 채팅 안에서 사용자에게 묻게 한다. 학습자의 답은 Agent가 맥락으로 해석해 `resolve_decision_from_chat`으로 기록하되 학습자 원문을 인용해야 하고, LLM이 없는 Core는 인용·순서·명시 번호 모순만 검증한다. 이유는 학습자 원문 그대로 저장한다.
+- **Helper:** 읽기 권한만 가진다(2026-10-09 사용자 결정으로 변경). 별도 채팅 탭의 Vibe Helper 에이전트는 파일 읽기·검색과 Helper Core 조회 도구만 받고, 코드 수정과 명령 실행은 Builder에게 맡긴다. Kiro 채팅에서 `/vibe-helper 질문`(manual Steering 슬래시 명령)이나 별도 채팅 탭의 Vibe Helper 에이전트로 부르고, 질문과 답 요약을 Helper 대화 Episode로 기록한다. Helper는 Builder 세션의 진행 중 활동을 기록으로 참고한다. 패널은 fallback이다.
+- **유지하는 강제 경계:** Evidence와 Concept State는 Core의 deterministic rule로만 바뀐다. Helper·Builder에는 Evidence·State 변경 도구를 주지 않고, Core는 Agent 출처 입력을 사용자 이해 근거로 받지 않는다. Analyst는 도구 없이 proposal만 낸다.
+- **Evidence 수집:** Kiro hook이 사용자가 채팅에 직접 친 발언을 USER Activity로 Core에 기록하고(일반 채팅도 Evidence 대상), 턴 종료로 Helper 교환을 마무리한다. Agent의 Core 도구 호출은 Core가 AGENT 출처로 기록한다. Event마다 추론하지 않고 Episode 종료 뒤 분석하는 원칙은 유지한다.
+- **개인화:** 기존 다음 Helper·Discovery 개인화에 더해, Core가 만든 학습자 요약을 Steering이 참조하는 파일로 모든 Kiro 대화에 반영한다. Steering은 세션 시작 때 고정되므로 세션 도중 변화는 프롬프트 hook 출력으로 보완한다.
+- **Discovery·Learning Spec:** 패널에 유지하고, 확정 Spec을 Kiro Spec(`requirements.md`)으로 내보낸다.
+- **Project 폴더:** 사용자가 Kiro에서 연 폴더가 비어 있으면 그 폴더를 Project 폴더로 등록해 같은 창에서 진행한다. 이미 파일이 있으면 Core가 만든 새 폴더를 새 창으로 여는 것을 제안한다. 기존 프로젝트 import는 여전히 범위 밖이다.
+- **Core 최소 수정:** Core와 데이터 계약은 host 중립으로 유지하고 Kiro 전용 기능은 `packages/kiro-adapter`와 확장에만 둔다. Kiro 기능 사용은 AWS 대회 평가를 위한 adapter 단계의 선택이다.
+- **일정:** 포스터 사전 제출 10/11에는 실측된 핵심 장면을, 본선 10/18까지는 안정화와 추가 구현을 진행한다.
 
 ## 1. 한 문장 정의
 
@@ -64,7 +61,7 @@
 - 투명한 작업: 실제 Agent 메시지, ToolCall, 파일 변경, 테스트와 오류 수정 흐름을 숨기지 않는다.
 - 보수적 Evidence: Agent가 말하거나 작성한 내용은 사용자 이해 근거가 아니다.
 - Local-first: 상태는 로컬 SQLite에 저장하고 필요한 Activity만 최소 수집한다.
-- 최소 권한: Builder만 생성 workspace에서 write/shell을 사용하고 Helper와 Analyst는 제한된 읽기·제안 권한만 가진다.
+- 최소 권한: Builder만 생성 workspace에서 write/shell을 사용하고 Helper와 Analyst는 제한된 읽기·제안 권한만 가진다. (본선: Helper는 읽기 권한만 갖고, Evidence·State 변경 권한은 Core가 강제한다. §0 참조)
 
 ## 6. 핵심 사용자 흐름
 
@@ -138,7 +135,7 @@ Learning Goal 입력
 
 ### Helper Agent
 
-- 항상 접근 가능한 read-only Agent
+- 항상 접근 가능한 read-only Agent (본선: Kiro 채팅 탭 에이전트도 읽기 도구만 받는다. §0 참조)
 - 최신 Builder 맥락, 관련 Task·Decision·코드·과거 Evidence를 선택적으로 조회
 - 더 쉽게, 더 자세히, 현재 코드로 예시, 선택지 비교, 이해 확인 지원
 - 코드 수정, shell 실행, Decision 확정과 State 변경 금지
@@ -214,7 +211,7 @@ Prompt Dependence:
 ## 13. UI
 
 - Agent 중심과 Code 중심 두 UI는 숙련도 단계가 아니라 취향 차이다.
-- MVP 주 surface는 Crew App 기반 Agent 중심 vertical flow다.
+- MVP 주 surface는 Crew App 기반 Agent 중심 vertical flow다. (예선 실제 제출물은 Kiro IDE 확장 패널이었다. 본선 주 surface는 일반 Kiro 채팅과 보조 패널이다. §0 참조)
 - Agent 중심은 왼쪽 실제 Builder session, 오른쪽 Helper chat을 기본으로 한다.
 - Code 중심은 Kiro editor 옆의 자체 확장/Webview 패널로 검증한다. 프론트 담당자의 Discovery·Spec·History 화면과 Builder/Helper 탭을 기존 Core와 실제 Kiro Agent에 연결하는 것을 T19에 포함한다.
 - 두 Mode는 같은 Core Project, Discovery Session, Spec, Task, Decision, Context와 Ledger를 사용한다. host의 raw chat session 공유는 요구하지 않는다.
@@ -307,6 +304,7 @@ MVP 필수:
 
 ### 대회 이후 확장
 
+- 채팅 밖 Agent 실행기의 LLM API 어댑터(초보자 설치·로그인 부담 제거). 본선은 kiro-cli 실행기를 쓴다
 - Claude Code와 Codex adapter
 - 기존 프로젝트 import
 - 다언어 project runtime

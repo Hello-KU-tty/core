@@ -1,6 +1,6 @@
 # T19-N IDE cutover 경영 판정
 
-작성 기준: 2026-09-16 KST. 상세 receipt는 [4시간 계획·결과](T19_NATIVE_IDE_ONLY_4H_CUTOVER_PLAN_20260915.md), [P1/P2 continuation](T19_NATIVE_P1_P2_CONTINUATION_20260915.md), [P2 v1.0.7 결과](../../tests/eval/results/evidence-analyst-v1.0.7.md), [이전 0.1.2 P2 baseline](T19_NATIVE_P2_LIVE_CLEAN_EVAL_20260915.md), [IDE adapter 인계 계약](T19_NATIVE_IDE_ADAPTER_CONTRACT_20260915.md)과 [frontend IDE 인계](../FRONTEND_IDE_HANDOFF_20260915.md)에 있다.
+작성 기준: 2026-09-16 KST. 상세 receipt는 [4시간 계획·결과](T19_NATIVE_IDE_ONLY_4H_CUTOVER_PLAN_20260915.md), [P1/P2 continuation](T19_NATIVE_P1_P2_CONTINUATION_20260915.md), [P2 v1.0.7 결과](../../tests/eval/results/evidence-analyst-v1.0.7.md), [이전 0.1.2 P2 baseline](T19_NATIVE_P2_LIVE_CLEAN_EVAL_20260915.md), [IDE adapter 인계 계약](T19_NATIVE_IDE_ADAPTER_CONTRACT_20260915.md)과 [frontend IDE 인계](../archive/preliminary/FRONTEND_IDE_HANDOFF_20260915.md)에 있다.
 
 ## 결론
 
@@ -34,4 +34,4 @@
 
 승인된 원래 판단창은 2026-09-15 09:58~13:58 UTC였다. 약 31분의 실제 작업 뒤 0.1.3 install/reload와 G Task action-time 승인을 기다리는 동안 deadline이 지났고 사용자가 14:43 UTC 이후 재개를 승인했다. 따라서 이 결과를 wall-clock 4시간 성공이나 새 4시간 deadline으로 기록하지 않는다. 승인 대기 뒤 실제 bounded run이 끝나 위 판정을 내린 것이다.
 
-Frontend는 [frontend IDE 인계](../FRONTEND_IDE_HANDOFF_20260915.md)의 DTO·상태·오류 seam으로 착수한다. native 실행은 위 exact pin의 실험 기능으로 표시하고, Evidence confidence/학습 성공이나 production-ready 문구를 만들지 않는다. 기존 CLI/Crew source는 유지하며 원본 main은 변경하지 않고 recovery worktree의 dirty 이력을 보존한다. commit/push는 이 판정에 포함하지 않는다.
+Frontend는 [frontend IDE 인계](../archive/preliminary/FRONTEND_IDE_HANDOFF_20260915.md)의 DTO·상태·오류 seam으로 착수한다. native 실행은 위 exact pin의 실험 기능으로 표시하고, Evidence confidence/학습 성공이나 production-ready 문구를 만들지 않는다. 기존 CLI/Crew source는 유지하며 원본 main은 변경하지 않고 recovery worktree의 dirty 이력을 보존한다. commit/push는 이 판정에 포함하지 않는다.

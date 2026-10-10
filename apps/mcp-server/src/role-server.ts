@@ -16,16 +16,19 @@ import {
   builderApplyDecisionToolInputSchema,
   builderCompleteTaskCommandSchema,
   builderCompleteTaskToolInputSchema,
+  builderGetBuildStatusQuerySchema,
   builderGetDecisionResultQuerySchema,
   builderGetTaskQuerySchema,
   builderRequestDecisionCommandSchema,
   builderRequestDecisionToolInputSchema,
+  builderResolveDecisionFromChatCommandSchema,
+  builderResolveDecisionFromChatToolInputSchema,
   builderStartTaskCommandSchema,
   builderTaskContextSchema,
   builderUpdateLiveContextCommandSchema,
   builderUpdateLiveContextToolInputSchema,
-  candidateEnrichmentDraftSchema,
   candidateDraftSchema,
+  candidateEnrichmentDraftSchema,
   candidatePreviewDraftSchema,
   discoveryContextSchema,
   discoveryGetContextQuerySchema,
@@ -152,6 +155,14 @@ export const ROLE_TOOL_CATALOG: Readonly<Record<AgentRole, readonly RoleToolDefi
       readOnly: true,
     },
     {
+      name: 'get_build_status',
+      title: 'Get build status',
+      description:
+        'Read a small summary: task revision, Live Context version and the Decisions still awaiting the learner or not yet applied, with numbered options.',
+      inputSchema: builderGetBuildStatusQuerySchema,
+      readOnly: true,
+    },
+    {
       name: 'start_task',
       title: 'Start Builder Task',
       description: 'Start a pending Builder Task at the expected revision.',
@@ -184,6 +195,14 @@ export const ROLE_TOOL_CATALOG: Readonly<Record<AgentRole, readonly RoleToolDefi
       title: 'Apply Decision result',
       description: 'Record how the resolved user Decision was applied and resume Context.',
       inputSchema: builderApplyDecisionToolInputSchema,
+      readOnly: false,
+    },
+    {
+      name: 'resolve_decision_from_chat',
+      title: 'Resolve Decision from learner chat',
+      description:
+        "Record the learner's own choice for an open Decision, citing verbatim quotes from their chat messages. Core verifies every quote; ask the learner when their choice is unclear.",
+      inputSchema: builderResolveDecisionFromChatToolInputSchema,
       readOnly: false,
     },
     {
@@ -677,6 +696,28 @@ async function applyDecisionFromTool(options: RoleBoundMcpServerOptions, input: 
   )
 }
 
+async function resolveDecisionFromChatTool(options: RoleBoundMcpServerOptions, input: unknown) {
+  const toolInput = builderResolveDecisionFromChatToolInputSchema.parse(input)
+  return options.application.executeAgent(
+    'BUILDER',
+    builderResolveDecisionFromChatCommandSchema.parse({
+      schemaVersion: 1,
+      kind: 'BUILDER_RESOLVE_DECISION_FROM_CHAT',
+      correlationId: toolInput.correlationId,
+      actor: { kind: 'AGENT', role: 'BUILDER' },
+      idempotencyKey: toolInput.idempotencyKey,
+      projectId: toolInput.projectId,
+      taskId: toolInput.taskId,
+      decisionId: toolInput.decisionId,
+      selection: toolInput.selection,
+      citedUserMessages: toolInput.citedUserMessages,
+      ...(toolInput.rationaleQuote === undefined
+        ? {}
+        : { rationaleQuote: toolInput.rationaleQuote }),
+    }),
+  )
+}
+
 async function completeTaskFromTool(options: RoleBoundMcpServerOptions, input: unknown) {
   const toolInput = builderCompleteTaskToolInputSchema.parse(input)
   const contextResult = await options.application.executeAgent('BUILDER', {
@@ -801,9 +842,11 @@ export function createRoleBoundMcpServer(options: RoleBoundMcpServerOptions): Mc
                         ? await requestDecisionFromTool(options, input)
                         : options.role === 'BUILDER' && tool.name === 'apply_decision_result'
                           ? await applyDecisionFromTool(options, input)
-                          : options.role === 'BUILDER' && tool.name === 'complete_task'
-                            ? await completeTaskFromTool(options, input)
-                            : await options.application.executeAgent(options.role, input)
+                          : options.role === 'BUILDER' && tool.name === 'resolve_decision_from_chat'
+                            ? await resolveDecisionFromChatTool(options, input)
+                            : options.role === 'BUILDER' && tool.name === 'complete_task'
+                              ? await completeTaskFromTool(options, input)
+                              : await options.application.executeAgent(options.role, input)
         const payload = toJsonObject(result.success ? result.data : result.error)
         return {
           content: [{ type: 'text', text: JSON.stringify(payload) }],

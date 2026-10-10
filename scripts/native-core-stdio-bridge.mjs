@@ -2,18 +2,19 @@
 // Kiro's IDE Agent is the model; this process only relays fixed Core tools.
 import { appendFile, lstat, readFile, realpath } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
 import {
   Client,
   StreamableHTTPClientTransport,
 } from '../apps/mcp-server/node_modules/@modelcontextprotocol/client/dist/index.mjs'
 import { Server } from '../apps/mcp-server/node_modules/@modelcontextprotocol/server/dist/index.mjs'
 import { StdioServerTransport } from '../apps/mcp-server/node_modules/@modelcontextprotocol/server/dist/stdio.mjs'
+import nativePrivatePaths from '../examples/kiro-native-host/native-private-directory.cjs'
 import { candidateIdSchema } from '../packages/contracts/dist/primitives.js'
+import { createBridgeLifecycle } from './native-bridge-lifecycle.mjs'
 import { restoreCoreProvenEmptyActiveDecisions } from './native-builder-transport.mjs'
 import { describeCompletionInput } from './native-completion-diagnostic.mjs'
-import { createBridgeLifecycle } from './native-bridge-lifecycle.mjs'
 import { describeNativeCoreError } from './native-core-error-diagnostic.mjs'
-import { previewInputFailure } from './native-discovery-preview-validation.mjs'
 import {
   advertiseNativeEnrichment,
   bindNativeEnrichment,
@@ -21,6 +22,7 @@ import {
   nativeEnrichmentFailure,
   nativeEnrichmentToolError,
 } from './native-discovery-enrichment.mjs'
+import { previewInputFailure } from './native-discovery-preview-validation.mjs'
 import { restoreDiscoveryEmptyCollections } from './native-discovery-transport.mjs'
 import {
   advertiseJsonEnvelope,
@@ -30,7 +32,6 @@ import {
   jsonEnvelopeToolError,
 } from './native-json-envelope.mjs'
 import { allowedNativeReceipt } from './native-receipt-scope.mjs'
-import nativePrivatePaths from '../examples/kiro-native-host/native-private-directory.cjs'
 
 const ROLE_TOOLS = {
   DISCOVERY: [
@@ -43,11 +44,13 @@ const ROLE_TOOLS = {
   ],
   BUILDER: [
     'get_builder_task',
+    'get_build_status',
     'start_task',
     'update_build_context',
     'request_user_decision',
     'get_decision_result',
     'apply_decision_result',
+    'resolve_decision_from_chat',
     'complete_task',
   ],
   HELPER: ['get_helper_context'],
@@ -62,6 +65,10 @@ const DISCOVERY_MODES = new Set([
   'SPEC',
   'SPEC_RECOVERY',
 ])
+// Kiro waits 60 s for an MCP server by default. A Project connection (Kiro-native) may start
+// before the Core that restores it, so its bridge waits for Core within that window.
+const STARTUP_WAIT_MS = 45_000
+const NOT_READY = new Set(['ENOENT', 'BRIDGE_BINDING_NOT_READY'])
 const descriptorPath = process.argv[2]
 const expectedWorkspace = process.argv[3]
 const receiptPath = process.env.VIBE_NATIVE_BRIDGE_RECEIPT_FILE
@@ -97,8 +104,11 @@ async function loadBinding() {
       : (fileInfo.mode & 0o077) !== 0)
   )
     throw new Error('BRIDGE_DESCRIPTOR_UNSAFE')
-  const binding = JSON.parse(await readFile(file, 'utf8'))
+  const raw = await readFile(file, 'utf8')
+  const binding = JSON.parse(raw)
+  if (binding?.status === 'REVOKED') throw new Error('BRIDGE_BINDING_NOT_READY')
   if (
+    (binding.lifecycle !== undefined && binding.lifecycle !== 'PROJECT') ||
     !Object.hasOwn(ROLE_TOOLS, binding.role) ||
     (binding.role === 'DISCOVERY'
       ? typeof binding.discoverySessionId !== 'string' || binding.taskId !== undefined
@@ -136,20 +146,63 @@ async function loadBinding() {
     endpoint.hash
   )
     throw new Error('BRIDGE_ENDPOINT_INVALID')
-  return { binding, file, endpoint, canonical }
+  return { binding, file, endpoint, canonical, raw }
 }
 
-async function start() {
-  const { binding, file, endpoint } = await loadBinding()
-  lifecycle.stage('BINDING_VALIDATED')
+async function connectCore({ binding, endpoint }) {
   const client = new Client({ name: 'vibe-helper-native-core-bridge', version: '0.1.0' })
   const transport = new StreamableHTTPClientTransport(endpoint, {
     requestInit: { headers: { Authorization: binding.authorization } },
   })
-  lifecycle.stage('CORE_CONNECTING')
   await client.connect(transport)
+  try {
+    return { client, listed: await client.listTools() }
+  } catch (error) {
+    await client.close().catch(() => undefined)
+    throw error
+  }
+}
+
+const notReady = (error, loaded) =>
+  NOT_READY.has(error?.code) ||
+  NOT_READY.has(error?.message) ||
+  // A Project descriptor that still names a Core which is gone or not listening yet.
+  (loaded?.binding.lifecycle === 'PROJECT' && !/^BRIDGE_[A-Z_]+$/.test(error?.message ?? ''))
+
+// Returned as a tool result so the Agent can keep working and try again; never a mock success.
+const notConnectedResult = () => {
+  const payload = {
+    code: 'VIBE_HELPER_NOT_CONNECTED',
+    message:
+      'Vibe Helper Core is not connected right now (Kiro may still be starting it). Keep working on parts that need no learner decision, do not ask a real decision before Core records it, and call this tool again in a few seconds.',
+  }
+  return { content: [{ type: 'text', text: JSON.stringify(payload) }], isError: true }
+}
+
+async function start() {
+  const deadline = Date.now() + STARTUP_WAIT_MS
+  let loaded
+  let connection
+  for (;;) {
+    loaded = undefined
+    try {
+      loaded = await loadBinding()
+      lifecycle.stage('BINDING_VALIDATED')
+      lifecycle.stage('CORE_CONNECTING')
+      connection = await connectCore(loaded)
+      break
+    } catch (error) {
+      if (!notReady(error, loaded) || Date.now() > deadline) throw error
+      await delay(1000)
+    }
+  }
+  let { binding } = loaded
+  // The descriptor text last validated. Unchanged text needs no new check (on Windows each check
+  // inspects the file's ACL through PowerShell).
+  let validatedRaw = loaded.raw
+  let { client } = connection
+  const { listed } = connection
   lifecycle.stage('CORE_CONNECTED')
-  const listed = await client.listTools()
   lifecycle.stage('CORE_TOOLS_LISTED')
   const actualNames = listed.tools.map((tool) => tool.name)
   if (
@@ -181,22 +234,62 @@ async function start() {
     const name = request.params?.name
     if (typeof name !== 'string' || !binding.toolNames.includes(name))
       throw new Error('BRIDGE_TOOL_NOT_ALLOWED')
-    const latest = JSON.parse(await readFile(file, 'utf8'))
+    // Each call re-reads the descriptor. A run binding must stay exactly the same. A Project
+    // binding may be rewritten for the same folder, Project and role (a new Core after a restart
+    // or a rebind); the bridge then follows it, and waits while no Core is connected.
+    let latest = binding
+    let latestRaw = validatedRaw
+    const current = await readFile(resolve(descriptorPath), 'utf8').catch(() => null)
+    if (current !== validatedRaw) {
+      try {
+        const loaded = await loadBinding()
+        latest = loaded.binding
+        latestRaw = loaded.raw
+      } catch (error) {
+        if (binding.lifecycle === 'PROJECT' && notReady(error)) return notConnectedResult()
+        throw new Error('BRIDGE_BINDING_REVOKED')
+      }
+    }
+    const sameScope =
+      latest.role === binding.role &&
+      latest.workspace === binding.workspace &&
+      latest.projectId === binding.projectId &&
+      latest.discoverySessionId === binding.discoverySessionId &&
+      latest.mode === binding.mode &&
+      JSON.stringify(latest.requestedCandidateIds) ===
+        JSON.stringify(binding.requestedCandidateIds) &&
+      JSON.stringify(latest.toolNames) === JSON.stringify(binding.toolNames)
+    const sameConnection =
+      latest.taskId === binding.taskId &&
+      latest.correlationId === binding.correlationId &&
+      latest.url === binding.url &&
+      latest.authorization === binding.authorization
     if (
-      latest.role !== binding.role ||
-      latest.workspace !== binding.workspace ||
-      latest.projectId !== binding.projectId ||
-      latest.taskId !== binding.taskId ||
-      latest.discoverySessionId !== binding.discoverySessionId ||
-      latest.mode !== binding.mode ||
-      JSON.stringify(latest.requestedCandidateIds) !==
-        JSON.stringify(binding.requestedCandidateIds) ||
-      latest.correlationId !== binding.correlationId ||
-      latest.url !== binding.url ||
-      latest.authorization !== binding.authorization ||
-      JSON.stringify(latest.toolNames) !== JSON.stringify(binding.toolNames)
+      !sameScope ||
+      (!sameConnection && (binding.lifecycle !== 'PROJECT' || latest.lifecycle !== 'PROJECT'))
     )
       throw new Error('BRIDGE_BINDING_REVOKED')
+    if (!sameConnection) {
+      let next
+      try {
+        next = await connectCore(await loadBinding())
+      } catch {
+        return notConnectedResult()
+      }
+      const names = next.listed.tools.map((tool) => tool.name)
+      if (
+        names.length !== binding.toolNames.length ||
+        names.some((tool) => !binding.toolNames.includes(tool))
+      ) {
+        await next.client.close().catch(() => undefined)
+        throw new Error('BRIDGE_CORE_CATALOG_MISMATCH')
+      }
+      await client.close().catch(() => undefined)
+      client = next.client
+      binding = latest
+      await receipt({ event: 'PROJECT_BINDING_FOLLOWED', role: binding.role })
+    }
+    validatedRaw = latestRaw
     const rawArguments = request.params.arguments ?? {}
     let envelope
     try {
@@ -347,7 +440,14 @@ async function start() {
       }
     }
     await receipt({ event: 'CORE_TOOL_REQUESTED', role: binding.role, toolName: name })
-    const result = await client.callTool({ name, arguments: normalized.input })
+    let result
+    try {
+      result = await client.callTool({ name, arguments: normalized.input })
+    } catch (error) {
+      // The descriptor still names a Core that stopped; the next Core rewrites it.
+      if (binding.lifecycle === 'PROJECT') return notConnectedResult()
+      throw error
+    }
     await receipt({
       event: 'CORE_TOOL_RESULT',
       role: binding.role,

@@ -1,0 +1,236 @@
+# 본선 설치물 0.2.6 (Kiro-native, Mac·Windows) 프론트 인계
+
+본선 방향([PROJECT_BRIEF §0](../PROJECT_BRIEF.md))에 맞춰 Mac 설치물의 host를 Kiro-native로 바꿨다. 0.2.1은 첫 실사용 체험 피드백(K09)을 반영했고, 0.2.2는 본선 계정 재실측에서 나온 Analyst·Evidence 정책 변경을 더했고, 0.2.3은 Kiro 채팅 Helper 에이전트가 도구를 받지 못하던 문제를 고치고 Helper를 읽기 전용으로 바꿨고, 0.2.4는 Kiro 연결이 Core 재시작을 넘어 유지되게 하고 끊긴 동안의 학습자 발언을 큐로 보존하며, 0.2.5는 같은 코드로 Windows x64 설치물을 빌드할 수 있게 했다(Mac은 backend, Windows는 frontend가 빌드). 프론트 담당자가 설치해 패널을 다듬을 수 있는 상태다.
+
+- 설치 파일: Mac [`releases/macos/kiro-native/builder-helper-agent-panel-0.2.6-darwin-arm64.vsix`](../releases/macos/kiro-native/builder-helper-agent-panel-0.2.6-darwin-arm64.vsix) · 41,540,133 bytes · SHA-256 `6deb34e6d9534b0328a726daa0cfef79abd6081a21de47993d029fb123f356a7` · [receipt](../releases/macos/kiro-native/macos-vsix-receipt.json) · [항목별 hash](../releases/macos/kiro-native/files.json)
+- Windows 설치물: frontend가 빌드해 `releases/windows/kiro-native/`에 올린다([Windows에서](#windows에서)).
+- 빌드 출처: backend `a18f718`(`finals/kiro-native`), frontend `c2c873c`(`program` 저장소 `finals/trial-feedback` 브랜치). 0.2.5(backend `1f1eea4`), 0.2.4(backend `2b0487a`), 0.2.3(backend `7df50ec`), 0.2.2(backend `012c664`), 0.2.1(backend `4def349`)과 0.2.0(frontend `e65cd7f`)은 Git 이력에 있다.
+
+## 프론트 담당자 빠른 시작
+
+- **코드:** backend `Hello-KU-tty/core`의 `finals/kiro-native` 브랜치(이 문서와 설치 파일), frontend `Hello-KU-tty/program`의 `finals/trial-feedback` 브랜치 `c2c873c`(0.2.4에 들어간 패널).
+- **설치 파일 바로 받기:** [0.2.6 Mac VSIX](https://github.com/Hello-KU-tty/core/raw/refs/heads/finals/kiro-native/releases/macos/kiro-native/builder-helper-agent-panel-0.2.6-darwin-arm64.vsix). 받은 뒤 `shasum -a 256 <파일>`이 위 SHA-256과 같은지 확인한다.
+- **Mac(Apple Silicon):** 아래 [설치 전 준비](#설치-전-준비)와 [설치와 사용 흐름](#설치와-사용-흐름)대로 쓴다.
+- **Windows:** frontend가 빌드·확인·업로드한다. 절차는 [Windows에서](#windows에서)에 있다(0.2.5부터).
+- **패널 코드에 필요한 변경:** 0.2.1 이후 host API(`frontend-host.d.cts`), frontend SDK, Core 계약은 바뀌지 않았다. 0.2.2의 Evidence 표시 검토 한 가지만 있다([0.2.2에서 바뀐 점](#022에서-바뀐-점-analystevidence-정책)).
+
+## 0.2.6에서 바뀐 점 (버전 강제 완화)
+
+- 버전은 의존성이 깨지지 않는 범위만 강제한다. 빌드는 Node 24.x(포장 SQLite 모듈의 ABI)와 pnpm 11.13.1 이상 11.x(lockfile)면 된다. 학습자는 여전히 Node·pnpm을 설치하지 않는다.
+- kiro-cli는 최소 2.21.1만 요구하고 상한이 없다. 기본 설치 위치 다음에 PATH에서도 찾는다.
+- Kiro IDE는 버전을 고정하지 않고 최신판을 기준으로 맞춘다([DECISIONS](DECISIONS.md) "버전은 의존성이 깨지지 않는 범위만").
+
+## 0.2.5에서 바뀐 점 (Windows x64 지원)
+
+- host가 macOS와 Windows에서 시작한다. Windows는 kiro-cli를 `Program Files\Kiro-Cli`, `%LOCALAPPDATA%\Kiro-Cli`, 그다음 PATH에서 찾는다.
+- Kiro-native Core는 Kiro 실행 파일이 아니라 실제 Node(PATH의 24.18·24.19 또는 관리 Node)로 돈다. hook·MCP 명령에 Core의 Node 경로가 쓰이기 때문이다.
+- Kiro 작업 폴더 해시, hook 명령 인용(Windows는 cmd.exe), 생성 폴더 터미널 PATH를 Windows에 맞췄다.
+- 포장 스크립트를 하나로 합쳤다. Mac은 `pnpm panel:pack:macos <program>`, Windows는 `pnpm panel:pack:kiro-windows <program>`.
+- macOS 동작은 바뀌지 않았다. 패널·host API 계약도 그대로다.
+
+## 0.2.4에서 바뀐 점 (연결 유지와 발언 큐)
+
+- **연결 복원:** Core가 시작할 때 이전에 연결한 Project를 다시 연결해 연결 파일과 작업 폴더의 hook·MCP·에이전트 파일을 새로 쓴다. Kiro를 껐다 켜거나 확장을 업데이트해도 **Open Project in Kiro Chat을 다시 할 필요가 없다.** 폴더가 없어졌으면 만들지 않는다. 권한 규칙은 다시 쓰지 않는다.
+- **bridge가 새 연결을 따라감:** 같은 폴더·Project·역할이면 Builder·Helper MCP가 바뀐 연결을 따라가서 창을 다시 로드하지 않아도 된다. Core가 없는 동안에는 MCP 서버가 실패하지 않고 도구가 `VIBE_HELPER_NOT_CONNECTED`를 돌려주며, 시작 때 Core가 아직 없으면 최대 45초 기다린다.
+- **발언 큐:** hook이 Core에 닿지 못한 학습자 발언을 연결 폴더의 사용자 전용 큐에 남기고, Core가 연결 직후와 hook 요청 때 순서대로 한 번씩 기록한다. 늦게 들어온 발언은 Core가 받은 시각으로 남는다. 끊긴 동안의 Helper 질문은 기록하지 않는다.
+- **Steering 0.5.2:** 도구가 `VIBE_HELPER_NOT_CONNECTED`를 돌려주면 Builder는 Decision 없는 작업만 계속하고 Core가 받기 전에는 묻거나 적용·완료하지 않는다. Helper는 한 번 다시 시도한다.
+- 근거와 보안 판단은 [DECISIONS](DECISIONS.md) "본선: Kiro 연결은 Core가 다시 시작해도 유지하고, 끊긴 동안의 학습자 발언은 큐로 보존". 패널·host 파일은 바뀌지 않았다.
+
+## 0.2.3에서 바뀐 점 (Helper 에이전트 도구와 읽기 전용)
+
+- **고친 문제:** 0.2.1·0.2.2의 `vibe-helper` 에이전트 파일에는 `tools`가 없었다. Kiro 1.2.56은 이때 사용자 에이전트에 도구를 하나도 주지 않아(Kiro 기본 `disclose_context`만 남음), Helper 탭이 `get_helper_context`를 부르지 못하고 승인 창 뒤 일반 설명으로 답했다. 0.2.1 재실측의 Helper 확인은 `/vibe-helper` 슬래시 명령이었고 에이전트 탭은 실제로 확인하지 않았다. 아래 0.2.1 항목의 "Helper 탭" 설명은 0.2.3부터 맞다.
+- **도구:** 에이전트는 `tools: ["read", "@vibe-helper-helper"]`로 Kiro 내장 읽기 도구(파일 읽기, 진단, 검색)와 Helper Core 서버만 받는다. Builder 도구(작업 공간 MCP)는 계속 받지 않는다.
+- **Core 연결 값:** Helper Core 서버는 연결된 Project·Task·correlation만 받는다. 에이전트 프롬프트에 그 세 값이 없어서, 도구가 열린 뒤에도 Helper가 Builder Steering에서 projectId·correlationId만 옮겨 적고 taskId를 빼 Core가 `AGENT_RUN_SCOPE_MISMATCH`로 거절했다. 이제 에이전트 프롬프트에 세 값을 그대로 넣는다(Builder Steering과 같은 방식).
+- **Helper는 읽기 전용(사용자 결정):** Steering 0.5.1에서 "부탁하면 수정 가능" 규칙을 뺐다. 학습자가 고쳐 달라고 하면 Builder 탭에 부탁하라고 안내한다. `/vibe-helper` 슬래시 턴은 Builder 세션 안이라 같은 규칙을 프롬프트로만 지킨다. [DECISIONS](DECISIONS.md) "본선: Helper는 읽기 권한만".
+- **바뀐 항목:** 0.2.2와 비교해 Core 묶음, Steering 원문(`portable/agent-prompts/kiro-steering.md`), manifest, 버전 표기 2곳. 이미 연결한 Project는 업데이트 뒤 **Open Project in Kiro Chat**을 다시 실행해야 새 에이전트 파일이 써진다.
+
+## 0.2.2에서 바뀐 점 (Analyst·Evidence 정책)
+
+패널·host·hook·Steering 파일은 0.2.1과 같다. 74개 항목 중 Core 묶음(`portable/bin/core.mjs`), 그 hash를 담은 `portable/manifest.json`, 버전 표기 2곳만 다르다. 근거와 위험은 [DECISIONS](DECISIONS.md)의 "본선: Analyst 기본 모델 Sonnet 5.5(대안 Auto)와 과대 제안의 최대치 저장"에 있다.
+
+- **Analyst 모델:** kiro-cli Analyst가 `claude-sonnet-5.5`를 먼저 쓰고, kiro-cli가 "모델을 쓸 수 없음"으로 거절할 때만 `auto`로 넘어간다. 거절된 모델은 그 Core 프로세스 동안 다시 시도하지 않는다. Discovery·Helper 모델은 바뀌지 않았다.
+- **과대 제안:** Analyst가 정책상 최대보다 높은 Concept State를 제안하면 거절하지 않고 정책 최대치로 받는다. Core는 상태를 올리지 않는다. 결정 설명(`explanation`)이 "…supporting `<받은 상태>`, the policy maximum; the Analyst proposed `<제안 상태>`." 형식이 되고, 원래 제안(`maximumSupportedState`)은 그대로 남는다.
+- **패널 영향:** `OVERSTATED_MAXIMUM_STATE` 거절은 이제 상태를 붙인 모순(CONTRADICTION) 제안에서만 나온다. Evidence 화면이 이 사유 코드를 "과대 판정으로 버림"으로 보여 주고 있다면, 같은 사례가 이제 `ACCEPTED`(`VALID_USER_EVIDENCE`)로 오므로 받은 상태와 제안 상태가 다를 때 낮춰 받았다는 표시를 검토한다.
+
+## 0.2.1에서 바뀐 점 (체험 피드백 K09)
+
+- **Project 폴더:** 지금 연 폴더가 비어 있으면 **Open Project in Kiro Chat**이 그 폴더를 Project 폴더로 쓰고 같은 창에서 이어 간다. 파일이 있으면 새 폴더를 새 창으로 열지 묻는다. 이미 다른 폴더에서 만들고 있는 Project는 그 폴더를 연다.
+- **도구 허용:** 처음 한 번 "Vibe Helper 도구를 묻지 않고 허용할까요?"를 묻고, 허용하면 Project 폴더마다 Kiro 권한 규칙 한 줄을 더한다. 파일 수정·명령 실행 확인은 그대로다.
+- **Helper 탭:** Project 폴더에 `vibe-helper` 에이전트가 생긴다. Kiro 채팅에서 새 탭을 열고 에이전트 목록에서 `vibe-helper`를 고르면 Helper로 쓴다. 다른 탭 Builder의 진행 중 활동을 기록으로 참고한다. `/vibe-helper 질문`도 그대로 된다.
+- **Steering 0.5.0:** 예상 Decision을 한꺼번에 묻지 않고 구현이 그 지점에 닿을 때 하나씩 묻는다. 묻기 전에 기록한다. 첫 빌드 전에 설치된 도구를 확인한다.
+- **신뢰 안내:** 연결된 폴더가 신뢰되지 않았으면 신뢰를 안내하고, 신뢰한 뒤 창 다시 로드를 제안한다.
+- **패널(프론트 `finals/trial-feedback`):** 후보를 찾는 동안 입력 폼 대신 로딩 카드, 후보 다듬기 버튼 4개 대신 **보완하기** 하나, 최신 라운드만 보이고 이전 후보는 접힘, "스펙" 대신 "계획", **이걸로 시작**을 계획 맨 위와 고치기 입력 위에 둠, 예상 Decision을 "만들면서 정하게 될 것들"로 표시.
+
+## 예선 0.1.4와 달라진 점
+
+| 항목 | 예선 0.1.4 | 본선 0.2.x |
+| --- | --- | --- |
+| 지원 Kiro | 1.1.70 고정(설치본 hash 확인) | 버전 고정 없음. 1.2.37·1.2.56에서 확인 |
+| Discovery·패널 Helper·Analyst | Kiro IDE 내부 비공개 Agent 연결 | Core가 kiro-cli로 실행 |
+| Builder | 패널이 시작하는 IDE 내부 실행 | 학습자의 Kiro 채팅(빈 현재 폴더 또는 생성 폴더) |
+| Decision | 패널 카드 | Kiro 채팅에서 번호 선택지로 묻고 자연어 답을 기록. 패널 카드 경로도 남아 있음 |
+| 준비 상태 | 1.1.70 확인 + worker 준비 | kiro-cli 설치 + `kiro-cli whoami` 성공 |
+
+## 설치 전 준비
+
+1. Apple Silicon Mac에 Kiro IDE 최신판을 설치하고 로그인한다(Kiro 버전은 고정하지 않는다).
+2. Kiro CLI를 설치한다(kiro.dev의 Kiro CLI 설치 안내). host는 `~/.local/bin/kiro-cli`, `/Applications/Kiro CLI.app/Contents/MacOS/kiro-cli`, 그다음 PATH 순서로 찾는다. 버전은 최소 2.21.1이고 상한은 없다(확인: 2.28.0).
+3. 터미널에서 `kiro-cli login`. Builder ID 무료 계정과 본선 팀 계정(IAM Identity Center)에서 동작을 확인했다. IDE 로그인과 CLI 로그인은 따로다. 조직 계정은 IDE에서도 로그인해야 MCP가 열린다(로그인 전에는 `mcpEnabled: false`).
+4. 예선 0.1.x를 쓰던 Kiro라면 모든 Kiro 창을 닫았다가 연다. 이전 Core가 끝나기 전에는 `CORE_UPDATE_WAITING_FOR_OWNER_EXIT`로 기다린다. 기존 History(`core-data`)는 그대로 읽힌다.
+
+## 설치와 사용 흐름
+
+1. Kiro Extensions(`Cmd+Shift+X`) → `…` → **Install from VSIX…**에서 위 파일을 고르고 다시 로드한다.
+2. **Agent Panel**에서 학습 목표를 넣고 Discovery → 후보 선택 → Learning Spec 확정까지 기존 화면대로 진행한다.
+3. 명령 팔레트 **Vibe Helper: Open Project in Kiro Chat** → Project를 고르면 Core가 Project 폴더(빈 현재 폴더 또는 생성 폴더)에 Steering·hook·MCP 설정·Helper 에이전트·Kiro Spec을 쓴다. 현재 폴더면 그대로, 생성 폴더면 새 Kiro 창으로 연다.
+4. Kiro 채팅에서 **새 세션(+)**을 열고 만들기 시작한다(hook은 세션 시작 때 적용된다). Agent는 Core MCP 도구로 Task 상태를 읽고, 학습자가 정해야 할 것은 번호 선택지로 묻는다. 학습자가 채팅으로 답하면 Agent가 원문을 인용해 기록하고 Core가 인용을 검증한다.
+5. 학습자 발언은 hook으로 Core에 Evidence 원천(USER)으로 쌓인다. Decision이 끝나면 Analyst(kiro-cli, Sonnet 5.5, 쓸 수 없으면 Auto)가 분석하고, Core가 Concept State를 갱신해 `.vibe-helper/learner-profile.md`에 쓴다. 이 요약은 **새 채팅 세션부터** Agent에 반영된다(Steering은 세션 시작 때 고정).
+6. Helper는 새 채팅 탭에서 `vibe-helper` 에이전트를 고르거나, 채팅에서 `/vibe-helper 질문`으로 부른다. 답은 Helper Episode로 기록된다.
+
+Kiro를 껐다 켜거나 확장을 업데이트해도 0.2.4부터는 3번을 다시 하지 않는다. Core가 시작하면서 연결을 복원한다.
+
+## Windows에서
+
+**분담:** Mac 설치물은 backend가, Windows 설치물은 frontend가 빌드·확인·업로드한다([DECISIONS](DECISIONS.md) "본선: 플랫폼 분담"). 0.2.5부터 Kiro-native host·Core·hook·MCP bridge가 Windows x64를 지원한다. 본선 경로는 Kiro 내부 비공개 API 대신 공식 기능(Steering·hook·MCP·사용자 에이전트)과 kiro-cli를 쓰므로 frontend 코드는 그대로 빌드한다. 예선 Windows 설치물 0.0.18([WINDOWS_VSIX](WINDOWS_VSIX.md))은 Kiro 1.1.70 전용이라 본선 확인에 쓰지 않는다.
+
+**Windows에서 확인된 범위:** Windows 분기(kiro-cli 위치, Kiro 작업 폴더 해시의 소문자·슬래시 정규화, cmd.exe용 hook 명령 인용, 생성 폴더 터미널 PATH, 실제 Node로 Core 실행)는 Windows를 흉내 낸 테스트와 Kiro 1.2.56 코드로 확인했다. 실제 Windows 기기에서는 아직 돌려 보지 않았다. 아래 확인이 첫 실측이다.
+
+### 1. 준비 (Windows 11 x64)
+
+- Git, Node.js **24.x**(`node -v`, 권장 24.19.0), pnpm **11.13.1 이상 11.x**(`npm install -g pnpm`; pnpm 10 이상이면 저장소의 권장 pnpm으로 스스로 바꿔 실행), 기본 PowerShell. Node 메이저는 포장 SQLite 모듈이 Core의 Node 24와 맞아야 해서 24여야 한다. 이 도구들은 빌드하는 사람만 필요하고, 설치물을 쓰는 학습자는 Node·pnpm을 설치하지 않는다.
+- Kiro IDE 최신판에 로그인. Kiro CLI를 Kiro 공식 안내대로 설치한다(최소 2.21.1, 상한 없음). 공식 설치 스크립트(`irm https://cli.kiro.dev/install.ps1 | iex`, 2.29.0)는 관리자 권한 없이 `%LOCALAPPDATA%\Kiro-Cli\`에 설치한다. host는 `C:\Program Files\Kiro-Cli\`, `%LOCALAPPDATA%\Kiro-Cli\`, 그다음 PATH에서 `kiro-cli.exe`를 찾으므로 다른 위치에 설치해도 된다. 설치 전에 열어 둔 Kiro 창은 새 PATH를 모르므로, 다른 위치에 설치했다면 Kiro를 완전히 종료했다가 연다. 새 터미널에서 `kiro-cli login` 후 `kiro-cli whoami`가 성공해야 한다. IDE와 CLI 로그인은 따로다.
+
+### 2. 빌드
+
+폴더 위치는 자유다. 아래 `C:\dev\...`는 예시이며 실제 위치로 바꾼다.
+
+```powershell
+git clone https://github.com/Hello-KU-tty/program C:\dev\program
+Set-Location C:\dev\program
+git checkout finals/trial-feedback
+npm ci --ignore-scripts
+npm run typecheck
+npm test
+
+git clone https://github.com/Hello-KU-tty/core C:\dev\core
+Set-Location C:\dev\core
+git checkout finals/kiro-native
+pnpm install --frozen-lockfile
+pnpm panel:pack:kiro-windows C:\dev\program
+```
+
+결과는 `<core 폴더>\dist\windows-vsix-*\`의 `builder-helper-agent-panel-<버전>-win32-x64.vsix`, `receipt.json`, `files.json`이다. 버전은 Mac 설치물과 같은 번호다. 포장 Core만 따로 보려면 `node scripts\test-portable-core.mjs`(예선 Windows 검사)를 돌린다.
+
+### 3. 설치한 Kiro에서 확인
+
+1. Extensions(`Ctrl+Shift+X`) → `…` → **Install from VSIX…** → 다시 로드. Agent Panel이 Core에 연결된다. kiro-cli를 못 찾으면 `KIRO_CLI_NOT_INSTALLED`(이때 `where.exe kiro-cli` 결과를 남긴다), 로그인이 없으면 `KIRO_CLI_LOGIN_REQUIRED`.
+2. 빈 폴더를 열고 신뢰한다. Agent Panel에서 학습 목표 → 후보 선택 → 계획 확정.
+3. `Ctrl+Shift+P` → **Vibe Helper: Open Project in Kiro Chat** → Project 선택. 같은 창에 연결되고 `.kiro\hooks\vibe-helper.json`, `.kiro\agents\vibe-helper.json`, `.kiro\settings\mcp.json`이 생긴다. Kiro의 MCP 서버 목록에 `vibe-helper Connected (9 tools)`가 보여야 한다.
+4. Kiro 채팅 새 세션에서 "Vibe Helper 도구로 작업 상태만 확인해서 한 줄로 알려줘. 코드는 만들지 마." → 답에 Task 상태(PENDING 등)가 나온다.
+5. 새 채팅 탭에서 에이전트 목록의 `vibe-helper`를 고르고 질문한다 → 확정 계획을 바탕으로 답하고 승인 창이 뜨지 않는다.
+6. Kiro를 완전히 종료했다가 같은 폴더를 다시 열고 4를 반복한다. Open Project를 다시 하지 않아도 동작해야 한다.
+7. Agent Panel의 History에서 4·5의 학습자 발언이 기록됐는지 본다.
+
+### 4. 올리기와 문제 보고
+
+- 확인한 VSIX와 `receipt.json`, `files.json`을 backend 저장소의 `releases/windows/kiro-native/`에 넣어 `finals/kiro-native`에 커밋·푸시한다(또는 PR). 커밋 메시지에 위 확인 1~7의 결과를 적는다.
+- Windows 문제는 직접 고쳐도 된다. `finals/kiro-native`에서 브랜치를 따서 PR로 올리고, `pnpm test:unit`, `pnpm test:integration`, `node --test examples/kiro-panel/test/*.test.cjs`를 돌린다. macOS 동작이 바뀌는 변경이면 PR에 적는다. backend가 검토해 Mac 설치물에도 넣는다.
+- 직접 고치기 어려우면 단계 번호, 화면의 오류 코드, Kiro 버전(Help → About), `kiro-cli --version`, Kiro Output 패널의 `Kiro Logs`·`Kiro - MCP Logs`에서 `vibe-helper`가 들어간 줄을 남긴다. 토큰·계정 정보는 붙이지 않는다.
+
+## 패널에서 다듬을 것
+
+host API 형식은 [`examples/kiro-panel/src/frontend-host.d.cts`](../examples/kiro-panel/src/frontend-host.d.cts)가 기준이다. 프론트의 `vendor/frontend-host` 타입을 이 파일로 갱신한다.
+
+- **준비 상태 표시:** `status.helperMode === 'KIRO_CLI'`. 실패 코드는 다음 두 가지다.
+  - `status.errorCode === 'KIRO_CLI_NOT_INSTALLED'`: Core가 시작하지 않으므로 History도 열리지 않는다. 설치를 안내한다.
+  - `status.nativeErrorCode === 'KIRO_CLI_LOGIN_REQUIRED'`: History는 읽히고 Agent 실행은 막힌다. `kiro-cli login`을 안내하고, 로그인 뒤 **Retry Core Connection**을 실행하게 한다.
+- **Builder 탭:** 패널에서 Builder run을 시작하면 Core가 `BUILDER_RUNS_IN_HOST_CHAT`로 거절한다. 시작 버튼 자리에 "Kiro 채팅에서 열기"를 두고 `host.openProjectInKiro(projectId)`를 부른다. 결과의 `folder`는 `REGISTERED`(현재 폴더), `GENERATED`(생성 폴더), `CANCELLED`(학습자가 새 창을 거절)다. Spec 확정 전이거나 Task가 없으면 `KIRO_BIND_TASK_NOT_READY`다. 확인 창(도구 허용, 새 창 열기)은 host가 띄운다.
+- **Decision 카드:** 기본 경로는 채팅이다. 패널 카드로 확정해도 Core는 받지만 채팅 Agent는 다음 턴에 상태를 다시 읽어야 안다. 카드는 열린 Decision과 확정 결과를 보여 주는 쪽을 권장한다.
+- **native worker 의존 제거:** `host.worker`는 남아 있지만 상태와 질문이 없다(`getStatus()`는 `undefined`, `listUserInputs()`는 빈 배열). native 질문 UI가 이것을 기다리지 않게 한다.
+- **Evidence·Concept State 표시:** 기존 History/Evidence 조회 그대로다. 채팅 발언은 `USER_MESSAGE`, 채팅 확정 Decision은 `DecisionResolution.chatSource`(`mappedBy: 'BUILDER'`)로 구분된다.
+
+## 알려진 제한
+
+- 확장 업데이트 뒤 기존 프로젝트의 hook·MCP 경로는 새 Core가 시작하면서 고친다(0.2.4). 그 전까지 몇 초 동안 Kiro가 옛 경로의 MCP 시작 실패를 표시할 수 있다.
+- 연결은 Project당 하나다. 다시 연결하면 이전 연결 토큰은 폐기된다.
+- Builder 채팅 단계(같은 창 연결 뒤 hook 기록, Steering 0.5.0의 Decision 시점, `/vibe-helper`의 Builder 활동 사용, 허용 규칙으로 Vibe Helper 도구 승인 창 0회)는 0.2.1·Kiro 1.2.37로 본선 계정에서 확인했다([K09 재실측](spikes/KIRO_NATIVE_K09_REMEASURE_20261009.md)). 0.2.3의 Builder Steering 내용은 같고 버전 표기만 0.5.1이다. Kiro 1.2.56에서 Builder 턴은 다시 확인하지 않았다.
+- Core가 45초 넘게 뜨지 않으면 Builder·Helper MCP 시작이 실패하고 Kiro의 MCP 재연결이 필요하다. 끊긴 동안 친 학습자 발언은 큐로 보존되지만 Core가 받은 시각으로 기록되고, 끊긴 동안의 Helper 질문은 기록되지 않는다. 큐에는 redaction 전 원문이 Core가 읽을 때까지 사용자 전용 파일로 남는다(최대 1MB·200개).
+- Workspace Trust 화면은 사용자가 직접 거쳤지만 우리 신뢰 안내·다시 로드 알림이 떴는지는 기록하지 못했다. 도구 허용 동의(저장값 `ALLOW`)와 새 창 확인(생성 폴더가 새 창으로 열림)은 기록으로 확인했다.
+- 셸 명령 승인은 그대로 매번 뜬다(K11).
+- Helper 답 수집은 Kiro 세션 기록 파일(비공개 형식)에 기대며, 못 읽으면 안내 문구로 기록한다.
+- 지원 플랫폼은 Apple Silicon Mac과 Windows x64다. 그 밖의 플랫폼에서는 host가 `KIRO_NATIVE_HOST_PLATFORM_UNSUPPORTED`로 시작하지 않는다. Windows는 실제 기기 실측 전이다.
+- Kiro는 최소 버전(VS Code 엔진 `^1.131.0`, 확인한 가장 오래된 Kiro 1.2.37)만 두고 최신판을 따라간다. 자동 업데이트되면 확인 루틴을 다시 돌린다. 데모 기기는 확인한 버전에서 자동 업데이트를 끈다. 1.2.4 → 1.2.37 → 1.2.56(2026-10-09)으로 바뀌었다. Builder 채팅 단계는 1.2.37에서, Helper 탭·hook 기록·도구 허용은 1.2.56에서 확인했다.
+
+## 0.2.6 확인 (2026-10-10)
+
+- 자동 검사: `pnpm typecheck`, unit 177 통과·3 skip, integration 500 통과·8 skip, 패널 CJS 182 통과·2 skip, `scripts/test-macos-package.mjs` 9개 PASS, biome 통과. preflight는 pnpm 11.14.2를 받고 11.13.0·10.x·npm·Node 26을 거절하는 것을 확인했다.
+- macOS 격리 Kiro 1.2.56(모델 호출 없음, 일반 PATH로 실행): 0.2.5 위에 설치 → 새 Core가 관리 Node로 떠서 연결을 복원하고 두 MCP 서버가 다시 연결됐다.
+
+## 0.2.5 확인 (2026-10-10)
+
+- 자동 검사: backend `pnpm typecheck`, `pnpm test:unit` 177 통과·3 skip, `pnpm test:integration` 500 통과·8 skip, 패널 CJS 180 통과·2 skip, `scripts/test-macos-package.mjs` 9개 PASS, biome format·lint(소스 경로) 통과. 새 테스트: Windows 작업 폴더 해시·cmd.exe 인용, Windows host의 kiro-cli 위치와 실제 Node 실행, 지원하지 않는 플랫폼 거절, Windows 생성 폴더 터미널 PATH.
+- macOS 격리 Kiro 1.2.56(모델 호출 없음): 0.2.4 위에 설치하고 Kiro를 다시 열자 새 Core가 연결을 복원했고 두 MCP 서버가 다시 연결됐다. hook 명령은 macOS 인용 그대로다.
+- Windows 실측: frontend의 첫 빌드 확인으로 한다(위 [Windows에서](#windows에서)).
+
+## 0.2.4 확인 (2026-10-10)
+
+- 자동 검사: backend `pnpm typecheck`, `pnpm test:unit` 177 통과·3 skip, `pnpm test:integration` 498 통과·8 skip, `scripts/test-macos-package.mjs` 9개 PASS, biome format·lint(소스 경로) 통과. 새 integration: 새 Core의 연결 복원과 없어진 폴더 건너뛰기, 다시 연결 때 회수 표시 없음, 큐의 순서·중복 1회·안전하지 않은 큐 폐기, 실제 hook 스크립트의 큐 쌓기(접속 실패·회수, Stop 제외), 실제 bridge 프로세스의 시작 대기·새 연결 따라가기·연결 없음 결과·다른 폴더 거절.
+- 격리 Kiro 1.2.56 프로필(본선 계정). 화면 조작과 화면 문구 확인은 Codex(`gpt-6-astra`, computer use), 판정은 Kiro 로그·세션 기록·Core SQLite와 화면 문구를 함께 봤다.
+  - **Kiro 재시작 + 0.2.3 위 업데이트:** 직접 다시 연결하지 않았다. 옛 경로 MCP는 01:31:39에 시작 실패, 새 Core가 연결을 복원해 경로를 고친 01:32:05에 Kiro가 두 서버를 다시 연결했다. 화면: `vibe-helper Connected (9 tools)`, `vibe-helper-helper Connected (1 tool)`. Builder `get_build_status`, Helper `get_helper_context` 성공, 학습자 발언 `USER_MESSAGE` 기록, 승인 창 0회.
+  - **열린 창에서 다시 연결:** 창 다시 로드 없이 같은 Builder 탭의 다음 `get_build_status`가 성공(bridge가 새 연결을 따라감).
+  - **Core에 닿지 못한 발언:** hook 연결 파일을 닫힌 포트로 바꾼 상태(Core가 사라진 것과 같은 조건)에서 보낸 발언이 큐(0600)에 남았고 채팅은 막히지 않았다. 다음 연결 때 Core가 한 번 기록하고 큐를 지웠다.
+- 크레딧: 이번 확인 직전 29.39(01:31 기록), 이후 채팅 3턴은 다음 창 로드 때 갱신된다.
+
+## 0.2.3 확인 (2026-10-09~10)
+
+- 자동 검사: backend `pnpm typecheck`, `pnpm test:unit` 177 통과·3 skip, `pnpm test:integration` 493 통과·8 skip(Helper 에이전트의 `tools`, 읽기 전용 문구, 프롬프트의 Core 연결 값 회귀 검사 포함), `scripts/test-macos-package.mjs` 9개 PASS, biome format·lint(소스 경로) 통과.
+- 격리 Kiro 1.2.56 프로필(본선 계정)에서 0.2.3을 설치하고 생성 폴더 Project를 다시 연결했다. 화면 조작은 Codex(`gpt-6-astra`, computer use)가 했고 판정은 Kiro 로그·세션 기록·Core SQLite로 했다.
+  - 채팅 모드 목록: Default, Spec, Quick Spec, Bug Fix, Plan, kirocrew 3개(사용자 전역 에이전트), `vibe-helper`.
+  - `vibe-helper` 탭: 도구 8개(`toolCount: 8`), `get_helper_context` 성공(정책 `allow`, 승인 창 0회), 파일 검색·목록도 승인 없이 실행. 답은 확정 계획(오프라인 메모장, Task PENDING)을 바탕으로 했다.
+  - Core: 질문과 답이 `USER_MESSAGE`·`HELPER_RESPONSE`로 기록.
+  - 도중에 나온 실패 두 가지를 고쳤다(taskId 누락 → `AGENT_RUN_SCOPE_MISMATCH`, 위 0.2.3 항목). 다른 하나(다시 연결 뒤 옛 MCP 프로세스 → `BRIDGE_BINDING_REVOKED`)는 0.2.4에서 고쳤다.
+- 0.2.2 실측(Kiro 1.2.56, 사용자 클릭): 도구 허용 동의 `ALLOW` 저장, 권한 규칙 `vibe-helper/*`·`vibe-helper-helper/*` 기록, 파일 있는 폴더에서 생성 폴더가 새 창으로 열림, Helper 탭 판별과 Core 기록 동작. Helper 도구는 위 문제로 실패했다.
+- 확인하지 못한 것: Sonnet 5.5 Analyst의 실제 실행(이번 Helper 대화 Episode는 아직 분석되지 않음), Kiro 1.2.56의 Builder 턴.
+- 크레딧: 이 확인 전체에서 계정 사용량 27.39 → 29.08(마지막 Helper 턴 전 기록). Discovery·계획 0.42, Core에 기록된 Helper 대화 4건, Codex가 한글 입력 누락으로 중단하고 다시 보낸 턴 2번을 포함한다.
+
+## 0.2.2 확인 (2026-10-09)
+
+- 자동 검사: backend `pnpm typecheck`, `pnpm test:unit` 177 통과·3 skip, `pnpm test:integration` 493 통과·8 skip(모델 순서와 "쓸 수 없음" 거절 처리, 정책 최대치 저장 포함), `scripts/test-macos-package.mjs` 9개 PASS. biome format·lint는 소스 경로(`apps packages scripts tests examples agents`)로 통과했다. 저장소 전체 `biome format .`은 사용자 실험 폴더 `.local-experiments/kiro-native-recovery/biome.json`의 중첩 설정 때문에 시작하지 못한다(그 폴더는 건드리지 않음).
+- 포장 확인: 0.2.1과 항목별 hash를 비교해 Core 묶음·manifest·버전 표기 4개만 다름을 확인했다. Core 묶음에 Analyst 모델 순서와 정책 최대치 설명 문구가 들어 있다(0.2.1 묶음에는 없음).
+- 격리 Kiro **1.2.56** 프로필(kiro-cli 2.28.0, 본선 계정)에 0.2.1 위로 설치: 기존 Core 데이터로 `CORE_CONNECTED`·`WORKER_READY`·`helperMode: KIRO_CLI`. 이어서 처음 보는 학습 목표(Personal Need 없음)로 Discovery 미리보기 10개(30초), 후보 선택·계획 생성(36초), 확정·Task 준비가 이 Core로 진행됐다. 창을 닫으면 Core가 26초 뒤 스스로 끝났다.
+- 남은 확인: 신뢰·도구 허용·새 창 확인 창과 모드 목록의 `vibe-helper` 선택(사용자 클릭), Sonnet 5.5 Analyst의 실제 실행.
+
+## 0.2.1 확인 (2026-10-09, 모델 호출 없음)
+
+- 자동 검사: backend `pnpm test:unit` 177 통과·3 skip, `pnpm test:integration` 489 통과·8 skip(현재 폴더 등록과 거절 사례, Helper 탭 판별과 Builder 활동 첨부, 허용 규칙, 연결 API 검증 포함), 패널 host 11개를 포함한 패널 CJS 179 통과·2 skip, `scripts/test-macos-package.mjs` 9개 PASS. frontend `vitest` 811 통과, `tsc` 통과.
+- 패널 화면: 실제 webview 묶음을 Chrome에서 1280px과 360px 폭으로 띄워 로딩 카드, 최신 라운드와 접힌 이전 후보, 보완하기 버튼, 두 개의 이걸로 시작, 예상 Decision 안내를 확인했다(Kiro 테마 변수는 임의 값).
+- 격리 Kiro 1.2.37 프로필에 0.2.1을 설치하고 빈 폴더를 연 상태에서 연결 API를 host와 같은 인자로 불렀다. 결과는 `registered: true`, 그 폴더에 `.kiro/agents/vibe-helper.json`·hooks·Steering·MCP·Spec 기록, 권한 규칙 기록(`coreTools: WRITTEN`). 다시 로드 없이 Kiro가 Builder MCP 서버에 연결했고 `vibe-helper`를 작업 공간 에이전트로 등록했다. hook은 새 채팅 세션을 만들 때 2개가 적재됐다(그 전에는 0개).
+
+## 0.2.0 검증 (2026-10-08)
+
+격리 Kiro 1.2.37 프로필(`kiro.kiroAgent` 1.1.294)에 같은 내용의 VSIX(73개 항목 hash 동일, 압축 timestamp만 다름)를 설치했다. 합성 Campus Drop Project를 Core 데이터에 미리 넣었고, 판정은 Core SQLite의 구조화 필드로만 했다. 개인 Builder ID 무료 계정, Kiro 채팅과 Analyst 모두 Auto 모델.
+
+| 단계 | 결과 |
+| --- | --- |
+| 확장 활성화와 Core 시작 | `CORE_CONNECTED`, `native: WORKER_READY`, `helperMode: KIRO_CLI`. Core 명령은 `managed-kiro --kiro-cli <설치 경로>` |
+| Project 목록과 연결 | 합성 Project 표시. `openProjectInKiro` 성공, 생성 폴더가 새 창으로 열림. `.kiro/` Steering 0.4.0·hook·MCP·Spec과 `.vibe-helper/` 생성. hook·MCP 명령은 포장된 Node와 `portable/bin/` 스크립트를 가리키고 작업 폴더 파일에 토큰 없음 |
+| 채팅 → hook | 첫 채팅이 `USER_MESSAGE`(actor `USER`)로 기록 |
+| 채팅 Decision | Agent가 Core MCP로 상태를 읽고 3개 선택지 Decision(`PRODUCT_BEHAVIOR`, source `BUILDER`)을 요청. 자연어 답("1시간으로 할게. …")이 `selectionKind: OPTION`, `chatSource.mappedBy: BUILDER`로 확정 |
+| Analyst와 상태 | DECISION Episode `ANALYZED`, 분석 작업 `SUCCEEDED`(kiro-cli). 제안 `JUSTIFIED_DECISION` → Core `ACCEPTED`(`VALID_USER_EVIDENCE`) → `link expiry` `DEMONSTRATED`. 학습자 요약 파일 갱신 |
+| Discovery | 패널 host API로 새 학습 목표 Discovery 시작(enrichment 끔) → run `SUCCEEDED`, 미리보기 후보 10개(source `DISCOVERY`/`AGENT`) |
+
+이번 검증에는 Kiro 채팅 2턴에 1.57크레딧이 들었다. Analyst 1회와 Discovery 미리보기 1회까지 합하면 약 2크레딧으로 추정한다.
+
+자동 검사: 패널 host 8개, Core lifecycle 19개, 패널 CJS 전체 176 통과·2 skip, `pnpm test:unit` 177 통과·3 skip, `pnpm test:integration` 475 통과·8 skip, `scripts/test-macos-package.mjs` 9개 PASS. 마지막 검사는 포장 자산의 Core·SQLite lifecycle을 기존 `managed` 명령으로 확인하는 것이다. `managed-kiro`는 위 실제 Kiro 확인이 담당한다. 패널 화면 자체는 이번에 눈으로 확인하지 않았다.
+
+## 다시 빌드
+
+backend `finals/kiro-native` checkout에서, Node 24.x·pnpm 11.13.1 이상 11.x로(권장 24.19.0·11.13.1):
+
+```sh
+pnpm install --frozen-lockfile
+pnpm panel:pack:macos <frontend checkout 경로>        # Apple Silicon Mac
+pnpm panel:pack:kiro-windows <frontend checkout 경로> # Windows x64
+```
+
+`dist/macos-vsix-*`에 VSIX, receipt와 `files.json`이 생긴다. 프론트 변경을 반영하려면 프론트 checkout을 고친 뒤 같은 명령을 다시 실행한다. `vibeHelper.openInKiro` 명령 등록은 패키징 단계에서 manifest에 더해지므로 프론트 `package.json`에 넣지 않아도 된다.

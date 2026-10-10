@@ -5,7 +5,11 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { build } from 'esbuild'
 import environment from '../examples/program-macos-dev/isolated-environment.cjs'
 
-if (process.platform !== 'darwin' || process.arch !== 'arm64' || process.version !== 'v24.19.0')
+if (
+  process.platform !== 'darwin' ||
+  process.arch !== 'arm64' ||
+  process.versions.node.split('.')[0] !== '24'
+)
   throw new Error('MAC_DEVELOPMENT_TOOLCHAIN_REQUIRED')
 const program = await realpath(resolve(process.argv[2] ?? ''))
 const product = JSON.parse(await readFile(join(program, 'package.json'), 'utf8'))

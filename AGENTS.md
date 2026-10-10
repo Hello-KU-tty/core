@@ -19,7 +19,8 @@
 ## 설계 불변식
 
 - Discovery, Builder, Helper와 Evidence Analyst는 Agent이고, validation과 Concept State 계산은 deterministic Core의 책임이다.
-- Helper와 Analyst는 read-only다. Builder의 write/shell은 생성 workspace로 제한한다.
+- Analyst는 도구 없이 proposal만 낸다. Helper는 읽기 권한만 가진다(파일 읽기·검색과 Helper Core 조회만, 수정·명령 실행 없음). Evidence·Concept State·Decision 확정 도구는 Helper와 Builder에게 주지 않는다.
+- 예선 패널 경로의 Builder write/shell은 생성 workspace로 제한한다. 본선 Kiro-native 경로의 Builder는 사용자의 Kiro Agent이며, Vibe Helper는 관찰·개입만 하고 Core는 등록된 workspace root 밖의 경로를 받지 않는다.
 - Agent-authored 설명·코드와 사용자 Evidence의 provenance를 분리한다. Agent 출력, 확인 응답이나 card click만으로 이해 상태를 높이지 않는다.
 - `MISCONCEPTION`은 Concept State가 아니라 해결 가능한 open issue다.
 - Builder stream을 숨기지 않되 저장·표시 전에 secret과 민감 경로를 redaction한다.
@@ -34,7 +35,8 @@
 
 ## 코드와 검증
 
-- Node.js 24.19.0, pnpm 11.13.1과 TypeScript strict mode를 사용하고 package boundary를 지킨다. `.node-version`, `package.json` engine과 preflight를 우회하지 않는다.
+- Node.js 24.x, pnpm 11.13.1 이상 11.x(권장 24.19.0·11.13.1)와 TypeScript strict mode를 쓰고 package boundary를 지킨다. 버전은 의존성이 깨지지 않는 범위만 강제한다: Node 메이저는 포장 SQLite 네이티브 모듈 ABI, pnpm은 lockfile과 깨진 릴리스 때문이다. 사용자 설치물이 직접 받는 Node·pnpm만 해시와 함께 고정한다. preflight를 우회하지 않는다.
+- Kiro IDE와 kiro-cli는 최신판을 기준으로 맞춘다. 버전 상한을 두지 않고(kiro-cli는 최소 2.21.1), 자동 업데이트로 깨지면 고친다.
 - 설치는 `pnpm install --frozen-lockfile`, 전체 검증은 `pnpm check`를 사용한다. 개별 검증 명령은 `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, `pnpm test:integration`, `pnpm build`, `pnpm test:smoke`, `pnpm test:e2e`다.
 - lifecycle build script는 `pnpm-workspace.yaml`에 명시된 `better-sqlite3`와 `esbuild`만 허용한다. 새 package의 install script를 허용하기 전에 필요성과 공급망 경계를 결정 기록에 남긴다.
 - 변경 범위에 맞는 unit, contract, storage integration, Agent fixture/eval과 UI/E2E를 실행한다.

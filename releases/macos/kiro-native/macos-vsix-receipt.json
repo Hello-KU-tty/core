@@ -1,0 +1,19 @@
+{
+  "file": "builder-helper-agent-panel-0.2.6-darwin-arm64.vsix",
+  "version": "0.2.6",
+  "hostMode": "KIRO_NATIVE",
+  "publicationStatus": "PUSHED_TO_BRANCH",
+  "target": "darwin-arm64",
+  "bytes": 41540133,
+  "sha256": "6deb34e6d9534b0328a726daa0cfef79abd6081a21de47993d029fb123f356a7",
+  "files": 74,
+  "fileInventory": "files.json",
+  "frontendVersion": "0.0.18",
+  "buildFrontendCommit": "c2c873c27b5563037853236aa402cd1b97910929",
+  "buildFrontendBranch": "finals/trial-feedback",
+  "buildBackendCommit": "a18f718d4e908f09ba912ead76ff3fa9948aa319",
+  "workingTreeNote": "The backend checkout had uncommitted release edits and the learner's untracked feedback notes, all outside the build inputs.",
+  "changedFromPrevious": "Against 0.2.5: kiro-cli needs 2.21.1 or later with no upper bound and is also looked up on PATH; development-mode Core accepts Node 24.x. Build toolchain checks are ranges (Node 24.x, pnpm 11.13.1+ in 11.x).",
+  "liveCheck": "Isolated Kiro 1.2.56 profile on macOS, launched with a plain PATH: installed over 0.2.5, the new Core (managed Node) restored the Project connection and both MCP servers reconnected. No model calls. The Windows VSIX is built and checked by the frontend.",
+  "publishedBranch": "Hello-KU-tty/core finals/kiro-native"
+}

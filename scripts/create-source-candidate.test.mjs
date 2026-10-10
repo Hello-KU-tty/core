@@ -45,7 +45,7 @@ test('source selection excludes private state, old packages and unreviewed exper
   assert.equal(selectedSource('backend', 'CONVERSATION_RECORD.md'), false)
   assert.equal(selectedSource('backend', 'examples/frontend-handoff/archive.mjs'), true)
   assert.equal(selectedSource('backend', 'examples/program-macos-dev/kiro-1170-source.cjs'), true)
-  assert.equal(selectedSource('backend', 'scripts/package-macos-program.mjs'), true)
+  assert.equal(selectedSource('backend', 'scripts/package-program.mjs'), true)
   assert.equal(selectedSource('frontend', 'vendor/frontend-client/index.js'), true)
   assert.equal(selectedSource('frontend', 'BACKEND_TAKEOVER_PROGRESS_20260928.md'), false)
   assert.equal(selectedSource('other', 'package.json'), false)

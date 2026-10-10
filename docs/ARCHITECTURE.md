@@ -1,27 +1,11 @@
 # Vibe Helper 기술 아키텍처
 
-## Mac 도구 복구 경계
-
-- `acquireCoreNode`는 검증된 Mac 설치 Node/라이선스를 private hash-addressed cache에 원자적으로 복사한다. 모든 재사용에서 byte hash를 검사하고 실행 probe를 유지한다.
-- 이전 bundled Node 기록은 같은 확장의 단조 증가 버전과 정확한 이전 `portable/bin/node` 경로에 한해 새 cache descriptor로 정규화한다. shared shim·workspace launcher·descriptor의 중간 상태는 정확한 이전/새 바이트만 허용한다.
-- 사라진 workspace는 canonical한 가장 가까운 부모와 ENOENT를 확인한 뒤 도구 선택에만 기록을 재사용한다. 임의 경로 검색·프로젝트 이동·source 수정·기록 삭제는 하지 않는다. 존재하는 링크/비공개 권한 위반·변조는 복구 근거가 아니다.
-
 ## 1. 상태
 
-- native 검증은 수정하지 않은 Mac0.1.2 VSIX와 격리 Kiro profile을 사용한다. 제품의 기본 global storage/Core/workspace 경로와 별도 Helper 창을 유지한다. 개발 harness의900/880 admission을 우회하거나 제품 결과로 혼동하지 않으며 실제 계정 dashboard를 단계별 관측한다. 계정 자료를 복사하지 않는다.
-
-- 배포 갱신은 명시적으로 지정한 frontend checkout에서 Mac 확장을 빌드하고 Core와 frontend 출처를 receipt에 남긴다. 개발자 ZIP은 오래된 부분 덮어쓰기 kit 대신 두 저장소 소스와 프론트의 검증된 기존 Windows portable 자산을 포함한 재현용 snapshot이다. Mac portable은 공식 arm64 Node를 포함해 별도로 빌드한다. 기존 URL은 호환 진입점이며 불변 artifact 식별자는 버전·SHA-256으로 구분한다.
-
-- 2026-09-29 Mac VSIX는 기존 frontend provider·Core lease lifecycle·native worker를 재사용한다. darwin-arm64 자산 검증과 Mac 도구 경로를 추가하며 Node 공식 배포본과 라이선스를 포함해 Homebrew/source checkout 의존을 없앤다. SQLite·prompt·권한 계약은 유지한다.
-
-- 2026-09-28 통합 개선은 별도 `vibe-helper-frontend` checkout의 기존 port/controller/webview를 그대로 사용한다. Mac 검증에서는 현재 Windows portable 자산을 실행·변조하지 않고 검증된 Mac source runtime과 동일 HTTP/SSE 계약을 사용할 수 있는지 먼저 확인한다. 개발 검증용 연결과 Windows 제품 설치 지원은 구분한다.
-- 상태: 사용자 승인 완료, T18 Campus Drop Golden Path 구현 및 검증 완료
+- 상태: 예선 MVP 구조(T00~T19) 구현 완료. 본선의 Kiro-native adapter 구조는 [3.5절](#35-본선-kiro-native-adapter-구조)을 따른다.
+- 예선 기간 상태 메모와 Mac 도구 복구 경계: [승인 이력](archive/preliminary/APPROVAL_HISTORY.md)
 - 기준 입력: [PROJECT_BRIEF.md](../PROJECT_BRIEF.md), [SPEC.md](SPEC.md)
-- T03 versioned contract와 Agent/UI runtime validation, T04 pure reducer와 Evidence policy v1.0.0, T05 SQLite schema/repository/migration, T06 application use case와 역할 고정 MCP server, T07 criterion 기반 evaluation contract와 harness, T08 Candidate loop, T09 Discovery와 Learning Spec, T10 native workspace lifecycle, T11 Builder와 Decision gate, T12 bounded Helper context, T13 Evidence Analyst와 durable Analysis Job, T14 Crew backend와 session restore, T15 Discovery/Spec UI, T16 conversation-first Agent Mode, T17 Evidence Trace와 다음 대화 개인화, T18 hidden Analyst worker·local result runtime·optional Final Upgrade까지 구현됐다.
 - Kiro/Crew 세부 연결은 capability spike 결과에 따라 이 문서를 갱신한다.
-- 2026-09-07 T19 범위는 자체 IDE 패널의 Discovery·Spec·Builder·Helper·History 실제 연결과 frontend 로컬 실행 인계로 갱신됐다. [상세 구현 계획](T19_IMPLEMENTATION_PLAN.md)의 구현·검증은 승인됐고 진행 중이다. frontend 대상은 Windows native 실행이며 push는 별도 승인 대상이다. 아래 새 transport 설계의 실제 capability는 아직 검증 중이다.
-- 2026-09-15 사용자는 [4시간 IDE-only 전환 판단](spikes/T19_NATIVE_IDE_ONLY_4H_CUTOVER_PLAN_20260915.md)을 승인했다. 이는 pin한 macOS Kiro의 native adapter를 IDE frontend의 우선 개발 seam으로 쓸지 판단하는 범위이며, deterministic Core와 기존 CLI adapter를 삭제하거나 Windows/장기 안정성을 소급 승인하지 않는다.
-- 2026-09-23 Windows 우선·확장 단독 설치 경험을 승인했다. 2026-09-24 W2/W3에서 portable runtime과 extension-managed Core lifecycle, Windows 실제 Discovery·별도 창 Helper를 검증했다. W4는 기존/미설치 도구 환경의 native Builder와 결과 HTTP를 검증했다. 아래 11.4절의 clean 설치 전체 흐름과 출하 안정성은 W5 gate로 남는다.
 
 ## 2. 선택한 기술 스택과 선택 이유
 
@@ -151,6 +135,36 @@ normalized Activity Events
 ```
 
 Evidence 분석 실패는 Builder result와 Project History를 롤백하지 않는다. 분석은 재시도 가능한 별도 상태다.
+
+### 3.5 본선 Kiro-native adapter 구조
+
+본선 방향([PROJECT_BRIEF §0](../PROJECT_BRIEF.md#0-본선-방향-kiro-native-개입))의 목표 구조다. 실제 동작은 K01 spike로 확정하며, 아래 3.1~3.4의 예선 패널 경로는 fallback으로 유지한다.
+
+```text
+Core (host 중립, 최소 수정)              Kiro adapter·확장 (Kiro 기능)
+─────────────────────────────            ──────────────────────────────────
+ActivityEvent 수신 (기존 계약)    ◀───── hook 스크립트: stdin JSON → Core 이벤트
+Decision·Concept MCP 도구 (기존)  ◀───── .kiro/settings/mcp.json 등록
+Learning Spec (기존 구조)         ─────▶ .kiro/specs/<app>/requirements.md (EARS)
+학습자 요약 생성 (신규 후보)      ─────▶ .kiro/steering/ 의 #[[file:]] 참조 파일
+등록 폴더 경로 정책 (K09)        ◀───── 사용자가 연 빈 Kiro 폴더 등록(local-backend)
+Helper 역할 MCP (기존)            ◀───── .kiro/agents/vibe-helper.json (Helper 탭)
+```
+
+| Kiro hook | 수집 내용 | provenance |
+| --- | --- | --- |
+| `promptSubmit` | 사용자가 Kiro 채팅에 친 발언(`USER_PROMPT`) | USER |
+| `postToolUse`, `fileEdited` 등 | Agent의 도구 사용·변경 파일 | AGENT |
+| `postTaskExecution` | Spec task 종료, BUILD_TASK Episode 경계 | — |
+| `agentStop` | 대화 Episode 경계, 학습자 요약 갱신 예약 | — |
+
+- hook 명령은 Node 스크립트 하나로 통일해 로컬 Core에 한 번 POST하고, LLM을 호출하지 않는다.
+- Helper는 읽기 권한만 가진다. Kiro 채팅 Helper 에이전트는 `tools: ["read", "@vibe-helper-helper"]`로 파일 읽기·검색과 Helper Core 조회만 받는다. `/vibe-helper` 슬래시 턴은 Builder 세션 안이라 프롬프트로만 읽기 전용을 지킨다. Evidence·State 변경 도구는 Helper와 Builder에 노출하지 않는다.
+- Core는 등록된 workspace root 밖의 경로와 Agent 출처의 이해 근거를 거절한다. redaction 경계는 기존과 같다.
+- Project 폴더는 사용자가 연 빈 폴더(등록) 또는 Core 생성 폴더다. 등록은 local-backend의 private 파일에 두고, Core 경로 정책이 매번 canonical·디렉터리·생성 루트 비중첩을 다시 확인한다.
+- Steering·Helper 에이전트 원문은 `docs/agent-prompts/kiro-steering.md`에 버전과 함께 두고 adapter는 자리만 채운다.
+- Helper 탭이나 패널 Helper의 질문에는 Builder 세션 기록(Kiro 비공개 형식)의 최근 활동을 Agent 출처 기록으로 붙인다. 저장하지 않으며 Evidence가 아니다.
+- Kiro 연결은 Project 단위로 Core 재시작을 넘어 유지한다. Core는 시작할 때 연결 기록이 있는 Project를 다시 연결해 연결 파일을 새로 쓰고, bridge는 같은 폴더·역할의 바뀐 연결을 따라간다. Core에 닿지 못한 학습자 발언은 hook이 사용자 전용 큐에 남기고, Core가 연결 직후와 hook 요청 때 순서대로 한 번씩 기록한다(DECISIONS 2026-10-10).
 
 ## 4. 주요 모듈과 책임
 
@@ -439,11 +453,13 @@ Discovery Agent:
 Builder Agent:
 
 - `get_builder_task`
+- `get_build_status`: 본선 Kiro-native 경로의 작은 조회. Task revision, Live Context 버전, 아직 학습자를 기다리거나 적용되지 않은 Decision(번호 붙은 선택지)만 돌려준다. 큰 도구 응답이 파일로 빠져 Agent가 셸로 읽으려는 문제를 막는다
 - `start_task`
 - `update_build_context`
 - `request_user_decision`
 - `get_decision_result`
 - `apply_decision_result`
+- `resolve_decision_from_chat`: 본선 Kiro-native 경로에서 학습자의 채팅 답을 원문 인용과 함께 Decision 확정으로 기록한다. Core가 인용·순서·명시 번호 모순을 검증한다
 - `complete_task`
 
 Helper Agent:
@@ -694,15 +710,15 @@ T18 package는 app manifest, phase별 Discovery Agent, Builder·Helper, hidden n
 
 ### 11.4 Windows 제품 확장과 런타임 선택 — W2/W3/W4 검증, clean 출하는 W5
 
-- 2026-09-29 후속은 pnpm pin 변경 때 공유 shim·프로젝트 launcher·private descriptor를 함께 검증한다. 외부 pnpm 선택도 같은 제품 상위 설치·동일 Node와 나머지 필드·정확한 기존 파일이 모두 맞을 때만 Core 소유 shim을 교체하며 사용자 도구는 수정/실행하지 않는다. frontend update kit은 적용 receipt/이전 manifest의 전체 관리 hash로 기준을 선택하고 적용 후 다음 baseline receipt를 기록한다. [절차](FRONTEND_HANDOFF.md).
+- 2026-09-29 후속은 pnpm pin 변경 때 공유 shim·프로젝트 launcher·private descriptor를 함께 검증한다. 외부 pnpm 선택도 같은 제품 상위 설치·동일 Node와 나머지 필드·정확한 기존 파일이 모두 맞을 때만 Core 소유 shim을 교체하며 사용자 도구는 수정/실행하지 않는다. frontend update kit은 적용 receipt/이전 manifest의 전체 관리 hash로 기준을 선택하고 적용 후 다음 baseline receipt를 기록한다. [절차](archive/preliminary/FRONTEND_HANDOFF.md).
 
-- 2026-09-24 W2는 win32-x64 portable Core/bridge와 runtime 선택·획득을, W3는 자동 lifecycle·native worker·통합 패널을, W4는 생성 앱 도구 선택·획득과 실제 native shell/result HTTP를 검증했다. [W2 package 계약](T19_W2_PORTABLE_CORE_HANDOFF.md), [W3 lifecycle 인계](T19_W3_LIFECYCLE_HANDOFF.md), [W4 toolchain 인계](T19_W4_TOOLCHAIN_HANDOFF.md)를 따른다. 검증된 Node 24.18.0/24.19.0 및 NAPI 10/SQLite probe만 허용하며 개발 pin은 유지한다. clean 전체 흐름은 W5 목표다.
+- 2026-09-24 W2는 win32-x64 portable Core/bridge와 runtime 선택·획득을, W3는 자동 lifecycle·native worker·통합 패널을, W4는 생성 앱 도구 선택·획득과 실제 native shell/result HTTP를 검증했다. [W2 package 계약](archive/preliminary/T19_W2_PORTABLE_CORE_HANDOFF.md), [W3 lifecycle 인계](archive/preliminary/T19_W3_LIFECYCLE_HANDOFF.md), [W4 toolchain 인계](archive/preliminary/T19_W4_TOOLCHAIN_HANDOFF.md)를 따른다. 검증된 Node 24.18.0/24.19.0 및 NAPI 10/SQLite probe만 허용하며 개발 pin은 유지한다. clean 전체 흐름은 W5 목표다.
 
-- reference 구현은 [Windows 인계](WINDOWS_EXTENSION_HANDOFF_20260923.md)의 ESLint·Microsoft .NET·Java extension 사례를 따른다. 별도 Core process와 현재 loopback HTTP/SSE SDK 계약을 유지하며 실행 주체를 extension host의 lifecycle manager로 옮긴다. 언어 서버 구현 패턴을 참고하되 Core API를 LSP로 바꾸지는 않는다.
+- reference 구현은 [Windows 인계](archive/preliminary/WINDOWS_EXTENSION_HANDOFF_20260923.md)의 ESLint·Microsoft .NET·Java extension 사례를 따른다. 별도 Core process와 현재 loopback HTTP/SSE SDK 계약을 유지하며 실행 주체를 extension host의 lifecycle manager로 옮긴다. 언어 서버 구현 패턴을 참고하되 Core API를 LSP로 바꾸지는 않는다.
 - backend/bridge의 runtime descriptor는 executable, 고정된 bootstrap args/env, version, architecture, capability 결과와 소유권을 함께 표현한다. Kiro host runtime → 기존 호환 Node → 확장 관리 Node 순서로 검증·선택한다. 사용자 입력을 범용 shell command로 받지 않는다. Electron `runAsNode`가 지원되지 않으면 설정/fuse를 수정하지 않고 다음 후보로 이동한다.
 - Kiro runtime으로 별도 Core를 띄우려면 Node API/Node-API와 SQLite load·transaction을 확인한다. `better-sqlite3` 13.0.3은 Node-API 10을 요청하므로 단순 `Node >=22` 판정으로 대체하지 않는다. Kiro native Agent의 version/source/mode/권한 gate는 별개로 유지한다.
 - native worker는 extension host에, deterministic Core/SQLite는 별도 local process에 둔다. stdio MCP bridge에도 검증된 runtime descriptor를 전달한다. HTTP MCP로 바꾸면 그 transport의 실제 role binding을 별도로 검증하며 stdio와 동등하다고 가정하지 않는다.
-- native endpoint 선택은 canonical workspace와 현재 확장 창 ID를 함께 사용한다. host-owned `ExtensionContext.logUri`의 검증된 `window<id>/exthost/<extension-id>` 구조만 ID source로 사용하며, 알려진 현재 창이 아직 registry에 없으면 bounded 대기 후 실패한다. ID를 얻을 수 없는 layout은 기존 workspace 유일성 검사를 유지한다. 폴더 전환 전에 이미 같은 생성 폴더를 연 유효한 endpoint가 있으면 현재 창을 보존하고 기존 창 worker의 처리를 기다린다. registry 조회/선택만으로 Agent 요청을 시작하거나 Trust를 변경하지 않는다. B6 검증·Windows 후속은 [9월 29일 답변](FRONTEND_LIVE_TEST_RESPONSE_20260929.md)을 따른다.
+- native endpoint 선택은 canonical workspace와 현재 확장 창 ID를 함께 사용한다. host-owned `ExtensionContext.logUri`의 검증된 `window<id>/exthost/<extension-id>` 구조만 ID source로 사용하며, 알려진 현재 창이 아직 registry에 없으면 bounded 대기 후 실패한다. ID를 얻을 수 없는 layout은 기존 workspace 유일성 검사를 유지한다. 폴더 전환 전에 이미 같은 생성 폴더를 연 유효한 endpoint가 있으면 현재 창을 보존하고 기존 창 worker의 처리를 기다린다. registry 조회/선택만으로 Agent 요청을 시작하거나 Trust를 변경하지 않는다. B6 검증·Windows 후속은 [9월 29일 답변](archive/preliminary/FRONTEND_LIVE_TEST_RESPONSE_20260929.md)을 따른다.
 - 생성 앱 실행은 W4의 별도 project runtime descriptor를 사용한다. `ResultRuntimeSupervisor`는 선택된 일반 Node와 제한 환경으로 실행한다. Kiro executable이나 `ELECTRON_RUN_AS_NODE`를 일반 Node로 전달하지 않는다. native Agent shell은 Core 발급 `.kiro/vibe-tools.cmd`와 packaged runner로 같은 Node/pnpm을 사용하며 worker의 protected file 검증·기존 명령 guard·one-time permission을 통과해야 한다. 기존/미설치 두 도구 환경의 native shell과 deterministic 실행은 검증됐으며 관측 복구와 남은 경계는 [W4 결과](spikes/T19_W4_TOOLCHAIN_RESULTS_20260924.md)를 따른다.
 - VSIX는 UI/host/SDK, Core JS와 필요한 runtime JS dependencies, worker/bridge/guard, canonical prompts, migration SQL·journal, 해당 OS/architecture SQLite binary, manifest·checksum·license를 포함한다. source checkout, devDependencies, 다른 플랫폼 binary, DB/token은 제외한다. 새 packaging 도구 선택은 spike/결정 기록을 거친다.
 - extension package는 읽기 전용 asset root로 취급하고 mutable data는 host가 제공한 사용자별 storage 위치 아래의 전용 root로 분리한다. portable runtime/cache, private connection, DB/backup과 generated workspaces를 구분하며 Windows ACL·경로/junction을 검증한다.

@@ -32,6 +32,8 @@ export interface CoreResources {
   readonly promptDirectory: string
   readonly migrationsDirectory: string
   readonly guard: string
+  /** Kiro-native hook runner; absent from packages built before the finals Kiro-native path. */
+  readonly kiroHook?: string
   readonly manifest: CoreResourceManifest
 }
 export interface CoreResourceManifest {
@@ -149,7 +151,7 @@ export async function loadCoreResources(resourceRoot: string): Promise<CoreResou
     ...(manifest.target === 'darwin-arm64' ? ['bin/node', 'licenses/node-LICENSE'] : []),
   ]
   if (required.some((name) => !manifest.files[name])) fail('CORE_RESOURCE_REQUIRED_ASSET_MISSING')
-  for (const name of ['discovery', 'builder', 'helper', 'evidence-analyst']) {
+  for (const name of ['discovery', 'builder', 'helper', 'evidence-analyst', 'kiro-steering']) {
     const version = manifest.promptVersions[name]
     const file = `agent-prompts/${name}.md`
     if (
@@ -167,6 +169,7 @@ export async function loadCoreResources(resourceRoot: string): Promise<CoreResou
     bridge: join(root, 'bin/bridge.mjs'),
     probe: join(root, 'bin/probe.cjs'),
     guard: join(root, 'bin/guard.mjs'),
+    ...(manifest.files['bin/kiro-hook.mjs'] ? { kiroHook: join(root, 'bin/kiro-hook.mjs') } : {}),
     promptDirectory: join(root, 'agent-prompts'),
     migrationsDirectory: join(root, 'drizzle'),
   })

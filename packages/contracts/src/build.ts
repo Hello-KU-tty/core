@@ -16,9 +16,10 @@ import {
   learningScopeCategorySchema,
   learningSpecIdSchema,
   liveContextIdSchema,
+  messageIdSchema,
   nonEmptyTextSchema,
-  projectIdSchema,
   personalizationTraceIdSchema,
+  projectIdSchema,
   redactionStatusSchema,
   schemaVersionSchema,
   shortTextSchema,
@@ -320,6 +321,12 @@ export const decisionRequestSchema = z
     }
   })
 
+/** Present only when the Builder mapped the learner's own chat messages to this resolution. */
+export const decisionChatSourceSchema = z.strictObject({
+  mappedBy: z.literal('BUILDER'),
+  userMessageIds: z.array(messageIdSchema).min(1).max(5),
+})
+
 export const decisionResolutionSchema = z
   .strictObject({
     schemaVersion: schemaVersionSchema,
@@ -334,6 +341,7 @@ export const decisionResolutionSchema = z
     customProposal: nonEmptyTextSchema.optional(),
     rationale: nonEmptyTextSchema.optional(),
     helperUsed: z.boolean(),
+    chatSource: decisionChatSourceSchema.optional(),
     resolvedAt: utcTimestampSchema,
     source: z.strictObject({ kind: z.literal('USER') }),
     redactionStatus: redactionStatusSchema,
@@ -386,6 +394,46 @@ export const builderApplyDecisionToolInputSchema = z.strictObject({
   appliedResult: nonEmptyTextSchema,
   sourceReferences: z.array(contextualSourceReferenceSchema).max(30),
   context: decisionContextDraftSchema.omit({ blockingReason: true }),
+})
+
+export const chatDecisionSelectionSchema = z.discriminatedUnion('kind', [
+  // Options are presented to the learner in request order, numbered from 1.
+  z.strictObject({ kind: z.literal('OPTION'), optionNumber: z.int().min(1).max(6) }),
+  z.strictObject({ kind: z.literal('RECOMMENDATION') }),
+  z.strictObject({ kind: z.literal('CUSTOM'), proposalQuote: nonEmptyTextSchema }),
+])
+
+/** A verbatim excerpt of the learner's own chat message. Core locates the message by the quote. */
+export const chatDecisionCitationSchema = z.strictObject({
+  quote: nonEmptyTextSchema.refine(
+    (quote) => quote.replace(/\s/g, '').length >= 2,
+    'A cited quote needs at least two non-space characters',
+  ),
+  messageId: messageIdSchema.optional(),
+})
+
+const chatDecisionCitationsSchema = z
+  .array(chatDecisionCitationSchema)
+  .min(1)
+  .max(5)
+  .refine(
+    (citations) =>
+      new Set(citations.map((citation) => citation.messageId ?? `quote:${citation.quote}`)).size ===
+      citations.length,
+    'Each citation must be distinct',
+  )
+
+export const builderResolveDecisionFromChatToolInputSchema = z.strictObject({
+  __tool_use_purpose: nonEmptyTextSchema.optional(),
+  schemaVersion: schemaVersionSchema,
+  projectId: projectIdSchema,
+  taskId: taskIdSchema,
+  decisionId: decisionIdSchema,
+  correlationId: correlationIdSchema,
+  idempotencyKey: idempotencyKeySchema,
+  selection: chatDecisionSelectionSchema,
+  citedUserMessages: chatDecisionCitationsSchema,
+  rationaleQuote: nonEmptyTextSchema.optional(),
 })
 
 export const validationResultSchema = z.strictObject({
@@ -468,3 +516,6 @@ export type BuilderUpdateLiveContextToolInput = z.infer<
 export type BuilderRequestDecisionToolInput = z.infer<typeof builderRequestDecisionToolInputSchema>
 export type BuilderApplyDecisionToolInput = z.infer<typeof builderApplyDecisionToolInputSchema>
 export type BuilderCompleteTaskToolInput = z.infer<typeof builderCompleteTaskToolInputSchema>
+export type DecisionChatSource = z.infer<typeof decisionChatSourceSchema>
+export type ChatDecisionSelection = z.infer<typeof chatDecisionSelectionSchema>
+export type ChatDecisionCitation = z.infer<typeof chatDecisionCitationSchema>

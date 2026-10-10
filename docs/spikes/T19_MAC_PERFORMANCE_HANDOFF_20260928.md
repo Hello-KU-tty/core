@@ -1,8 +1,8 @@
 # Mac 백엔드 성능 개선 → Windows 재평가 인계
 
-Git 전달 후 재개는 [Windows 재개 지침](../WINDOWS_RESUME_20260928.md)을 먼저 본다. 아래 미커밋/미푸시 표기는 Mac Goal 종료 시점의 검증 snapshot이며 이후 승인된 Git 전달과 구분한다.
+Git 전달 후 재개는 [Windows 재개 지침](../archive/preliminary/WINDOWS_RESUME_20260928.md)을 먼저 본다. 아래 미커밋/미푸시 표기는 Mac Goal 종료 시점의 검증 snapshot이며 이후 승인된 Git 전달과 구분한다.
 
-**Mac 작업 완료 — 2026-09-28 09:50 KST경 사용자 조기 마무리 승인:** 예정된10:00까지 추가 보고를 기다리지 않고 종료한다. 1차 성능 개선 뒤 최신 프론트 B2/B1을 수정하고 복구 계약을 보강했다. 프론트 담당자용 [후속 답변](../FRONTEND_LIVE_TEST_RESPONSE_20260928.md), [B1–B5 상세 대조](T19_FRONTEND_LATE_LIVE_TRIAGE_20260928.md)와 [정제된 JSON 근거](T19_MAC_PERFORMANCE_RECEIPTS_20260928.json)를 함께 본다. 아래 수치는 Mac 검증이며 새 Windows 평가·VSIX 전달을 뜻하지 않는다.
+**Mac 작업 완료 — 2026-09-28 09:50 KST경 사용자 조기 마무리 승인:** 예정된10:00까지 추가 보고를 기다리지 않고 종료한다. 1차 성능 개선 뒤 최신 프론트 B2/B1을 수정하고 복구 계약을 보강했다. 프론트 담당자용 [후속 답변](../archive/preliminary/FRONTEND_LIVE_TEST_RESPONSE_20260928.md), [B1–B5 상세 대조](T19_FRONTEND_LATE_LIVE_TRIAGE_20260928.md)와 [정제된 JSON 근거](T19_MAC_PERFORMANCE_RECEIPTS_20260928.json)를 함께 본다. 아래 수치는 Mac 검증이며 새 Windows 평가·VSIX 전달을 뜻하지 않는다.
 
 ## 결과 요약
 
@@ -22,7 +22,7 @@ Git 전달 후 재개는 [Windows 재개 지침](../WINDOWS_RESUME_20260928.md)�
 | B3 PREVIEW 재시도 | 새 key의 기존 `startRun`으로 같은 Project/Session 재시도, same-key 중복 방지, durable restore 무재실행 | frontend 옛 run ID cache 갱신. durable 실패 History/abandon API는 미구현 |
 | B4 Trust·B5 권한 회수 | Trust 전 History/실행 차단, 사용자 grant 후 worker 준비. 실패 즉시 grant401·route404·descriptor REVOKED 확인 | Windows 창 전환/프로세스 종료/role file 정리/Enterprise 정책 영향은 미확정 |
 
-구체적인 오류 코드와 재시도 순서는 [프론트 후속 답변](../FRONTEND_LIVE_TEST_RESPONSE_20260928.md)에 있다. 새 dependency/DB migration/protocol 변경, 프론트 직접 수정, 사용자 기존 창/공유 Core의 강제 종료는 없다. 이 연장 구간의 모델 호출은0회다.
+구체적인 오류 코드와 재시도 순서는 [프론트 후속 답변](../archive/preliminary/FRONTEND_LIVE_TEST_RESPONSE_20260928.md)에 있다. 새 dependency/DB migration/protocol 변경, 프론트 직접 수정, 사용자 기존 창/공유 Core의 강제 종료는 없다. 이 연장 구간의 모델 호출은0회다.
 
 ## 채택 변경과 측정 범위
 

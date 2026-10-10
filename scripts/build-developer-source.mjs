@@ -61,7 +61,7 @@ Windows portable의 manifest로 검증된 runtime dependencies와 라이선스�
 
 ## 도구와 검사
 
-Node.js 24.19.0 / pnpm 11.13.1을 준비합니다. pin을 우회하지 마세요.
+Node.js 24.x와 pnpm 11.13.1 이상 11.x를 준비합니다(권장 24.19.0 / 11.13.1).
 frontend/: npm ci --ignore-scripts && npm run typecheck && npm test && npm run build
 backend/: pnpm install --frozen-lockfile && pnpm exec playwright install chromium && pnpm check
 backend/: pnpm panel:build && node scripts/test-program-consumer.mjs ../frontend

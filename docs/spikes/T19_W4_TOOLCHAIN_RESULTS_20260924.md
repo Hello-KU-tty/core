@@ -1,6 +1,6 @@
 # T19-W4 Windows 생성 앱 도구 검증
 
-> 2026-09-24, win32-x64. 합성 TypeScript HTTP 앱과 격리된 Kiro profile을 사용했다. 현재 판정은 [TASKS](../TASKS.md), 구현·재현 절차는 [W4 인계](../T19_W4_TOOLCHAIN_HANDOFF.md), 경로·credential 없는 수치는 [receipt](T19_W4_TOOLCHAIN_RECEIPTS_20260924.json)를 따른다.
+> 2026-09-24, win32-x64. 합성 TypeScript HTTP 앱과 격리된 Kiro profile을 사용했다. 현재 판정은 [TASKS](../TASKS.md), 구현·재현 절차는 [W4 인계](../archive/preliminary/T19_W4_TOOLCHAIN_HANDOFF.md), 경로·credential 없는 수치는 [receipt](T19_W4_TOOLCHAIN_RECEIPTS_20260924.json)를 따른다.
 
 ## 구현과 실제 경로
 

@@ -6,19 +6,17 @@ import { Client } from '@modelcontextprotocol/client'
 import { InMemoryTransport, type McpServer } from '@modelcontextprotocol/server'
 import { ApplicationService, WorkspacePathPolicy } from '@vibe-helper/application'
 import {
+  type AgentRole,
   builderTaskSchema,
+  type CandidatePreview,
   candidateRoundSchema,
   discoveryFeedbackSchema,
   discoverySessionSchema,
   learningSpecRevisionSchema,
   projectCandidateRevisionSchema,
   projectSchema,
-  type AgentRole,
-  type CandidatePreview,
 } from '@vibe-helper/contracts'
 import { describe, expect, it } from 'vitest'
-
-import { openInMemorySqliteStorage } from '../../../packages/storage-sqlite/src/index.js'
 import {
   builderTaskFixture,
   candidateFixture,
@@ -32,6 +30,7 @@ import {
   projectFixture,
   timestamp,
 } from '../../../packages/contracts/test/fixtures.js'
+import { openInMemorySqliteStorage } from '../../../packages/storage-sqlite/src/index.js'
 import {
   createRoleBoundMcpServer,
   ROLE_TOOL_CATALOG,
@@ -210,11 +209,13 @@ const expectedCatalog: Readonly<Record<AgentRole, readonly string[]>> = {
   ],
   BUILDER: [
     'get_builder_task',
+    'get_build_status',
     'start_task',
     'update_build_context',
     'request_user_decision',
     'get_decision_result',
     'apply_decision_result',
+    'resolve_decision_from_chat',
     'complete_task',
   ],
   HELPER: ['get_helper_context', 'request_builder_context_refresh'],

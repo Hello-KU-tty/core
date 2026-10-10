@@ -1,0 +1,51 @@
+{
+  "version": "1.0.0",
+  "purpose": "Kiro Agent interpretation of a learner's chat reply to an open Decision (K05). Synthetic learner messages; not real user data.",
+  "decision": {
+    "question": "공유 링크를 얼마 동안 열 수 있게 할까요?",
+    "options": ["1시간", "24시간", "7일"],
+    "recommendedOptionNumber": 1
+  },
+  "cases": [
+    {
+      "id": "explicit-number",
+      "message": "아까 링크 만료 시간 물어본 거, 2번으로 할게. 하루 정도는 열어둬야 집에서 받을 수 있어서.",
+      "expect": { "resolve": true, "optionNumber": 2, "rationaleRequired": true }
+    },
+    {
+      "id": "content-shortest",
+      "message": "링크 만료 시간 말인데 제일 짧은 쪽이 낫겠어. 공용 PC라 링크가 오래 남아 있으면 불안해.",
+      "expect": { "resolve": true, "optionNumber": 1, "rationaleRequired": true }
+    },
+    {
+      "id": "number-trap",
+      "message": "링크 만료 시간은 2시간(1번)으로 할게. 민감한 파일이 많아서 짧은 게 좋아.",
+      "expect": { "resolve": true, "optionNumber": 1, "rationaleRequired": true }
+    },
+    {
+      "id": "recommendation",
+      "message": "링크 만료 시간은 네가 추천한 걸로 할게.",
+      "expect": { "resolve": true, "optionNumber": 1, "rationaleRequired": false }
+    },
+    {
+      "id": "custom",
+      "message": "링크 만료 시간 말인데, 시간 말고 다운로드 한 번 하면 바로 만료되게 해줘. 한 번 받으면 끝이니까.",
+      "expect": { "resolve": true, "custom": true, "rationaleRequired": true }
+    },
+    {
+      "id": "question-not-choice",
+      "message": "링크 만료 시간 말인데, 잘 모르겠어. 1시간이랑 24시간이 실제로 뭐가 달라?",
+      "expect": { "resolve": false }
+    },
+    {
+      "id": "undecided",
+      "message": "링크 만료 시간은… 하루? 아니 일주일이 나으려나. 좀 더 생각해볼게.",
+      "expect": { "resolve": false }
+    },
+    {
+      "id": "middle-by-elimination",
+      "message": "만료 시간은 1번은 너무 짧고 3번은 너무 길어. 그래서 중간 걸로 할게.",
+      "expect": { "resolve": true, "optionNumber": 2, "rationaleRequired": true }
+    }
+  ]
+}

@@ -1,0 +1,120 @@
+import { cp, mkdir, mkdtemp, readFile, realpath, writeFile } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
+import { build } from 'esbuild'
+import { inventory } from '../examples/frontend-handoff/archive.mjs'
+import { loadCoreResources } from '../packages/runtime/dist/portable-core.js'
+import { archive as archiveWindows } from '../examples/frontend-handoff/archive.mjs'
+import { archiveMacos } from './archive-macos.mjs'
+import { sourceProvenance } from './source-provenance.mjs'
+
+// Kiro-native VSIX for the machine it is built on: Apple Silicon Mac or Windows x64. The portable
+// Core holds native modules for that target, so each platform is built on its own OS.
+const target = `${process.platform}-${process.arch}`
+// Node 24.x: the packaged SQLite native module must match the Core's Node 24 ABI.
+if (!['darwin-arm64', 'win32-x64'].includes(target) || process.versions.node.split('.')[0] !== '24')
+  throw new Error('PROGRAM_BUILD_TOOLCHAIN_REQUIRED')
+const mac = target === 'darwin-arm64'
+if (!process.argv[2]) throw new Error('EXPLICIT_FRONTEND_CHECKOUT_REQUIRED')
+const program = await realpath(resolve(process.argv[2]))
+const sources = {
+  backend: await sourceProvenance(resolve('.')),
+  frontend: await sourceProvenance(program),
+}
+const product = JSON.parse(await readFile(join(program, 'package.json'), 'utf8'))
+if (product.name !== 'builder-helper-agent-panel') throw new Error('PROGRAM_CHECKOUT_REQUIRED')
+const portable = await loadCoreResources(resolve(`dist/portable-core-${target}`))
+if (portable.manifest.target !== target) throw new Error('PROGRAM_PACKAGE_TARGET_INVALID')
+await mkdir(resolve('dist'), { recursive: true })
+const output = await mkdtemp(resolve(`dist/${mac ? 'macos' : 'windows'}-vsix-`))
+const stage = join(output, 'stage')
+const extension = join(stage, 'extension')
+await mkdir(extension, { recursive: true })
+await cp(portable.root, join(extension, 'portable'), { recursive: true })
+await cp(join(program, 'media'), join(extension, 'media'), { recursive: true })
+// Kiro-native host (finals): the host registers `vibeHelper.openInKiro`, so the manifest
+// gains that command here without requiring a frontend checkout change.
+const hostCommands = [
+  { command: 'vibeHelper.openInKiro', title: 'Vibe Helper: Open Project in Kiro Chat' },
+]
+const pkg = {
+  ...product,
+  version: '0.2.6',
+  displayName: 'Hello Vibe',
+  description: `Kiro-native Vibe Helper for ${mac ? 'Apple Silicon Mac' : 'Windows x64'}: local Core, kiro-cli Agents and Kiro chat hooks.`,
+  engines: { vscode: '^1.131.0' },
+  contributes: {
+    ...product.contributes,
+    commands: [
+      ...(product.contributes?.commands ?? []).filter(
+        (entry) => !hostCommands.some((host) => host.command === entry.command),
+      ),
+      ...hostCommands,
+    ],
+  },
+}
+delete pkg.scripts
+delete pkg.devDependencies
+delete pkg.dependencies
+delete pkg.allowScripts
+await writeFile(join(extension, 'package.json'), JSON.stringify(pkg, null, 2))
+await build({
+  absWorkingDir: program,
+  entryPoints: [join(program, 'src/extension.ts')],
+  outfile: join(extension, 'dist/extension.js'),
+  bundle: true,
+  platform: 'node',
+  format: 'cjs',
+  target: 'node24',
+  external: ['vscode'],
+  legalComments: 'eof',
+})
+await build({
+  absWorkingDir: program,
+  entryPoints: [join(program, 'src/webview/main.ts')],
+  outfile: join(extension, 'dist/webview/main.js'),
+  bundle: true,
+  platform: 'browser',
+  format: 'iife',
+  target: 'es2020',
+  legalComments: 'eof',
+})
+const xml = (value) =>
+  String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;')
+await writeFile(
+  join(stage, '[Content_Types].xml'),
+  `<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="json" ContentType="application/json"/><Default Extension="js" ContentType="application/javascript"/><Default Extension="vsixmanifest" ContentType="text/xml"/>${['cjs', 'mjs', 'node', 'sql', 'md', 'svg', 'png', 'html'].map((ext) => `<Default Extension="${ext}" ContentType="application/octet-stream"/>`).join('')}${mac ? '<Override PartName="/extension/portable/bin/node" ContentType="application/octet-stream"/>' : ''}</Types>`,
+)
+await writeFile(
+  join(stage, 'extension.vsixmanifest'),
+  `<?xml version="1.0"?><PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011"><Metadata><Identity Language="en-US" Id="${xml(pkg.name)}" Version="${xml(pkg.version)}" Publisher="${xml(pkg.publisher)}" TargetPlatform="${target}"/><DisplayName>${xml(pkg.displayName)}</DisplayName><Description xml:space="preserve">${xml(pkg.description)}</Description><Properties><Property Id="Microsoft.VisualStudio.Code.Engine" Value="^1.131.0"/><Property Id="Microsoft.VisualStudio.Code.TargetPlatform" Value="${target}"/></Properties></Metadata><Installation><InstallationTarget Id="Microsoft.VisualStudio.Code"/></Installation><Dependencies/><Assets><Asset Type="Microsoft.VisualStudio.Code.Manifest" Path="extension/package.json" Addressable="true"/></Assets></PackageManifest>`,
+)
+const files = await inventory(stage)
+for (const item of files) {
+  if (
+    /\.(?:db|sqlite|log|map)$|(?:^|\/)(?:\.env|connection\.json|dev-config\.json|test|tests)(?:$|\/)/.test(
+      item.name,
+    )
+  )
+    throw new Error('PROGRAM_PACKAGE_PRIVATE_FILE_DENIED')
+  const bytes = await readFile(join(stage, item.name))
+  if (bytes.includes(Buffer.from(resolve('.'))) || bytes.includes(Buffer.from(program)))
+    throw new Error('PROGRAM_PACKAGE_DEVELOPER_PATH_LEAK')
+}
+const path = join(output, `${pkg.name}-${pkg.version}-${target}.vsix`)
+const archive = mac ? await archiveMacos(stage, path) : await archiveWindows(stage, path)
+const report = {
+  file: path,
+  version: pkg.version,
+  frontendVersion: product.version,
+  sources,
+  target,
+  bytes: archive.bytes,
+  sha256: archive.sha256,
+  files: files.length,
+  sourceCheckoutRequired: false,
+  installParser: 'PENDING',
+  nativePaidCalls: 0,
+}
+await writeFile(join(output, 'files.json'), JSON.stringify(files, null, 2))
+await writeFile(join(output, 'receipt.json'), JSON.stringify(report, null, 2))
+console.log(JSON.stringify(report))

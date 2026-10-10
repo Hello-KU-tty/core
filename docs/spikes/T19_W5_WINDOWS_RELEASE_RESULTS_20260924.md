@@ -1,6 +1,6 @@
 # T19-W5 Windows 출하 검증 기록
 
-> 진행 중. 현재 PC의 격리 profile 실측이며 clean machine 또는 출하 PASS가 아니다. [계획](../T19_W5_RELEASE_VALIDATION_PLAN.md), [receipt](T19_W5_WINDOWS_RELEASE_RECEIPTS_20260924.json), [설치 인계](../T19_W5_RELEASE_VALIDATION_HANDOFF.md)를 따른다.
+> 진행 중. 현재 PC의 격리 profile 실측이며 clean machine 또는 출하 PASS가 아니다. [계획](../archive/preliminary/T19_W5_RELEASE_VALIDATION_PLAN.md), [receipt](T19_W5_WINDOWS_RELEASE_RECEIPTS_20260924.json), [설치 인계](../archive/preliminary/T19_W5_RELEASE_VALIDATION_HANDOFF.md)를 따른다.
 
 ## 현재 설치 후보
 

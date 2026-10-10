@@ -81,6 +81,7 @@ await bundle('apps/local-backend/dist/main.js', 'bin/core.mjs', {
   define: { __VIBE_PACKAGED_CORE__: 'true' },
 })
 await bundle('scripts/native-core-stdio-bridge.mjs', 'bin/bridge.mjs')
+await bundle('scripts/kiro-hook.mjs', 'bin/kiro-hook.mjs')
 await bundle('scripts/portable-runtime-probe.cjs', 'bin/probe.cjs')
 await bundle('packages/kiro-adapter/dist/builder-tool-guard-node.js', 'bin/guard.mjs')
 await bundle('packages/runtime/dist/index.js', 'bin/runtime.cjs')
@@ -187,7 +188,7 @@ for (const name of await readdir(migrationRoot))
   if (/^\d{4}_[a-z0-9_]+\.sql$/.test(name)) await copy(join(migrationRoot, name), `drizzle/${name}`)
 await copy(join(migrationRoot, 'meta/_journal.json'), 'drizzle/meta/_journal.json')
 const promptVersions = {}
-for (const name of ['discovery', 'builder', 'helper', 'evidence-analyst']) {
+for (const name of ['discovery', 'builder', 'helper', 'evidence-analyst', 'kiro-steering']) {
   const data = (
     await readFile(join(repository, 'docs/agent-prompts', `${name}.md`), 'utf8')
   ).replaceAll('\r\n', '\n')

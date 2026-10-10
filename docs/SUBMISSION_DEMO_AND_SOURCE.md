@@ -1,6 +1,6 @@
 # 제출 데모와 소스 범위
 
-> **역사 기록(9월28일):** 아래 미제출·pilot 미확보·영상 미완료·0.0.10 등의 표현은 당시 상태다. 후속으로 사용자가 실제 사용 후 정성 인터뷰와 제출 완료 화면을 제공했고 Windows0.0.18/Mac0.1.1 및 소스 ZIP이 게시됐다. 현재 로컬 후속 후보·영상 담당·남은 native/정량 검증은 [현재 제출·검증 상태](VALIDATION_STATUS_20260930.md)와 [설치 가이드](DOWNLOAD_GUIDE.md)를 따른다. 옛 checklist를 사후 완료로 바꾸거나 당시 모델 검사 수치를 새 설치본 결과로 재사용하지 않는다.
+> **역사 기록(9월28일):** 아래 미제출·pilot 미확보·영상 미완료·0.0.10 등의 표현은 당시 상태다. 후속으로 사용자가 실제 사용 후 정성 인터뷰와 제출 완료 화면을 제공했고 Windows0.0.18/Mac0.1.1 및 소스 ZIP이 게시됐다. 현재 로컬 후속 후보·영상 담당·남은 native/정량 검증은 [현재 제출·검증 상태](archive/preliminary/VALIDATION_STATUS_20260930.md)와 [설치 가이드](DOWNLOAD_GUIDE.md)를 따른다. 옛 checklist를 사후 완료로 바꾸거나 당시 모델 검사 수치를 새 설치본 결과로 재사용하지 않는다.
 
 2026-09-28 준비 초안. 비공개 source 검토 후보의 독립 재현을 통과했다. 외부 제출, commit/push, 공개 배포는 하지 않았다. 공식 제출 형식과 실제 사람 pilot/baseline의 처리에 대한 사용자 확인이 남아 있다.
 
@@ -35,13 +35,13 @@
 | frontend | 실제 src/test/media/build config/package.json/package-lock.json. 별도 소스 버전/manifest를 backend와 함께 고정 |
 | 문서 | README, 승인된 명세/설계/결정, 제출 초안, NFR/검증 보고서의 정제 사본 |
 | 실행 가능한 예제 | Campus Drop fixture와 정제된 생성 앱 소스/package/lock/테스트. 합성 예제임을 명시 |
-| Windows kit | 9/29 kit2026.09.29.2·VSIX0.0.10 자동 검증/CLI 설치 완료. 실제 native 업그레이드는 별도 미검증. [최신 hash/범위](SUBMISSION_READINESS_20260929.md) |
+| Windows kit | 9/29 kit2026.09.29.2·VSIX0.0.10 자동 검증/CLI 설치 완료. 실제 native 업그레이드는 별도 미검증. [최신 hash/범위](archive/preliminary/SUBMISSION_READINESS_20260929.md) |
 
 제외: `.git`, `.data`, `.local-experiments`, `node_modules`, package cache, 생성 DB/WAL/SHM/backup, connection/token/credit/admission 파일, `.env`, raw 대화/terminal/로그, 실제 사용자 경로가 포함된 private receipt, Kiro profile/설정/로그인 자료, 임시 폴더 전체. LICENSE/제3자 notice는 실제 포함 dependency/asset에 맞춰 보존한다.
 
 `node scripts/create-source-candidate.mjs <FRONTEND_CHECKOUT>`은 Git checkout의 tracked allowlist+검토된 신규 파일만 새 private 폴더에 복사한다. 각 파일의 원본/사본 SHA, 문서 경로 일반화 여부와 합성 redaction fixture 예외 수를 기록하며 runtime/test를 정제해서 바꾸지 않는다. 링크/비정규 파일/덮어쓰기와 알려진 secret 패턴을 거절한다. 이 도구는 archive 생성·설치·모델 호출·업로드를 하지 않으며 결과는 `PRIVATE_REVIEW_CANDIDATE_NOT_RELEASE`다. 검증을 위해 별도 archive를 만들고 새 폴더에 풀어 frozen install/전체 검사와 native 회귀·actual consumer를 수행한다. 실패 후보를 지우거나 결과를 수정하지 않는다.
 
-첫 후보의 backend 전체/프론트719 검사는 통과했지만 native 회귀에 필요한 과거 prompt2개가 빠졌다. 두 archive prompt를 포함한 수정 후보752개는 전체·E2E·추가 회귀210+2SKIP·actual consumer와 검사 후 SHA 확인을 통과했다. [정확한 archive hash와 재현 결과](SOURCE_REPRODUCIBILITY_20260928.md)를 따르며 첫 후보는 전달하지 않는다. 역사적 internal 문서 일부는 의도적으로 제외하므로 남은 과거 링크가 전체 저장소 이력을 제공한다고 주장하지 않는다.
+첫 후보의 backend 전체/프론트719 검사는 통과했지만 native 회귀에 필요한 과거 prompt2개가 빠졌다. 두 archive prompt를 포함한 수정 후보752개는 전체·E2E·추가 회귀210+2SKIP·actual consumer와 검사 후 SHA 확인을 통과했다. [정확한 archive hash와 재현 결과](archive/preliminary/SOURCE_REPRODUCIBILITY_20260928.md)를 따르며 첫 후보는 전달하지 않는다. 역사적 internal 문서 일부는 의도적으로 제외하므로 남은 과거 링크가 전체 저장소 이력을 제공한다고 주장하지 않는다.
 
 ## 최종 고정 체크리스트
 

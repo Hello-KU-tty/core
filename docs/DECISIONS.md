@@ -1,5 +1,131 @@
 # 결정 기록
 
+## 본선: 버전은 의존성이 깨지지 않는 범위만 강제하고 Kiro는 최신판 기준
+
+- **맥락:** 예선 때 재현 빌드와 Kiro 내부 비공개 API 의존 때문에 Node 24.19.0·pnpm 11.13.1을 정확히 강제했고, 맞지 않으면 빌드·실행을 거절했다. 본선은 공개 기능과 kiro-cli를 쓰고 사용자가 초보자라, 정확한 버전 강제는 이유 없이 설치와 개발을 막는다. kiro-cli는 스스로 업데이트되는데 Core가 2.x까지만 받아 3.0이 나오면 모두 막힐 구조였다.
+- **결정(사용자 지시, 2026-10-10):**
+  - 개발·빌드: Node 24.x(포장 SQLite 네이티브 모듈이 Core의 Node 24 ABI와 맞아야 함), pnpm 11.13.1 이상 11.x(lockfile, pnpm이 막는 깨진 11.12.0·11.13.0 제외). `.node-version`(24.19.0)과 `packageManager`(pnpm@11.13.1)는 권장값이고, pnpm 10 이상은 `packageManager`의 pnpm으로 스스로 바꿔 실행한다. preflight·`engines`·포장 스크립트·개발용 스크립트를 이 범위로 바꿨다.
+  - 사용자 실행: 사용자가 Node·pnpm을 설치할 필요는 그대로 없다. Core와 생성 앱이 직접 받는 Node 24.19.0·pnpm 11.13.1은 해시 검증 때문에 계속 고정한다. PATH의 Node가 검증 범위(24.18·24.19) 밖이면 거절하지 않고 그 검증된 Node를 받는다.
+  - kiro-cli는 최소 2.21.1만 요구하고 상한을 없앴다(`KIRO_CLI_VERSION_TOO_OLD_NEED_2_21_1`). 앞으로 깨지면 ACP 연결에서 오류로 드러난다.
+  - Kiro IDE는 최소 버전만 두고 상한·고정은 두지 않는다(사용자 동의, 2026-10-10). 최소는 VSIX의 VS Code 엔진 하한 `^1.131.0`이고, 실제로 확인한 가장 오래된 Kiro는 1.2.37이다. 최신판만 지원하는 방식은 쓰지 않는다. Kiro는 자동 업데이트되고 받을 수 있는 것도 최신판뿐이라, 최신만 지원하면 업데이트 당일 깨질 때 모두 막힌다. 최소 미만 안내 화면은 따로 만들지 않는다.
+  - Kiro가 업데이트되면 확인 루틴(Kiro 재시작 후 연결 복원, Builder 도구 호출, Helper 탭 도구 호출, hook 기록)을 Codex 화면 조작으로 돌리고(약 1크레딧) 깨진 것을 고친다. 깨지기 쉬운 곳은 Kiro 내부 형식에 기대는 네 곳이다: 권한 파일, 세션 기록 위치·형식, 작업 폴더 해시, 사용자 에이전트 `tools` 의미. 지금까지 1.2.37·1.2.56에서 확인했다.
+  - 본선 데모 기기는 쓸 Kiro 버전을 확인한 뒤 자동 업데이트를 끈다.
+  - kiro-cli 위치도 강제하지 않는다. 기본 설치 위치 다음에 PATH에서 찾는다(macOS·Windows).
+- **이전 결정 대체:** AGENTS.md의 "Node.js 24.19.0, pnpm 11.13.1… preflight를 우회하지 않는다"를 범위 규칙으로 바꿨다. preflight 자체는 계속 지킨다.
+
+## 본선: 플랫폼 분담과 Kiro-native의 Windows 지원
+
+- **맥락:** 본선에는 Windows 지원이 포함된다. backend는 Mac에서, frontend는 Windows에서 개발한다. 본선 경로는 Kiro 내부 비공개 API 대신 공식 기능(Steering·hook·MCP·사용자 에이전트)과 kiro-cli(2.0부터 Windows 11 기본 지원)를 쓰므로, 막고 있던 것은 Mac 전용으로 둔 host·포장 코드였다.
+- **결정(사용자 지시, 2026-10-10):** Mac 설치물은 backend가, Windows 설치물은 frontend가 빌드·확인·업로드한다. backend는 같은 코드로 Windows를 빌드할 수 있게 둔다.
+  - host는 macOS와 Windows에서 시작한다. Windows의 kiro-cli는 공식 설치 위치(`Program Files\Kiro-Cli`, 2.29.0 설치 스크립트의 사용자 위치 `%LOCALAPPDATA%\Kiro-Cli`)를 먼저, 그다음 PATH의 `kiro-cli.exe`를 찾는다.
+  - Kiro-native Core는 Kiro 실행 파일(`ELECTRON_RUN_AS_NODE`)이 아니라 실제 Node(PATH의 24.18·24.19 또는 관리 Node)로 돈다. Core가 자기 Node 경로를 hook·MCP 명령에 쓰기 때문이다.
+  - Kiro 작업 폴더 해시는 Kiro(1.2.56)와 같은 정규화(슬래시, 끝 슬래시 제거, Windows 소문자)를 거친다. Kiro 세션 기록 위치와 권한 파일 위치가 Windows에서도 맞는다.
+  - hook 명령은 Kiro가 쓰는 셸(Windows는 cmd.exe)에 맞게 인용한다. Windows에서 `%`, `"`, 줄바꿈이 든 경로는 거절한다.
+  - 생성 폴더 터미널은 Windows에서 학습자의 PATH 앞에 포장 Node·pnpm을 붙인다(macOS는 정해진 PATH). PowerShell 실행 정책은 그 터미널에만 RemoteSigned다.
+  - 포장 스크립트는 하나(`scripts/package-program.mjs`)로 두고 빌드하는 OS(`darwin-arm64` 또는 `win32-x64`)용 VSIX를 만든다. Windows는 `pnpm panel:pack:kiro-windows <program 경로>`.
+- **검증 한계:** Windows 분기는 Windows를 흉내 낸 테스트와 설치된 Kiro 1.2.56 코드 확인까지다. 실제 Windows 기기 실측은 frontend의 첫 빌드 확인(핸드오프 "Windows에서")이 맡는다.
+
+## 본선: Kiro 연결은 Core가 다시 시작해도 유지하고, 끊긴 동안의 학습자 발언은 큐로 보존
+
+- **맥락:** 0.2.3 실측에서 다시 연결한 뒤 이미 떠 있던 Builder·Helper MCP가 옛 연결 정보로 `BRIDGE_BINDING_REVOKED`를 냈다. 코드 확인 결과 Core는 Kiro 연결을 메모리에만 두고, 끝날 때 연결 파일을 회수 상태로 바꾼다. Core는 Kiro 종료·재실행, 확장 업데이트, 충돌, (코드상) 30초 넘는 잠자기 뒤에 새로 뜬다. 그때마다 hook은 학습자 발언을 소리 없이 버리고 MCP는 끊겼으며, 학습자가 Open Project를 다시 하고 창까지 다시 로드해야 했다.
+- **결정(사용자 승인, 2026-10-10):**
+  - Core는 시작할 때 연결 기록(`kiro-bindings/<projectId>/`)이 있는 Project를 다시 연결해 연결 파일과 작업 폴더의 hook·MCP·에이전트 파일을 새로 쓴다. 폴더가 없어졌으면 만들지 않고 건너뛴다. 권한 규칙은 다시 쓰지 않는다.
+  - Kiro 연결 파일은 `lifecycle: "PROJECT"`를 갖는다. bridge는 같은 폴더·Project·역할·도구 목록이면 바뀐 주소·토큰·Task를 따라간다. 폴더나 역할이 바뀌면 지금처럼 거절한다. 연결이 없을 때는 MCP 서버를 실패시키지 않고 도구 결과로 `VIBE_HELPER_NOT_CONNECTED`를 돌려준다. 시작 때 Core가 아직 없으면 최대 45초 기다린다(Kiro 기본 MCP 시작 대기 60초 안). 예선의 실행 단위 연결은 기존 규칙(조금이라도 바뀌면 거절) 그대로다.
+  - 다시 연결하거나 Core가 끝날 때 연결 파일에 회수 표시를 쓰지 않는다. 토큰은 메모리의 handler와 함께 사라지고, 다음 연결이 파일을 제자리에서 바꾼다. 회수 표시가 새 연결 뒤에 늦게 써지는 경쟁도 없어진다.
+  - hook은 학습자 발언마다 전달 ID를 붙인다. Core에 닿지 못하면(연결 없음, 접속 실패, 시간 초과, 401·404·5xx) 그 발언을 연결 폴더의 `hook-queue.jsonl`(0600)에 덧붙인다. Core만 큐를 읽는다. 연결 직후와 hook 요청을 받을 때마다 큐를 이름 바꿔 가져와 순서대로 기록하고 지운다. 전달 ID를 멱등키로 써서, 시간 초과됐지만 실제로 닿은 발언이 큐로 다시 와도 한 번만 남는다.
+  - Steering 0.5.2: 도구가 `VIBE_HELPER_NOT_CONNECTED`를 돌려주면 Builder는 Decision이 필요 없는 작업만 계속하고, Core가 받기 전에는 진짜 Decision을 묻거나 적용·완료하지 않는다. Helper는 한 번 다시 부르고, 안 되면 맥락을 못 불러왔다고 밝힌다.
+- **보안 판단:** 엄격한 비교는 실행 단위 연결을 회수하기 위한 것이었다. Kiro-native 연결은 폴더 단위로 계속 유지되므로, 같은 폴더·역할 안에서 새 토큰을 따라가도 권한 범위가 넓어지지 않는다. 연결 파일과 큐는 사용자 전용 파일이고 bridge·Core가 모두 권한과 링크 수를 확인한다. 큐에는 redaction 전 학습자 원문이 Core가 읽을 때까지 남는다(최대 1MB·200개, 읽으면 삭제). Kiro도 세션 원문을 로컬에 저장하므로 노출 범위를 넓히지 않는다.
+- **한계:** 늦게 들어온 발언은 Core가 받은 시각으로 기록된다(순서는 유지, 원래 시각은 계약 변경이 필요해 하지 않음). 끊긴 동안의 Helper 질문은 답과 짝지을 수 없어 기록하지 않는다. Core가 45초 넘게 뜨지 않으면 MCP 시작이 실패하고 Kiro의 MCP 재연결이 필요하다.
+
+## 본선: Helper는 읽기 권한만
+
+- **맥락:** 0.2.2 실측(Kiro 1.2.56)에서 Kiro 채팅의 `vibe-helper` 에이전트가 Helper Core 도구를 하나도 받지 못했다. 에이전트 파일에 `tools`가 없었고, Kiro는 이때 허용 목록을 빈 배열로 처리한다(로그 `custom_agent.tool_selection toolCount: 1`, 남은 1개는 Kiro의 `disclose_context`). 모델은 `disclose_context`로 서버를 불러오려다 승인 창을 띄웠고 `Item not found`로 끝나 일반 설명으로 답했다. 도구 범위를 정해야 했다.
+- **결정(사용자 승인, 2026-10-09):** Helper는 읽기 권한만 가진다. Kiro 채팅 Helper 에이전트는 `tools: ["read", "@vibe-helper-helper"]`로 Kiro 내장 읽기 도구(파일 읽기, 진단, 검색)와 자기 Helper Core 서버만 받는다. 작업 공간 MCP(Builder 도구)는 계속 빼고(`includeMcpJson: false`), 학습자가 부탁해도 파일 수정과 명령 실행은 하지 않으며 바꿀 것은 Builder 탭에 부탁하게 안내한다(Steering 0.5.1). `/vibe-helper` 슬래시 턴은 Builder 세션 안이라 도구를 뺄 수 없어 같은 규칙을 프롬프트로만 지킨다. 패널 Helper(kiro-cli)는 이미 Core 조회 도구만 쓴다.
+- **이유:** 정식 Helper 원문(`helper.md`)과 제품 명세(`FR-HLP-002`)가 read-only이고, Builder 탭과 같은 파일을 동시에 고치는 위험을 권한으로 막는다. 현재 코드를 읽어야 "현재 코드로 예시"를 줄 수 있어 읽기 도구는 연다.
+- **확인 근거:** 설치된 Kiro 1.2.56 `kiro.kiro-agent` 번들에서 에이전트 `tools`가 허용 목록이 되고, 비어 있으면 도구가 없으며, MCP 도구에 `@<서버>` 태그가, 내장 읽기 도구에 `read` 태그가 붙는 것을 확인했다. 실제 화면 확인은 K09에서 다시 한다.
+- **이전 결정 대체:** "본선: Helper 역할은 프롬프트로 제한하고 상태 권한만 Core가 강제"의 코드·shell 부분(부탁하면 수정 가능)을 대체한다. Evidence·Concept State·Decision 확정을 Core가 강제하는 부분은 그대로다. PROJECT_BRIEF §0, AGENTS.md 설계 불변식, ARCHITECTURE를 함께 고쳤다.
+
+## 본선: Analyst 기본 모델 Sonnet 5.5(대안 Auto)와 과대 제안의 최대치 저장
+
+- **근거:** 본선 계정에서 같은 16개 사례로 Auto 11/16, Sonnet 5.5 14/16, Opus 5.5 14/16이었다([모델 비교](../tests/eval/results/evidence-analyst-models-kiro-cli.md) 3차). 실측에서도 Auto가 학습자의 실제 판단을 `MEDIUM` 강도에 `DEMONSTRATED`로 제안해 Core가 통째로 거절했고, 학습자의 이유가 Evidence로 남지 않았다([K09 재실측](spikes/KIRO_NATIVE_K09_REMEASURE_20261009.md)).
+- **결정(사용자 승인, 2026-10-09):**
+  - Analyst 기본 모델을 `claude-sonnet-5.5`로 하고, 그 모델을 쓸 수 없는 계정(개인 무료 계정 등)에서는 `auto`로 넘어간다. kiro-cli가 프롬프트 단계에서 "모델을 쓸 수 없음"으로 거절할 때만 다음 후보로 다시 시도하고, 그 모델은 프로세스가 끝날 때까지 건너뛴다. 다른 오류는 재시도하지 않는다. `--analyst-model`을 주면 그 모델만 쓴다. 공급자 오류 문구는 밖으로 내보내지 않는다.
+  - Analyst가 정책상 최대보다 높은 상태를 제안하면 거절하지 않고 정책 최대치로 낮춰 받는다. Core는 상태를 올리지 않으며, 낮췄다는 사실은 결정 설명과 원래 제안(`maximumSupportedState`)으로 남는다. 상태를 붙인 모순(CONTRADICTION) 제안은 앞뒤가 맞지 않으므로 계속 거절한다.
+- **위험:** Sonnet 5.5는 preview 모델이라 바뀌거나 내려갈 수 있다. 그때는 Auto로 넘어가며 품질이 낮아질 수 있다. 낮춰 받기는 과대 판정을 덜 버리는 대신, Analyst가 강도를 과하게 매긴 경우도 정책 최대치까지는 Evidence로 남긴다.
+- **이전 결정 대체:** "Evidence Analyst 기본 모델은 Auto"(무료 계정 평가 기준)를 대체한다.
+
+## 본선: 첫 실사용 체험 피드백 반영(K09)
+
+- **맥락:** 사용자가 0.2.0으로 처음부터 직접 써 본 뒤 피드백 15건을 남겼다. 확인한 원인은 [첫 체험 기록](spikes/KIRO_NATIVE_FIRST_TRIAL_20261009.md)에 있다.
+- **사용자 승인(2026-10-09):** 10(Builder 워크플로 재설계), 13의 명령 자동 허용, 15(크레딧)는 별도 작업 K10~K12로 남긴다. 7은 6을 반영한 뒤 다시 실측한다. 나머지는 검토 보고의 제안대로 진행한다.
+- **Project 폴더(범위 변경):** 사용자가 Kiro에서 연 폴더가 비어 있으면(편집기·VCS 메타데이터만 허용) 그 폴더를 Project 폴더로 등록해 같은 창에서 진행한다. 파일이 있으면 Core 생성 폴더를 새 창으로 여는 것을 묻는다. 등록은 local-backend의 private 파일(`registered-workspaces.json`)에 두는 host adapter 상태이고, Core 경로 정책은 등록 폴더를 canonical·디렉터리·생성 루트와 겹치지 않음으로 다시 확인한다. 소유자, 홈·루트 자체, Core 데이터와의 겹침, symlink를 거절한다. 다른 폴더에서 이미 작업 중인 Project는 옮기지 않는다. 패널의 결과 실행은 생성 폴더 전용으로 남긴다. 기존 프로젝트 import는 여전히 범위 밖이다.
+- **Steering 0.5.0과 원문 위치:** Kiro Steering 원문을 `docs/agent-prompts/kiro-steering.md`(버전 포함)로 옮기고 adapter는 자리만 채운다. 예상 Decision은 예고로만 주고 구현이 닿을 때 하나씩 묻게 했다. 묻기 전에 기록하게 했다. `start_task` 직후와 계획 변경·적용·검증·완료 때 작업 맥락을 남기게 했다. 첫 빌드 전에 실행 환경을 확인해 있는 도구로 만들게 했다(패키지 관리자를 고정하지 않음). 평가는 크레딧 확보 뒤 K09 재실측에서 한다.
+- **Helper가 Builder 진행 중 활동을 봄:** Helper 질문이 다른 탭에서 오면 hook이 Builder 세션 기록(Kiro 비공개 형식)의 최근 두 턴을 읽어 질문 맥락에 붙인다. 진행 중인 턴도 포함한다. 패널 Helper(kiro-cli)에도 같은 기록을 붙인다. Agent 출처 기록이라고 표시하고 redaction한다. Core에 저장하지 않으며 Evidence가 아니다. 기록을 못 읽으면 붙이지 않는다.
+- **Kiro 채팅의 Helper 에이전트:** 연결 때 Project 폴더에 `.kiro/agents/vibe-helper.json`을 쓴다. 이 에이전트는 작업 공간 MCP 파일을 쓰지 않고(`includeMcpJson: false`) 자기 Helper 역할 Core 서버(`get_helper_context`만)를 쓴다. 역할은 프롬프트로 제한한다(정식 `helper.md`에 본선 규칙을 앞에 붙임). 이 탭의 모든 질문을 Helper 질문으로 기록한다. 탭 자동 생성은 공개 API가 없어 하지 않는다.
+- **Vibe Helper 도구 허용:** 연결 때 한 번 동의를 받으면 Kiro 작업 공간 권한 파일에 `vibe-helper/*`, `vibe-helper-helper/*` 허용 규칙 한 줄을 더한다. Kiro가 직접 쓴 모양의 파일만 고치고, 그 밖의 모양이면 손대지 않는다. 내부 형식이라 깨지면 Kiro가 다시 묻는 상태로 돌아간다.
+- **신뢰 안내:** 연결된 폴더가 신뢰되지 않았으면 신뢰가 필요하다고 알리고, 신뢰 직후 창 다시 로드를 제안한다. Kiro는 신뢰 전 hook·Steering을 적용하지 않고 hook을 세션 시작 때 읽기 때문이다.
+- **정리:** 예선 때 `~/.kiro/agents/`에 남은 Vibe Helper 전역 에이전트 12개를 `/Users/hurdoo/coding/archives/kiro-agents-legacy-20260913/`으로 옮겼다. KiroCrew 에이전트는 그대로 두었다.
+- **검증 한계:** unit·integration·패널 테스트로 확인했다. 실제 Kiro에서 에이전트 목록 표시, 권한 규칙의 즉시 적용, 같은 창 연결 뒤 hook·Steering 적재, Steering 0.5.0의 Decision 시점은 모델 크레딧이 필요해 K09 재실측으로 남긴다.
+
+## 본선: Mac 설치물의 host를 Kiro-native로 전환(0.2.0)
+
+- **맥락:** 프론트 담당자가 본선 구조로 패널을 다듬으려면 설치 가능한 VSIX가 필요하다. 예선 0.1.4 host는 Kiro 1.1.70 설치본 hash와 IDE 내부 비공개 Agent 연결을 전제로 해서 현재 Kiro(1.2.37)에서는 Agent를 실행하지 못한다. Core에는 `managed-kiro` 명령과 Project별 연결 API가 이미 있었지만, 포장된 Core가 그 명령을 거절했다.
+- **결정:** `finals/kiro-native`의 frontend host는 Core를 `managed-kiro --kiro-cli <설치 경로>`로 띄운다. 준비 상태는 kiro-cli 존재와 `kiro-cli whoami` 성공(종료 코드만 확인, 계정 출력은 읽지 않음)이다. 설치되지 않았으면 Core를 띄우지 않고, 로그인이 없으면 History만 읽게 한다. host는 `vibeHelper.openInKiro` 명령과 `openProjectInKiro(projectId)`로 POST `/api/kiro/bind` 후 생성 폴더를 새 창으로 연다. 응답의 폴더가 private `workspaces` 아래가 아니면 열지 않는다. 명령 등록은 패키징 때 manifest에 더해 프론트 저장소를 바꾸지 않는다. 버전은 0.2.0이다.
+- **예선 경로:** 1.1.70 IDE 내부 worker 코드는 저장소에 남지만 이 host 묶음에는 들어가지 않는다. 예선 0.1.4 설치물은 `main`의 `releases/macos/0.1.0/`에 그대로 있다.
+- **검증과 한계:** 격리 Kiro 1.2.37 프로필에서 설치, Core 시작, 연결, 채팅 hook, 채팅 Decision, kiro-cli Analyst, Concept State 갱신, Discovery 미리보기를 Core의 구조화 필드로 확인했다. 확장 업데이트 뒤에는 hook·MCP 경로가 이전 확장 폴더를 가리키므로 다시 연결해야 한다. MCP 첫 승인과 Workspace Trust 화면은 미확인이다. [프론트 인계](FRONTEND_KIRO_NATIVE_HANDOFF.md).
+
+## 본선: Evidence Analyst 기본 모델은 Auto
+
+- **근거:** 같은 16개 고정 사례·결정적 판정으로 kiro-cli 모델을 비교했다. Auto 14/16(형식 오류 0, 사례당 약 0.12크레딧), Sonnet 4.5 11→12/16(두 실행 판정 15/16 일치), GLM-5 12/16, Haiku 4.5 9/16, DeepSeek 3.2와 MiniMax M2.5는 형식 오류가 잦았다. 무료 Builder ID 계정에서는 Opus·GPT 계열이 열리지 않았다. [비교 결과](../tests/eval/results/evidence-analyst-models-kiro-cli.md).
+- **결정:** Core 일반 모드의 Analyst 기본 모델을 `auto`로 하고 `--analyst-model`로 바꿀 수 있게 한다. 다른 역할은 기존 `--model` 기본값(Haiku 4.5)을 쓰며 역할별로 바꿀 수 있다.
+- **위험과 대응:** Auto는 서버가 모델을 고르므로 시간이 지나면 바뀔 수 있다. 결과는 Core 규칙으로 걸러져 품질 저하가 잘못된 이해 판정이 아니라 Evidence 누락으로 나타난다. 본선 팀 계정에서 모델 목록과 같은 평가를 다시 확인하고, 고정 대안은 Sonnet 4.5로 둔다.
+
+## 본선: 채팅 확정 Decision의 판단 근거 Evidence와 kiro-cli 버전 범위
+
+- **맥락:** kiro-cli 2.28 Analyst로 실제 채팅 확정 Decision Episode를 분석했더니 JUSTIFIED_DECISION 제안이 거절됐다. 원인은 둘이다. Analyst가 학습자 문장의 순서를 바꿔 인용했고(정당한 거절), 규칙이 개념 표현을 확정 이유 문장 안에서만 찾았다. 채팅 확정의 이유는 "1시간은 짧아" 같은 짧은 원문 구절이라 개념 표현("공유 링크 만료 시간")은 같은 메시지의 앞부분에 있다.
+- **결정:** 확정 이유가 있고 `chatSource`가 있는 Decision에 한해, 확정 기록이 인용한 학습자 채팅 메시지 중 같은 Episode에 있는 USER `USER_MESSAGE` 원문도 개념 표현과 인용의 근거 텍스트로 인정한다. 글자 그대로 일치해야 하는 조건, 출처 USER, Episode 범위, 확정 이유 필수 조건은 그대로다. UI 확정 Decision의 규칙은 바뀌지 않는다.
+- **kiro-cli 버전:** Core 일반 모드의 kiro-cli 확인을 정확히 2.21.1에서 2.21.1 이상 2.x로 넓혔다. 2.28.0에서 ACP initialize와 실제 Analyst 1회(SUCCEEDED, 약 8초)를 확인했다. 3.x는 별도 확인 전까지 거절한다.
+
+## 본선: 채팅 밖 Agent는 kiro-cli로 실행하고, 실행기는 어댑터로 교체 가능하게 둔다
+
+- **맥락:** Kiro-native 구조에서 Builder는 사용자의 Kiro 채팅이지만 Discovery, 패널 Helper, Evidence Analyst는 채팅 밖에서 돌아야 한다. 예선 제품의 IDE 내부 실행기는 비공개 Agent 연결부와 Kiro 설치본의 정확한 버전·해시 고정에 의존해, 현재 Kiro 1.2.4와 자동 갱신되는 Agent 확장(실측 중 1.1.237→1.1.294)에서 거절되거나 다시 깨질 수 있다. kiro-cli는 IDE에 포함되지 않는 별도 앱이고 로그인도 따로다.
+- **결정:** 본선에서는 Core의 기존 kiro-cli ACP 실행기(`LocalAgentHost`, 역할별 `agents/vibe-helper-*.json`)로 채팅 밖 Agent를 돌린다. 사용자는 처음 한 번 kiro-cli 설치와 로그인을 한다. 같은 Kiro 구독 크레딧을 쓰는 이점이 있다.
+- **교체 가능성 확인:** Core 실행 계층(`packages/runtime`)은 `WorkflowAgentPort.invoke()`만 알고, kiro-cli 구현(`LocalAgentHost`)과 예선 IDE 내부 구현(`NativeAgentRelay`)이 같은 포트를 구현한다. 역할 결과는 역할별 Core MCP 도구로 제출되고 Core가 검증한다. 따라서 LLM API 실행기는 같은 포트를 구현하고 역할 프롬프트와 MCP 도구 호출 루프만 담당하면 되며 Core·계약·MCP는 바꾸지 않는다. 남는 정리 거리: 이벤트 타입 이름(`KiroAcpEvent`)의 Kiro 표기, 역할 프롬프트가 Kiro Agent JSON에 들어 있는 형식.
+- **실측:** kiro-cli 2.28.0의 `acp`가 initialize에 protocolVersion 1, HTTP MCP 지원으로 응답했다(모델 호출 없음). 개인 계정 로그인 뒤 실제 Analyst 실행은 남은 확인이다.
+- **대회 이후:** 초보자 제품화에서는 설치·로그인 부담을 없애는 LLM API 실행기를 어댑터로 추가하는 방안을 검토한다. 구독만으로 쓰는 이점은 CLI, 사용자 편의는 API가 크다. MVP 범위의 Bedrock 제외 결정은 그대로다.
+
+## 본선: 채팅 Decision 확정과 생성 workspace 재사용
+
+- **맥락:** K01 spike에서 Agent가 MCP로 Decision을 요청하고 사용자가 채팅에서 이유와 함께 답하는 흐름을 확인했다. 사용자는 Decision이 Kiro 채팅 안에서 끝나는 방식(A)을 골랐다. Core가 확정하려면 선택지가 필요하지만 사용자 답은 자연어다.
+- **결정(수정):** 처음에는 번호 규칙만으로 확정하려 했으나, 사용자가 번호 없이 내용으로 답하거나 여러 턴 뒤에 결정하는 경우를 다루지 못해 혼합 방식으로 바꿨다. Kiro Agent(LLM)가 대화 맥락을 보고 선택을 해석해 Builder 도구 `resolve_decision_from_chat`으로 기록하되, 근거가 된 **학습자 원문 구절**을 반드시 인용한다. Core(LLM 없음)는 의미가 아니라 확인 가능한 사실만 검증한다: 인용이 Decision 요청 이후 같은 Task의 USER 채팅 메시지에 글자 그대로 있는가, 이유·제3안 텍스트도 인용된 원문에 있는가, 인용 메시지에 번호가 하나만 명시돼 있다면 Agent 기록과 같은가(`findExplicitOptionMentions`, "2시간(1번)"은 1번). 확정 기록은 출처 USER에 `chatSource: { mappedBy: BUILDER, userMessageIds }`를 남기고 이유·제3안은 원문 구절만 저장한다. UI 경로는 `chatSource`를 넣을 수 없다. 의미 해석이 맞는지는 Agent의 채팅 확인 문장과 사용자 정정, 그리고 Agent 해석 정확도 평가 세트로 확인한다. Decision 확정은 기존처럼 1회만 가능하므로, 해석이 애매하면 Agent가 기록 전에 다시 묻고, 확정 뒤 번복은 새 Decision으로 다룬다. `parseChatDecisionReply`는 명시적 번호 답의 빠른 경로로 남긴다.
+- **채팅 Evidence:** Kiro 채팅의 일반 사용자 발언도 `UI_RECORD_CHAT_MESSAGE`로 USER 출처 Activity로 저장한다. 열린 Decision이 하나뿐이면 그 Decision Episode에, 아니면 Task의 작업 Episode에 붙여 Analyst가 Episode 종료 뒤 분석한다. Episode는 500개 이벤트 상한에 도달하면 이벤트만 저장하고 Episode에는 붙이지 않는다.
+- **출처 근거:** K01에서 UserPromptSubmit은 사용자가 보낸 프롬프트에만 발동했고, Kiro가 만든 Spec 실행 프롬프트와 Stop hook 계속 실행에는 발동하지 않았다. 단, 확장이 `sessions.sendPrompt`로 보낸 문장도 사용자 프롬프트로 들어오므로 Vibe Helper 확장은 이 경로로 내용을 대신 보내지 않는다.
+- **workspace:** 기존 프로젝트 import는 MVP 제외이므로 외부 workspace root 등록 계약을 만들지 않는다. "Kiro에서 시작하기"는 Core가 이미 관리하는 생성 workspace를 Kiro 폴더로 열고 그 안의 `.kiro/`에 Steering·hook·MCP 설정을 설치한다. 기존 `WorkspacePathPolicy` 경계를 그대로 쓴다.
+- **학습자 요약:** Core의 `buildLearnerProfile`(1.0.0)이 Concept State를 점수 없는 안내문으로 만들고, 열린 오해 이슈는 따옴표 안의 한 줄 요약(200자 상한)으로만 넣는다. Kiro adapter는 이 결과를 Steering이 `#[[file:]]`로 참조하는 파일에 쓴다. Steering은 세션 시작 때 고정되므로 세션 도중 변화는 UserPromptSubmit hook 출력으로 보완한다.
+
+## 본선: Kiro-native 개입 구조로 전환
+
+- **맥락:** 사용자의 원래 구상은 일반 Kiro 바이브코딩 중에 확장이 hook 등으로 개입하는 것이었다. 예선에서는 시간 때문에 패널이 Kiro 내부 Agent 세션을 직접 운영하는 별도 바이브코딩 환경이 됐다. 이 경로는 비공개 Agent 연결부와 Helper 권한 격리 절차에 의존한다.
+- **결정:** 코딩은 사용자의 Kiro 채팅·Spec·task 실행이 맡고, Vibe Helper는 Kiro Spec 파일, Steering(상시 포함과 `#[[file:]]` 참조), MCP, Hook과 보조 패널로 개입한다. 확정 Learning Spec은 Kiro Spec으로 내보내고, 실제 Decision은 MCP `request_decision`으로 채팅에서 묻는다. 사용자 발언은 promptSubmit hook으로 USER 출처, Agent 도구 사용은 hook으로 AGENT 출처로 기록한다.
+- **대안:** 예선 패널 경로 유지(별도 환경 문제 유지), Kiro Power로 배포(keyword 기반 동적 활성화라 상시 개입과 Core 생명주기·UI를 담기 어려움, 대회 이후 재검토).
+- **확인 근거:** Kiro 공식 문서의 hook trigger·Steering·Spec·Power 설명과 설치된 Kiro 1.2.4 `kiro.kiro-agent` 번들의 hook 식별자(`promptSubmit`, `agentStop`, `preToolUse`, `postToolUse`, `fileEdited`, `pre/postTaskExecution`, `USER_PROMPT`, `hooks.migrateToV2`). 실제 동작은 K01 spike 전까지 미검증이다.
+- **영향:** 예선 패널 경로는 fallback으로 보존한다. 기존 코드는 삭제하지 않는다.
+
+## 본선: Helper 역할은 프롬프트로 제한하고 상태 권한만 Core가 강제
+
+> 코드·shell 부분은 "본선: Helper는 읽기 권한만"(2026-10-09)으로 대체됐다.
+
+- **맥락:** 예선의 Helper read-only 강제는 provenance 분리, Builder와의 동시 수정 방지, Helper가 일을 대신 밀지 않는 제품 역할, Agent의 상태 조작 방지를 위해서였다. 이를 위해 별도 all-deny 세션과 준비 순서가 필요했다.
+- **결정:** Helper의 코드·shell 제한은 프롬프트로 둔다. 사용자가 명시적으로 부탁하면 수정할 수 있다. Evidence·Concept State·Decision 확정은 계속 Core가 강제한다. Helper와 Builder에 해당 도구를 주지 않고, Core는 Agent 출처 입력을 사용자 이해 근거로 받지 않는다. Analyst는 도구 없는 proposal 생성기로 유지한다.
+- **이유:** Kiro-native 구조에서는 모든 Agent 도구 사용이 hook으로 AGENT 출처로 기록되므로 provenance가 권한 없이도 유지된다. Builder가 사용자 Kiro 채팅이면 우리 쪽 Builder 세션과의 동시 수정 충돌도 없다. "바이브코딩으로 AI에게 물어본다"는 경험을 권한 격리보다 우선한다.
+- **영향:** AGENTS.md 설계 불변식과 PROJECT_BRIEF §0을 갱신했다. Helper 위치는 Kiro 채팅 탭(A)을 먼저 실측하고 실패하면 패널(B)을 쓴다.
+
+## 본선: Core 최소 수정, Kiro 기능은 adapter에만
+
+- **맥락:** Core를 분리한 목적은 다른 host로의 이식성이다. Kiro 전용 기능은 AWS 대회 평가를 위해 쓴다.
+- **결정:** Core와 contracts는 host 중립으로 유지한다. 기존 `ActivityEvent`(`USER_MESSAGE`, `DECISION_REQUESTED/RESOLVED`, `CONCEPT_REPORTED`)와 Episode 계약을 재사용한다. Core 신규 후보는 외부 workspace root의 Project 등록과 Concept State의 host 중립 학습자 요약 두 가지로 제한한다. `.kiro/` 파일 위치, hook 형식, Steering 문법, EARS 렌더링, `session_id` 매핑은 `packages/kiro-adapter`와 확장에 둔다.
+- **영향:** Claude Code 등 다른 host는 같은 Core에 adapter만 추가하면 된다(예: 학습자 요약을 `CLAUDE.md`에 배치). 구체 Core 변경은 K02에서 테스트와 함께 확정한다.
+
 ## 문서 날짜 표기 정리
 
 - 사용자 요청으로 README와 추적 중인 텍스트 문서의 지정 기준 이후 날짜 표기를 제거한다. 승인·변경 내용과 검증 결과·한계 자체는 남긴다.
@@ -102,7 +228,7 @@
 - **검증/승인 경계:** 자동 검사·VSIX 후보 준비는 이번 요청 범위다. commit/push·외부 제출·Trust 변경·사용자 창 종료는 별도 실행하지 않는다. 최종 제출의 사람 pilot·baseline·live demo 요건을 완화하지 않는다. 미커밋 후보는 manifest의 dirty 상태를 그대로 기록한다.
 - **Spec 복귀:** frontend가 기존 Core mutation을 화면 이동에 잘못 호출하고 있었다. 돌아가기는 저장 후보·입력·Spec을 보존하고, 새 후보 받기에서만 기존 command와 새 preview를 실행한다. 선택 완료 Session 재개나 새 API는 추가하지 않는다.
 - **제출 소스:** Mac 전용 임시 경로 대신 OS 임시 경로를 사용하고 Windows home 표기 검사·문서 사본 일반화, 이번 kit helper/fixture 포함을 보완한다. 원본 runtime/test를 정제해서 바꾸지 않으며 신규 파일은 명시적 allowlist만 포함한다. 사본과 archive는 로컬 검토 후보이며 공개나 독립 clean 재현 PASS를 자동 선언하지 않는다.
-- **소스 재현 결과:** 고정 ZIP을 별도 폴더에 풀고 각 저장소 의존성을 lockfile로 새 설치했다. backend 전체 check, frontend753개/타입/build, panel build 뒤 native169+selector6, 실제 consumer PASS 및 source781개 hash 불변을 확인했다. OS·Node·pnpm·package store·Edge는 같은 PC의 검증된 자원을 사용하므로 새 PC/오프라인 재현이나 실제 모델 품질을 증명하지 않는다. ZIP 안 문서는 동결 시점 그대로 두고 후속 결과는 외부 receipt와 [재현 보고서](SOURCE_REPRODUCIBILITY_20260929.md)에 연결한다.
+- **소스 재현 결과:** 고정 ZIP을 별도 폴더에 풀고 각 저장소 의존성을 lockfile로 새 설치했다. backend 전체 check, frontend753개/타입/build, panel build 뒤 native169+selector6, 실제 consumer PASS 및 source781개 hash 불변을 확인했다. OS·Node·pnpm·package store·Edge는 같은 PC의 검증된 자원을 사용하므로 새 PC/오프라인 재현이나 실제 모델 품질을 증명하지 않는다. ZIP 안 문서는 동결 시점 그대로 두고 후속 결과는 외부 receipt와 [재현 보고서](archive/preliminary/SOURCE_REPRODUCIBILITY_20260929.md)에 연결한다.
 
 ## 2026-09-29: B7~B11 보완과 broken pnpm pin 교체
 
@@ -120,7 +246,7 @@
 - **결정:** 인식 가능한 local `logUri`에서 현재 창 ID를 구하고, canonical workspace와 ID가 모두 맞는 endpoint 하나만 선택한다. 현재 창 ID가 없으면 종전의 유일한 workspace endpoint만 허용한다. ID가 있는데 다른 창만 있으면 그 창으로 fallback하지 않으며 현재 창 등록을 bounded 대기한다. 모순/중복 endpoint·잘못된 port/token은 계속 거절한다. 이 선택을 일반 role, protected Helper/Analyst와 barrier에 함께 적용한다.
 - **전환/복구:** 대상 생성 폴더의 유효한 endpoint가 이미 있으면 현재 창을 같은 폴더로 재전환하지 않고 기존 창 worker에 처리를 맡긴다. 대상 창에 worker가 없거나 Trust가 필요한 경우 사용자에게 기존 창 확인과 명시적 재시도를 안내하며 창 강제 종료·자동 유료 retry·Trust 변경을 하지 않는다. `NATIVE_ENDPOINT_AMBIGUOUS`의 run 오류 전달은 유지한다. transient run의 재시작 후 소실은 B3의 별도 저장 계약이다.
 - **검증 경계:** 합성 Windows/POSIX context, 같은 폴더의 두 창/foreign 경로/누락/중복/등록 지연, worker 라우팅과 terminal 오류 전파를 모델 없이 재현한다. 기존 private source/permission gate·prompt·Core protocol·DB는 변경하지 않는다. Windows 1.1.70의 실제 context/두 창과 새 kit/VSIX는 해당 환경에서 추가 검증한다.
-- **결과:** unit156/integration365/eval41/Campus3/smoke6, 확장CJS167, panel build와 새 bundle activation PASS. E2E는 기존 사용자 서버/브라우저 sandbox 제약을 분리한 실행에서12개 PASS. 초기 환경 실패와 Windows 미실측은 [B6 답변](FRONTEND_LIVE_TEST_RESPONSE_20260929.md)에 보존했다.
+- **결과:** unit156/integration365/eval41/Campus3/smoke6, 확장CJS167, panel build와 새 bundle activation PASS. E2E는 기존 사용자 서버/브라우저 sandbox 제약을 분리한 실행에서12개 PASS. 초기 환경 실패와 Windows 미실측은 [B6 답변](archive/preliminary/FRONTEND_LIVE_TEST_RESPONSE_20260929.md)에 보존했다.
 
 ## 2026-09-28: 실제 프론트와 함께 제출 준비 재개
 
@@ -272,7 +398,7 @@
 ## 2026-09-24: 다른 기기 재개를 위한 개발 checkpoint
 
 - **사용자 요청:** 현재 W1~W5 작업의 commit/push와 다른 기기 재개 준비. push 대상은 collaborator 권한이 있는 기존 조직 remote `https://github.com/Hello-KU-tty/core.git`의 `codex/windows-extension-runtime-20260923`으로 확인했다. 과거 작업별 local-only 또는 commit/push 제외 범위는 당시 기록으로 보존한다.
-- **인계:** 필요한 source·검증 script·tests·canonical prompts와 sanitized 결과를 함께 commit한다. [재개 문서](CROSS_DEVICE_HANDOFF_20260924.md)에 도구 pin·빌드·실패 근거·남은 gate를 기록하고 새 기기에서는 새 합성 환경을 사용한다. private DB/profile/credential/원본 로그와 생성 설치물은 Git에 포함하지 않는다. PR/merge/release나 사용자 데이터 동기화는 수행하지 않는다.
+- **인계:** 필요한 source·검증 script·tests·canonical prompts와 sanitized 결과를 함께 commit한다. [재개 문서](archive/preliminary/CROSS_DEVICE_HANDOFF_20260924.md)에 도구 pin·빌드·실패 근거·남은 gate를 기록하고 새 기기에서는 새 합성 환경을 사용한다. private DB/profile/credential/원본 로그와 생성 설치물은 Git에 포함하지 않는다. PR/merge/release나 사용자 데이터 동기화는 수행하지 않는다.
 - **상태:** 소스 인계가 W5 출하 완료를 뜻하지 않는다. W5와 T19/T19-N의 기존 미완료 상태를 유지한다.
 
 ## 2026-09-24 W5 packaged 검증기 준비 한도 정합
@@ -339,7 +465,7 @@
 - **source spike:** pin한 Agent 1.1.28 SHA의 Windows native `DefaultTerminal`은 `process.env`에서 직접 PowerShell child를 만들며 VS Code terminal 환경 collection을 사용하지 않는다. 전역 환경이나 Agent private source를 수정하지 않는다. Core가 생성 workspace의 보호된 `.kiro/vibe-tools.cmd`를 발급하고 native shell은 이 고정 진입점으로 기존 허용 명령만 실행한다. worker는 파일·scope를 검증한 뒤 기존 one-time permission/command guard를 적용한다. 일반 workspace와 기존 Mac/CLI 경로는 유지한다.
 - **획득:** 공식 npm `pnpm/11.12.0` metadata를 2026-09-24 조회했다. tarball은 `https://registry.npmjs.org/pnpm/-/pnpm-11.12.0.tgz`, integrity는 `sha512-ggpvvQ2fBMImY4ACrq0eRTQKkTndXcB3wdg+9EqiSByOtmN7TJqmlqPH41uoGOSc8nIT5fK5ETjQm3o+JuiYug==`다. 고정 URL·hash·크기·timeout 후 일반 파일만 private staging으로 추출하고 cache를 다시 검증한다. dependency/install script 추가 없이 Node 기본 API를 쓴다.
 - **권한:** launcher는 Core 환경을 상속하지 않고 선택한 Node/pnpm과 private pnpm config/cache/store만 제공한다. package script는 기존 생성 앱 실행 권한 안에서 동작하며 승인된 esbuild/better-sqlite3 이외 dependency lifecycle은 거절한다. 이는 임의 생성 코드에 대한 OS sandbox 완성을 주장하지 않는다.
-- **검증:** [W4 계획](T19_W4_TOOLCHAIN_PLAN.md), [실측 결과](spikes/T19_W4_TOOLCHAIN_RESULTS_20260924.md). 두 도구 환경에서 native shell·실제 HTTP, 실패·복구와 최종 `pnpm check`를 통과했다. 중간 조회 실패는 같은 run의 read-only 재관측으로 확인했으며 최초 실패를 보존했다. clean machine·workspace 전환 host crash·조회 안정성과 전체 수직 흐름의 출하 판정은 W5에 남긴다.
+- **검증:** [W4 계획](archive/preliminary/T19_W4_TOOLCHAIN_PLAN.md), [실측 결과](spikes/T19_W4_TOOLCHAIN_RESULTS_20260924.md). 두 도구 환경에서 native shell·실제 HTTP, 실패·복구와 최종 `pnpm check`를 통과했다. 중간 조회 실패는 같은 run의 read-only 재관측으로 확인했으며 최초 실패를 보존했다. clean machine·workspace 전환 host crash·조회 안정성과 전체 수직 흐름의 출하 판정은 W5에 남긴다.
 
 ## 2026-09-24: W3 Core 소유권과 Windows Helper 보조 창
 
@@ -347,12 +473,12 @@
 - **선택:** global storage의 단일 Core lock/instance를 여러 확장 창이 공유한다. 각 host는 인증된 짧은 lease를 갱신하며, 한 창 종료나 workspace 전환 중에도 다른 창의 Core를 종료하지 않는다. 마지막 lease가 사라진 뒤 30초 유예를 지나면 Core가 SQLite를 닫고 credential을 폐기한다. crash 후 새 instance에는 durable state만 복원하며 응답 불명확 mutation과 진행 중 stream은 자동 재생하지 않는다. 정상 연결된 구버전 owner의 임의 종료 없이 업데이트 대기 상태를 표시한다.
 - **데이터:** 초기화와 migration은 owner lock 안에서 수행하며 기존 SQLite backup/quick_check를 재사용한다. 새 schema를 구버전 코드로 여는 것은 거절한다. DB/backup과 runtime cache/quarantine은 자동 삭제하지 않는다.
 - **native/UI:** Windows pinned source custom Agent와 기존 worker·SDK·제품 패널을 재사용한다. Helper/Analyst의 Core 발급 전용 workspace를 보조 창으로 열며 두 창 모두 같은 extension global storage를 사용한다. 준비/연결/native 가능 상태와 실제 Core 저장 완료를 구분한다.
-- **검증:** [W3 계획](T19_W3_LIFECYCLE_PLAN.md). 결과 확인 전 W3/W5 PASS를 주장하지 않는다. 새 dependency·Agent prompt 정책·전역 IDE 설정 변경은 없다.
+- **검증:** [W3 계획](archive/preliminary/T19_W3_LIFECYCLE_PLAN.md). 결과 확인 전 W3/W5 PASS를 주장하지 않는다. 새 dependency·Agent prompt 정책·전역 IDE 설정 변경은 없다.
 - **결과:** [W3 실측](spikes/T19_W3_LIFECYCLE_RESULTS_20260924.md)에서 통합 VSIX 일반 창 설치, native Discovery·Helper 저장, 자동 보조 창과 실제 owner/마지막 창 종료를 확인했다. 실제 owner 종료에서 발견한 Core 중단은 managed child의 process group 분리로 보정하고 lease 종료까지 검증했다. crash/rotation·update/backup·downgrade와 전체 회귀도 통과했다. W3 완료만 판정하며 W4/W5·T19/T19-N 한계는 유지한다.
 
 ## 2026-09-24: W2 portable Core와 검증된 private runtime
 
-- **상태:** 사용자 `T19 w2` 착수 요청과 기존 Windows 설치 요구에 따른 구현 선택. [계획](T19_W2_PORTABLE_CORE_PLAN.md)의 실제 결과로 완료 여부를 판정한다.
+- **상태:** 사용자 `T19 w2` 착수 요청과 기존 Windows 설치 요구에 따른 구현 선택. [계획](archive/preliminary/T19_W2_PORTABLE_CORE_PLAN.md)의 실제 결과로 완료 여부를 판정한다.
 - **결정:** 기존 esbuild로 Core/bridge/host adapter를 bundle하고 runtime resource manifest에 파일별 SHA-256·platform·prompt version을 기록한다. SQLite 13.0.3의 win32-x64 prebuild와 JS wrapper, migration SQL/journal 및 실행 dependency license만 포함한다. 런타임 탐색은 Kiro child → 기존 Node → 검증된 cache → 공식 Node 조건부 획득 순서를 따른다.
 - **획득:** 공식 `https://nodejs.org/dist/v24.19.0/SHASUMS256.txt`를 2026-09-24 재조회했다. `win-x64/node.exe`의 SHA-256은 `3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237`이다. HTTPS 고정 URL·redirect 금지·크기 제한·hash pin 후 private staging에서만 실행하며 완료 cache도 재검증한다. archive 대신 executable을 받아 임의 archive extraction을 피한다. Node license는 검증된 공식 ZIP의 LICENSE를 패키지에 동봉한다. 이 선택은 download bytes가 ZIP보다 커지는 tradeoff가 있어 실제 크기를 기록한다.
 - **도구:** 새 npm dependency나 lifecycle script는 추가하지 않는다. Windows VSIX writer/reader는 기본 PowerShell/.NET System.IO.Compression을 사용한다. 경로는 환경 변수 data로 전달하며 shell 문자열에 삽입하지 않는다. 기존 macOS packaging은 유지한다.
@@ -834,7 +960,7 @@
 - **완료 판정:** 계약·mock 인계, transport 실측, Discovery/Spec 실제 연결, Builder/Helper·Decision 연결과 프론트 로컬 재현을 단계별로 기록한다. T19 완료는 자체 패널의 실제 연속 흐름과 Crew/Core 저장 상태 일치로 판정하며 화면 mock이나 내장 Agent 선택기만으로 대체하지 않는다. Evidence/Final Upgrade 전체 화면 parity·polish와 공개 배포는 별도 후속 범위로 남긴다.
 - **tradeoff:** 내장 Agent config만 제공할 때보다 runtime lifecycle과 프론트 협업 계약이 늘어난다. 대신 프론트가 데이터 저장과 모델 실행을 혼동하거나 Crew 구현을 화면별로 복제하지 않고 Discovery부터 실제 프로젝트 작업까지 연결할 수 있다. 별도 IDE 제작, 다른 model provider·host adapter, 기존 project import, cloud sync와 외부 공개 서버는 추가하지 않는다.
 - **참조:** [프론트 prototype](https://github.com/Hello-KU-tty/program/tree/c639a595353f0db38e09112ba094ce5510fb1cbd), [Kiro ACP 공식 문서](https://kiro.dev/docs/cli/acp/), [프론트 연동 계획](FRONTEND_INTEGRATION.md). 공식 지원 설명은 설치 환경에서의 성공 증거를 대신하지 않는다.
-- **완료 기준 보완:** 같은 날 사용자는 계획 승인을 요청하며, push된 backend와 지침을 받은 frontend 개발자가 자신의 컴퓨터에서 실행하고 실제 Kiro IDE의 Discovery·Spec·Builder·History 화면을 모두 구현할 수 있어야 한다고 명시했다. History 목록·단계별 복원·재시작, 외부 client 소비와 clean checkout, 네 화면의 실제 IDE 최소 예제를 인계 조건에 포함한다. frontend 제품 화면의 최종 디자인 완료와 backend 인계 완료는 구분한다. 독립 local backend·HTTP/SSE·ACP·client 배치안은 [T19_IMPLEMENTATION_PLAN.md](T19_IMPLEMENTATION_PLAN.md)에 제안했으며 상세 계획 승인은 아직 받지 않았다.
+- **완료 기준 보완:** 같은 날 사용자는 계획 승인을 요청하며, push된 backend와 지침을 받은 frontend 개발자가 자신의 컴퓨터에서 실행하고 실제 Kiro IDE의 Discovery·Spec·Builder·History 화면을 모두 구현할 수 있어야 한다고 명시했다. History 목록·단계별 복원·재시작, 외부 client 소비와 clean checkout, 네 화면의 실제 IDE 최소 예제를 인계 조건에 포함한다. frontend 제품 화면의 최종 디자인 완료와 backend 인계 완료는 구분한다. 독립 local backend·HTTP/SSE·ACP·client 배치안은 [T19_IMPLEMENTATION_PLAN.md](archive/preliminary/T19_IMPLEMENTATION_PLAN.md)에 제안했으며 상세 계획 승인은 아직 받지 않았다.
 - **착수 승인:** 이후 사용자는 위 상세 계획에서 push를 제외하고 승인했다. 구현·실측·검증과 검증 후 commit은 진행하되 push 직전에 다시 승인받는다. frontend OS는 Windows로 확인됐다. Windows native/PowerShell 경로를 기준으로 하고 WSL이나 macOS 검증만으로 Windows 실행을 보장하지 않는다. 기존 사용자 Crew 설치·DB·설정은 변경하지 않고 격리된 synthetic data/workspace에서 첫 transport spike를 수행한다.
 
 ## 2026-09-07: T19 장기 실행의 SQLite 네이티브 충돌 검증
@@ -995,7 +1121,7 @@
 - **참고 근거:** [ESLint client](https://github.com/microsoft/vscode-eslint/blob/main/client/src/client.ts)와 [languageclient](https://github.com/microsoft/vscode-languageserver-node/blob/main/client/src/node/main.ts)의 editor runtime/fork, [.NET acquisition](https://github.com/dotnet/vscode-dotnet-runtime/blob/main/Documentation/commands.md)의 기존 탐색·user-level install, [Java extension](https://github.com/redhat-developer/vscode-java#setting-the-jdk)의 embedded JRE와 project JDK 구분을 2026-09-23 조회했다. [Electron runAsNode](https://www.electronjs.org/docs/latest/tutorial/fuses#runasnode)는 비활성화될 수 있어 Windows Kiro의 지원을 별도로 측정한다. 이는 Kiro public Agent API 또는 해당 dependency 추가 승인이 아니다.
 - **용량 관측:** 공식 npm `better-sqlite3-13.0.3.tgz`의 `prebuilds/win32-x64.node`는 압축 전 1,989,632 bytes다. Node 24.19.0 win-x64 전체 ZIP의 Content-Length는 37,304,352 bytes였다. 실제 VSIX/설치 디스크/RAM 측정값과 구분하며 총 용량 목표를 측정 없이 보장하지 않는다.
 - **대안과 tradeoff:** 모든 Node/OS binary를 포함하면 offline 최초 기동은 단순해지지만 중복 용량이 늘어난다. 설치된 Node만 요구하면 초보자의 무설치 경험이 깨진다. editor runtime 우선은 패키지를 줄이지만 host compatibility 검증이 필요하고, 조건부 다운로드는 network·재시도·무결성 관리가 필요하다. runtime 파일 재사용이 별도 Core process의 메모리 사용량을 없애지는 않는다.
-- **진행 경계:** [Windows 인계](WINDOWS_EXTENSION_HANDOFF_20260923.md)와 T19-W0~W5로 요구·artifact 목록·수직 흐름 검증을 관리한다. 기존 T19/T19-N 미완료와 Evidence quality 제한을 유지한다. 과거 macOS-only/fixed-path 결정은 그 baseline의 관측으로 보존하며, 제품 설치 목표는 이 결정이 갱신한다. runtime/Agent gate를 삭제해 성공으로 만들지 않는다.
+- **진행 경계:** [Windows 인계](archive/preliminary/WINDOWS_EXTENSION_HANDOFF_20260923.md)와 T19-W0~W5로 요구·artifact 목록·수직 흐름 검증을 관리한다. 기존 T19/T19-N 미완료와 Evidence quality 제한을 유지한다. 과거 macOS-only/fixed-path 결정은 그 baseline의 관측으로 보존하며, 제품 설치 목표는 이 결정이 갱신한다. runtime/Agent gate를 삭제해 성공으로 만들지 않는다.
 
 ## 2026-09-23: Windows 작업은 native recovery에서 분기
 
@@ -1005,7 +1131,7 @@
 
 ## 2026-09-24: W1 Windows runtime 재사용과 native capability 판정
 
-- **상태:** 사용자 승인 [W1 계획](T19_W1_WINDOWS_CAPABILITY_PLAN.md)의 8개 native turn과 회귀/종료 감사를 완료했다. [결과와 한계](spikes/T19_W1_WINDOWS_CAPABILITY_RESULTS_20260924.md), [sanitized receipt](spikes/T19_W1_WINDOWS_RECEIPTS_20260924.json)를 근거로 W1만 완료하고 W2를 다음 작업으로 둔다.
+- **상태:** 사용자 승인 [W1 계획](archive/preliminary/T19_W1_WINDOWS_CAPABILITY_PLAN.md)의 8개 native turn과 회귀/종료 감사를 완료했다. [결과와 한계](spikes/T19_W1_WINDOWS_CAPABILITY_RESULTS_20260924.md), [sanitized receipt](spikes/T19_W1_WINDOWS_RECEIPTS_20260924.json)를 근거로 W1만 완료하고 W2를 다음 작업으로 둔다.
 - **runtime:** 설치된 Kiro IDE 1.1.14 / Agent 1.1.28 / API 1.131.0 / Windows x64에서 extension-host의 Node 24.18.0·Electron 42.7.0·NAPI 10을 `process.execPath` + `ELECTRON_RUN_AS_NODE=1` child로 재사용할 수 있었다. 실제 win32-x64 SQLite transaction/reopen, Core/SDK와 stdio bridge가 통과했다. 개발 pin 24.19.0/11.12.0은 별도로 충족했으며 바꾸지 않는다. 다른 product runtime 후보나 ARM64를 검증했다고 확대하지 않는다.
 - **Windows 경계:** private directory/descriptor의 owner·DACL 검증을 추가하고 unsafe ACL/junction/hardlink를 거절한다. cloud session hash는 설치 source에 맞게 drive 경로의 slash/lowercase를 정규화한다. CRLF·separator·fixture portability를 고쳤고 canonical prompt 정책, dependency/lifecycle 허용 범위는 유지한다.
 - **native 동시성:** 한 창의 custom Builder/Helper queue는 여전히 직렬이었다. 이 Agent 버전은 `agentArtifacts`를 항상 켜는 승격 목록에 포함하여 과거 stable-empty-experiments 가정이 성립하지 않는다. 기존 protected built-in Helper를 Windows에 그대로 허용하지 않는다. 합성 profile에서 별도 Development Host를 만든 뒤 Helper의 empty catalog/all-deny, 별도 windowId와 실제 응답 중첩을 확인했다. 이는 **두 창 capability 관측**이며 제품 UX 채택 승인이 아니다. W3의 source gate와 lifecycle/UX 설계에 이 제한을 명시한다.
@@ -1015,7 +1141,7 @@
 ## 2026-09-26: 프론트 연결 인계 우선과 품질 개선 병행
 
 - **승인 근거:** 사용자는 성능·품질 개선을 모두 기다리기보다 frontend에 먼저 연결 기반을 넘기고 병행 작업하도록 재평가를 요청했다. frontend 요청서와 소스를 검토한 브리핑 뒤 해당 계획의 문서 작성을 승인했다.
-- **결정:** [프론트 인계 계획](FRONTEND_HANDOFF_PLAN_20260926.md)에 요청서 A~D 답변·전달물·기존 어댑터 수정점·검증 순서를 고정한다. `program`의 `LocalCoreDiscoveryPort`와 UI를 유지하고 Windows의 자동 Core/worker/connection 경계를 재사용 가능한 host 모듈로 제공하는 작업을 우선한다. 현재 reference panel 구현과 아직 제공되지 않은 독립 모듈을 구분한다.
+- **결정:** [프론트 인계 계획](archive/preliminary/FRONTEND_HANDOFF_PLAN_20260926.md)에 요청서 A~D 답변·전달물·기존 어댑터 수정점·검증 순서를 고정한다. `program`의 `LocalCoreDiscoveryPort`와 UI를 유지하고 Windows의 자동 Core/worker/connection 경계를 재사용 가능한 host 모듈로 제공하는 작업을 우선한다. 현재 reference panel 구현과 아직 제공되지 않은 독립 모듈을 구분한다.
 - **계약:** local protocol 1, Core 식별자·entity별 revision·idempotency·provenance와 권한 경계를 유지한다. frontend는 실제 지원 source 판정과 자동 연결을 사용하며 live 실패를 Mock 성공으로 바꾸지 않는다. 사용자 제품 설치에 수동 backend/connection 경로를 다시 요구하지 않는다.
 - **완료 구분:** W5 설치·실행은 기존 실측으로 완료됐다. 첫 frontend 연결 인계와 상위 T19/T19-N·MVP 완료는 별도 판정이다. 성능·Analyst 정확도·개인화 효과의 후속 개선은 병행하며 AC-MVP-012/015나 보안·데이터 경계를 완화하지 않는다. 새 제품 범위나 dependency 도입 결정은 아니다.
 - **이번 실행 범위:** 계획·인계 안내 링크·다음 작업 문서화다. host 구현, frontend 저장소 수정, 모델 호출, 외부 전달·commit/push는 이번 문서 작성으로 수행하거나 완료한 것으로 기록하지 않는다.
