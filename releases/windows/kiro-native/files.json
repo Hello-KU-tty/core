@@ -11,13 +11,13 @@
   },
   {
     "name": "extension/dist/extension.js",
-    "bytes": 1337354,
-    "sha256": "072a6150c98d29fea487465711722e4b722815d94c344fb82840132433ef667e"
+    "bytes": 1342532,
+    "sha256": "64a02fa523ab57dd400b4714d34647f37456f71a929e7f5755a6a3d6e2736da5"
   },
   {
     "name": "extension/dist/webview/main.js",
-    "bytes": 171565,
-    "sha256": "df32230533be0bc9a12280ba31193e2822b5546d5c125b26777447c610433d52"
+    "bytes": 175168,
+    "sha256": "f564cd2d0be0f820431b26b7c323cd50c442eb088d5602b8fd2243fecbdf9f66"
   },
   {
     "name": "extension/media/agent-panel.svg",
@@ -66,8 +66,8 @@
   },
   {
     "name": "extension/portable/bin/core.mjs",
-    "bytes": 1090735,
-    "sha256": "75936f3ec2abeedabba13bee032989184923e4e343ca85dfd389063359bce054"
+    "bytes": 1090794,
+    "sha256": "312d6d4ec328c25cdb1c099edc2663a000b87804f2c159e3f75a83ceec61fd4d"
   },
   {
     "name": "extension/portable/bin/extension.cjs",
@@ -111,8 +111,8 @@
   },
   {
     "name": "extension/portable/bin/runtime.cjs",
-    "bytes": 455323,
-    "sha256": "31a4d19c53e7b1e7737ca7c04eebfccd19bde999ef69885b015622736015cb8d"
+    "bytes": 455382,
+    "sha256": "b4db61f846e8baa0f476ba71c0605bb88f45288a894f8a511214b975547b8163"
   },
   {
     "name": "extension/portable/drizzle/0000_daily_moira_mactaggert.sql",
@@ -222,7 +222,7 @@
   {
     "name": "extension/portable/manifest.json",
     "bytes": 10621,
-    "sha256": "43a43793bd796efc1e62c574a536e80e7c5fc9e9f2f47906a35c499dbd6db755"
+    "sha256": "aeb38f8ddfac82d75cd93dbeed57a2ebe68761bcce45678698ae40b0ea542472"
   },
   {
     "name": "extension/portable/node_modules/better-sqlite3/lib/binding.js",
