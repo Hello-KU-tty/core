@@ -3,7 +3,7 @@
 본선 방향([PROJECT_BRIEF §0](../PROJECT_BRIEF.md))에 맞춰 Mac 설치물의 host를 Kiro-native로 바꿨다. 0.2.1은 첫 실사용 체험 피드백(K09)을 반영했고, 0.2.2는 본선 계정 재실측에서 나온 Analyst·Evidence 정책 변경을 더했고, 0.2.3은 Kiro 채팅 Helper 에이전트가 도구를 받지 못하던 문제를 고치고 Helper를 읽기 전용으로 바꿨고, 0.2.4는 Kiro 연결이 Core 재시작을 넘어 유지되게 하고 끊긴 동안의 학습자 발언을 큐로 보존하며, 0.2.5는 같은 코드로 Windows x64 설치물을 빌드할 수 있게 했다(Mac은 backend, Windows는 frontend가 빌드). 프론트 담당자가 설치해 패널을 다듬을 수 있는 상태다.
 
 - 설치 파일: Mac [`releases/macos/kiro-native/builder-helper-agent-panel-0.2.6-darwin-arm64.vsix`](../releases/macos/kiro-native/builder-helper-agent-panel-0.2.6-darwin-arm64.vsix) · 41,540,133 bytes · SHA-256 `6deb34e6d9534b0328a726daa0cfef79abd6081a21de47993d029fb123f356a7` · [receipt](../releases/macos/kiro-native/macos-vsix-receipt.json) · [항목별 hash](../releases/macos/kiro-native/files.json)
-- Windows 설치물: frontend가 빌드해 `releases/windows/kiro-native/`에 올린다([Windows에서](#windows에서)).
+- 설치 파일: Windows [`releases/windows/kiro-native/builder-helper-agent-panel-0.2.6-win32-x64.vsix`](../releases/windows/kiro-native/builder-helper-agent-panel-0.2.6-win32-x64.vsix) · 2,534,895 bytes · SHA-256 `7fc736437b48af1c7132d70da071131708b6c4ab743c08917423b5dd217a5398` · [receipt](../releases/windows/kiro-native/windows-vsix-receipt.json) · [항목별 hash](../releases/windows/kiro-native/files.json). frontend가 backend `850b276`에서 빌드하고 확인했다([0.2.6 Windows 확인](#026-windows-확인-2026-10-10)).
 - 빌드 출처: backend `a18f718`(`finals/kiro-native`), frontend `c2c873c`(`program` 저장소 `finals/trial-feedback` 브랜치). 0.2.5(backend `1f1eea4`), 0.2.4(backend `2b0487a`), 0.2.3(backend `7df50ec`), 0.2.2(backend `012c664`), 0.2.1(backend `4def349`)과 0.2.0(frontend `e65cd7f`)은 Git 이력에 있다.
 
 ## 프론트 담당자 빠른 시작
@@ -93,7 +93,7 @@ Kiro를 껐다 켜거나 확장을 업데이트해도 0.2.4부터는 3번을 다
 
 **분담:** Mac 설치물은 backend가, Windows 설치물은 frontend가 빌드·확인·업로드한다([DECISIONS](DECISIONS.md) "본선: 플랫폼 분담"). 0.2.5부터 Kiro-native host·Core·hook·MCP bridge가 Windows x64를 지원한다. 본선 경로는 Kiro 내부 비공개 API 대신 공식 기능(Steering·hook·MCP·사용자 에이전트)과 kiro-cli를 쓰므로 frontend 코드는 그대로 빌드한다. 예선 Windows 설치물 0.0.18([WINDOWS_VSIX](WINDOWS_VSIX.md))은 Kiro 1.1.70 전용이라 본선 확인에 쓰지 않는다.
 
-**Windows에서 확인된 범위:** Windows 분기(kiro-cli 위치, Kiro 작업 폴더 해시의 소문자·슬래시 정규화, cmd.exe용 hook 명령 인용, 생성 폴더 터미널 PATH, 실제 Node로 Core 실행)는 Windows를 흉내 낸 테스트와 Kiro 1.2.56 코드로 확인했다. 실제 Windows 기기에서는 아직 돌려 보지 않았다. 아래 확인이 첫 실측이다.
+**Windows에서 확인된 범위:** Windows 분기(kiro-cli 위치, Kiro 작업 폴더 해시의 소문자·슬래시 정규화, cmd.exe용 hook 명령 인용, 생성 폴더 터미널 PATH, 실제 Node로 Core 실행)는 Windows를 흉내 낸 테스트와 Kiro 1.2.56 코드로 확인했다. 2026-10-10 Windows 11 x64 실기기(Kiro 1.2.56)에서 아래 1~7을 모두 통과했다([0.2.6 Windows 확인](#026-windows-확인-2026-10-10)). 생성 폴더(새 창) 경로와 Builder Decision 턴은 Windows에서 아직 돌려 보지 않았다.
 
 ### 1. 준비 (Windows 11 x64)
 
@@ -158,8 +158,27 @@ host API 형식은 [`examples/kiro-panel/src/frontend-host.d.cts`](../examples/k
 - Workspace Trust 화면은 사용자가 직접 거쳤지만 우리 신뢰 안내·다시 로드 알림이 떴는지는 기록하지 못했다. 도구 허용 동의(저장값 `ALLOW`)와 새 창 확인(생성 폴더가 새 창으로 열림)은 기록으로 확인했다.
 - 셸 명령 승인은 그대로 매번 뜬다(K11).
 - Helper 답 수집은 Kiro 세션 기록 파일(비공개 형식)에 기대며, 못 읽으면 안내 문구로 기록한다.
-- 지원 플랫폼은 Apple Silicon Mac과 Windows x64다. 그 밖의 플랫폼에서는 host가 `KIRO_NATIVE_HOST_PLATFORM_UNSUPPORTED`로 시작하지 않는다. Windows는 실제 기기 실측 전이다.
+- 지원 플랫폼은 Apple Silicon Mac과 Windows x64다. 그 밖의 플랫폼에서는 host가 `KIRO_NATIVE_HOST_PLATFORM_UNSUPPORTED`로 시작하지 않는다. Windows는 0.2.6에서 실기기로 확인했다(생성 폴더 경로·Decision 턴 제외).
 - Kiro는 최소 버전(VS Code 엔진 `^1.131.0`, 확인한 가장 오래된 Kiro 1.2.37)만 두고 최신판을 따라간다. 자동 업데이트되면 확인 루틴을 다시 돌린다. 데모 기기는 확인한 버전에서 자동 업데이트를 끈다. 1.2.4 → 1.2.37 → 1.2.56(2026-10-09)으로 바뀌었다. Builder 채팅 단계는 1.2.37에서, Helper 탭·hook 기록·도구 허용은 1.2.56에서 확인했다.
+
+## 0.2.6 Windows 확인 (2026-10-10)
+
+frontend가 Windows 11 x64 실기기에서 처음 빌드하고 확인했다. Kiro 1.2.56, kiro-cli 2.29.0(본선 계정), 예선 0.0.19 위에 설치, 화면 조작은 사용자. 판정은 Kiro 로그·작업 폴더 파일·Core SQLite로 했다.
+
+- **빌드 전 수정(backend `850b276`):** 공식 설치 스크립트로 깐 kiro-cli는 `%LOCALAPPDATA%\Kiro-Cli`에 있어서 host가 이 위치도 찾게 했다. Windows에서만 실패하던 테스트 13개(`new URL().pathname` 경로, POSIX mode 단언, `/` 경로 정규식)를 고쳤다. macOS 동작은 같다.
+- **자동 검사(Windows):** `pnpm typecheck`, unit 179 통과·1 skip, integration 496 통과·12 skip, 패널 CJS 184 통과·1 skip, `scripts/test-portable-core.mjs` 전체 PASS(관리 Node 다운로드·hash 확인 포함). frontend `c2c873c` typecheck와 `npm test` 811 통과.
+- **확인 1~7:** 모두 통과.
+  1. Core가 PATH의 Node 24.18.0으로 `managed-kiro --kiro-cli %LOCALAPPDATA%\Kiro-Cli\kiro-cli.exe`를 실행했고, 기존 History(Project 6개)를 그대로 읽었다.
+  2. 빈 폴더에서 학습 목표 → 후보 → 계획 확정까지 진행했다.
+  3. Open Project가 같은 창에 연결했다. 이때 `.kiro\hooks`·`agents`·`settings\mcp.json`·`steering`·`specs`가 써졌고, hook 명령은 cmd.exe 인용이다. 창 다시 로드 뒤 `vibe-helper Connected`, hook 2개 등록(아래 첫 항목 참고).
+  4. Builder 채팅에서 도구 1회로 `PENDING`을 받았다. 승인 창은 없었다.
+  5. `vibe-helper` 탭이 도구 1회로 확정 계획을 바탕으로 답했다. 승인 창은 없었다.
+  6. Kiro를 완전히 종료했다가 다시 열자 새 Core가 연결을 복원했고, Open Project 없이 4가 성공했다.
+  7. Core에 4·5·6의 발언이 `USER_MESSAGE`(actor `USER`)로, Helper 답이 actor `AGENT/HELPER`로 기록됐다.
+- **본 것 (Windows 전용 아님):**
+  - 신뢰하지 않은 상태로 연 창에서 신뢰한 **뒤에** Open Project를 하면, Kiro가 창을 처음 열 때 꺼 둔 hook(`hooks.v2.executionDisabledUntrustedWorkspace`)과 작업 공간 MCP를 다시 읽지 않는다. 그래서 hook은 `(disabled)`, MCP 목록은 빈 채로 남는다. host의 다시 로드 안내는 연결된 폴더를 신뢰할 때만 떠서 이 순서에서는 나오지 않는다. 창을 다시 로드하면 된다.
+  - 패널에서 "이걸로 시작"을 누르면 `BUILDER_RUNS_IN_HOST_CHAT` 오류 카드가 뜬다. 예상한 거절이며, 패널 쪽 할 일([패널에서 다듬을 것](#패널에서-다듬을-것)의 Builder 탭)이다.
+- 크레딧: 채팅 3턴 약 0.79(0.26·0.27·0.26), Discovery·계획 생성 별도. 계정 표시 1.28/50.
 
 ## 0.2.6 확인 (2026-10-10)
 

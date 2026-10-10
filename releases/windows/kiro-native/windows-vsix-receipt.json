@@ -1,0 +1,22 @@
+{
+  "file": "builder-helper-agent-panel-0.2.6-win32-x64.vsix",
+  "version": "0.2.6",
+  "hostMode": "KIRO_NATIVE",
+  "publicationStatus": "PULL_REQUEST",
+  "target": "win32-x64",
+  "bytes": 2534895,
+  "sha256": "7fc736437b48af1c7132d70da071131708b6c4ab743c08917423b5dd217a5398",
+  "files": 73,
+  "fileInventory": "files.json",
+  "frontendVersion": "0.0.18",
+  "buildFrontendCommit": "c2c873c27b5563037853236aa402cd1b97910929",
+  "buildFrontendBranch": "finals/trial-feedback",
+  "buildBackendCommit": "850b2768b2f6fdde74a52f4daa6cd94f8720340e",
+  "buildBackendBranch": "fix/windows-first-real-run",
+  "workingTreeNote": "Both checkouts were clean (workingTreeChangesIncluded: false for backend and frontend).",
+  "buildToolchain": "Windows 11 x64 (10.0.26200), Node 24.19.0, pnpm 11.13.1",
+  "nodeRuntime": "Not packaged. Core runs on a Node 24.x found on PATH, or on the managed Node 24.19.0 it downloads and hash-checks.",
+  "changedFromPrevious": "First Windows Kiro-native VSIX. Against Mac 0.2.6 (a18f718): the host also looks for kiro-cli in %LOCALAPPDATA%\\Kiro-Cli (the per-user location of the official kiro-cli 2.29.0 install script); Windows-only test fixes. macOS behavior is unchanged.",
+  "liveCheck": "Windows 11 x64, Kiro 1.2.56, kiro-cli 2.29.0, installed over prelim 0.0.19, user clicks. All 7 steps of the handoff's Windows check passed: Core managed-kiro with the per-user kiro-cli; Discovery to a confirmed plan; Open Project in Kiro Chat in the empty open folder (hooks, agent and MCP files written; vibe-helper Connected after a window reload, see the PR); Builder chat get-status PENDING with no approval prompt; vibe-helper agent tab answered from the confirmed plan with no approval prompt; after a full Kiro restart the new Core restored the connection without Open Project; Core recorded the learner messages as USER_MESSAGE and the Helper answer.",
+  "publishedBranch": "Hello-KU-tty/core fix/windows-first-real-run (PR to finals/kiro-native)"
+}
