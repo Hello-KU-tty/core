@@ -1,5 +1,19 @@
 # 결정 기록
 
+## 본선: 개발 명령 미리 승인(K11)
+
+- **맥락:** 첫 체험에서 Autopilot을 켜도 셸 명령을 16번 모두 물었다. Autopilot은 파일 변경을 바로 적용할지만 정하고, 명령 확인은 Kiro 권한 규칙이 정한다. 권한 규칙 형식(`capability: shell`, 명령 앞부분을 `*`로 맞추는 `match`·`exclude`, 거부 > 묻기 > 허용)은 [Kiro 공식 문서](https://kiro.dev/docs/permissions/)에 있고, 폴더 범위 파일은 `~/.kiro/workspace-roots/<폴더 해시>/permissions.yaml`이다.
+- **결정(사용자 승인, 2026-10-10):**
+  - 선택지는 "개발 명령 미리 승인"과 "수동으로 승인" 두 개다. 처음 **Open Project in Kiro Chat** 때 한 번 묻고 전역에 저장한다(`vibeHelper.commandApproval`). 0.2.x의 도구만 허용하던 동의(`vibeHelper.coreToolsConsent`)는 범위가 넓어져 쓰지 않고 다시 묻는다. 창을 그냥 닫으면 아무것도 정하지 않고 다음에 다시 묻는다.
+  - 미리 승인하면 Vibe Helper가 연결한 Project 폴더의 권한 파일에 Vibe Helper 도구 규칙과 개발 명령 규칙을 넣는다. 목록 원문은 `KIRO_PREAPPROVED_RULES`(`packages/kiro-adapter/src/kiro-workspace-node.ts`)다. 묻지 않는 것: 파일 조회(ls·cat·head·tail·wc·grep·sort·find·which·echo), 폴더·파일 만들기와 옮기기(mkdir·touch·cp·mv), 설치·실행·빌드·테스트(node·npm·npx·pnpm·yarn·bun·tsc·python3), git, 내 컴퓨터 서버 확인(localhost·127.0.0.1 주소의 curl), 같은 뜻의 PowerShell 명령. 계속 묻는 것: 목록 밖 명령(rm·kill·pkill·sudo·chmod·bash -c·eval·xargs 등)과 예외(publish, 전역 설치, git push·reset --hard·clean·config --global, find -exec·-delete, 사용자 정보가 붙은 URL).
+  - 수동으로 승인하면 우리가 넣은 항목만 지우고, 학습자가 Kiro에서 직접 고른 "항상" 규칙은 남긴다. 우리 규칙은 우리 항목을 모두 가진 허용 규칙으로 알아본다(Kiro가 그 규칙에 "항상 허용"을 덧붙여도 그 항목은 남는다).
+  - 명령 팔레트의 **Vibe Helper: Change Command Approval**로 언제든 바꾼다. Core가 지금 연결된 모든 Project 폴더에 바로 적용한다(`POST /api/kiro/approval`). host는 폴더 경로를 넘기지 않는다.
+  - Kiro가 직접 쓴 모양의 파일만 고친다. flow 목록, 다른 최상위 키, `permissions.json`이 있으면 손대지 않아 Kiro가 계속 묻는다.
+  - 신뢰되지 않은 폴더에서는 미리 승인이 효과가 없으므로, 같은 창에서 연결한 직후에도 신뢰 안내를 띄운다(새 창은 창이 뜰 때 안내한다).
+- **근거:** [셸 승인 실측](spikes/KIRO_NATIVE_SHELL_APPROVAL_20261010.md). 모델 호출 없는 Kiro 판정(kiro-cli 2.29.0 v3 엔진의 `_kiro/permissions/explain`)으로 두 번의 체험에서 실제로 실행된 명령을 다시 판정했다. 첫 체험은 16번이 1번으로, 재실측은 9번이 6번으로 줄고, 남은 6번은 모두 `rm -rf`·`kill`이다. 0.2.7 설치본의 본선 계정 Builder 구현 턴에서는 셸 명령 5번이 모두 승인 요청 없이 실행됐다.
+- **위험과 한계:** 허용 목록은 실수 방지용이지 격리 장치가 아니다. `node`·`npm run`·`python3`는 임의 코드를 실행하고, `cat`·`cp`·리디렉션은 폴더 밖 경로에도 닿는다(`cat ~/.ssh/id_rsa`, `echo > ~/.zshrc`가 허용됨을 확인했다). 신뢰하지 않은 폴더에서는 규칙이 있어도 Kiro가 매번 묻는다. 폴더 해시 위치는 비공개라 Kiro가 바꾸면 다시 묻는 상태로 돌아간다. PowerShell 명령은 Mac의 Kiro 판정기로만 확인했고 Windows 실측이 남았다.
+- **이전 결정 대체:** "첫 실사용 체험 피드백 반영(K09)"의 "Vibe Helper 도구 허용"(도구만 허용하는 동의)을 대체한다.
+
 ## 본선: 버전은 의존성이 깨지지 않는 범위만 강제하고 Kiro는 최신판 기준
 
 - **맥락:** 예선 때 재현 빌드와 Kiro 내부 비공개 API 의존 때문에 Node 24.19.0·pnpm 11.13.1을 정확히 강제했고, 맞지 않으면 빌드·실행을 거절했다. 본선은 공개 기능과 kiro-cli를 쓰고 사용자가 초보자라, 정확한 버전 강제는 이유 없이 설치와 개발을 막는다. kiro-cli는 스스로 업데이트되는데 Core가 2.x까지만 받아 3.0이 나오면 모두 막힐 구조였다.

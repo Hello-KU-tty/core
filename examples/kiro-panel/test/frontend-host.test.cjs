@@ -7,14 +7,14 @@ const { test } = require('node:test')
 const projectId = 'project_00000000-0000-4000-8000-000000000001'
 const generatedRoot = '/private/core-data/workspaces'
 const workspace = `${generatedRoot}/projects/campus-drop`
-const ok = data => ({ status: 200, body: { success: true, data: { projectId, taskId: 'task_1', registered: false, coreTools: 'NOT_REQUESTED', ...data } } })
+const ok = data => ({ status: 200, body: { success: true, data: { projectId, taskId: 'task_1', registered: false, permissions: 'NOT_REQUESTED', ...data } } })
 const refuse = error => ({ status: 409, body: { success: false, error } })
 
 function harness({ trusted = true, installed = true, loggedIn = true, fail = false, platform = 'darwin',
   binds = [ok({ workspace })], openFolders = [], answers = {}, bound = false, consent } = {}) {
   let listener, trustListener, stopped = 0, starts = 0, mutations = 0, terminals = 0
   const commands = new Map(), executed = [], messages = [], fetches = [], whoami = [], dialogs = []
-  const globalState = new Map(consent ? [['vibeHelper.coreToolsConsent', consent]] : [])
+  const globalState = new Map(consent ? [['vibeHelper.commandApproval', consent]] : [])
   let lifecycleOptions
   const runtimeCalls = []
   const code = readFileSync(join(__dirname, '../src/frontend-host.cjs'), 'utf8')
@@ -171,34 +171,82 @@ test('untrusted window skips terminal tools until the user grants trust', async 
 })
 
 test('Open in Kiro without an open folder binds the generated folder and opens it in a new window', async () => {
-  const h = harness({ answers: { '허용': true } }), host = await h.create()
+  const h = harness({ answers: { '개발 명령 미리 승인': true } }), host = await h.create()
   await h.commands.get('vibeHelper.openInKiro')()
   assert.equal(h.fetches.length, 1)
   assert.equal(h.fetches[0].url, 'http://127.0.0.1:1/api/kiro/bind')
   assert.equal(h.fetches[0].init.headers.authorization, 'Bearer synthetic-secret')
-  assert.equal(JSON.stringify(h.fetches[0].body), JSON.stringify({ protocolVersion: 1, projectId, allowCoreTools: true }))
+  assert.equal(JSON.stringify(h.fetches[0].body), JSON.stringify({ protocolVersion: 1, projectId, approval: 'PREAPPROVED' }))
+  const asked = h.dialogs.find(item => item.items.includes('개발 명령 미리 승인'))
+  assert.equal(JSON.stringify(asked.items), JSON.stringify(['개발 명령 미리 승인', '수동으로 승인']))
+  assert.equal(asked.modal, true)
   assert.equal(h.opened().length, 1)
   assert.equal(h.opened()[0].path, workspace)
   assert.equal(h.opened()[0].options.forceNewWindow, true)
-  assert.equal(h.globalState.get('vibeHelper.coreToolsConsent'), 'ALLOW')
+  assert.equal(h.globalState.get('vibeHelper.commandApproval'), 'PREAPPROVED')
   await host.dispose()
 })
 
 test('Open in Kiro uses the empty open folder as the Project folder in this window', async () => {
   const folder = '/Users/synthetic/memo'
-  const h = harness({ openFolders: [folder], consent: 'ASK',
+  const h = harness({ openFolders: [folder], consent: 'MANUAL',
     binds: [ok({ workspace: folder, registered: true })] }), host = await h.create()
   await h.commands.get('vibeHelper.openInKiro')()
-  assert.equal(JSON.stringify(h.fetches[0].body), JSON.stringify({ protocolVersion: 1, projectId, workspace: folder, allowCoreTools: false }))
+  assert.equal(JSON.stringify(h.fetches[0].body), JSON.stringify({ protocolVersion: 1, projectId, workspace: folder, approval: 'MANUAL' }))
   assert.equal(h.opened().length, 0)
-  assert.equal(h.dialogs.some(item => item.items.includes('허용')), false)
+  assert.equal(h.dialogs.some(item => item.items.includes('개발 명령 미리 승인')), false)
   assert.match(h.messages.at(-1)[1], /이 폴더를 Vibe Helper Project로 연결했어요/)
   await host.dispose()
 })
 
+test('connecting an untrusted open folder asks for trust instead of saying chat is ready', async () => {
+  const folder = '/Users/synthetic/memo'
+  const h = harness({ trusted: false, openFolders: [folder], consent: 'PREAPPROVED',
+    binds: [ok({ workspace: folder, registered: true })] }), host = await h.create()
+  await h.commands.get('vibeHelper.openInKiro')()
+  await settle()
+  const asked = h.dialogs.find(item => item.items.includes('신뢰 설정 열기'))
+  assert.equal(asked.text, '이 폴더를 Vibe Helper Project로 연결했어요. 이 폴더를 신뢰해야 Vibe Helper가 Kiro 채팅에 연결돼요.')
+  assert.equal(h.messages.some(([, text]) => /새 세션\(\+\)/.test(text)), false)
+  assert.equal(h.opened().length, 0)
+  await host.dispose()
+})
+
+test('a dismissed approval question decides nothing and leaves Kiro rules alone', async () => {
+  const h = harness({ consent: undefined }), host = await h.create()
+  h.globalState.set('vibeHelper.coreToolsConsent', 'ALLOW')
+  await h.commands.get('vibeHelper.openInKiro')()
+  assert.equal(JSON.stringify(h.fetches[0].body), JSON.stringify({ protocolVersion: 1, projectId }))
+  assert.equal(h.globalState.has('vibeHelper.commandApproval'), false)
+  assert.ok(h.dialogs.some(item => item.items.includes('수동으로 승인')))
+  await host.dispose()
+})
+
+test('changing the approval asks again and applies it to every connected Project folder', async () => {
+  const counts = written => ({ status: 200, body: { success: true, data: { WRITTEN: written, UNCHANGED: 0, UNRECOGNIZED: 1 } } })
+  const h = harness({ consent: 'PREAPPROVED', answers: { '수동으로 승인': true }, binds: [counts(2)] }), host = await h.create()
+  await h.commands.get('vibeHelper.changeCommandApproval')()
+  assert.equal(h.fetches[0].url, 'http://127.0.0.1:1/api/kiro/approval')
+  assert.equal(JSON.stringify(h.fetches[0].body), JSON.stringify({ protocolVersion: 1, approval: 'MANUAL' }))
+  assert.equal(h.globalState.get('vibeHelper.commandApproval'), 'MANUAL')
+  assert.match(h.messages.at(-1)[1], /명령과 도구마다 확인을 받아요\. Project 폴더 1곳은/)
+  await host.dispose()
+  const dismissed = harness({ consent: 'MANUAL' }), other = await dismissed.create()
+  await dismissed.commands.get('vibeHelper.changeCommandApproval')()
+  assert.equal(dismissed.fetches.length, 0)
+  assert.equal(dismissed.globalState.get('vibeHelper.commandApproval'), 'MANUAL')
+  await other.dispose()
+  assert.equal(dismissed.commands.has('vibeHelper.changeCommandApproval'), false)
+  const failing = harness({ answers: { '개발 명령 미리 승인': true }, binds: [refuse('KIRO_NATIVE_NOT_ENABLED')] })
+  const third = await failing.create()
+  await failing.commands.get('vibeHelper.changeCommandApproval')()
+  assert.match(failing.messages.at(-1)[1], /Kiro 채팅 연결을 지원하지 않습니다/)
+  await third.dispose()
+})
+
 test('a folder with other files leads to a generated folder in a new window only after the learner agrees', async () => {
   const folder = '/Users/synthetic/busy'
-  const agreed = harness({ openFolders: [folder], consent: 'ALLOW', answers: { '새 창에서 열기': true },
+  const agreed = harness({ openFolders: [folder], consent: 'PREAPPROVED', answers: { '새 창에서 열기': true },
     binds: [refuse('WORKSPACE_FOLDER_NOT_EMPTY'), ok({ workspace })] })
   let host = await agreed.create(); await host.prepare()
   const result = await host.openProjectInKiro(projectId)
@@ -207,7 +255,7 @@ test('a folder with other files leads to a generated folder in a new window only
   assert.equal(agreed.opened()[0].path, workspace)
   assert.ok(agreed.dialogs.some(item => item.modal && /이미 다른 파일이 있어요/.test(item.text)))
   await host.dispose()
-  const declined = harness({ openFolders: [folder], consent: 'ALLOW',
+  const declined = harness({ openFolders: [folder], consent: 'PREAPPROVED',
     binds: [refuse('WORKSPACE_FOLDER_NOT_EMPTY'), ok({ workspace })] })
   host = await declined.create(); await host.prepare()
   assert.equal((await host.openProjectInKiro(projectId)).folder, 'CANCELLED')
@@ -218,7 +266,7 @@ test('a folder with other files leads to a generated folder in a new window only
 
 test('a Project already built in another folder opens that folder instead of splitting the work', async () => {
   const elsewhere = '/Users/synthetic/memo-first'
-  const h = harness({ openFolders: ['/Users/synthetic/empty'], consent: 'ALLOW',
+  const h = harness({ openFolders: ['/Users/synthetic/empty'], consent: 'PREAPPROVED',
     binds: [refuse('PROJECT_REGISTERED_ELSEWHERE'), ok({ workspace: elsewhere, registered: true })] })
   const host = await h.create(); await host.prepare()
   const result = await host.openProjectInKiro(projectId)
@@ -228,18 +276,18 @@ test('a Project already built in another folder opens that folder instead of spl
 })
 
 test('the generated folder window rebinds in place, and an unconfirmed outside folder never opens', async () => {
-  const inPlace = harness({ openFolders: [workspace], consent: 'ALLOW' })
+  const inPlace = harness({ openFolders: [workspace], consent: 'PREAPPROVED' })
   let host = await inPlace.create(); await host.prepare()
   assert.equal((await host.openProjectInKiro(projectId)).openedNewWindow, false)
   assert.equal(inPlace.fetches[0].body.workspace, undefined)
   assert.equal(inPlace.opened().length, 0)
   await host.dispose()
-  const escaped = harness({ consent: 'ALLOW', binds: [ok({ workspace: '/Users/synthetic/elsewhere', registered: false })] })
+  const escaped = harness({ consent: 'PREAPPROVED', binds: [ok({ workspace: '/Users/synthetic/elsewhere', registered: false })] })
   host = await escaped.create(); await host.prepare()
   await assert.rejects(host.openProjectInKiro(projectId), /KIRO_BIND_WORKSPACE_UNSAFE/)
   assert.equal(escaped.opened().length, 0)
   await host.dispose()
-  const notReady = harness({ consent: 'ALLOW', binds: [refuse('KIRO_BIND_TASK_NOT_READY')] })
+  const notReady = harness({ consent: 'PREAPPROVED', binds: [refuse('KIRO_BIND_TASK_NOT_READY')] })
   host = await notReady.create()
   await notReady.commands.get('vibeHelper.openInKiro')()
   assert.match(notReady.messages.at(-1)[1], /Learning Spec/)

@@ -4,10 +4,12 @@ import { conversationIdSchema, uiRequestSchema } from '@vibe-helper/contracts'
 import { describe, expect, it } from 'vitest'
 
 import {
+  applyKiroCommandApproval,
   helperExchangeRequest,
   KIRO_HELPER_AGENT_NAME,
   KIRO_HELPER_MCP_SERVER_NAME,
   KIRO_MCP_SERVER_NAME,
+  KIRO_PREAPPROVED_RULES,
   kiroConversationId,
   kiroPermissionsFile,
   kiroSessionAgentMode,
@@ -15,7 +17,6 @@ import {
   kiroWorkspaceHash,
   lastAssistantReply,
   mergeKiroMcpConfig,
-  mergeKiroPermissionRules,
   parseKiroHookInput,
   parseKiroSteeringTemplates,
   renderHelperSteering,
@@ -490,23 +491,87 @@ describe('Kiro-native workspace adapter', () => {
     expect(summarizeKiroSessionActivity('')).toBeNull()
   })
 
-  it("adds the Core tools rule only to a permission file shaped like Kiro's own", () => {
-    const rule = `  - capability: mcp\n    effect: allow\n    match:\n      - ${KIRO_MCP_SERVER_NAME}/*\n      - ${KIRO_HELPER_MCP_SERVER_NAME}/*\n`
-    expect(mergeKiroPermissionRules(null)).toEqual({ status: 'WRITE', text: `rules:\n${rule}` })
-    expect(mergeKiroPermissionRules('rules: []\n')).toEqual({
-      status: 'WRITE',
-      text: `rules:\n${rule}`,
-    })
+  it("pre-approves the Core tools and dev commands in a permission file shaped like Kiro's own", () => {
+    const mcp = `  - capability: mcp\n    effect: allow\n    match:\n      - ${KIRO_MCP_SERVER_NAME}/*\n      - ${KIRO_HELPER_MCP_SERVER_NAME}/*\n`
+    const written = (existing: string | null) => {
+      const result = applyKiroCommandApproval(existing, 'PREAPPROVED')
+      if (result.status !== 'WRITE') throw new Error(result.status)
+      return result.text
+    }
+    const fresh = written(null)
+    expect(
+      fresh.startsWith(
+        `rules:\n${mcp}  - capability: shell\n    effect: allow\n    match:\n      - ls\n`,
+      ),
+    ).toBe(true)
+    expect(fresh).toContain('    exclude:\n      - npm publish*\n')
+    expect(written('')).toBe(fresh)
+    expect(written('rules: []\n')).toBe(fresh)
+    expect(applyKiroCommandApproval(fresh, 'PREAPPROVED')).toEqual({ status: 'UNCHANGED' })
+    // Kiro's own "always" choices stay; the migration writes keys in another order.
     const kiro =
-      'rules:\n  - capability: mcp\n    effect: allow\n    match:\n      - vibe-helper/get_build_status\n'
-    expect(mergeKiroPermissionRules(kiro)).toEqual({ status: 'WRITE', text: `${kiro}${rule}` })
-    expect(mergeKiroPermissionRules(`rules:\n${rule}`)).toEqual({ status: 'ALREADY_ALLOWED' })
-    expect(mergeKiroPermissionRules('rules:\n  - capability: shell\npolicy: strict\n')).toEqual({
-      status: 'UNRECOGNIZED',
+      'rules:\n  - capability: mcp\n    match:\n      - vibe-helper/get_build_status\n    effect: allow\n'
+    expect(written(kiro)).toBe(`${kiro}${fresh.slice('rules:\n'.length)}`)
+    // A 0.2.x file with only the Core tools rule gets both rules, once each.
+    expect(written(`rules:\n${mcp}`)).toBe(fresh)
+    // Kiro may quote values when it rewrites the file.
+    const quoted = fresh.replace('      - npm *\n', '      - "npm *"\n').replaceAll('\n', '\r\n')
+    expect(applyKiroCommandApproval(quoted, 'PREAPPROVED')).toEqual({ status: 'UNCHANGED' })
+  })
+
+  it("manual approval removes only the Vibe Helper entries and keeps the learner's own", () => {
+    const fresh = applyKiroCommandApproval(null, 'PREAPPROVED')
+    if (fresh.status !== 'WRITE') throw new Error(fresh.status)
+    expect(applyKiroCommandApproval(fresh.text, 'MANUAL')).toEqual({
+      status: 'WRITE',
+      text: 'rules: []\n',
     })
-    expect(mergeKiroPermissionRules('{"rules":[]}')).toEqual({ status: 'UNRECOGNIZED' })
+    const other = '  - capability: shell\n    effect: deny\n    match:\n      - sudo *\n'
+    expect(applyKiroCommandApproval(`${fresh.text}${other}`, 'MANUAL')).toEqual({
+      status: 'WRITE',
+      text: `rules:\n${other}`,
+    })
+    // An "always allow" Kiro added inside our shell rule outlives it.
+    const merged = fresh.text.replace('      - git *\n', '      - git *\n      - rm -rf dist\n')
+    const manual = applyKiroCommandApproval(merged, 'MANUAL')
+    if (manual.status !== 'WRITE') throw new Error(manual.status)
+    expect(manual.text).toContain(
+      '    match:\n      - rm -rf dist\n    exclude:\n      - npm publish*',
+    )
+    expect(manual.text).not.toContain('- npm *\n')
+    expect(manual.text).not.toContain(`- ${KIRO_MCP_SERVER_NAME}/*`)
+    expect(applyKiroCommandApproval(manual.text, 'MANUAL')).toEqual({ status: 'UNCHANGED' })
+    // A learner rule that happens to share one entry is not ours.
+    const own = 'rules:\n  - capability: shell\n    effect: allow\n    match:\n      - npm *\n'
+    expect(applyKiroCommandApproval(own, 'MANUAL')).toEqual({ status: 'UNCHANGED' })
+    expect(applyKiroCommandApproval(null, 'MANUAL')).toEqual({ status: 'UNCHANGED' })
+  })
+
+  it('leaves permission files it does not recognise alone', () => {
+    for (const text of [
+      'rules:\n  - capability: shell\npolicy: strict\n',
+      '{"rules":[]}',
+      'rules:\n  - capability: shell\n    effect: allow\n    match: ["npm *"]\n',
+      'rules:\n  - capability: shell\n    effect: allow\n    match:\n      nested: true\n',
+      'rules:\n- capability: shell\n',
+      'rules: []\n  - capability: shell\n',
+    ])
+      for (const approval of ['PREAPPROVED', 'MANUAL'] as const)
+        expect(applyKiroCommandApproval(text, approval)).toEqual({ status: 'UNRECOGNIZED' })
     expect(kiroPermissionsFile('/Users/me', '/Users/me/memo')).toMatch(
       /^\/Users\/me\/\.kiro\/workspace-roots\/[0-9a-f]{16}\/permissions\.yaml$/,
     )
+  })
+
+  it('keeps every pre-approved pattern a plain YAML string and the risky commands out', () => {
+    const shell = KIRO_PREAPPROVED_RULES.find((rule) => rule.capability === 'shell')
+    for (const rule of KIRO_PREAPPROVED_RULES) {
+      const values = [...rule.match, ...rule.exclude]
+      expect(new Set(values).size).toBe(values.length)
+      for (const value of values) expect(value).not.toMatch(/^[-?:,[\]{}#&*!|>'"%@`\s]|: | #|\s$/)
+    }
+    for (const risky of ['rm', 'sudo', 'kill', 'pkill', 'chmod', 'bash', 'sh', 'eval', 'xargs'])
+      expect(shell?.match.some((value) => value.split(' ')[0] === risky)).toBe(false)
+    expect(shell?.exclude).toEqual(expect.arrayContaining(['npm publish*', 'git push*']))
   })
 })

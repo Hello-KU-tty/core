@@ -114,7 +114,7 @@ describe('Kiro binding manager', () => {
       taskId: ids.task,
       workspace: generated,
       registered: false,
-      coreTools: 'NOT_REQUESTED',
+      permissions: 'NOT_REQUESTED',
     })
     expect(handlers.size).toBe(3)
     const directory = join(root, 'kiro-bindings', ids.project)
@@ -237,19 +237,44 @@ describe('Kiro binding manager', () => {
     manager.close()
   })
 
-  it("writes the Core tools rule into Kiro's permission file only with consent", async () => {
+  it("applies the learner's approval choice to Kiro's permission file", async () => {
     const { home, manager, generated } = await setup()
     const file = kiroPermissionsFile(home, generated)
-    expect((await manager.bind(ids.project)).coreTools).toBe('NOT_REQUESTED')
+    expect((await manager.bind(ids.project)).permissions).toBe('NOT_REQUESTED')
     await expect(lstat(file)).rejects.toThrow()
-    expect((await manager.bind(ids.project, { allowCoreTools: true })).coreTools).toBe('WRITTEN')
+    expect((await manager.bind(ids.project, { approval: 'MANUAL' })).permissions).toBe('UNCHANGED')
+    await expect(lstat(file)).rejects.toThrow()
+    expect((await manager.bind(ids.project, { approval: 'PREAPPROVED' })).permissions).toBe(
+      'WRITTEN',
+    )
     const text = await readFile(file, 'utf8')
     expect(text).toContain('- vibe-helper/*')
     expect(text).toContain('- vibe-helper-helper/*')
+    expect(text).toContain('- npm *')
+    expect(text).toContain('- git push*')
     expect((await lstat(file)).mode & 0o077).toBe(0)
-    expect((await manager.bind(ids.project, { allowCoreTools: true })).coreTools).toBe(
-      'ALREADY_ALLOWED',
+    expect((await manager.bind(ids.project, { approval: 'PREAPPROVED' })).permissions).toBe(
+      'UNCHANGED',
     )
+    // Turning it off reaches every bound folder at once; a restore never touches the rules.
+    expect(await manager.setCommandApproval('MANUAL')).toEqual({
+      WRITTEN: 1,
+      UNCHANGED: 0,
+      UNRECOGNIZED: 0,
+    })
+    expect(await readFile(file, 'utf8')).toBe('rules: []\n')
+    expect(await manager.setCommandApproval('MANUAL')).toEqual({
+      WRITTEN: 0,
+      UNCHANGED: 1,
+      UNRECOGNIZED: 0,
+    })
+    await writeFile(file, '{"rules":[]}')
+    expect(await manager.setCommandApproval('PREAPPROVED')).toEqual({
+      WRITTEN: 0,
+      UNCHANGED: 0,
+      UNRECOGNIZED: 1,
+    })
+    expect(await readFile(file, 'utf8')).toBe('{"rules":[]}')
     manager.close()
   })
 

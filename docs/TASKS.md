@@ -97,10 +97,13 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - **검토 거리(초안):** Kiro 채팅용 도구 수와 입력 축소(식별자·버전·멱등키를 서버가 채움), 이유 인용을 글자 복사 대신 hook이 받은 메시지 ID로, Decision 요청 직전 발언의 근거 인정 여부, 작업 맥락과 완료 단계 자동화.
 - **진행:** 현재 상태 한 장 정리 완료(2026-10-09, backend `012c664`·Steering 0.5.0 기준): [Builder 워크플로 정리](spikes/KIRO_NATIVE_BUILDER_WORKFLOW_20261009.md). Core Builder 계약은 바꾸지 않았다. 다음은 사용자의 재설계.
 
-### [>] K11. 셸 명령 자동 허용 정책
+### [~] K11. 셸 명령 자동 허용 정책
 
 - **출처:** 체험 피드백 13. Autopilot에서도 셸 명령은 매번 확인했다(16번, 모두 이번만 허용).
 - **검토 거리:** Kiro 권한 규칙(명령 앞부분 기준 항상 허용, 작업 공간 범위)과 우리가 미리 넣을 수 있는 범위, 위험 낮은 명령 목록, 사용자 동의와 끄기, 공개 문서가 아닌 내부 형식 의존 위험.
+- **결정(사용자, 2026-10-10):** 개발 명령 목록 B안, 선택지는 "개발 명령 미리 승인"과 "수동으로 승인" 두 개([DECISIONS](DECISIONS.md) "본선: 개발 명령 미리 승인(K11)").
+- **진행:** 모델 호출 없는 Kiro 판정으로 규칙을 확인했다([셸 승인 실측](spikes/KIRO_NATIVE_SHELL_APPROVAL_20261010.md)): 실제 체험 명령 기준 첫 체험 16→1번, 재실측 9→6번(남은 것은 모두 `rm -rf`·`kill`), 위험 명령 39개는 계속 묻기. 구현: adapter `KIRO_PREAPPROVED_RULES`·`applyKiroCommandApproval`(Kiro 모양 파일만 고침, 수동 전환 때 우리 항목만 제거), Core 연결 요청 `approval`과 `POST /api/kiro/approval`(연결된 모든 Project 폴더에 적용), host 확인 창 두 선택지와 **Vibe Helper: Change Command Approval**. 검증(Node 24.19.0): adapter 단위 테스트 포함 `pnpm typecheck` 통과, unit 177 통과·3 skip, integration 503 통과·8 skip, 패널 CJS 185 통과·2 skip(같은 창 연결 뒤 신뢰 안내 포함), Mac 패키지 9 PASS, 바꾼 TS 파일 Biome 통과(전체 `format:check`·`lint`는 기존 `.local-experiments` 중첩 설정 오류로 실행 전에 멈춤). Mac VSIX 0.2.7(미배포, K10과 함께 배포 예정)을 격리 Kiro 1.2.56에 설치하고, 처음 보는 목표의 새 Project를 빈 폴더에 연결해 설치된 Core에서 미리 승인 → 수동 → 미리 승인 왕복, 같은 요청 반복 시 변화 없음, 다른 Project 폴더의 학습자 규칙 보존, Core가 쓴 파일의 Kiro 판정이 단위 테스트 출력과 같음을 확인했다. Codex 화면 조작으로 확인 창 두 선택지와 문구, 바꾸기 명령의 알림과 규칙 제거·복원을 확인했다. 본선 계정 Builder 구현 턴(Autopilot, Default 모드)에서 셸 명령 5번이 모두 승인 요청 없이 실행됐고(첫 체험은 16번 모두 승인), Vibe Helper 도구 14번도 승인 창이 없었으며, 구현 중 Decision 2개, 이유 원문 확정, Task 완료, 테스트 21개 통과까지 이어졌다(채팅 10.13크레딧). 실측 중 같은 창 연결 때 신뢰 안내가 없는 빈틈을 찾아 host를 고쳤다(신뢰되지 않은 폴더에서는 미리 승인이 효과가 없다). 신뢰 직후 다시 로드 제안 알림은 실제 화면에서 확인했다(K09 남은 확인).
+- **남은 것:** Windows의 PowerShell 판정(frontend 실측), 같은 창 연결 뒤 신뢰 안내의 실제 화면, 프론트 인계 문서 갱신과 VSIX 배포(K10과 함께).
 
 ### [ ] K13. Windows 설치물 (frontend 담당)
 
