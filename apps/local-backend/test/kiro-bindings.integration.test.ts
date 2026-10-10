@@ -1,6 +1,7 @@
 import { lstat, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { ApplicationService, WorkspacePathPolicy } from '@vibe-helper/application'
 import {
   builderTaskSchema,
@@ -27,9 +28,14 @@ import {
 } from '../../../packages/contracts/test/fixtures.js'
 import type { LocalMcpHandler } from '../src/agent-host.js'
 import { KiroBindingManager } from '../src/kiro-bindings.js'
+import { isPrivateDirectory } from '../src/private-files.js'
 import { WorkspaceRegistry } from '../src/workspace-registry.js'
 
-const repository = new URL('../../../', import.meta.url).pathname
+const repository = fileURLToPath(new URL('../../../', import.meta.url))
+// Only the owner can read the file. POSIX: its mode. Windows: modes are not permissions; a file
+// inherits its folder's ACL, which the descriptor test checks with isPrivateDirectory.
+const ownerOnly = async (file: string) =>
+  process.platform === 'win32' || ((await lstat(file)).mode & 0o077) === 0
 
 async function setup() {
   const base = await realpath(await mkdtemp(join(tmpdir(), 'vibe-kiro-bind-')))
@@ -118,10 +124,9 @@ describe('Kiro binding manager', () => {
     })
     expect(handlers.size).toBe(3)
     const directory = join(root, 'kiro-bindings', ids.project)
-    for (const name of ['builder-mcp.json', 'helper-mcp.json', 'hook.json']) {
-      const info = await lstat(join(directory, name))
-      expect(info.mode & 0o077).toBe(0)
-    }
+    for (const name of ['builder-mcp.json', 'helper-mcp.json', 'hook.json'])
+      expect(await ownerOnly(join(directory, name))).toBe(true)
+    if (process.platform === 'win32') expect(await isPrivateDirectory(directory)).toBe(true)
     const descriptor = JSON.parse(await readFile(join(directory, 'builder-mcp.json'), 'utf8'))
     expect(descriptor).toMatchObject({ role: 'BUILDER', workspace: first.workspace })
     expect(descriptor.url).toMatch(/^http:\/\/127\.0\.0\.1:47831\/mcp\/native-/)
@@ -154,7 +159,7 @@ describe('Kiro binding manager', () => {
     const bound = await manager.bind(ids.project, { workspace: folder })
     expect(bound).toMatchObject({ workspace: folder, registered: true })
     expect(registry.get(ids.project)).toBe(folder)
-    expect((await lstat(registryFile)).mode & 0o077).toBe(0)
+    expect(await ownerOnly(registryFile)).toBe(true)
     expect(await readFile(join(folder, '.kiro/steering/vibe-helper-learner.md'), 'utf8')).toContain(
       ids.project,
     )
@@ -246,7 +251,7 @@ describe('Kiro binding manager', () => {
     const text = await readFile(file, 'utf8')
     expect(text).toContain('- vibe-helper/*')
     expect(text).toContain('- vibe-helper-helper/*')
-    expect((await lstat(file)).mode & 0o077).toBe(0)
+    expect(await ownerOnly(file)).toBe(true)
     expect((await manager.bind(ids.project, { allowCoreTools: true })).coreTools).toBe(
       'ALREADY_ALLOWED',
     )

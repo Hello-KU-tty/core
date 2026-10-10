@@ -22,7 +22,7 @@
 
 ## 0.2.5에서 바뀐 점 (Windows x64 지원)
 
-- host가 macOS와 Windows에서 시작한다. Windows는 kiro-cli를 `Program Files\Kiro-Cli`, 그다음 PATH에서 찾는다.
+- host가 macOS와 Windows에서 시작한다. Windows는 kiro-cli를 `Program Files\Kiro-Cli`, `%LOCALAPPDATA%\Kiro-Cli`, 그다음 PATH에서 찾는다.
 - Kiro-native Core는 Kiro 실행 파일이 아니라 실제 Node(PATH의 24.18·24.19 또는 관리 Node)로 돈다. hook·MCP 명령에 Core의 Node 경로가 쓰이기 때문이다.
 - Kiro 작업 폴더 해시, hook 명령 인용(Windows는 cmd.exe), 생성 폴더 터미널 PATH를 Windows에 맞췄다.
 - 포장 스크립트를 하나로 합쳤다. Mac은 `pnpm panel:pack:macos <program>`, Windows는 `pnpm panel:pack:kiro-windows <program>`.
@@ -98,7 +98,7 @@ Kiro를 껐다 켜거나 확장을 업데이트해도 0.2.4부터는 3번을 다
 ### 1. 준비 (Windows 11 x64)
 
 - Git, Node.js **24.x**(`node -v`, 권장 24.19.0), pnpm **11.13.1 이상 11.x**(`npm install -g pnpm`; pnpm 10 이상이면 저장소의 권장 pnpm으로 스스로 바꿔 실행), 기본 PowerShell. Node 메이저는 포장 SQLite 모듈이 Core의 Node 24와 맞아야 해서 24여야 한다. 이 도구들은 빌드하는 사람만 필요하고, 설치물을 쓰는 학습자는 Node·pnpm을 설치하지 않는다.
-- Kiro IDE 최신판에 로그인. Kiro CLI를 Kiro 공식 안내대로 설치한다(최소 2.21.1, 상한 없음). host는 기본 위치 `C:\Program Files\Kiro-Cli\`, 그다음 PATH에서 `kiro-cli.exe`를 찾으므로 다른 위치에 설치해도 된다. 새 터미널에서 `kiro-cli login` 후 `kiro-cli whoami`가 성공해야 한다. IDE와 CLI 로그인은 따로다.
+- Kiro IDE 최신판에 로그인. Kiro CLI를 Kiro 공식 안내대로 설치한다(최소 2.21.1, 상한 없음). 공식 설치 스크립트(`irm https://cli.kiro.dev/install.ps1 | iex`, 2.29.0)는 관리자 권한 없이 `%LOCALAPPDATA%\Kiro-Cli\`에 설치한다. host는 `C:\Program Files\Kiro-Cli\`, `%LOCALAPPDATA%\Kiro-Cli\`, 그다음 PATH에서 `kiro-cli.exe`를 찾으므로 다른 위치에 설치해도 된다. 설치 전에 열어 둔 Kiro 창은 새 PATH를 모르므로, 다른 위치에 설치했다면 Kiro를 완전히 종료했다가 연다. 새 터미널에서 `kiro-cli login` 후 `kiro-cli whoami`가 성공해야 한다. IDE와 CLI 로그인은 따로다.
 
 ### 2. 빌드
 

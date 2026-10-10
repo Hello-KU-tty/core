@@ -19,15 +19,18 @@ const safeCode = error => /^[A-Z][A-Z0-9_]{0,99}$/.test(error?.code ?? error?.me
   ? error.code ?? error.message : 'FRONTEND_HOST_FAILED'
 // Kiro-native runs on Apple Silicon Mac and Windows x64 (Kiro CLI 2.x runs natively on Windows 11).
 const KIRO_NATIVE_PLATFORMS = new Set(['darwin', 'win32'])
-// Usual install locations first (Windows: the official installer's Program Files\Kiro-Cli; macOS:
-// the install script's ~/.local/bin or the app bundle), then kiro-cli on PATH, so another install
-// location still works.
+// Usual install locations first (Windows: the official installer's per-user %LOCALAPPDATA%\Kiro-Cli,
+// as kiro-cli 2.29.0 installs, or Program Files\Kiro-Cli; macOS: the install script's ~/.local/bin or
+// the app bundle), then kiro-cli on PATH, so another install location still works. The per-user
+// folder is checked directly because a Kiro window opened before the install keeps its old PATH.
 const onPath = name => (process.env.PATH ?? process.env.Path ?? '').split(delimiter)
   .filter(directory => isAbsolute(directory)).map(directory => join(directory, name))
 const kiroCliCandidates = () => process.platform === 'win32'
   ? [
       join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Kiro-Cli', 'kiro-cli.exe'),
       join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Kiro-Cli', 'bin', 'kiro-cli.exe'),
+      ...(process.env.LOCALAPPDATA && isAbsolute(process.env.LOCALAPPDATA)
+        ? [join(process.env.LOCALAPPDATA, 'Kiro-Cli', 'kiro-cli.exe')] : []),
       ...onPath('kiro-cli.exe'),
     ]
   : [join(homedir(), '.local/bin/kiro-cli'), '/Applications/Kiro CLI.app/Contents/MacOS/kiro-cli',

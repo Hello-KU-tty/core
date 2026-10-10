@@ -13,6 +13,7 @@ import {
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { ApplicationService, WorkspacePathPolicy } from '@vibe-helper/application'
 import {
   builderTaskSchema,
@@ -46,7 +47,7 @@ import {
 } from '../../../packages/contracts/test/fixtures.js'
 import { createKiroHookBinding } from '../src/kiro-hook-binding.js'
 
-const repository = new URL('../../../', import.meta.url).pathname
+const repository = fileURLToPath(new URL('../../../', import.meta.url))
 
 const setup = async (
   paths: { workspace?: string; homeDirectory?: string; queueFile?: string } = {},
@@ -346,12 +347,15 @@ describe('Kiro hook binding', () => {
       '다시 연결된 뒤',
     ])
 
-    // A queue other users could read is discarded without recording.
-    await writeFile(queueFile, `${JSON.stringify({ input: prompt(randomUUID(), '노출') })}\n`)
-    await chmod(queueFile, 0o644)
-    expect(await binding.drainQueue()).toBe(0)
-    await expect(lstat(queueFile)).rejects.toThrow()
-    expect(userMessages()).toHaveLength(4)
+    // A queue other users could read is discarded without recording. POSIX modes only: on Windows
+    // the queue is private through its folder's ACL and chmod cannot widen it.
+    if (process.platform !== 'win32') {
+      await writeFile(queueFile, `${JSON.stringify({ input: prompt(randomUUID(), '노출') })}\n`)
+      await chmod(queueFile, 0o644)
+      expect(await binding.drainQueue()).toBe(0)
+      await expect(lstat(queueFile)).rejects.toThrow()
+      expect(userMessages()).toHaveLength(4)
+    }
     binding.revoke()
   })
 
@@ -398,7 +402,7 @@ describe('Kiro hook binding', () => {
       prompt: '둘째 말',
     })
     await run({ hook_event_name: 'Stop', session_id: 'sess_r', cwd: '/w' })
-    expect((await lstat(queueFile)).mode & 0o077).toBe(0)
+    if (process.platform !== 'win32') expect((await lstat(queueFile)).mode & 0o077).toBe(0)
     const queued = (await readFile(queueFile, 'utf8'))
       .trim()
       .split('\n')

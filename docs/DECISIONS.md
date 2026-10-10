@@ -17,7 +17,7 @@
 
 - **맥락:** 본선에는 Windows 지원이 포함된다. backend는 Mac에서, frontend는 Windows에서 개발한다. 본선 경로는 Kiro 내부 비공개 API 대신 공식 기능(Steering·hook·MCP·사용자 에이전트)과 kiro-cli(2.0부터 Windows 11 기본 지원)를 쓰므로, 막고 있던 것은 Mac 전용으로 둔 host·포장 코드였다.
 - **결정(사용자 지시, 2026-10-10):** Mac 설치물은 backend가, Windows 설치물은 frontend가 빌드·확인·업로드한다. backend는 같은 코드로 Windows를 빌드할 수 있게 둔다.
-  - host는 macOS와 Windows에서 시작한다. Windows의 kiro-cli는 공식 설치 위치(`Program Files\Kiro-Cli`)를 먼저, 그다음 PATH의 `kiro-cli.exe`를 찾는다.
+  - host는 macOS와 Windows에서 시작한다. Windows의 kiro-cli는 공식 설치 위치(`Program Files\Kiro-Cli`, 2.29.0 설치 스크립트의 사용자 위치 `%LOCALAPPDATA%\Kiro-Cli`)를 먼저, 그다음 PATH의 `kiro-cli.exe`를 찾는다.
   - Kiro-native Core는 Kiro 실행 파일(`ELECTRON_RUN_AS_NODE`)이 아니라 실제 Node(PATH의 24.18·24.19 또는 관리 Node)로 돈다. Core가 자기 Node 경로를 hook·MCP 명령에 쓰기 때문이다.
   - Kiro 작업 폴더 해시는 Kiro(1.2.56)와 같은 정규화(슬래시, 끝 슬래시 제거, Windows 소문자)를 거친다. Kiro 세션 기록 위치와 권한 파일 위치가 Windows에서도 맞는다.
   - hook 명령은 Kiro가 쓰는 셸(Windows는 cmd.exe)에 맞게 인용한다. Windows에서 `%`, `"`, 줄바꿈이 든 경로는 거절한다.

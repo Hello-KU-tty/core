@@ -11,7 +11,8 @@ const ok = data => ({ status: 200, body: { success: true, data: { projectId, tas
 const refuse = error => ({ status: 409, body: { success: false, error } })
 
 function harness({ trusted = true, installed = true, loggedIn = true, fail = false, platform = 'darwin',
-  binds = [ok({ workspace })], openFolders = [], answers = {}, bound = false, consent } = {}) {
+  binds = [ok({ workspace })], openFolders = [], answers = {}, bound = false, consent, env = process.env,
+  installedAt = () => true } = {}) {
   let listener, trustListener, stopped = 0, starts = 0, mutations = 0, terminals = 0
   const commands = new Map(), executed = [], messages = [], fetches = [], whoami = [], dialogs = []
   const globalState = new Map(consent ? [['vibeHelper.coreToolsConsent', consent]] : [])
@@ -56,10 +57,10 @@ function harness({ trusted = true, installed = true, loggedIn = true, fail = fal
     'node:fs/promises': { mkdir: async () => {}, realpath: async value => value,
       access: async path => {
         if (path.endsWith('.kiro/hooks/vibe-helper.json')) { if (!bound) throw new Error('ENOENT'); return }
-        if (!installed) throw new Error('ENOENT')
+        if (!installed || !installedAt(path)) throw new Error('ENOENT')
       }, constants: { X_OK: 1 } },
     'node:os': { homedir: () => '/Users/synthetic' },
-    'node:path': platform === 'win32' ? require('node:path').win32 : require('node:path'),
+    'node:path': require('node:path')[platform === 'win32' ? 'win32' : 'posix'],
     [require('node:path')[platform === 'win32' ? 'win32' : 'posix'].join('/extension', 'portable/bin/runtime.cjs')]: {
       selectCoreRuntime: async options => { runtimeCalls.push(options); return {} } },
     '@vibe-helper/frontend-client/node': {
@@ -72,7 +73,7 @@ function harness({ trusted = true, installed = true, loggedIn = true, fail = fal
   }
   const module = { exports: {} }
   const queue = [...binds]
-  runInNewContext(code, { module, require: name => modules[name] ?? {}, process: { ...process, platform },
+  runInNewContext(code, { module, require: name => modules[name] ?? {}, process: { ...process, platform, env },
     AbortSignal, fetch: async (url, init) => {
       fetches.push({ url, init, body: JSON.parse(init.body) })
       const next = queue.shift() ?? refuse('NO_MORE_BINDS')
@@ -118,6 +119,17 @@ test('Windows host finds kiro-cli in Program Files and runs Core on a real Node,
   await h.lifecycleOptions().selectRuntime(undefined)
   assert.equal(h.runtimeCalls.length, 1)
   assert.equal('kiroExecutable' in h.runtimeCalls[0], false)
+  await host.dispose()
+})
+
+test('Windows host finds the per-user kiro-cli install even when Kiro started with an older PATH', async () => {
+  const localAppData = 'C:\\Users\\learner\\AppData\\Local'
+  const h = harness({ platform: 'win32', env: { ProgramFiles: 'C:\\Program Files', LOCALAPPDATA: localAppData, PATH: 'C:\\Windows' },
+    installedAt: path => path.startsWith(localAppData) })
+  const host = await h.create()
+  await host.prepare()
+  assert.equal(h.lifecycleOptions().launchArgs()[1], `${localAppData}\\Kiro-Cli\\kiro-cli.exe`)
+  assert.equal(host.getStatus().native, 'WORKER_READY')
   await host.dispose()
 })
 

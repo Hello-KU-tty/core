@@ -411,7 +411,7 @@ describe('Kiro-native workspace adapter', () => {
     expect(
       kiroSessionTranscriptPath('/Users/me', '/w', 'sess_c9b023e7-578f-46a6-8708-a4c8190fd613'),
     ).toMatch(
-      /^\/Users\/me\/\.kiro\/sessions\/[0-9a-f]{16}\/sess_c9b023e7-578f-46a6-8708-a4c8190fd613\/messages\.jsonl$/,
+      /^[\\/]Users[\\/]me[\\/]\.kiro[\\/]sessions[\\/][0-9a-f]{16}[\\/]sess_c9b023e7-578f-46a6-8708-a4c8190fd613[\\/]messages\.jsonl$/,
     )
     expect(() => kiroSessionTranscriptPath('/Users/me', '/w', '../../etc')).toThrow(
       'KIRO_SESSION_ID_INVALID',
@@ -506,7 +506,7 @@ describe('Kiro-native workspace adapter', () => {
     })
     expect(mergeKiroPermissionRules('{"rules":[]}')).toEqual({ status: 'UNRECOGNIZED' })
     expect(kiroPermissionsFile('/Users/me', '/Users/me/memo')).toMatch(
-      /^\/Users\/me\/\.kiro\/workspace-roots\/[0-9a-f]{16}\/permissions\.yaml$/,
+      /^[\\/]Users[\\/]me[\\/]\.kiro[\\/]workspace-roots[\\/][0-9a-f]{16}[\\/]permissions\.yaml$/,
     )
   })
 })
