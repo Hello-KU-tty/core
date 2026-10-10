@@ -341,7 +341,20 @@ export async function selectProjectToolchain(options: {
   )
     fail('PROJECT_TOOLCHAIN_UNSUPPORTED')
   const root = await ownedPrivateDirectory(options.privateRoot)
-  for (const name of ['home', 'config', 'cache', 'data', 'state', 'bin'])
+  // projectEnvironment points USERPROFILE, APPDATA and LOCALAPPDATA here. They must exist: with
+  // a missing AppData folder, Windows PowerShell gets an empty LocalApplicationData and writes its
+  // Microsoft\Windows\PowerShell cache relative to the cwd, into the learner's Project folder.
+  for (const name of [
+    'home',
+    'home/AppData',
+    'home/AppData/Local',
+    'home/AppData/Roaming',
+    'config',
+    'cache',
+    'data',
+    'state',
+    'bin',
+  ])
     await ownedPrivateDirectory(join(root, name))
   await writeFile(join(root, 'empty.npmrc'), '', { flag: 'wx', mode: 0o600 }).catch(
     async (error) => {
