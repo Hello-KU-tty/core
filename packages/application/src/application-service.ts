@@ -462,10 +462,20 @@ export class ApplicationService {
         return this.#completeTask(request)
       case 'BUILDER_CHAT_CHECK_PROGRESS':
         return this.#chatCheckProgress(this.#chatRoute(request))
-      case 'BUILDER_CHAT_SAVE_PROGRESS':
-        return this.#chatSaveProgress(this.#chatRoute(request, true))
-      case 'BUILDER_CHAT_ASK_CHOICE':
-        return this.#chatAskChoice(this.#chatRoute(request, true))
+      case 'BUILDER_CHAT_SAVE_PROGRESS': {
+        const routed = this.#chatRoute(request, true)
+        return builderChatSaveProgressReceiptSchema.parse({
+          ...(await this.#chatSaveProgress(routed)),
+          ...this.#chatFollowUpTask(routed, request.taskId),
+        })
+      }
+      case 'BUILDER_CHAT_ASK_CHOICE': {
+        const routed = this.#chatRoute(request, true)
+        return builderChatAskChoiceReceiptSchema.parse({
+          ...(await this.#chatAskChoice(routed)),
+          ...this.#chatFollowUpTask(routed, request.taskId),
+        })
+      }
       case 'BUILDER_CHAT_SAVE_CHOICE':
         return this.#chatSaveChoice(this.#chatRoute(request))
       case 'BUILDER_CHAT_FINISH_TASK':
@@ -4227,6 +4237,34 @@ export class ApplicationService {
     })
   }
 
+  /**
+   * A write that reached a follow-up Task (started by this call, or by an earlier call this
+   * chat's connection has not followed yet) tells the Builder the new Task and its criteria.
+   * Without them it finished against the earlier Task's criteria and was refused.
+   */
+  #chatFollowUpTask(
+    routed: { readonly projectId: string; readonly taskId: string; readonly correlationId: string },
+    connectedTaskId: string,
+  ): {
+    followUpTask?: { title: string; acceptanceCriteria: { key: string; description: string }[] }
+  } {
+    if (routed.taskId === connectedTaskId) return {}
+    const { task } = this.#readBuilderAggregate(
+      routed.projectId,
+      routed.taskId,
+      routed.correlationId,
+    )
+    return {
+      followUpTask: {
+        title: task.title,
+        acceptanceCriteria: task.acceptanceCriteria.map(({ key, description }) => ({
+          key,
+          description,
+        })),
+      },
+    }
+  }
+
   #chatCheckProgress(
     request: Extract<AgentRequest, { kind: 'BUILDER_CHAT_CHECK_PROGRESS' }>,
   ): BuilderChatProgress {
@@ -4944,6 +4982,12 @@ export class ApplicationService {
     // it was and the Builder can keep working toward the criteria.
     const preview = draft(this.#timestamp(), aggregate.task.revision)
     const invalid = validateCompletionReport(aggregate.task, preview)
+    if (invalid === 'TASK_ACCEPTANCE_RESULTS_INCOMPLETE')
+      throw this.#validationError(
+        request.correlationId,
+        invalid,
+        `Report each acceptance criterion of this task exactly once by key: ${aggregate.task.acceptanceCriteria.map((criterion) => criterion.key).join(', ')}. check_progress shows what each one means.`,
+      )
     if (invalid !== undefined) throw this.#domainError(request.correlationId, invalid)
     this.#assertChangedCriteria(aggregate, preview, request.correlationId)
     await this.#workspacePolicy.validateReferences(

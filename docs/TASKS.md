@@ -111,7 +111,15 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - **출처:** 사용자 지시(2026-10-10). 본선에는 Windows 지원이 포함되고, Mac은 backend, Windows는 frontend가 빌드·확인·업로드한다.
 - **backend 몫(완료):** host·Core·hook·bridge의 Windows 지원과 공통 포장 스크립트(`pnpm panel:pack:kiro-windows`), Windows를 흉내 낸 테스트, [핸드오프의 Windows 절차](FRONTEND_KIRO_NATIVE_HANDOFF.md#windows에서).
 - **완료 조건:** frontend가 Windows 11 x64에서 0.2.5 이상 VSIX를 빌드하고 핸드오프의 확인 1~7을 통과해 `releases/windows/kiro-native/`에 올린다. Windows 문제는 frontend가 PR로 고쳐도 되고(관련 테스트 실행, macOS 영향은 PR에 명시), backend가 검토해 Mac 설치물에도 반영한다. 직접 고치기 어려운 것은 보고하면 backend가 고친다.
-- **진행:** frontend가 0.2.6을 Windows 11 실기기에서 확인 1~7 통과로 올렸다(2026-10-10~11, 사용자 위치 kiro-cli와 사적 AppData 수정 포함). 2026-10-11 `main` 통합 뒤 0.2.7(K10·K11·완료 뒤 이어서 만들기·늦은 신뢰 다시 로드)을 `main`에서 빌드하고 확인 1~10을 거쳐 올려 달라고 요청한다([Windows 0.2.7 빌드 요청](FRONTEND_KIRO_NATIVE_HANDOFF.md#windows-027-빌드-요청-frontend)).
+- **진행:** frontend가 0.2.6을 Windows 11 실기기에서 확인 1~7 통과로 올렸다(2026-10-10~11, 사용자 위치 kiro-cli와 사적 AppData 수정 포함). 2026-10-11 `main` 통합 뒤 0.2.7(K10·K11·완료 뒤 이어서 만들기·늦은 신뢰 다시 로드)을 `main`에서 빌드하고 확인 1~10을 거쳐 올려 달라고 요청했고, frontend가 backend `4c6362c`·frontend `88275f6`으로 빌드해 확인 1~10을 통과(9·10은 조건부)하고 올렸다(2026-10-11, [0.2.7 Windows 확인](FRONTEND_KIRO_NATIVE_HANDOFF.md#027-windows-확인-2026-10-11)). 조건부 두 건(첫 Builder 턴이 선택을 열지 않음, 후속 Task의 `finish_task` 누락·첫 거절)은 K14에서 고쳤다. `scripts/test-portable-core.mjs`가 Kiro 1.2.56(Electron 44, Node 24.21, ABI 149)의 Kiro 런타임 단계에서 `RUNTIME_PROBE_REJECTED`로 실패한다. 본선 host는 Core를 실제 Node로만 띄우므로 이 단계를 본선 기준으로 바꿀지 결정이 남았다.
+
+### [~] K14. Builder가 묻는 기준과 후속 Task 완료 (Windows 0.2.7 확인 후속)
+
+- **출처:** frontend Windows 0.2.7 확인(2026-10-11)의 backend 검토 두 건. 첫 Builder 턴이 선택을 열지 않음(0.2.6 2차와 같음), 후속 Task에서 `finish_task` 누락과 이전 기준 키로 인한 첫 거절.
+- **결정:** [DECISIONS](DECISIONS.md) "본선: Builder가 학습자에게 묻는 기준"(사용자 결정, 2026-10-12). 애매하면 묻는다.
+- **범위:** Steering 0.7.0, kiro-adapter가 에이전트 담당 영역 전달, `save_progress`·`ask_choice` 응답의 `followUpTask`, 기준 키를 밝히는 완료 거절.
+- **완료 조건:** adapter·Core·연결 테스트, 기존 unit·integration·eval·패널 회귀 없음, 실제 Kiro에서 처음 보는 목표로 첫 Builder 턴(예상 Decision을 구현 중 하나씩 묻는지, 시작 때 몰아 묻지 않는지, 에이전트 담당 선택을 밝히는지)과 후속 Task 완료(첫 `finish_task` 성공), Mac VSIX 재생성.
+- **진행:** 구현과 자동 검사 완료(2026-10-12, Node 24.19.0): `pnpm typecheck` 통과, unit 177 통과·3 skip, integration 528 통과·9 skip, eval 46 통과·1 skip, 패널 CJS 187 통과·2 skip, `scripts/test-macos-package.mjs` 9 PASS, 바꾼 파일 Biome 통과. 실제 Kiro 확인 완료([기록](../tests/eval/results/kiro-builder-ask-k14.md), 시험 VSIX, 약 16크레딧): 예상 Decision이 없는 처음 보는 목표에서 "만들기 시작해줘" → 학습 목표 영역의 선택 두 개를 코드 직전에 하나씩 물음 → 완료, 후속 요청 두 번도 하나씩 물음, 후속 Task의 첫 `finish_task` 성공. 실측에서 Builder가 규칙·영역 이름을 학습자에게 말해 Steering 문구를 고치고 다시 확인했다. 남은 것: 예상 Decision이 있는 Spec의 첫 턴 실측(이번 Discovery는 비워 둠), Mac 설치물 0.2.8 배포와 Windows 빌드 요청(사용자 결정).
 
 ### [ ] K12. 크레딧 사용 측정과 절감
 

@@ -195,6 +195,8 @@ describe('Kiro chat Builder surface (K10)', () => {
       summary: 'Build the memo API, then the list.',
     })
     expect(first).toMatchObject({ success: true, data: { outcome: 'SAVED', contextVersion: 1 } })
+    // Starting the connected Task itself is not a follow-up.
+    expect((first as { data?: object }).data).not.toHaveProperty('followUpTask')
     expect(harness.aggregate().task.status).toBe('ACTIVE')
     expect(harness.aggregate().liveContext).toMatchObject({
       checkpoint: 'TASK_STARTED',
@@ -518,9 +520,20 @@ describe('Kiro chat Builder surface (K10)', () => {
     })
 
     await harness.say('이제 메모를 가족과 공유하는 기능도 넣어 줘')
+    // The call that starts the follow-up returns its criteria, so the Builder does not finish
+    // against the earlier Task's keys (Windows 0.2.7 check, Steering 0.7.0).
     expect(await harness.note({ kind: 'PLAN', summary: 'Add a share link.' })).toMatchObject({
       success: true,
-      data: { outcome: 'SAVED', contextVersion: 1 },
+      data: {
+        outcome: 'SAVED',
+        contextVersion: 1,
+        followUpTask: {
+          acceptanceCriteria: [
+            { key: 'user_request', description: '이제 메모를 가족과 공유하는 기능도 넣어 줘' },
+            { key: 'verified_outcome' },
+          ],
+        },
+      },
     })
     const followUp = harness.storage.repository.readLatestTaskForProject(ids.project)
     expect(followUp).toMatchObject({
@@ -577,6 +590,19 @@ describe('Kiro chat Builder surface (K10)', () => {
       success: true,
       data: { outcome: 'SAVED' },
     })
+    // The earlier Task's criteria are refused with the keys this Task needs, and nothing is written.
+    const stale = await harness.finish({
+      ...completeReport,
+      decisionsApplied: [{ decisionId, how: 'Only family members with the link can open it.' }],
+    })
+    expect(stale).toMatchObject({
+      success: false,
+      error: { code: 'TASK_ACCEPTANCE_RESULTS_INCOMPLETE' },
+    })
+    expect((stale as { error: { message: string } }).error.message).toContain(
+      'by key: user_request, verified_outcome.',
+    )
+    expect(followUpAggregate().task.status).toBe('ACTIVE')
     expect(
       await harness.finish({
         ...completeReport,

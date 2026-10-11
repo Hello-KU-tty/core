@@ -219,10 +219,16 @@ describe('Kiro-native workspace adapter', () => {
     expect(learner).not.toContain('What the learner owns')
     const scoped = renderLearnerSteering(templates, binding, {
       learnerFocus: [{ title: '만료되는 공유 링크와 접근 토큰', conceptNames: ['link expiry'] }],
+      agentSupport: [{ title: '화면 꾸미기' }],
       expectedDecisions: [{ description: '공유 링크를 얼마 동안 열 수 있게 할지 정한다.' }],
     })
-    expect(scoped).toContain('- 만료되는 공유 링크와 접근 토큰 (link expiry)')
-    expect(scoped).toContain('- 공유 링크를 얼마 동안 열 수 있게 할지 정한다.')
+    expect(scoped).toContain(
+      'Learner focus (ask real choices here):\n- 만료되는 공유 링크와 접근 토큰 (link expiry)',
+    )
+    expect(scoped).toContain('Agent support (decide here and state what you chose):\n- 화면 꾸미기')
+    expect(scoped).toContain(
+      'Expected decisions (ask each when the work reaches it):\n- 공유 링크를 얼마 동안 열 수 있게 할지 정한다.',
+    )
     expect(scoped).toContain('making it a configurable option')
     expect(scoped).not.toContain('{{')
     const helper = renderHelperSteering(templates)
@@ -232,15 +238,17 @@ describe('Kiro-native workspace adapter', () => {
   })
 
   it('steers decisions to the moment they arise, recorded before they are asked (since 0.5.0)', () => {
-    expect(templates.version).toBe('0.6.2')
+    expect(templates.version).toBe('0.7.0')
     const scoped = renderLearnerSteering(templates, binding, {
       learnerFocus: [],
+      agentSupport: [],
       expectedDecisions: [{ description: '메모를 누가 볼 수 있게 할지 정한다.' }],
     })
-    // Expected decisions are a heads-up, asked one at a time when the work reaches them.
-    expect(scoped).toContain('heads-up from planning, not a checklist')
+    // Expected decisions are asked one at a time when the work reaches them, never up front.
+    expect(scoped).toContain('Ask each one when the implementation reaches it')
     expect(scoped).toContain('Ask one decision at a time')
-    expect(scoped).toContain('Do not ask them up front or copy their wording')
+    expect(scoped).toContain('Do not ask them up front, together or in the Spec')
+    expect(scoped).toContain('Never ask several choices together or at the start of a task')
     // Record first, then show; context right after start_task and before complete_task.
     expect(scoped.indexOf('Record it first')).toBeLessThan(
       scoped.indexOf('In chat, list the options'),
@@ -267,9 +275,34 @@ describe('Kiro-native workspace adapter', () => {
     // 0.6.1: the learner's own option is their choice, recorded as custom without a new question.
     expect(learner).toContain('Do not open a new choice to ask about it again')
     // 0.6.2: the learner's language, and more work after finishing becomes a follow-up task.
-    expect(learner).toContain("Reply in the learner's language.")
+    expect(learner).toContain("write all of it in the learner's language")
+    // Live check (0.7.0): notes between tool calls are shown too; they were in English.
+    expect(learner).toContain('including short notes between tool calls, is shown to the learner')
     expect(learner).toContain('starts a follow-up task in this folder')
     expect(learner).toContain('Do not start new work the learner did not ask for')
+  })
+
+  it('asks real choices by Spec area, and when in doubt asks (0.7.0)', () => {
+    const learner = renderLearnerSteering(templates, binding)
+    // A real choice has more than one reasonable option and changes what the learner gets.
+    expect(learner).toContain('when in doubt, ask')
+    expect(learner).toContain('more than one option is reasonable for this project')
+    expect(learner).toContain('A convention with one usual answer')
+    // Expected decisions are asked, skipped only with a stated reason.
+    expect(learner).toContain('Skip it only if the learner already settled it')
+    // Learner focus and anything the Spec does not cover: ask; unsure counts as ask.
+    expect(learner).toContain('If you are unsure whether a choice is real or whose it is, ask.')
+    // Agent support: decide and state the choice plainly, no ownership talk, no approval request.
+    expect(learner).toContain('state plainly what you chose')
+    expect(learner).toContain('Do not ask for approval; the learner can ask about it.')
+    // Live check: the Builder narrated "this is an agent-support area, so I decide".
+    expect(learner).toContain('Talk about the work, not about these rules, in every message.')
+    expect(learner).toContain('do not call them "the learner"')
+    expect(learner).toContain('security, data-loss or external-cost risk: ask it, in any area')
+    // A follow-up task is finished only by finish_task, against its own criteria.
+    expect(learner).toContain('is finished only when `finish_task` succeeds')
+    expect(learner).toContain("report those criteria, not the earlier task's")
+    expect(learner).toContain('`followUpTask`')
   })
 
   it('fails closed on a missing, duplicated or unfilled steering template', () => {

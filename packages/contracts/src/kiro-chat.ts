@@ -212,11 +212,21 @@ export const builderChatProgressSchema = z.strictObject({
   lastNote: nonEmptyTextSchema.optional(),
 })
 
+/**
+ * Present when the call reached a follow-up Task instead of the Task the chat was connected to,
+ * so the Builder finishes against the new criteria without another call.
+ */
+const followUpTaskSchema = z.strictObject({
+  title: labelSchema,
+  acceptanceCriteria: builderChatProgressSchema.shape.acceptanceCriteria,
+})
+
 export const builderChatSaveProgressReceiptSchema = z.strictObject({
   schemaVersion: schemaVersionSchema,
   correlationId: correlationIdSchema,
   outcome: z.enum(['SAVED', 'UNCHANGED']),
   contextVersion: entityRevisionSchema,
+  followUpTask: followUpTaskSchema.optional(),
 })
 
 export const builderChatAskChoiceReceiptSchema = z.strictObject({
@@ -226,6 +236,7 @@ export const builderChatAskChoiceReceiptSchema = z.strictObject({
   decisionId: decisionIdSchema,
   options: z.array(numberedOptionSchema).min(2).max(6),
   recommendedNumber: z.int().min(1).max(6),
+  followUpTask: followUpTaskSchema.optional(),
 })
 
 export const builderChatSaveChoiceReceiptSchema = z.strictObject({

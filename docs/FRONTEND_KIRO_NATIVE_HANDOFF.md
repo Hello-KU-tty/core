@@ -205,6 +205,7 @@ frontend가 Windows 11 x64(Kiro 1.2.56, kiro-cli 2.29.0, 본선 계정)에서 ba
 - **backend 검토 (Windows 전용 아님):**
   - 첫 턴 Builder가 정할 거리를 열지 않는다(0.2.6 2차 실측과 같다).
   - Builder가 구현 뒤 `finish_task`를 부르지 않고 턴을 끝낼 때가 있다.
+  - **backend 처리(2026-10-12, K14):** 두 건 모두 고쳤고 다음 설치물에 들어간다. Steering 0.7.0은 실제 선택을 코드가 그 답을 필요로 할 때 하나씩 묻고(애매하면 묻기, 에이전트 담당 영역은 정하고 밝히기), 후속 Task도 `finish_task`가 성공해야 끝난 것으로 본다. 후속 Task를 시작한 `save_progress`·`ask_choice` 응답에 `followUpTask`(새 수락 기준)가 실리고, 기준이 맞지 않는 완료 거절은 필요한 키를 알려 준다. 근거는 [DECISIONS](DECISIONS.md) "본선: Builder가 학습자에게 묻는 기준", 실측은 [K14 기록](../tests/eval/results/kiro-builder-ask-k14.md). `scripts/test-portable-core.mjs`의 Kiro 런타임 단계는 아직 정하지 않았다.
 - **frontend 할 일:** `reloadRequired`일 때 패널의 `REGISTERED` 안내를 "창을 다시 로드한 뒤 새 세션(+)에서 시작하세요"로 바꾼다. Windows에서는 새 폴더마다 이 경우라서 필요하다.
 - **크레딧:** 이번 확인 약 15(계정 표시 15.1/50 이후 Builder 3턴 포함).
 

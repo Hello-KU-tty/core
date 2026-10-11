@@ -710,12 +710,14 @@ function fill(template: string, values: Readonly<Record<string, string>>): strin
 const steeringHeader = (inclusion: 'always' | 'manual', version: string) =>
   `---\ninclusion: ${inclusion}\n---\n\n<!-- vibe-helper kiro-native steering ${version}. Managed by Vibe Helper; local edits are replaced. -->\n`
 
-/** What the confirmed Learning Spec says the learner owns; copied, not reworded. */
+/** What the confirmed Learning Spec says the learner and the Builder own; copied, not reworded. */
 export interface KiroLearnerScope {
   readonly learnerFocus: readonly {
     readonly title: string
     readonly conceptNames: readonly string[]
   }[]
+  /** Areas the Builder decides itself and only states what it chose (Steering 0.7.0). */
+  readonly agentSupport: readonly { readonly title: string }[]
   readonly expectedDecisions: readonly { readonly description: string }[]
 }
 
@@ -725,7 +727,9 @@ function renderScope(
 ): string {
   if (
     scope === undefined ||
-    (scope.learnerFocus.length === 0 && scope.expectedDecisions.length === 0)
+    (scope.learnerFocus.length === 0 &&
+      scope.agentSupport.length === 0 &&
+      scope.expectedDecisions.length === 0)
   )
     return ''
   const one = (value: string) => value.replace(/\s+/g, ' ').trim()
@@ -733,11 +737,15 @@ function renderScope(
     (item) =>
       `- ${one(item.title)}${item.conceptNames.length > 0 ? ` (${item.conceptNames.map(one).join(', ')})` : ''}`,
   )
+  const support = scope.agentSupport.map((item) => `- ${one(item.title)}`)
   const decisions = scope.expectedDecisions.map((item) => `- ${one(item.description)}`)
   const blocks = [
-    ...(focus.length > 0 ? [`Learner focus:\n${focus.join('\n')}`] : []),
+    ...(focus.length > 0 ? [`Learner focus (ask real choices here):\n${focus.join('\n')}`] : []),
+    ...(support.length > 0
+      ? [`Agent support (decide here and state what you chose):\n${support.join('\n')}`]
+      : []),
     ...(decisions.length > 0
-      ? [`Expected decisions (heads-up only):\n${decisions.join('\n')}`]
+      ? [`Expected decisions (ask each when the work reaches it):\n${decisions.join('\n')}`]
       : []),
   ]
   return fill(templates.learnerScope, { FOCUS_AND_DECISIONS: blocks.join('\n\n') })
@@ -1080,6 +1088,9 @@ export function learnerScopeFrom(
     learnerFocus: spec.scope
       .filter((item) => item.category === 'LEARNER_FOCUS')
       .map((item) => ({ title: item.title, conceptNames: item.conceptNames })),
+    agentSupport: spec.scope
+      .filter((item) => item.category === 'AGENT_SUPPORT')
+      .map((item) => ({ title: item.title })),
     expectedDecisions: spec.expectedDecisions.map((item) => ({ description: item.description })),
   }
 }

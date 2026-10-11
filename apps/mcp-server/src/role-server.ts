@@ -280,7 +280,7 @@ export const KIRO_CHAT_BUILDER_TOOLS: readonly KiroChatToolDefinition[] = [
     name: 'save_progress',
     title: 'Save progress',
     description:
-      "Save a short progress note that the learner's helper tab reads: your plan, a change of direction, a new plan after an error, or the start of a test run.",
+      "Save a short progress note that the learner's helper tab reads: your plan, a change of direction, a new plan after an error, or the start of a test run. After a finished task, a PLAN note for the learner's new request starts a follow-up task; the result then has followUpTask with the acceptance criteria to finish against.",
     inputSchema: kiroChatSaveProgressToolInputSchema,
     readOnly: false,
     command: (input) => ({ kind: 'BUILDER_CHAT_SAVE_PROGRESS', note: withoutToolPurpose(input) }),

@@ -148,7 +148,11 @@ describe('Kiro binding manager', () => {
     expect(steering).not.toContain(ids.task)
     expect(steering).toContain('`save_choice`')
     expect(steering).toContain('What the learner owns')
-    expect(steering).toContain('steering 0.6.2.')
+    expect(steering).toContain('steering 0.7.0.')
+    // 0.7.0: the Spec's agent-support areas reach the Builder, which decides there itself.
+    expect(steering).toContain(
+      'Agent support (decide here and state what you chose):\n- Local application shell',
+    )
     const agent = await readFile(join(first.workspace, '.kiro/agents/vibe-helper.json'), 'utf8')
     expect(JSON.parse(agent).mcpServers['vibe-helper-helper'].args[1]).toBe(
       join(directory, 'helper-mcp.json'),
