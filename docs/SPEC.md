@@ -107,6 +107,17 @@ Concept Ledger + Project History
 → 자동 커리큘럼이 아니라 흥미·실용성을 보조
 ```
 
+### 4.5 Next Move(다음 한 걸음)
+
+```text
+Task 완료 (Builder는 완료 메시지 끝에 한 줄 안내)
+→ 뒤에서 확장 방향 3개 생성 (Analyst와 동시에, 기다리지 않음)
+→ 패널: 생성 중 표시 → 후보 / Builder 채팅: 학습자가 물으면 전달
+→ 학습자가 Builder 채팅에 번호나 원하는 방향을 직접 말함
+→ 후속 Task (아무것도 하지 않으면 그대로 끝)
+→ 그 Task를 마치면 새 후보로 바뀜
+```
+
 ## 5. 기능 요구사항
 
 ### 5.1 Project Discovery
@@ -250,6 +261,28 @@ Concept Ledger + Project History
 
 - 같은 질문에 관련 Evidence가 있을 때와 없을 때 Helper context와 답변이 의미 있게 달라진다.
 - Ledger 때문에 명백히 덜 매력적인 후보만 추천하지 않는다.
+
+### 5.8.1 Next Move(다음 한 걸음)
+
+본선 Kiro-native 경로의 요구사항이다. 예선 패널의 Final Upgrade(`UI_PREPARE_FINAL_UPGRADE_TASK`)는 fallback으로 남는다.
+
+- `FR-NXT-001`: Task가 완료되면(후속 Task 포함) Core는 그 Task의 Next Move 생성 job을 durable하게 만들어야 한다. 같은 Task에는 job이 하나다.
+- `FR-NXT-002`: job은 완료 직후 Analyst job과 동시에 실행해, 학습자가 결과를 확인하는 동안 후보가 준비되게 해야 한다. Analyst를 기다리지 않으므로 학습자 요약은 생성 시점의 것을 쓴다(완료 때 닫힌 Episode의 분석은 다음 Next Move부터 반영). Builder 턴과 Task 완료도 기다리게 하지 않는다. 완료부터 후보 저장까지 30초 이내를 목표로 측정한다.
+- `FR-NXT-003`: 생성 Agent는 Discovery 하위 역할의 도구 없는 hidden slot이다. 입력은 확정 Learning Spec, 완료된 Task와 완료 보고(구현·남은 일·제한), 학습자 요약, 이미 시작한 이전 Next Move다. 출력은 후보 3개이고 Core가 형식·길이·개수를 검증한다.
+- `FR-NXT-004`: 후보는 이 프로젝트의 실제 제품 가치를 높이고, 현재 범위를 크게 깨지 않고, 생성 workspace의 로컬 실행으로 만들 수 있어야 한다(hosted 배포, 결제, 실제 외부 계정 연동이 필요한 것은 제외). 흥미와 실용성이 먼저이고 아직 적용 근거가 적은 개념은 보조 신호로만 쓴다(FR-PER-005). 이미 시작한 방향을 반복하지 않고, 교육 목적만의 기능이나 점수·진도 문구를 쓰지 않는다.
+- `FR-NXT-005`: 후보는 제목(16자), 한 줄 설명(45자), 좋아지는 점(35자), 크기(작음·보통)를 화면에 보이고, 관련 개념은 내부 provenance로만 보존한다.
+- `FR-NXT-006`: 상태는 생성 중(대기 포함), 준비됨, 실패, 지난 것(후속 Task가 시작됨)이다. 자동 재시도는 1회이고, 두 번 실패하면 사유 코드를 보존한 실패 상태로 두며 패널의 다시 만들기만 새 시도를 연다.
+- `FR-NXT-007`: 패널은 Project 화면에 생성 중 표시, 후보 목록, 실패와 다시 만들기를 보여야 한다. 후보에는 시작·선택 버튼을 두지 않고 "마음에 드는 게 있으면 Builder 채팅에 번호나 원하는 방향을 말해 주세요. 지금 안 해도 돼요" 같은 안내만 둔다. 알림은 띄우지 않는다.
+- `FR-NXT-008`: Builder는 완료 메시지 끝에 한 줄로 다음 한 걸음을 안내하고 생성을 기다리지 않는다. 학습자가 다음 방향을 물으면 Core가 준 후보(또는 생성 중·실패 상태)를 번호와 함께 그대로 전하고 따로 목록을 만들지 않는다. 학습자가 묻지 않으면 다시 꺼내지 않는다.
+- `FR-NXT-009`: 시작은 학습자가 Builder 채팅에 직접 말할 때만이다. FR-BLD-008 후속 Task 경로를 그대로 쓰고, 학습자가 후보를 골랐다면 Builder가 고른 번호를 넘긴다. Core는 그 번호가 준비된 후보인지와 학습자 발언의 명시 번호와 모순되지 않는지만 검증한다. 후속 Task는 고른 후보와 학습자 원문을 함께 목표로 갖고 후보의 Agent 출처를 보존한다. 후보 없이 직접 쓴 요청은 지금과 같다.
+- `FR-NXT-010`: 후보 생성·조회·선택은 Evidence와 Concept State를 바꾸지 않는다. 학습자 발언은 기존 USER Activity 규칙 그대로다.
+- `FR-NXT-011`: Helper는 같은 Project의 현재 후보를 읽기 전용 맥락으로 받아 학습자의 비교 질문에 답할 수 있다.
+
+완료 관찰:
+
+- 처음 보는 목표로 만든 Project(Personal Need 유무 각각)에서 Task 완료 → 생성 중 → 후보 → 학습자 발언 → 후속 Task 완료가 이어진다.
+- 후속 Task를 마치면 이미 한 방향을 뺀 새 후보가 나온다.
+- 후보를 보거나 고르기만 해서는 Concept State가 바뀌지 않는다.
 
 ### 5.9 UI Mode
 
@@ -395,6 +428,7 @@ T01 macOS probe의 두 실행은 20~37ms에 dispatch가 반환되고 약 12초 �
 - Event마다 LLM 분석
 - 자체 IDE와 범용 sandbox 설치 UX
 - 여러 cloud deployment adapter
+- 생성 결과물의 배포 도우미(대회 이후 후보, TASKS T35)
 - Bedrock provider
 - Claude Code·Codex adapter
 - 복잡한 multi-agent 토론

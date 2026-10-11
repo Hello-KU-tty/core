@@ -126,6 +126,15 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - **출처:** 체험 피드백 15. 채팅 18.16크레딧 중 10.13은 앱 전체 구현 한 턴(모델 호출 46번)이었고, Vibe Helper 처리 몫은 약 4~5크레딧으로 추정했다.
 - **검토 거리:** 같은 과제를 Vibe Helper 연결 유무로 비교 측정, Steering·도구 설명 크기, 실패 재시도, 채팅 밖 kiro-cli 실행(Discovery·Helper·Analyst) 비용.
 
+### [~] K15. Next Move(다음 한 걸음)
+
+- **출처:** 사용자 결정(2026-10-12). Final Upgrade가 본선 경로에 없다는 확인에서 시작했다.
+- **결정:** [DECISIONS](DECISIONS.md) "본선: Final Upgrade 대신 Next Move(다음 한 걸음)", [SPEC 5.8.1](SPEC.md#581-next-move다음-한-걸음).
+- **선행:** K14(Builder가 묻는 기준과 후속 Task 완료) 구현(`0d72da4`). 같은 후속 Task·`save_progress` 응답 영역을 고친다.
+- **범위:** Core(job 생성·lease·재시도·검증, 조회·다시 만들기, 고른 번호 연결과 후속 Task provenance), storage migration 0008, WorkflowRuntime의 별도 Next Move worker(Analyst와 동시 실행), local-backend `NEXT_MOVE` mode, `discovery.md` Next Move 절, Steering(완료 한 줄 안내, 물을 때만 전달, 번호 넘기기), Helper context, 패널 카드(frontend 담당, 조회 계약 인계), Mac VSIX.
+- **완료 조건:** domain·application unit·integration(완료당 job 하나, Analyst와 동시 실행, 재시도·실패, 늦은 결과 거절, 번호 연결과 모순 거절, 지난 것 처리, Evidence·Concept State 불변), 기존 DB를 보존하는 migration 테스트, Next Move 평가 fixture(처음 보는 목표 2개와 Campus Drop, Personal Need 유무, 이미 한 방향 반복 금지, 로컬 실행 제약)와 prompt 버전·결과 기록, 기존 unit·integration·eval·패널 회귀 없음, 실제 Kiro에서 Task 완료 → 패널 생성 중 → 후보 → 학습자 번호 발언 → 후속 Task 완료 → 새 후보 1회와 완료부터 후보 저장까지 시간(목표 30초, Analyst 동시 실행 상태), 패널 데스크톱·좁은 화면 확인, Mac VSIX 재생성.
+- **기한:** 내부 10/18, 본선 발표 10/19 전.
+
 ## 3. 예선 작업 요약
 
 상세 기록은 [예선 작업 기록](archive/preliminary/TASKS_PRELIMINARY.md)에 있다.
@@ -226,3 +235,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - 장기 학습 효과를 단기 proxy로 과장하지 않는다.
 - 결과를 근거로 scope와 business/operation 모델을 새 결정 기록으로 승인한다.
 
+### [ ] T35. 생성 결과물 배포 도우미
+
+- **출처:** 원래 구상의 Final Upgrade(배포 전 마지막 업그레이드)는 배포 단계가 있어야 성립한다(DECISIONS "본선: Final Upgrade 대신 Next Move", 2026-10-12).
+- **범위(후보):** 한 TypeScript Golden Path와 한 hosted provider(SPEC 8.4), 배포 직전 점검과 마지막 업그레이드 제안. hosted 배포는 데이터 경계를 바꾸므로 시작 전에 별도 승인과 결정 기록이 필요하다.

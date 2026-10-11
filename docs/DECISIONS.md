@@ -1,5 +1,25 @@
 # 결정 기록
 
+## 본선: Final Upgrade 대신 Next Move(다음 한 걸음)
+
+- **맥락:** 원래 구상의 Final Upgrade는 "배포 전 마지막 업그레이드"였다(PROJECT_SPEC §13.6). T18에서 Core 계약(`UI_PREPARE_FINAL_UPGRADE_TASK`, `FINAL_UPGRADE` Episode)과 예선 패널 화면까지 만들었지만, 본선 Kiro-native 경로와 K 작업에는 연결되지 않았다. MVP에는 배포 단계가 없어(hosted 배포는 범위 밖) "배포 직전"을 알 수 있는 사건이 없고, 언제 추천할지도 정하지 못한 채 미뤄 왔다. 개념을 그대로 지키려면 배포 도우미가 필요해 본선 일정에 비해 크다.
+- **결정(사용자, 2026-10-12):**
+  1. **이름과 성격:** 마지막 한 번이 아니라, Task를 마칠 때마다 "이 프로젝트를 어떻게 키울까요?"를 제안하는 Next Move로 바꾼다. Discovery의 `UPGRADE` 전략(PROJECT_SPEC §5.5)을 프로젝트 안으로 옮긴 하위 버전이다. 화면 이름은 "다음 한 걸음"이다.
+  2. **생성:** Discovery·Spec 하위 Agent가 Analyst처럼 뒤에서 만든다. 학습자가 결과를 확인하는 동안 보여 줘야 하므로 완료 직후 Analyst와 동시에 돌리고 Analyst를 기다리지 않는다. Analyst는 계속 느긋한 백그라운드 작업이다. 그 대가로 완료 때 닫히는 BUILD_TASK·Helper Episode의 분석은 이번 후보에 들어가지 않는다. Task 중 Decision Episode는 확정 때 이미 닫혀 분석되므로 판단 Evidence 대부분은 반영되고, 나머지는 다음 Next Move부터 반영된다. 도구 없는 hidden slot이 후보 3개를 단일 fenced JSON으로 내고, Core가 검증·저장한다. 자동 재시도는 1회다. 목표는 완료부터 30초 이내다(측정 근거: kiro-cli Analyst 중앙값 14.0초, Discovery preview 10개 21.6초).
+  3. **보이는 곳:** 패널 Project 화면에 생성 중 표시, 후보, 실패와 다시 만들기를 둔다. Builder가 완료 메시지에서 "확인해 보세요"라고 한 뒤에도 뒤에서 아직 만들고 있을 수 있어서 생성 중 표시가 필요하다. Builder 채팅은 완료 메시지 끝의 한 줄 안내만 하고, 학습자가 물으면 Core가 준 후보를 그대로 전한다. Helper는 후보를 읽기만 한다. 알림은 띄우지 않는다.
+  4. **시작 버튼 없음:** 제안일 뿐이므로 학습자가 지금 바로 뭔가 하지 않아도 되게 한다. 시작은 학습자가 Builder 채팅에 번호나 원하는 방향을 직접 말할 때만이고, 기존 "완료 뒤 이어서 만들기"(FR-BLD-008) 후속 Task로 이어진다. 확장이 Kiro 채팅에 대신 입력할 수도 없다(K01 S9의 입력 채우기 실패, `sendPrompt` 문장은 학습자 발언으로 기록되어 쓰지 않음).
+  5. **고른 후보의 연결:** Builder가 학습자가 고른 번호를 `save_progress`의 선택 필드로 넘긴다. Core는 그 번호가 준비된 후보인지와 학습자 발언의 명시 번호와 모순되지 않는지만 검증한다(K10의 "Agent가 해석, Core가 모순 검사"와 같은 방식). 후속 Task 목표에는 후보와 학습자 원문을 함께 담고, 후보의 Agent 출처를 보존한다.
+  6. **Evidence 경계:** 후보는 Agent 작성이고, 후보를 보거나 고르는 것은 Evidence가 아니다. Concept State는 기존 경로로만 바뀐다.
+  7. **Final Upgrade:** Core 계약, `FINAL_UPGRADE` Episode와 예선 패널 화면은 fallback으로 그대로 둔다. 이름을 바꾸거나 지우지 않는다(계약·DB 변경을 피함).
+  8. **배포 도우미:** 대회 이후 후보로 남긴다(TASKS T35).
+- **기각한 대안:**
+  - Builder가 완료 메시지에서 직접 후보를 만들기: 기다림과 추가 크레딧은 없지만, Builder가 Discovery 역할까지 맡고 추천 원칙(흥미·실용성 우선, 개념은 보조 신호)을 통제하기 어렵다.
+  - Analyst가 끝난 뒤 생성: 방금 Task의 Evidence까지 반영되지만, 학습자가 결과를 확인하는 동안 후보가 늦게 뜬다.
+  - 학습자가 요청할 때만 생성: "계속 제시"하는 느낌이 약하다.
+  - 패널 시작 버튼: Task를 미리 만들고 채팅을 여는 것까지만 가능해 학습자가 채팅에 한 번 더 입력해야 하고, 시작 경로가 둘이 된다.
+- **계약 변경(계획):** 새 표 `next_move_jobs`·`next_move_job_revisions`(migration 0008, 기존 표는 그대로), Core UI 조회 `UI_GET_NEXT_MOVE`·다시 만들기 명령, Kiro 채팅 `check_progress`·`finish_task` 응답의 선택 필드 `nextMove`, `save_progress`의 선택 필드(고른 번호), `get_helper_context`의 `nextMove`, local-backend `NEXT_MOVE` mode, `discovery.md`의 Next Move 절과 Steering 버전 올림. 새 의존성·install script·범용 도구는 없다.
+- **위험:** Task마다 kiro-cli 호출이 1~2회 늘어난다(K12에서 측정). migration 0008을 적용한 DB는 이전 설치물(0.2.7 이하)로 되돌릴 수 없다(`DATABASE_NEWER_THAN_PACKAGE`). Builder가 Steering을 따르지 않고 자기 목록을 만들 수 있다. 후보 품질은 평가 fixture로만 확인할 수 있다.
+
 ## 본선: Builder가 학습자에게 묻는 기준
 
 - **맥락(frontend Windows 실측 0.2.6 2차·0.2.7, 2026-10-11):** 첫 Builder 턴이 "만들기 시작해줘" 한 번에 선택을 하나도 묻지 않고 Task를 마쳤다. 0.2.6 2차에서는 HTTP 메서드·상태 코드 같은 선택을 혼자 정했고, 저장 방식은 학습자가 완료 뒤 따로 "번호로 물어봐"라고 해야 물었다. Mac K10 실측에서는 학습자가 첫 발언에 사정을 말해 첫 턴에 물었다. Steering 0.6.2는 Spec의 예상 Decision을 "예고"로 두고 "중요하지 않게 되면 건너뛰라"고 해서 묻지 않을 길이 넓었고, Core도 한 번도 묻지 않은 완료를 막지 않는다. 같은 실측에서 후속 Task는 `finish_task` 없이 끝났고, 학습자가 완료 기록을 부탁한 뒤 첫 `finish_task`가 이전 Task의 기준 키로 와서 `TASK_ACCEPTANCE_RESULTS_INCOMPLETE`로 거절됐다(Mac 0.2.7에서도 같은 거절). 후속 Task를 시작한 호출의 응답에 새 Task나 그 기준이 없었고, 거절 메시지도 무엇을 고칠지 말하지 않았다.

@@ -16,6 +16,7 @@
 - **Evidence 수집:** Kiro hook이 사용자가 채팅에 직접 친 발언을 USER Activity로 Core에 기록하고(일반 채팅도 Evidence 대상), 턴 종료로 Helper 교환을 마무리한다. Agent의 Core 도구 호출은 Core가 AGENT 출처로 기록한다. Event마다 추론하지 않고 Episode 종료 뒤 분석하는 원칙은 유지한다.
 - **개인화:** 기존 다음 Helper·Discovery 개인화에 더해, Core가 만든 학습자 요약을 Steering이 참조하는 파일로 모든 Kiro 대화에 반영한다. Steering은 세션 시작 때 고정되므로 세션 도중 변화는 프롬프트 hook 출력으로 보완한다.
 - **Discovery·Learning Spec:** 패널에 유지하고, 확정 Spec을 Kiro Spec(`requirements.md`)으로 내보낸다.
+- **Next Move(다음 한 걸음):** Task를 마칠 때마다 Discovery 하위 Agent가 Analyst처럼 뒤에서 이 프로젝트를 키울 방향 3개를 만든다. 패널은 생성 중 표시와 후보를 보여 주고, Builder 채팅은 학습자가 물을 때만 후보를 전한다. 제안일 뿐이라 시작 버튼이 없다. 학습자가 Builder 채팅에 번호나 원하는 방향을 직접 말하면 기존 후속 Task로 이어지고, 아무것도 하지 않아도 된다. 후보와 선택은 Evidence가 아니다. 예선의 Final Upgrade(배포 전 마지막 업그레이드)는 배포 도우미가 있어야 성립해 본선 경로에 쓰지 않고 예선 패널 fallback에만 남긴다(2026-10-12 사용자 결정).
 - **Project 폴더:** 사용자가 Kiro에서 연 폴더가 비어 있으면 그 폴더를 Project 폴더로 등록해 같은 창에서 진행한다. 이미 파일이 있으면 Core가 만든 새 폴더를 새 창으로 여는 것을 제안한다. 기존 프로젝트 import는 여전히 범위 밖이다.
 - **Core 최소 수정:** Core와 데이터 계약은 host 중립으로 유지하고 Kiro 전용 기능은 `packages/kiro-adapter`와 확장에만 둔다. Kiro 기능 사용은 AWS 대회 평가를 위한 adapter 단계의 선택이다.
 - **일정:** 포스터 사전 제출 10/11에는 실측된 핵심 장면을, 본선 10/18까지는 안정화와 추가 구현을 진행한다.
