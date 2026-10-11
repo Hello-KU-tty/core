@@ -3,21 +3,34 @@ import {
   type DiscoveryAggregate,
   type EpisodeAggregate,
   type EpisodeHistory,
-  PersistenceError,
   type EvidenceTrace,
   type IdempotencyReceipt,
+  PersistenceError,
   type PersistenceRepository,
   type PersistenceWriteResult,
   type ProjectRecoveryState,
 } from '@vibe-helper/application'
 import {
+  type AcceptedEvidence,
+  type ActivityEvent,
+  type AnalysisJob,
+  type AuditRecord,
   acceptedEvidenceSchema,
-  analysisJobSchema,
   activityEventSchema,
+  analysisJobSchema,
   auditRecordSchema,
+  type BaselineResult,
+  type BuilderTask,
   baselineResultIdSchema,
   baselineResultSchema,
   builderTaskSchema,
+  type CandidateEnrichment,
+  type CandidatePreviewRound,
+  type CandidateRound,
+  type CanonicalConcept,
+  type ConceptAliasProposal,
+  type ConceptLedgerEntry,
+  type ContextRefreshRequest,
   candidateEnrichmentSchema,
   candidatePreviewRoundSchema,
   candidateRoundSchema,
@@ -26,65 +39,52 @@ import {
   conceptLedgerEntrySchema,
   contextRefreshRequestSchema,
   correlationIdSchema,
-  decisionApplicationSchema,
-  decisionRequestSchema,
-  decisionResolutionSchema,
-  discoveryFeedbackSchema,
-  discoverySessionSchema,
-  episodeSchema,
-  evidenceDecisionSchema,
-  evidenceProposalSchema,
-  evaluationRunIdSchema,
-  evaluationRunSchema,
-  idempotencyKeySchema,
-  learningSpecRevisionSchema,
-  liveProjectContextSchema,
-  misconceptionIssueSchema,
-  personalizationTraceIdSchema,
-  personalizationTraceSchema,
-  projectCandidateRevisionSchema,
-  projectSchema,
-  stableEntityIdSchema,
-  taskCompletionReportSchema,
-  utcTimestampSchema,
-  type AcceptedEvidence,
-  type AnalysisJob,
-  type ActivityEvent,
-  type AuditRecord,
-  type BaselineResult,
-  type BuilderTask,
-  type CandidateEnrichment,
-  type CandidatePreviewRound,
-  type CandidateRound,
-  type CanonicalConcept,
-  type ConceptAliasProposal,
-  type ConceptLedgerEntry,
-  type ContextRefreshRequest,
   type DecisionApplication,
   type DecisionRequest,
   type DecisionResolution,
   type DiscoveryFeedback,
   type DiscoverySession,
+  decisionApplicationSchema,
+  decisionRequestSchema,
+  decisionResolutionSchema,
+  discoveryFeedbackSchema,
+  discoverySessionSchema,
   type Episode,
+  type EvaluationRun,
   type EvidenceDecision,
   type EvidenceProposal,
-  type EvaluationRun,
+  episodeSchema,
+  evaluationRunIdSchema,
+  evaluationRunSchema,
+  evidenceDecisionSchema,
+  evidenceProposalSchema,
+  idempotencyKeySchema,
   type LearningSpecRevision,
   type LiveProjectContext,
+  learningSpecRevisionSchema,
+  liveProjectContextSchema,
   type MisconceptionIssue,
+  misconceptionIssueSchema,
   type PersonalizationTrace,
   type Project,
   type ProjectCandidateRevision,
+  personalizationTraceIdSchema,
+  personalizationTraceSchema,
+  projectCandidateRevisionSchema,
+  projectSchema,
+  stableEntityIdSchema,
   type TaskCompletionReport,
+  taskCompletionReportSchema,
+  utcTimestampSchema,
 } from '@vibe-helper/contracts'
 import type Database from 'better-sqlite3'
 
 import {
   assertPayloadSafe,
+  type PreparedRecord,
   parseStoredRecord,
   prepareRecord,
   stableStringify,
-  type PreparedRecord,
 } from './serialization.js'
 
 interface ContractSchema<T> {
@@ -1845,6 +1845,40 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
     )
   }
 
+  readTaskChatEvents(
+    projectId: string,
+    taskId: string,
+    since: string,
+  ): readonly { readonly event: ActivityEvent; readonly helperTab: boolean }[] {
+    if (
+      !projectSchema.shape.id.safeParse(projectId).success ||
+      !builderTaskSchema.shape.id.safeParse(taskId).success ||
+      !utcTimestampSchema.safeParse(since).success
+    ) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Task chat event query is invalid')
+    }
+    return this.#read(() =>
+      this.#sqlite
+        .prepare<[string, string, string], PayloadRow & { readonly helper_tab: number }>(
+          `SELECT events.payload_json, events.payload_hash,
+             EXISTS (
+               SELECT 1 FROM episode_event_edges edges
+               JOIN episodes ON episodes.id = edges.episode_id
+               WHERE edges.event_id = events.id AND episodes.type = 'HELPER_CONVERSATION'
+             ) AS helper_tab
+           FROM activity_events events
+           WHERE events.project_id = ? AND events.task_id = ? AND events.occurred_at >= ?
+             AND events.event_type IN ('USER_MESSAGE', 'HELPER_RESPONSE', 'BUILDER_CHAT_TURN')
+           ORDER BY events.sequence ASC`,
+        )
+        .all(projectId, taskId, since)
+        .map((row) => ({
+          event: parseStoredRecord(activityEventSchema, row.payload_json, row.payload_hash),
+          helperTab: row.helper_tab === 1,
+        })),
+    )
+  }
+
   readOpenEpisode(
     projectId: string,
     type: Episode['type'],
@@ -2762,4 +2796,5 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
     }
   }
 }
+
 import { createHash } from 'node:crypto'

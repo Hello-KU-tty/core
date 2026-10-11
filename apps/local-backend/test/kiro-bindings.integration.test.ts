@@ -120,7 +120,7 @@ describe('Kiro binding manager', () => {
       taskId: ids.task,
       workspace: generated,
       registered: false,
-      coreTools: 'NOT_REQUESTED',
+      permissions: 'NOT_REQUESTED',
     })
     expect(handlers.size).toBe(3)
     const directory = join(root, 'kiro-bindings', ids.project)
@@ -128,7 +128,12 @@ describe('Kiro binding manager', () => {
       expect(await ownerOnly(join(directory, name))).toBe(true)
     if (process.platform === 'win32') expect(await isPrivateDirectory(directory)).toBe(true)
     const descriptor = JSON.parse(await readFile(join(directory, 'builder-mcp.json'), 'utf8'))
-    expect(descriptor).toMatchObject({ role: 'BUILDER', workspace: first.workspace })
+    expect(descriptor).toMatchObject({
+      role: 'BUILDER',
+      workspace: first.workspace,
+      taskId: ids.task,
+      toolNames: ['check_progress', 'save_progress', 'ask_choice', 'save_choice', 'finish_task'],
+    })
     expect(descriptor.url).toMatch(/^http:\/\/127\.0\.0\.1:47831\/mcp\/native-/)
     const helper = JSON.parse(await readFile(join(directory, 'helper-mcp.json'), 'utf8'))
     expect(helper).toMatchObject({ role: 'HELPER', toolNames: ['get_helper_context'] })
@@ -136,9 +141,11 @@ describe('Kiro binding manager', () => {
       join(first.workspace, '.kiro/steering/vibe-helper-learner.md'),
       'utf8',
     )
-    expect(steering).toContain(ids.task)
+    // K10: the scope lives in the private MCP descriptor; the steering names tools, not IDs.
+    expect(steering).not.toContain(ids.task)
+    expect(steering).toContain('`save_choice`')
     expect(steering).toContain('What the learner owns')
-    expect(steering).toContain('steering 0.5.2.')
+    expect(steering).toContain('steering 0.6.1.')
     const agent = await readFile(join(first.workspace, '.kiro/agents/vibe-helper.json'), 'utf8')
     expect(JSON.parse(agent).mcpServers['vibe-helper-helper'].args[1]).toBe(
       join(directory, 'helper-mcp.json'),
@@ -161,8 +168,16 @@ describe('Kiro binding manager', () => {
     expect(registry.get(ids.project)).toBe(folder)
     expect(await ownerOnly(registryFile)).toBe(true)
     expect(await readFile(join(folder, '.kiro/steering/vibe-helper-learner.md'), 'utf8')).toContain(
-      ids.project,
+      '`check_progress`',
     )
+    expect(
+      JSON.parse(
+        await readFile(
+          join(base, 'core', 'kiro-bindings', ids.project, 'builder-mcp.json'),
+          'utf8',
+        ),
+      ),
+    ).toMatchObject({ projectId: ids.project, workspace: folder })
     // Work in the folder does not block rebinding the same Project to it.
     await writeFile(join(folder, 'index.ts'), 'export {}\n')
     expect(await manager.bind(ids.project, { workspace: folder })).toMatchObject({
@@ -242,19 +257,44 @@ describe('Kiro binding manager', () => {
     manager.close()
   })
 
-  it("writes the Core tools rule into Kiro's permission file only with consent", async () => {
+  it("applies the learner's approval choice to Kiro's permission file", async () => {
     const { home, manager, generated } = await setup()
     const file = kiroPermissionsFile(home, generated)
-    expect((await manager.bind(ids.project)).coreTools).toBe('NOT_REQUESTED')
+    expect((await manager.bind(ids.project)).permissions).toBe('NOT_REQUESTED')
     await expect(lstat(file)).rejects.toThrow()
-    expect((await manager.bind(ids.project, { allowCoreTools: true })).coreTools).toBe('WRITTEN')
+    expect((await manager.bind(ids.project, { approval: 'MANUAL' })).permissions).toBe('UNCHANGED')
+    await expect(lstat(file)).rejects.toThrow()
+    expect((await manager.bind(ids.project, { approval: 'PREAPPROVED' })).permissions).toBe(
+      'WRITTEN',
+    )
     const text = await readFile(file, 'utf8')
     expect(text).toContain('- vibe-helper/*')
     expect(text).toContain('- vibe-helper-helper/*')
+    expect(text).toContain('- npm *')
+    expect(text).toContain('- git push*')
     expect(await ownerOnly(file)).toBe(true)
-    expect((await manager.bind(ids.project, { allowCoreTools: true })).coreTools).toBe(
-      'ALREADY_ALLOWED',
+    expect((await manager.bind(ids.project, { approval: 'PREAPPROVED' })).permissions).toBe(
+      'UNCHANGED',
     )
+    // Turning it off reaches every bound folder at once; a restore never touches the rules.
+    expect(await manager.setCommandApproval('MANUAL')).toEqual({
+      WRITTEN: 1,
+      UNCHANGED: 0,
+      UNRECOGNIZED: 0,
+    })
+    expect(await readFile(file, 'utf8')).toBe('rules: []\n')
+    expect(await manager.setCommandApproval('MANUAL')).toEqual({
+      WRITTEN: 0,
+      UNCHANGED: 1,
+      UNRECOGNIZED: 0,
+    })
+    await writeFile(file, '{"rules":[]}')
+    expect(await manager.setCommandApproval('PREAPPROVED')).toEqual({
+      WRITTEN: 0,
+      UNCHANGED: 0,
+      UNRECOGNIZED: 1,
+    })
+    expect(await readFile(file, 'utf8')).toBe('{"rules":[]}')
     manager.close()
   })
 

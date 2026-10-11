@@ -1,51 +1,127 @@
 {
-  "version": "1.0.0",
-  "purpose": "Kiro Agent interpretation of a learner's chat reply to an open Decision (K05). Synthetic learner messages; not real user data.",
+  "version": "2.0.0",
+  "purpose": "Kiro Agent interpretation of a learner's chat reply to an open Decision (K05), on the K10 Kiro chat tools: the Agent records only the choice with save_choice and Core links the learner's words. Adds wavering, negation, a misconception that changes the fitting option (re-ask before recording), a partly wrong reason (record), and a changed mind. Synthetic learner messages; not real user data.",
   "decision": {
     "question": "공유 링크를 얼마 동안 열 수 있게 할까요?",
-    "options": ["1시간", "24시간", "7일"],
+    "options": [
+      "1시간",
+      "24시간",
+      "7일"
+    ],
     "recommendedOptionNumber": 1
   },
   "cases": [
     {
       "id": "explicit-number",
       "message": "아까 링크 만료 시간 물어본 거, 2번으로 할게. 하루 정도는 열어둬야 집에서 받을 수 있어서.",
-      "expect": { "resolve": true, "optionNumber": 2, "rationaleRequired": true }
+      "expect": {
+        "resolve": true,
+        "optionNumber": 2,
+        "linked": true
+      }
     },
     {
       "id": "content-shortest",
       "message": "링크 만료 시간 말인데 제일 짧은 쪽이 낫겠어. 공용 PC라 링크가 오래 남아 있으면 불안해.",
-      "expect": { "resolve": true, "optionNumber": 1, "rationaleRequired": true }
+      "expect": {
+        "resolve": true,
+        "optionNumber": 1,
+        "linked": true
+      }
     },
     {
       "id": "number-trap",
       "message": "링크 만료 시간은 2시간(1번)으로 할게. 민감한 파일이 많아서 짧은 게 좋아.",
-      "expect": { "resolve": true, "optionNumber": 1, "rationaleRequired": true }
+      "expect": {
+        "resolve": true,
+        "optionNumber": 1,
+        "linked": true
+      }
     },
     {
       "id": "recommendation",
       "message": "링크 만료 시간은 네가 추천한 걸로 할게.",
-      "expect": { "resolve": true, "optionNumber": 1, "rationaleRequired": false }
+      "expect": {
+        "resolve": true,
+        "optionNumber": 1
+      }
     },
     {
       "id": "custom",
       "message": "링크 만료 시간 말인데, 시간 말고 다운로드 한 번 하면 바로 만료되게 해줘. 한 번 받으면 끝이니까.",
-      "expect": { "resolve": true, "custom": true, "rationaleRequired": true }
+      "expect": {
+        "resolve": true,
+        "custom": true,
+        "linked": true
+      }
     },
     {
       "id": "question-not-choice",
       "message": "링크 만료 시간 말인데, 잘 모르겠어. 1시간이랑 24시간이 실제로 뭐가 달라?",
-      "expect": { "resolve": false }
+      "expect": {
+        "resolve": false
+      }
     },
     {
       "id": "undecided",
       "message": "링크 만료 시간은… 하루? 아니 일주일이 나으려나. 좀 더 생각해볼게.",
-      "expect": { "resolve": false }
+      "expect": {
+        "resolve": false
+      }
     },
     {
       "id": "middle-by-elimination",
       "message": "만료 시간은 1번은 너무 짧고 3번은 너무 길어. 그래서 중간 걸로 할게.",
-      "expect": { "resolve": true, "optionNumber": 2, "rationaleRequired": true }
+      "expect": {
+        "resolve": true,
+        "optionNumber": 2,
+        "linked": true
+      }
+    },
+    {
+      "id": "wavering",
+      "message": "링크 만료 시간 말인데, 1번이 나은가 2번이 나은가… 아니다 2번이 낫겠다. 집에 가서 받을 시간은 있어야 하니까.",
+      "expect": {
+        "resolve": true,
+        "optionNumber": 2,
+        "linked": true
+      }
+    },
+    {
+      "id": "negation-ambiguous",
+      "message": "링크 만료 시간은 1번은 너무 짧아.",
+      "expect": {
+        "resolve": false
+      }
+    },
+    {
+      "id": "misconception-changes-fit",
+      "message": "링크 만료 시간은 7일로 해줘. 링크는 암호화돼 있어서 유출돼도 아무도 못 여니까 길어도 괜찮아.",
+      "expect": {
+        "resolve": false
+      }
+    },
+    {
+      "id": "partly-wrong-choice-fine",
+      "message": "링크 만료 시간은 1시간으로 할게. 짧을수록 안전하잖아. 어차피 링크는 암호화돼 있어서 유출돼도 못 열긴 하지만.",
+      "expect": {
+        "resolve": true,
+        "optionNumber": 1,
+        "linked": true
+      }
+    },
+    {
+      "id": "changed-mind",
+      "messages": [
+        "링크 만료 시간은 2번으로 할게.",
+        "아 역시 1번으로 바꿀래. 공용 PC에서 바로 받을 거라 짧아도 돼."
+      ],
+      "expect": {
+        "resolve": true,
+        "optionNumber": 1,
+        "changed": true,
+        "linked": true
+      }
     }
   ]
 }

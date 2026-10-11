@@ -32,6 +32,18 @@ function immutableTaskContent(task: BuilderTask): unknown {
   return immutable
 }
 
+/**
+ * The report rules a completion must pass, without the status transition. A criterion the
+ * learner's own Decision changed (CHANGED_BY_DECISION) does not have to pass; the application
+ * checks that the named Decision is a resolved Decision of this Task.
+ */
+export function validateCompletionReport(
+  task: BuilderTask,
+  report: TaskCompletionReport,
+): string | undefined {
+  return validateCompletion(task, report)
+}
+
 function validateCompletion(task: BuilderTask, report: TaskCompletionReport): string | undefined {
   if (
     report.projectId !== task.projectId ||
@@ -50,7 +62,7 @@ function validateCompletion(task: BuilderTask, report: TaskCompletionReport): st
   ) {
     return 'TASK_ACCEPTANCE_RESULTS_INCOMPLETE'
   }
-  if (report.acceptanceResults.some((result) => result.status !== 'PASSED')) {
+  if (report.acceptanceResults.some((result) => result.status === 'FAILED')) {
     return 'TASK_ACCEPTANCE_FAILED'
   }
   if (report.validationResults.some((result) => result.status === 'FAILED')) {

@@ -151,6 +151,31 @@ export function translateKiroHook(
   }
 }
 
+/**
+ * The Builder's reply at the end of a Builder chat turn (K10). Core keeps it as Agent-authored
+ * context so the Analyst can tell what the learner was answering; it is never user Evidence.
+ */
+export function builderChatTurnRequest(
+  binding: KiroCoreBinding,
+  sessionId: string,
+  reply: string,
+  idempotencyKey: string = `idem_${randomUUID()}`,
+): Extract<UiRequest, { kind: 'UI_RECORD_BUILDER_CHAT_TURN' }> | null {
+  const text = reply.trim().slice(0, MAX_CHAT_MESSAGE_CHARS)
+  if (text.length === 0) return null
+  return {
+    schemaVersion: 1,
+    kind: 'UI_RECORD_BUILDER_CHAT_TURN',
+    correlationId: binding.correlationId,
+    actor: { kind: 'UI' },
+    idempotencyKey,
+    projectId: binding.projectId,
+    taskId: binding.taskId,
+    conversationId: kiroConversationId(sessionId),
+    reply: text,
+  }
+}
+
 /** Builds the Helper exchange for a `/vibe-helper` question once its turn has stopped. */
 export function helperExchangeRequest(
   binding: KiroCoreBinding,
@@ -357,33 +382,206 @@ export function kiroPermissionsFile(homeDirectory: string, workspaceRoot: string
   )
 }
 
-const CORE_TOOLS_RULE = `  - capability: mcp\n    effect: allow\n    match:\n      - ${KIRO_MCP_SERVER_NAME}/*\n      - ${KIRO_HELPER_MCP_SERVER_NAME}/*\n`
+/** The learner's one choice: Kiro runs the Core tools and common dev commands unasked, or asks. */
+export type KiroCommandApproval = 'PREAPPROVED' | 'MANUAL'
+
+export interface KiroAllowRule {
+  readonly capability: 'mcp' | 'shell'
+  readonly match: readonly string[]
+  readonly exclude: readonly string[]
+}
 
 /**
- * Adds one rule allowing the Vibe Helper Core tools to a Kiro workspace permission file. Only a
- * file shaped like Kiro's own output (a top-level `rules:` list) is changed; anything else is left
- * alone so Kiro keeps asking. This is Kiro's internal format, so a failure only means prompts.
+ * Rules a pre-approved Project folder gets (K11, DECISIONS). Shell patterns are Kiro command
+ * prefixes where `*` is any text. Kiro checks every part of `;`, `&&`, `||`, `|`, newlines and
+ * `$( )` on its own, so one unlisted part keeps the prompt. Unlisted and excluded commands (rm,
+ * kill, sudo, publish, push, global installs, other hosts) keep asking. This list prevents
+ * mistakes; it is not a sandbox: `node`, package scripts, `cat` and redirections reach outside the
+ * folder. PowerShell names cover Windows, where Kiro uses the default terminal profile.
  */
-export function mergeKiroPermissionRules(
+export const KIRO_PREAPPROVED_RULES: readonly KiroAllowRule[] = [
+  {
+    capability: 'mcp',
+    match: [`${KIRO_MCP_SERVER_NAME}/*`, `${KIRO_HELPER_MCP_SERVER_NAME}/*`],
+    exclude: [],
+  },
+  {
+    capability: 'shell',
+    match: [
+      ...['ls', 'ls *', 'pwd', 'cd *', 'cat *', 'head *', 'tail *', 'wc *', 'grep *', 'sort *'],
+      ...['find *', 'which *', 'echo *', 'sleep *', 'uname *'],
+      ...['mkdir *', 'touch *', 'cp *', 'mv *'],
+      ...['node *', 'npm *', 'npx *', 'pnpm *', 'yarn', 'yarn *', 'bun *', 'tsc *', 'python3 *'],
+      'git *',
+      ...['curl http://localhost:*', 'curl -s http://localhost:*'],
+      ...['curl http://127.0.0.1:*', 'curl -s http://127.0.0.1:*'],
+      ...['Get-ChildItem*', 'Get-Content *', 'Select-Object *', 'Select-String *'],
+      ...['Measure-Object*', 'Test-Path *', 'Get-Location', 'Set-Location *', 'New-Item *'],
+      ...['Copy-Item *', 'Move-Item *', 'Start-Sleep *', 'Write-Output *', 'where.exe *'],
+      ...['py *', 'python *', 'curl.exe http://localhost:*', 'curl.exe -s http://localhost:*'],
+      ...['Invoke-WebRequest http://localhost:*', 'Invoke-RestMethod http://localhost:*'],
+    ],
+    exclude: [
+      ...['npm publish*', 'npm * -g*', 'npm * --global*', 'npm -g*', 'npm --global*'],
+      'npm *--location=global*',
+      ...['pnpm publish*', 'pnpm * -g*', 'pnpm * --global*', 'pnpm -g*', 'pnpm --global*'],
+      ...['yarn publish*', 'yarn npm publish*', 'yarn global*'],
+      ...['bun publish*', 'bun * -g*', 'bun * --global*'],
+      ...['git push*', 'git * push*', 'git reset --hard*', 'git clean*', 'git config --global*'],
+      ...['find * -exec*', 'find * -delete*', 'find * -ok*'],
+      ...['curl *@*', 'curl.exe *@*', 'Invoke-WebRequest *@*', 'Invoke-RestMethod *@*'],
+    ],
+  },
+]
+
+interface ParsedKiroRule {
+  /** Lines of the rule's own entries, from its `- ` item to its last key or list item. */
+  start: number
+  end: number
+  readonly fields: Map<string, string>
+  readonly lists: Map<string, { readonly line: number; readonly value: string }[]>
+}
+
+function yamlScalar(raw: string): string | null {
+  const text = raw.trim()
+  if (text.startsWith('"')) {
+    try {
+      const value: unknown = JSON.parse(text)
+      return typeof value === 'string' ? value : null
+    } catch {
+      return null
+    }
+  }
+  if (text.startsWith("'"))
+    return text.length > 1 && text.endsWith("'") ? text.slice(1, -1).replaceAll("''", "'") : null
+  const comment = text.search(/\s#/)
+  return (comment === -1 ? text : text.slice(0, comment)).trimEnd()
+}
+
+/**
+ * Reads Kiro's own permission file shape: `rules:` holding `- key: value` items whose lists are
+ * block lists. Anything else (flow lists, other top-level keys, nested maps) returns null.
+ */
+function parseKiroPermissionRules(lines: readonly string[]): readonly ParsedKiroRule[] | null {
+  const meaningful = (line: string) => line.trim() !== '' && !line.trim().startsWith('#')
+  const head = lines.findIndex(meaningful)
+  if (head === -1) return []
+  if (lines[head]?.trimEnd() === 'rules: []')
+    return lines.slice(head + 1).some(meaningful) ? null : []
+  if (lines[head]?.trimEnd() !== 'rules:') return null
+  const rules: ParsedKiroRule[] = []
+  let rule: ParsedKiroRule | undefined
+  let ruleIndent = -1
+  let list: { line: number; value: string }[] | undefined
+  const field = (text: string, line: number): boolean => {
+    const entry = /^([A-Za-z_]+):(?:\s+(.*))?$/.exec(text)
+    if (rule === undefined || entry?.[1] === undefined) return false
+    const [key, raw] = [entry[1], entry[2]?.trim() ?? '']
+    if (rule.fields.has(key) || rule.lists.has(key)) return false
+    list = undefined
+    if (raw === '' || raw.startsWith('#')) {
+      list = []
+      rule.lists.set(key, list)
+      return true
+    }
+    if (raw.startsWith('[') || raw.startsWith('{')) return false
+    const value = yamlScalar(raw)
+    if (value === null) return false
+    rule.fields.set(key, value)
+    rule.end = line + 1
+    return true
+  }
+  for (let index = head + 1; index < lines.length; index++) {
+    const line = lines[index] ?? ''
+    if (!meaningful(line)) continue
+    const indent = line.length - line.trimStart().length
+    const text = line.trim()
+    if (indent === 0) return null
+    if (ruleIndent === -1) ruleIndent = indent
+    if (indent === ruleIndent && text.startsWith('- ')) {
+      rule = { start: index, end: index + 1, fields: new Map(), lists: new Map() }
+      rules.push(rule)
+      if (!field(text.slice(2).trim(), index)) return null
+    } else if (indent === ruleIndent + 2 && !text.startsWith('- ')) {
+      if (!field(text, index)) return null
+    } else if (indent >= ruleIndent + 2 && text.startsWith('- ') && list !== undefined) {
+      const value = yamlScalar(text.slice(2))
+      if (value === null || rule === undefined) return null
+      list.push({ line: index, value })
+      rule.end = index + 1
+    } else return null
+  }
+  return rules
+}
+
+const listValues = (rule: ParsedKiroRule, key: string) =>
+  (rule.lists.get(key) ?? []).map((item) => item.value)
+
+/** A rule that holds every entry of one of ours, possibly with "always allow" entries Kiro added. */
+const holdsOurEntries = (rule: ParsedKiroRule, ours: KiroAllowRule) =>
+  rule.fields.get('capability') === ours.capability &&
+  rule.fields.get('effect') === 'allow' &&
+  ours.match.every((value) => listValues(rule, 'match').includes(value))
+
+function renderKiroAllowRule(rule: KiroAllowRule): string {
+  const list = (key: string, values: readonly string[]) =>
+    values.length === 0
+      ? ''
+      : `    ${key}:\n${values.map((value) => `      - ${value}\n`).join('')}`
+  return `  - capability: ${rule.capability}\n    effect: allow\n${list('match', rule.match)}${list('exclude', rule.exclude)}`
+}
+
+/**
+ * Applies the learner's approval choice to a Kiro workspace permission file. Pre-approval adds
+ * the Vibe Helper rules; manual approval removes their entries and any rule left empty, keeping
+ * every other rule and "always" choice. Only a file shaped like Kiro's own output is changed;
+ * anything else is left alone, so Kiro keeps asking. Kiro's format is public but its file
+ * location is not, so a failure only means prompts.
+ */
+export function applyKiroCommandApproval(
   existing: string | null,
+  approval: KiroCommandApproval,
 ):
   | { readonly status: 'WRITE'; readonly text: string }
-  | { readonly status: 'ALREADY_ALLOWED' | 'UNRECOGNIZED' } {
-  if (existing === null || existing.trim() === '' || existing.trim() === 'rules: []')
-    return { status: 'WRITE', text: `rules:\n${CORE_TOOLS_RULE}` }
-  const text = existing.replaceAll('\r\n', '\n')
-  const lines = text.split('\n')
-  const allowed = (server: string) =>
-    lines.some((line) => line.trim() === `- ${server}/*` || line.trim() === `- "${server}/*"`)
-  if (allowed(KIRO_MCP_SERVER_NAME) && allowed(KIRO_HELPER_MCP_SERVER_NAME))
-    return { status: 'ALREADY_ALLOWED' }
-  const body = lines.slice(lines[0]?.trim() === 'rules:' ? 1 : lines.length)
-  if (
-    lines[0]?.trim() !== 'rules:' ||
-    body.some((line) => line.trim().length > 0 && !line.startsWith('  ') && !line.startsWith('#'))
+  | { readonly status: 'UNCHANGED' | 'UNRECOGNIZED' } {
+  const lines = (existing ?? '').replaceAll('\r\n', '\n').split('\n')
+  const rules = parseKiroPermissionRules(lines)
+  if (rules === null) return { status: 'UNRECOGNIZED' }
+  const present = (ours: KiroAllowRule) =>
+    rules.some(
+      (rule) =>
+        holdsOurEntries(rule, ours) &&
+        ours.exclude.every((value) => listValues(rule, 'exclude').includes(value)),
+    )
+  const owned = rules.filter((rule) =>
+    KIRO_PREAPPROVED_RULES.some((ours) => holdsOurEntries(rule, ours)),
   )
-    return { status: 'UNRECOGNIZED' }
-  return { status: 'WRITE', text: `${text.trimEnd()}\n${CORE_TOOLS_RULE}` }
+  if (approval === 'PREAPPROVED' ? KIRO_PREAPPROVED_RULES.every(present) : owned.length === 0)
+    return { status: 'UNCHANGED' }
+  // Our entries leave first; a rule keeps only the "always" entries Kiro added to it, if any.
+  const removed = new Set<number>()
+  for (const rule of owned) {
+    const ours = KIRO_PREAPPROVED_RULES.find((candidate) => holdsOurEntries(rule, candidate))
+    const match = rule.lists.get('match') ?? []
+    const kept = match.filter((item) => !ours?.match.includes(item.value))
+    if (kept.length === 0) for (let line = rule.start; line < rule.end; line++) removed.add(line)
+    else for (const item of match) if (!kept.includes(item)) removed.add(item.line)
+  }
+  const left = lines.filter((_, index) => !removed.has(index))
+  const head = left.findIndex((line) => line.trim() !== '' && !line.trim().startsWith('#'))
+  const remaining = rules.length - owned.filter((rule) => removed.has(rule.start)).length
+  if (approval === 'MANUAL') {
+    if (remaining === 0 && head !== -1) left[head] = 'rules: []'
+    return { status: 'WRITE', text: `${left.join('\n').trimEnd()}\n` }
+  }
+  const base =
+    head === -1
+      ? [...left.filter((line) => line.trim() !== ''), 'rules:']
+      : left.map((line, index) => (index === head ? 'rules:' : line))
+  return {
+    status: 'WRITE',
+    text: `${base.join('\n').trimEnd()}\n${KIRO_PREAPPROVED_RULES.map(renderKiroAllowRule).join('')}`,
+  }
 }
 
 export interface KiroCommandPaths {
@@ -847,11 +1045,12 @@ export async function installKiroWorkspace(
   return { spec: `WRITTEN ${spec.directory}` }
 }
 
-/** Writes the Core tools rule into Kiro's permission file for one folder, with the learner's consent. */
-export async function allowKiroCoreTools(options: {
+/** Applies the learner's approval choice to Kiro's permission file for one Project folder. */
+export async function setKiroCommandApproval(options: {
   readonly homeDirectory: string
   readonly workspace: string
-}): Promise<'WRITTEN' | 'ALREADY_ALLOWED' | 'UNRECOGNIZED'> {
+  readonly approval: KiroCommandApproval
+}): Promise<'WRITTEN' | 'UNCHANGED' | 'UNRECOGNIZED'> {
   const { access, mkdir, readFile, rename, writeFile } = await import('node:fs/promises')
   const { dirname } = await import('node:path')
   const file = kiroPermissionsFile(options.homeDirectory, options.workspace)
@@ -864,7 +1063,7 @@ export async function allowKiroCoreTools(options: {
     if (error.code === 'ENOENT') return null
     throw error
   })
-  const merged = mergeKiroPermissionRules(existing)
+  const merged = applyKiroCommandApproval(existing, options.approval)
   if (merged.status !== 'WRITE') return merged.status
   await mkdir(dirname(file), { recursive: true, mode: 0o700 })
   const next = `${file}.${randomUUID()}.tmp`

@@ -29,6 +29,8 @@ import {
   testResultReferenceSchema,
 } from './references.js'
 
+export const BUILDER_CHAT_TURN_MAX_CHARS = 1_000
+
 export const activityPayloadSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('TASK_STARTED'), taskId: taskIdSchema }),
   z.strictObject({
@@ -53,6 +55,14 @@ export const activityPayloadSchema = z.discriminatedUnion('type', [
     conversationId: conversationIdSchema,
     messageId: messageIdSchema,
     summary: shortTextSchema,
+  }),
+  // The Builder's chat reply at the end of a Kiro turn (K10). Agent-authored context for the
+  // Analyst; it can never be a direct user Evidence source.
+  z.strictObject({
+    type: z.literal('BUILDER_CHAT_TURN'),
+    conversationId: conversationIdSchema,
+    messageId: messageIdSchema,
+    summary: nonEmptyTextSchema.max(BUILDER_CHAT_TURN_MAX_CHARS),
   }),
   z.strictObject({ type: z.literal('DECISION_REQUESTED'), decisionId: decisionIdSchema }),
   z.strictObject({
@@ -106,6 +116,16 @@ export const activityEventSchema = z
         code: 'custom',
         path: ['actor'],
         message: 'HELPER_RESPONSE must be authored by the Helper Agent',
+      })
+    }
+    if (
+      event.payload.type === 'BUILDER_CHAT_TURN' &&
+      (event.actor.kind !== 'AGENT' || event.actor.role !== 'BUILDER')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['actor'],
+        message: 'BUILDER_CHAT_TURN must be authored by the Builder Agent',
       })
     }
   })

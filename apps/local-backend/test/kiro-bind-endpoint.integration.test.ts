@@ -11,7 +11,7 @@ import { createLocalServer } from '../src/server.js'
 const projectId = 'project_00000000-0000-4000-8000-000000000001'
 
 describe('Kiro bind endpoint', () => {
-  it('passes only a validated folder and consent to the binding manager', async () => {
+  it('passes only a validated folder and approval choice to the binding manager', async () => {
     const application = new ApplicationService({
       storage: await openInMemorySqliteStorage(),
       workspacePolicy: await WorkspacePathPolicy.create(
@@ -41,13 +41,17 @@ describe('Kiro bind endpoint', () => {
           if (request.workspace === '/Users/me/busy') throw new Error('WORKSPACE_FOLDER_NOT_EMPTY')
           return { projectId: id, workspace: request.workspace ?? '/generated', registered: true }
         },
+        setCommandApproval: async (approval) => {
+          calls.push({ approval })
+          return { WRITTEN: 1, UNCHANGED: 0, UNRECOGNIZED: 0 }
+        },
       },
     })
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done))
     const address = server.address()
     if (address === null || typeof address === 'string') throw new Error('listen failed')
-    const post = (body: unknown, authorization = `Bearer ${token}`) =>
-      fetch(`http://127.0.0.1:${address.port}/api/kiro/bind`, {
+    const post = (body: unknown, authorization = `Bearer ${token}`, path = '/api/kiro/bind') =>
+      fetch(`http://127.0.0.1:${address.port}${path}`, {
         method: 'POST',
         headers: { authorization, 'content-type': 'application/json' },
         body: JSON.stringify(body),
@@ -57,7 +61,7 @@ describe('Kiro bind endpoint', () => {
         protocolVersion: 1,
         projectId,
         workspace: '/Users/me/memo',
-        allowCoreTools: true,
+        approval: 'PREAPPROVED',
       })
       expect(ok.status).toBe(200)
       expect(await ok.json()).toMatchObject({
@@ -70,7 +74,8 @@ describe('Kiro bind endpoint', () => {
       for (const invalid of [
         { protocolVersion: 1, projectId, workspace: 3 },
         { protocolVersion: 1, projectId, workspace: '' },
-        { protocolVersion: 1, projectId, allowCoreTools: 'yes' },
+        { protocolVersion: 1, projectId, approval: 'yes' },
+        { protocolVersion: 1, projectId, allowCoreTools: true },
         { protocolVersion: 1, projectId, extra: true },
         { protocolVersion: 2, projectId },
         { protocolVersion: 1, projectId: 'project_x' },
@@ -80,9 +85,32 @@ describe('Kiro bind endpoint', () => {
         expect(await response.json()).toEqual({ error: 'KIRO_BIND_REQUEST_INVALID' })
       }
       expect((await post({ protocolVersion: 1, projectId }, 'Bearer wrong')).status).toBe(401)
+      const approval = (body: unknown, authorization = `Bearer ${token}`) =>
+        post(body, authorization, '/api/kiro/approval')
+      const changed = await approval({ protocolVersion: 1, approval: 'MANUAL' })
+      expect(changed.status).toBe(200)
+      expect(await changed.json()).toEqual({
+        success: true,
+        data: { WRITTEN: 1, UNCHANGED: 0, UNRECOGNIZED: 0 },
+      })
+      for (const invalid of [
+        { protocolVersion: 1 },
+        { protocolVersion: 1, approval: 'ALLOW' },
+        { protocolVersion: 2, approval: 'MANUAL' },
+        { protocolVersion: 1, approval: 'MANUAL', projectId },
+        null,
+      ]) {
+        const response = await approval(invalid)
+        expect(response.status).toBe(400)
+        expect(await response.json()).toEqual({ error: 'KIRO_APPROVAL_REQUEST_INVALID' })
+      }
+      expect((await approval({ protocolVersion: 1, approval: 'MANUAL' }, 'Bearer x')).status).toBe(
+        401,
+      )
       expect(calls).toEqual([
-        { id: projectId, request: { workspace: '/Users/me/memo', allowCoreTools: true } },
+        { id: projectId, request: { workspace: '/Users/me/memo', approval: 'PREAPPROVED' } },
         { id: projectId, request: { workspace: '/Users/me/busy' } },
+        { approval: 'MANUAL' },
       ])
     } finally {
       server.closeAllConnections()

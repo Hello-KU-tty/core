@@ -15,12 +15,28 @@ import {
   analysisRuntimeRequestSchema,
   analystSubmitEvidenceProposalsCommandSchema,
   auditRecordSchema,
+  BUILDER_CHAT_TURN_MAX_CHARS,
+  type BuilderChatAskChoiceReceipt,
+  type BuilderChatFinishTaskReceipt,
+  type BuilderChatProgress,
+  type BuilderChatSaveChoiceReceipt,
+  type BuilderChatSaveProgressReceipt,
   type BuilderSessionBindingDescriptor,
   type BuilderTask,
   type BuilderTaskContext,
   type BuildStatus,
+  builderApplyDecisionCommandSchema,
+  builderChatAskChoiceReceiptSchema,
+  builderChatFinishTaskReceiptSchema,
+  builderChatProgressSchema,
+  builderChatSaveChoiceReceiptSchema,
+  builderChatSaveProgressReceiptSchema,
+  builderCompleteTaskCommandSchema,
+  builderRequestDecisionCommandSchema,
   builderSessionBindingDescriptorSchema,
+  builderStartTaskCommandSchema,
   builderTaskContextSchema,
+  builderUpdateLiveContextCommandSchema,
   buildStatusSchema,
   type CandidateRound,
   type CanonicalConcept,
@@ -33,6 +49,7 @@ import {
   contextRefreshRequestSchema,
   correlationIdSchema,
   type DecisionCommandReceipt,
+  type DecisionRequest,
   type DecisionResult,
   type DiscoveryContext,
   type DiscoveryFeedback,
@@ -59,11 +76,13 @@ import {
   helperContextSchema,
   helperConversationSummarySchema,
   helperExchangeReceiptSchema,
+  type KiroChatProgressNote,
   type LearnerProfileView,
   type LearningSpecRevision,
   type LiveProjectContext,
   learnerProfileViewSchema,
   liveProjectContextSchema,
+  MAX_ACTIVE_DECISIONS,
   type OperationError,
   type PersonalizationBasis,
   type PersonalizationTrace,
@@ -78,6 +97,8 @@ import {
   projectEvidenceTraceSchema,
   projectHistorySchema,
   projectSessionSnapshotSchema,
+  type TaskCompletionReport,
+  taskCompletionReportSchema,
   type UiRequest,
   uiRequestSchema,
   validateAgentRequest,
@@ -91,7 +112,9 @@ import {
   closeEpisode,
   confirmLearningSpec,
   evaluateEvidenceProposal,
+  findClearOptionAnswer,
   findExplicitOptionMentions,
+  linkEpisodeChatEvents,
   openDecision,
   planBuilderTask,
   planFinalUpgradeTask,
@@ -104,10 +127,31 @@ import {
   transitionAnalysisJob,
   transitionBuilderTask,
   transitionEpisodeAnalysis,
+  validateCompletionReport,
   writeLearningSpecDraft,
 } from '@vibe-helper/domain'
 
 import { ApplicationError, type ApplicationResult, createOperationError } from './errors.js'
+import {
+  activeChatDecisionIds,
+  CHAT_LINKED_AGENT_EVENT_LIMIT,
+  CHAT_LINKED_MESSAGE_LIMIT,
+  chatLiveContext,
+  chatSelection,
+  chatWindowStart,
+  currentDecisions,
+  defaultStage,
+  firstDecisionInChain,
+  latestDecisionInChain,
+  numberedOptions,
+  optionNumber,
+  progressCheckpoint,
+  sameChatChoice,
+  sameProgress,
+  supersededDecisionIds,
+  taskGoal,
+  truncateText,
+} from './kiro-chat-builder.js'
 import { redactContractText, SensitiveReferencePathError } from './redaction.js'
 import {
   canonicalJson,
@@ -138,6 +182,11 @@ export type AgentApplicationResponse =
   | EpisodeContext
   | CommandReceipt
   | EvidenceBatchApplicationResult
+  | BuilderChatProgress
+  | BuilderChatSaveProgressReceipt
+  | BuilderChatAskChoiceReceipt
+  | BuilderChatSaveChoiceReceipt
+  | BuilderChatFinishTaskReceipt
 
 export type UiApplicationResponse =
   | CommandReceipt
@@ -170,6 +219,8 @@ type IdPrefix =
   | 'decision_resolution'
   | 'decision_application'
   | 'context_refresh'
+  | 'context'
+  | 'completion_report'
   | 'conversation'
   | 'message'
   | 'event'
@@ -216,6 +267,11 @@ function evidenceEmptySummary(reason: string): string {
   // The complete Analyst reason remains in analysis[].resultSummary.
   // UI emptyReason is a 240-code-unit preview; do not split a surrogate pair.
   return reason.length <= 240 ? reason : reason.slice(0, 239).replace(/[\uD800-\uDBFF]$/, '') + '…'
+}
+
+/** Internal sub-commands of a Kiro chat tool get their own one-time key. */
+function chatIdempotencyKey(): string {
+  return `idem_${randomUUID()}`
 }
 
 function unique<T>(items: readonly T[]): T[] {
@@ -404,6 +460,16 @@ export class ApplicationService {
         return this.#resolveDecisionFromChat(request)
       case 'BUILDER_COMPLETE_TASK':
         return this.#completeTask(request)
+      case 'BUILDER_CHAT_CHECK_PROGRESS':
+        return this.#chatCheckProgress(request)
+      case 'BUILDER_CHAT_SAVE_PROGRESS':
+        return this.#chatSaveProgress(request)
+      case 'BUILDER_CHAT_ASK_CHOICE':
+        return this.#chatAskChoice(request)
+      case 'BUILDER_CHAT_SAVE_CHOICE':
+        return this.#chatSaveChoice(request)
+      case 'BUILDER_CHAT_FINISH_TASK':
+        return this.#chatFinishTask(request)
       case 'HELPER_GET_CONTEXT':
         return this.#getHelperContext(request)
       case 'HELPER_REQUEST_CONTEXT_REFRESH':
@@ -449,6 +515,8 @@ export class ApplicationService {
         return this.#recordHelperExchange(request)
       case 'UI_RECORD_CHAT_MESSAGE':
         return this.#recordChatMessage(request)
+      case 'UI_RECORD_BUILDER_CHAT_TURN':
+        return this.#recordBuilderChatTurn(request)
       case 'UI_READ_LEARNER_PROFILE':
         return this.#readLearnerProfile(request)
       case 'UI_RETRY_ANALYSIS':
@@ -2303,9 +2371,14 @@ export class ApplicationService {
           const appliedDecisionIds = new Set(
             current.decisionApplications.map((application) => application.decisionId),
           )
+          // A Decision replaced by the learner's changed choice is history, not active.
+          const supersededIds = supersededDecisionIds(current.decisionRequests)
           const expectedActiveDecisionIds = new Set(
             current.decisionRequests
-              .filter((decision) => !appliedDecisionIds.has(decision.id))
+              .filter(
+                (decision) =>
+                  !appliedDecisionIds.has(decision.id) && !supersededIds.has(decision.id),
+              )
               .map((decision) => decision.id),
           )
           if (
@@ -2644,7 +2717,7 @@ export class ApplicationService {
     )
     if (aggregate === null) throw this.#notFound(request.correlationId, 'BUILDER_TASK_NOT_FOUND')
     const applied = new Set(aggregate.decisionApplications.map((item) => item.decisionId))
-    const open = aggregate.decisionRequests
+    const open = currentDecisions(aggregate)
       .filter((decision) => !applied.has(decision.id))
       .sort((left, right) => Date.parse(right.requestedAt) - Date.parse(left.requestedAt))
     const numberOf = (decision: (typeof open)[number], optionId: string | undefined) =>
@@ -3104,7 +3177,7 @@ export class ApplicationService {
           request.correlationId,
         )
         const requestedDecisionIds = new Set(
-          current.decisionRequests.map((decision) => decision.id),
+          currentDecisions(current).map((decision) => decision.id),
         )
         const appliedDecisionIds = new Set(
           current.decisionApplications.map((application) => application.decisionId),
@@ -3132,6 +3205,7 @@ export class ApplicationService {
             'A current TASK_COMPLETED Live Context is required before Task completion.',
           )
         }
+        this.#assertChangedCriteria(current, request.report, request.correlationId)
         const scopeByConcept = new Map<string, string>()
         for (const item of current.learningSpec.scope) {
           for (const conceptName of item.conceptNames) {
@@ -4048,6 +4122,919 @@ export class ApplicationService {
     )
   }
 
+  // Kiro chat Builder surface (K10). The learner's Kiro Agent sends only what it decided; Core
+  // fills identity, versions and the active Decision set, and links the learner's own words.
+
+  #readBuilderAggregate(projectId: string, taskId: string, correlationId: string) {
+    return this.#storage.transaction((repository) =>
+      this.#requireBuilderAggregate(repository, projectId, taskId, correlationId),
+    )
+  }
+
+  #chatCheckProgress(
+    request: Extract<AgentRequest, { kind: 'BUILDER_CHAT_CHECK_PROGRESS' }>,
+  ): BuilderChatProgress {
+    const aggregate = this.#readBuilderAggregate(
+      request.projectId,
+      request.taskId,
+      request.correlationId,
+    )
+    const active = new Set(activeChatDecisionIds(aggregate))
+    const open = currentDecisions(aggregate)
+      .filter((decision) => active.has(decision.id))
+      .sort((left, right) => Date.parse(right.requestedAt) - Date.parse(left.requestedAt))
+    return builderChatProgressSchema.parse({
+      schemaVersion: 1,
+      correlationId: request.correlationId,
+      task: { title: aggregate.task.title, status: aggregate.task.status },
+      acceptanceCriteria: aggregate.task.acceptanceCriteria.map(({ key, description }) => ({
+        key,
+        description,
+      })),
+      openChoices: open.slice(0, 10).map((decision) => {
+        const resolution = aggregate.decisionResolutions.find(
+          (item) => item.decisionId === decision.id,
+        )
+        const chosen = optionNumber(decision, resolution?.selectedOptionId)
+        return {
+          decisionId: decision.id,
+          question: decision.question,
+          state: resolution === undefined ? 'WAITING_FOR_LEARNER' : 'CHOSEN',
+          options: numberedOptions(decision),
+          recommendedNumber: optionNumber(decision, decision.recommendedOptionId),
+          ...(chosen > 0 ? { chosenNumber: chosen } : {}),
+          ...(resolution?.selectionKind === 'CUSTOM' ? { chosenCustom: true } : {}),
+        }
+      }),
+      omittedOpenChoiceCount: Math.max(0, open.length - 10),
+      ...(aggregate.liveContext === null ? {} : { lastNote: aggregate.liveContext.currentGoal }),
+    })
+  }
+
+  /**
+   * Starts a pending Task and records its first Live Context, so the Agent never has to call a
+   * start tool or get the first checkpoint right. A first PLAN note becomes that start record.
+   */
+  async #chatEnsureStarted(
+    request: {
+      readonly projectId: string
+      readonly taskId: string
+      readonly correlationId: string
+      readonly actor: { readonly kind: 'AGENT'; readonly role: 'BUILDER' }
+    },
+    firstNote?: KiroChatProgressNote,
+  ): Promise<{ readonly consumedNote: boolean }> {
+    let aggregate = this.#readBuilderAggregate(
+      request.projectId,
+      request.taskId,
+      request.correlationId,
+    )
+    if (aggregate.task.status === 'PENDING') {
+      this.#startTask(
+        builderStartTaskCommandSchema.parse({
+          schemaVersion: 1,
+          kind: 'BUILDER_START_TASK',
+          correlationId: request.correlationId,
+          actor: request.actor,
+          idempotencyKey: chatIdempotencyKey(),
+          projectId: request.projectId,
+          taskId: request.taskId,
+          expectedTaskRevision: aggregate.task.revision,
+        }),
+      )
+      aggregate = this.#readBuilderAggregate(
+        request.projectId,
+        request.taskId,
+        request.correlationId,
+      )
+    }
+    if (aggregate.liveContext !== null) return { consumedNote: false }
+    const plan = firstNote?.kind === 'PLAN' ? firstNote : undefined
+    await this.#updateLiveContext(
+      builderUpdateLiveContextCommandSchema.parse({
+        schemaVersion: 1,
+        kind: 'BUILDER_UPDATE_LIVE_CONTEXT',
+        correlationId: request.correlationId,
+        actor: request.actor,
+        idempotencyKey: chatIdempotencyKey(),
+        context: chatLiveContext({
+          aggregate,
+          id: this.#generateId('context'),
+          correlationId: request.correlationId,
+          checkpoint: 'TASK_STARTED',
+          stage: plan?.stage ?? defaultStage('START'),
+          summary: plan?.summary ?? taskGoal(aggregate.task),
+          ...(plan === undefined ? {} : { note: plan }),
+          updatedAt: this.#timestamp(),
+        }),
+      }),
+    )
+    return { consumedNote: plan !== undefined }
+  }
+
+  async #chatSaveProgress(
+    request: Extract<AgentRequest, { kind: 'BUILDER_CHAT_SAVE_PROGRESS' }>,
+  ): Promise<BuilderChatSaveProgressReceipt> {
+    const { consumedNote } = await this.#chatEnsureStarted(request, request.note)
+    const aggregate = this.#readBuilderAggregate(
+      request.projectId,
+      request.taskId,
+      request.correlationId,
+    )
+    const current = aggregate.liveContext
+    if (current === null) throw this.#domainError(request.correlationId, 'LIVE_CONTEXT_REQUIRED')
+    const receipt = (outcome: 'SAVED' | 'UNCHANGED', contextVersion: number) =>
+      builderChatSaveProgressReceiptSchema.parse({
+        schemaVersion: 1,
+        correlationId: request.correlationId,
+        outcome,
+        contextVersion,
+      })
+    if (consumedNote) return receipt('SAVED', current.contextVersion)
+    const context = chatLiveContext({
+      aggregate,
+      id: current.id,
+      correlationId: request.correlationId,
+      checkpoint: progressCheckpoint(request.note.kind),
+      stage: request.note.stage ?? defaultStage(request.note.kind),
+      summary: request.note.summary,
+      note: request.note,
+      updatedAt: this.#timestamp(),
+    })
+    if (sameProgress(current, context)) return receipt('UNCHANGED', current.contextVersion)
+    await this.#updateLiveContext(
+      builderUpdateLiveContextCommandSchema.parse({
+        schemaVersion: 1,
+        kind: 'BUILDER_UPDATE_LIVE_CONTEXT',
+        correlationId: request.correlationId,
+        actor: request.actor,
+        idempotencyKey: chatIdempotencyKey(),
+        context,
+      }),
+    )
+    return receipt('SAVED', context.contextVersion)
+  }
+
+  async #chatAskChoice(
+    request: Extract<AgentRequest, { kind: 'BUILDER_CHAT_ASK_CHOICE' }>,
+  ): Promise<BuilderChatAskChoiceReceipt> {
+    await this.#chatEnsureStarted(request)
+    const aggregate = this.#readBuilderAggregate(
+      request.projectId,
+      request.taskId,
+      request.correlationId,
+    )
+    const receipt = (outcome: 'ASKED' | 'ALREADY_OPEN', decision: DecisionRequest) =>
+      builderChatAskChoiceReceiptSchema.parse({
+        schemaVersion: 1,
+        correlationId: request.correlationId,
+        outcome,
+        decisionId: decision.id,
+        options: numberedOptions(decision),
+        recommendedNumber: optionNumber(decision, decision.recommendedOptionId),
+      })
+    // Asking the same open question again (an Agent retry) returns the Decision already open.
+    const resolved = new Set(aggregate.decisionResolutions.map((item) => item.decisionId))
+    const question = request.choice.question.trim()
+    const existing = currentDecisions(aggregate).find(
+      (decision) => !resolved.has(decision.id) && decision.question.trim() === question,
+    )
+    if (existing !== undefined) return receipt('ALREADY_OPEN', existing)
+    const context = aggregate.liveContext
+    if (context === null) throw this.#domainError(request.correlationId, 'LIVE_CONTEXT_REQUIRED')
+    if (activeChatDecisionIds(aggregate).length >= MAX_ACTIVE_DECISIONS) {
+      throw this.#validationError(
+        request.correlationId,
+        'CHAT_TOO_MANY_OPEN_CHOICES',
+        `This Task already has ${MAX_ACTIVE_DECISIONS} choices that are open or not built yet. Finish the task with finish_task before asking more.`,
+      )
+    }
+    const choice = request.choice
+    const keys = choice.options.map((_, index) => `option_${index + 1}`)
+    const result = await this.#requestDecision(
+      builderRequestDecisionCommandSchema.parse({
+        schemaVersion: 1,
+        kind: 'BUILDER_REQUEST_DECISION',
+        correlationId: request.correlationId,
+        actor: request.actor,
+        idempotencyKey: chatIdempotencyKey(),
+        projectId: request.projectId,
+        taskId: request.taskId,
+        expectedTaskRevision: aggregate.task.revision,
+        expectedContextVersion: context.contextVersion,
+        decision: {
+          category: choice.category,
+          question: choice.question,
+          reasonRequiredNow: choice.whyNow,
+          options: choice.options.map((option, index) => ({
+            key: keys[index],
+            label: option.label,
+            description: option.description,
+            impacts: [truncateText(option.description, 240)],
+            tradeoffs: option.tradeoffs ?? [],
+          })),
+          recommendedOptionKey: keys[choice.recommended - 1],
+          recommendationRationale: choice.recommendationReason,
+          relatedConceptNames: choice.concepts ?? [],
+          sourceReferences: (choice.files ?? []).map((path) => ({ kind: 'CODE', path })),
+          independentWorkCanContinue: !choice.blocksWork,
+        },
+        context: {
+          stage: context.stage,
+          currentGoal: context.currentGoal,
+          recentChanges: context.recentChanges,
+          activeConceptNames: context.activeConceptNames,
+          relatedFiles: context.relatedFiles,
+          nextActions: context.nextActions,
+          ...(choice.blocksWork ? { blockingReason: choice.blockingReason ?? choice.whyNow } : {}),
+        },
+      }),
+    )
+    const decision = this.#readBuilderAggregate(
+      request.projectId,
+      request.taskId,
+      request.correlationId,
+    ).decisionRequests.find((item) => item.id === result.decisionId)
+    if (decision === undefined) throw this.#notFound(request.correlationId, 'DECISION_NOT_FOUND')
+    return receipt('ASKED', decision)
+  }
+
+  /**
+   * Records the learner's choice that the Builder read from chat. The Agent names only the
+   * choice; Core links the learner's own messages (Builder and Helper tabs, also from before
+   * the question) and checks two facts it can verify without an LLM: the learner answered in
+   * the Builder tab after the question, and a plain numbered answer is not contradicted.
+   * Answering an already chosen Decision again records a changed choice.
+   */
+  #chatSaveChoice(
+    request: Extract<AgentRequest, { kind: 'BUILDER_CHAT_SAVE_CHOICE' }>,
+  ): BuilderChatSaveChoiceReceipt {
+    return this.#storage.transaction((repository) =>
+      this.#idempotent(
+        repository,
+        request,
+        'builder.chat_save_choice',
+        builderChatSaveChoiceReceiptSchema,
+        () => {
+          const aggregate = this.#requireBuilderAggregate(
+            repository,
+            request.projectId,
+            request.taskId,
+            request.correlationId,
+          )
+          const decision = this.#chatTargetDecision(aggregate, request)
+          const resolution = aggregate.decisionResolutions.find(
+            (item) => item.decisionId === decision.id,
+          )
+          if (aggregate.decisionApplications.some((item) => item.decisionId === decision.id)) {
+            throw this.#domainError(request.correlationId, 'DECISION_ALREADY_APPLIED')
+          }
+          const selection = chatSelection(decision, request.answer.choice)
+          if (selection === undefined) {
+            throw this.#validationError(
+              request.correlationId,
+              'CHAT_DECISION_OPTION_NOT_FOUND',
+              'The chosen option number does not exist for this Decision.',
+            )
+          }
+          const chosenLabel = (target: DecisionRequest) =>
+            selection.optionIndex === undefined
+              ? (request.answer.customSummary ?? 'custom')
+              : (target.options[selection.optionIndex]?.label ?? 'option')
+          if (resolution !== undefined && sameChatChoice(decision, resolution, selection)) {
+            return {
+              response: builderChatSaveChoiceReceiptSchema.parse({
+                schemaVersion: 1,
+                correlationId: request.correlationId,
+                outcome: 'UNCHANGED',
+                decisionId: decision.id,
+                chosen: {
+                  ...(selection.optionIndex === undefined
+                    ? {}
+                    : { number: selection.optionIndex + 1 }),
+                  label: chosenLabel(decision),
+                  custom: selection.selectionKind === 'CUSTOM',
+                },
+                linkedMessageCount: resolution.chatSource?.linkedMessages?.length ?? 0,
+              }),
+              resourceId: decision.id,
+              resourceRevision: aggregate.task.revision,
+            }
+          }
+          const firstAsked = firstDecisionInChain(aggregate.decisionRequests, decision)
+          const repliesAfter = resolution?.resolvedAt ?? decision.requestedAt
+          const windowStart =
+            resolution?.resolvedAt ?? chatWindowStart(aggregate, firstAsked.requestedAt)
+          const chatEvents = repository
+            .readTaskChatEvents(request.projectId, request.taskId, windowStart)
+            .filter(
+              ({ event }) =>
+                event.correlationId === decision.correlationId &&
+                (event.decisionId === undefined ||
+                  (resolution === undefined && event.decisionId === decision.id)),
+            )
+          const learnerMessages = chatEvents.flatMap(({ event, helperTab }) =>
+            event.payload.type === 'USER_MESSAGE' && event.actor.kind === 'USER'
+              ? [{ event, payload: event.payload, helperTab }]
+              : [],
+          )
+          const replies = learnerMessages.filter(
+            ({ event, helperTab }) =>
+              !helperTab && Date.parse(event.occurredAt) > Date.parse(repliesAfter),
+          )
+          const lastReply = replies.at(-1)
+          if (lastReply === undefined) {
+            throw this.#validationError(
+              request.correlationId,
+              'CHAT_DECISION_NO_LEARNER_REPLY',
+              resolution === undefined
+                ? 'The learner has not answered in the Builder chat since the question. Ask, wait for their answer, then record it.'
+                : 'The learner has not said anything in the Builder chat since the last choice. Record a changed choice only after they say it.',
+            )
+          }
+          const selectedOptionId =
+            selection.optionIndex === undefined
+              ? undefined
+              : decision.options[selection.optionIndex]?.id
+          const clearAnswer = findClearOptionAnswer(decision, lastReply.payload.redactedExcerpt)
+          if (clearAnswer !== undefined && clearAnswer !== selectedOptionId) {
+            throw this.#validationError(
+              request.correlationId,
+              'CHAT_DECISION_CONTRADICTS_EXPLICIT_CHOICE',
+              `The learner answered option ${optionNumber(decision, clearAnswer)}. Record that option, or ask the learner to confirm.`,
+            )
+          }
+          const linkedMessages = learnerMessages.slice(-CHAT_LINKED_MESSAGE_LIMIT)
+          const linkedAgentEvents = chatEvents
+            .filter(({ event }) => event.payload.type !== 'USER_MESSAGE')
+            .slice(-CHAT_LINKED_AGENT_EVENT_LIMIT)
+            .map(({ event }) => event)
+          const linkEvents = [...linkedMessages.map(({ event }) => event), ...linkedAgentEvents]
+          const chatSource = {
+            mappedBy: 'BUILDER' as const,
+            userMessageIds: [...new Set(replies.map(({ payload }) => payload.messageId))].slice(-5),
+            linkedMessages: linkedMessages.map(({ event, payload, helperTab }) => ({
+              conversationId: payload.conversationId,
+              messageId: payload.messageId,
+              tab: helperTab ? ('HELPER' as const) : ('BUILDER' as const),
+              timing:
+                Date.parse(event.occurredAt) > Date.parse(firstAsked.requestedAt)
+                  ? ('AFTER_REQUEST' as const)
+                  : ('BEFORE_REQUEST' as const),
+            })),
+            ...(selection.selectionKind === 'CUSTOM' && request.answer.customSummary !== undefined
+              ? { builderSummary: request.answer.customSummary }
+              : {}),
+          }
+          const extraSourceReferences = replies.slice(-5).map(({ payload }) => ({
+            kind: 'USER_MESSAGE' as const,
+            conversationId: payload.conversationId,
+            messageId: payload.messageId,
+          }))
+          const target =
+            resolution === undefined
+              ? decision
+              : this.#reopenChangedDecision(repository, aggregate, decision, request)
+          const current =
+            target === decision
+              ? aggregate
+              : this.#requireBuilderAggregate(
+                  repository,
+                  request.projectId,
+                  request.taskId,
+                  request.correlationId,
+                )
+          this.#linkDecisionChat(repository, target, linkEvents)
+          const targetOptionId =
+            selection.optionIndex === undefined
+              ? undefined
+              : target.options[selection.optionIndex]?.id
+          const stored = decisionResolutionSchema.parse({
+            schemaVersion: 1,
+            id: this.#generateId('decision_resolution'),
+            decisionId: target.id,
+            projectId: target.projectId,
+            taskId: target.taskId,
+            correlationId: target.correlationId,
+            expectedContextVersion: current.liveContext?.contextVersion ?? 0,
+            selectionKind: selection.selectionKind,
+            ...(targetOptionId === undefined ? {} : { selectedOptionId: targetOptionId }),
+            ...(selection.selectionKind === 'CUSTOM'
+              ? { customProposal: lastReply.payload.redactedExcerpt }
+              : {}),
+            helperUsed: linkedMessages.some(({ helperTab }) => helperTab),
+            chatSource,
+            resolvedAt: this.#timestamp(),
+            source: { kind: 'USER' },
+            redactionStatus: 'VERIFIED_REDACTED',
+          })
+          const nextTask = this.#storeUserDecisionResolution(repository, {
+            aggregate: current,
+            decision: target,
+            resolution: stored,
+            correlationId: request.correlationId,
+            auditActor: request.actor,
+            auditSummary:
+              target === decision
+                ? 'Builder recorded the learner chat choice; Core linked the learner messages.'
+                : 'Builder recorded the learner changed chat choice; Core reopened and resolved the Decision.',
+            extraSourceReferences,
+          })
+          return {
+            response: builderChatSaveChoiceReceiptSchema.parse({
+              schemaVersion: 1,
+              correlationId: request.correlationId,
+              outcome: target === decision ? 'SAVED' : 'CHANGED',
+              decisionId: target.id,
+              chosen: {
+                ...(selection.optionIndex === undefined
+                  ? {}
+                  : { number: selection.optionIndex + 1 }),
+                label: chosenLabel(target),
+                custom: selection.selectionKind === 'CUSTOM',
+              },
+              linkedMessageCount: linkedMessages.length,
+            }),
+            resourceId: target.id,
+            resourceRevision: nextTask.revision,
+          }
+        },
+      ),
+    )
+  }
+
+  /** The Decision a chat answer belongs to: named, or the only one the learner can answer. */
+  #chatTargetDecision(
+    aggregate: BuilderTaskAggregate,
+    request: Extract<AgentRequest, { kind: 'BUILDER_CHAT_SAVE_CHOICE' }>,
+  ): DecisionRequest {
+    if (request.answer.decisionId !== undefined) {
+      const named = latestDecisionInChain(aggregate.decisionRequests, request.answer.decisionId)
+      if (named === undefined) throw this.#notFound(request.correlationId, 'DECISION_NOT_FOUND')
+      return named
+    }
+    const active = new Set(activeChatDecisionIds(aggregate))
+    const candidates = currentDecisions(aggregate).filter((decision) => active.has(decision.id))
+    const resolved = new Set(aggregate.decisionResolutions.map((item) => item.decisionId))
+    const waiting = candidates.filter((decision) => !resolved.has(decision.id))
+    const only =
+      waiting.length === 1 ? waiting[0] : candidates.length === 1 ? candidates[0] : undefined
+    if (only === undefined) {
+      throw this.#validationError(
+        request.correlationId,
+        'CHAT_DECISION_ID_REQUIRED',
+        'More than one choice is open; pass the decisionId from check_progress or ask_choice.',
+      )
+    }
+    return only
+  }
+
+  /**
+   * A changed choice reopens the same question as a new Decision that replaces the earlier one,
+   * so the earlier choice stays in history and the new one gets its own Episode and analysis.
+   */
+  #reopenChangedDecision(
+    repository: PersistenceRepository,
+    aggregate: BuilderTaskAggregate,
+    decision: DecisionRequest,
+    request: Extract<AgentRequest, { kind: 'BUILDER_CHAT_SAVE_CHOICE' }>,
+  ): DecisionRequest {
+    const liveContext = aggregate.liveContext
+    if (liveContext === null)
+      throw this.#domainError(request.correlationId, 'LIVE_CONTEXT_REQUIRED')
+    const reopenedAt = this.#timestamp()
+    const id = this.#generateId('decision')
+    const optionIds = decision.options.map(() => this.#generateId('decision_option'))
+    const recommendedIndex = optionNumber(decision, decision.recommendedOptionId) - 1
+    const contextVersion = liveContext.contextVersion + 1
+    const replacement = decisionRequestSchema.parse({
+      ...decision,
+      id,
+      contextVersion,
+      options: decision.options.map((option, index) => ({ ...option, id: optionIds[index] })),
+      recommendedOptionId: optionIds[recommendedIndex],
+      // The learner already chose; the replacement never blocks the Task.
+      independentWorkCanContinue: true,
+      replacesDecisionId: decision.id,
+      requestedAt: reopenedAt,
+    })
+    const { blockingReason: _blockingReason, ...unblocked } = liveContext
+    const context = liveProjectContextSchema.parse({
+      ...unblocked,
+      contextVersion,
+      expectedPreviousVersion: liveContext.contextVersion,
+      checkpoint: 'DECISION_REQUIRED',
+      activeDecisionIds: unique([
+        ...liveContext.activeDecisionIds.filter((item) => item !== decision.id),
+        id,
+      ]),
+      updatedAt: reopenedAt,
+      source: { kind: 'AGENT', role: 'BUILDER' },
+      redactionStatus: 'VERIFIED_REDACTED',
+    })
+    const contextResult = reduceLiveContext({
+      task: aggregate.task,
+      current: liveContext,
+      proposed: context,
+    })
+    if (contextResult.outcome === 'REJECTED') {
+      throw this.#domainError(request.correlationId, contextResult.reasonCode)
+    }
+    const opened = openDecision({
+      task: aggregate.task,
+      liveContext: contextResult.value,
+      request: replacement,
+    })
+    if (opened.outcome === 'REJECTED') {
+      throw this.#domainError(request.correlationId, opened.reasonCode)
+    }
+    repository.appendLiveContext(contextResult.value)
+    this.#fulfillContextRefreshRequests(repository, aggregate, contextResult.value)
+    repository.appendDecisionRequest(replacement)
+    const contextEvent = this.#appendActivityEvent(repository, {
+      projectId: replacement.projectId,
+      taskId: replacement.taskId,
+      correlationId: aggregate.task.correlationId,
+      actor: request.actor,
+      occurredAt: reopenedAt,
+      payload: {
+        type: 'LIVE_CONTEXT_UPDATED',
+        taskId: replacement.taskId,
+        liveContextId: contextResult.value.id,
+        contextVersion: contextResult.value.contextVersion,
+      },
+      sourceReferences: contextResult.value.relatedFiles,
+    })
+    const buildEpisode = repository.readOpenEpisode(
+      replacement.projectId,
+      this.#taskEpisodeType(aggregate.task),
+      { taskId: replacement.taskId },
+    )
+    if (buildEpisode !== null) this.#appendEpisodeEvent(repository, buildEpisode, contextEvent)
+    const decisionEvent = this.#appendActivityEvent(repository, {
+      projectId: replacement.projectId,
+      taskId: replacement.taskId,
+      decisionId: replacement.id,
+      correlationId: replacement.correlationId,
+      actor: request.actor,
+      occurredAt: reopenedAt,
+      payload: { type: 'DECISION_REQUESTED', decisionId: replacement.id },
+      sourceReferences: replacement.sourceReferences,
+    })
+    this.#openEpisode(repository, {
+      type: 'DECISION',
+      event: decisionEvent,
+      taskId: replacement.taskId,
+      decisionId: replacement.id,
+      conceptNames: replacement.relatedConceptNames,
+      contextReferences: replacement.sourceReferences,
+    })
+    this.#appendAudit(repository, {
+      correlationId: request.correlationId,
+      actor: request.actor,
+      action: 'SUBMITTED',
+      resource: { type: 'DECISION', id: replacement.id },
+      summary: 'Reopened a chosen Decision because the learner changed their choice in chat.',
+      changedFields: ['status'],
+      occurredAt: reopenedAt,
+    })
+    return replacement
+  }
+
+  /** Links the chat events around a choice to its open Decision Episode (K10). */
+  #linkDecisionChat(
+    repository: PersistenceRepository,
+    decision: DecisionRequest,
+    events: readonly ActivityEvent[],
+  ): void {
+    if (events.length === 0) return
+    const episode = repository.readOpenEpisode(decision.projectId, 'DECISION', {
+      decisionId: decision.id,
+    })
+    if (episode === null) return
+    const history = repository.readEpisodeHistory(decision.projectId, episode.id)
+    if (history === null) throw this.#notFound(decision.correlationId, 'EPISODE_NOT_FOUND')
+    const room = MAX_EPISODE_EVENTS - episode.eventIds.length - 1
+    const linked = linkEpisodeChatEvents({
+      current: episode,
+      currentEvents: history.events,
+      events: events.slice(-Math.max(0, room)),
+    })
+    if (linked.outcome === 'REJECTED') {
+      throw this.#domainError(decision.correlationId, linked.reasonCode)
+    }
+    if (linked.outcome === 'APPLIED') repository.appendEpisode(linked.value)
+  }
+
+  async #chatFinishTask(
+    request: Extract<AgentRequest, { kind: 'BUILDER_CHAT_FINISH_TASK' }>,
+  ): Promise<BuilderChatFinishTaskReceipt> {
+    const receipt = (
+      outcome: 'COMPLETED' | 'ALREADY_COMPLETED',
+      taskRevision: number,
+      ignoredConcepts: readonly string[],
+    ) =>
+      builderChatFinishTaskReceiptSchema.parse({
+        schemaVersion: 1,
+        correlationId: request.correlationId,
+        outcome,
+        taskRevision,
+        ignoredConcepts,
+      })
+    const before = this.#readBuilderAggregate(
+      request.projectId,
+      request.taskId,
+      request.correlationId,
+    )
+    if (before.task.status === 'COMPLETED') {
+      return receipt('ALREADY_COMPLETED', before.task.revision, [])
+    }
+    await this.#chatEnsureStarted(request)
+    let aggregate = this.#readBuilderAggregate(
+      request.projectId,
+      request.taskId,
+      request.correlationId,
+    )
+    const report = request.report
+    const decisions = currentDecisions(aggregate)
+    const resolved = new Set(aggregate.decisionResolutions.map((item) => item.decisionId))
+    if (decisions.some((decision) => !resolved.has(decision.id))) {
+      throw this.#validationError(
+        request.correlationId,
+        'TASK_DECISION_NOT_RESOLVED',
+        'A choice is still waiting for the learner. Ask it, record their answer with save_choice, then finish.',
+      )
+    }
+    const applied = new Set(aggregate.decisionApplications.map((item) => item.decisionId))
+    const how = new Map(
+      (report.decisionsApplied ?? []).flatMap(({ decisionId, how: text }) => {
+        const latest = latestDecisionInChain(aggregate.decisionRequests, decisionId)
+        return latest === undefined ? [] : [[latest.id, text] as const]
+      }),
+    )
+    const toApply = decisions.filter((decision) => !applied.has(decision.id))
+    const missing = toApply.filter((decision) => !how.has(decision.id))
+    if (missing.length > 0) {
+      throw this.#validationError(
+        request.correlationId,
+        'TASK_DECISION_APPLICATION_MISSING',
+        `Say in decisionsApplied how each chosen option was built: ${missing.map((decision) => decision.id).join(', ')}.`,
+      )
+    }
+    const scopeByConcept = new Map<string, LearningSpecRevision['scope'][number]['category']>()
+    for (const item of aggregate.learningSpec.scope) {
+      for (const conceptName of item.conceptNames) {
+        scopeByConcept.set(normalizedConceptName(conceptName), item.category)
+      }
+    }
+    const concepts = report.concepts ?? []
+    const reported = concepts.filter((concept) => {
+      const scope = scopeByConcept.get(normalizedConceptName(concept.name))
+      return scope !== undefined && scope !== 'EXCLUDED'
+    })
+    const ignoredConcepts = concepts
+      .filter((concept) => !reported.includes(concept))
+      .map((concept) => concept.name)
+    const code = (path: string) => ({ kind: 'CODE' as const, path })
+    const completionReportId = this.#generateId('completion_report')
+    const draft = (completedAt: string, expectedTaskRevision: number) =>
+      taskCompletionReportSchema.parse({
+        schemaVersion: 1,
+        id: completionReportId,
+        projectId: request.projectId,
+        taskId: request.taskId,
+        correlationId: request.correlationId,
+        expectedTaskRevision,
+        implementedFeatures: report.implemented,
+        acceptanceResults: report.acceptance.map((result) => ({
+          criterionKey: result.key,
+          status:
+            result.changedByDecisionId !== undefined
+              ? 'CHANGED_BY_DECISION'
+              : result.passed
+                ? 'PASSED'
+                : 'FAILED',
+          evidence: [],
+          ...(result.changedByDecisionId === undefined
+            ? {}
+            : { decisionId: result.changedByDecisionId }),
+        })),
+        validationResults: report.checks.map((check) => ({
+          name: check.name,
+          status: check.passed ? 'PASSED' : 'FAILED',
+          summary: check.summary,
+        })),
+        conceptUsage: reported.map((concept) => {
+          const scope = scopeByConcept.get(normalizedConceptName(concept.name))
+          return {
+            conceptName: concept.name,
+            scope,
+            importance: scope === 'LEARNER_FOCUS' ? 'CORE' : 'SUPPORTING',
+            usageReason: concept.why,
+            codeReferences: (concept.files ?? []).map(code),
+          }
+        }),
+        appliedDecisionIds: decisions.map((decision) => decision.id),
+        codeReferences: (report.files ?? []).map(code),
+        diffReferences: [],
+        specDeviations: report.deviations ?? [],
+        remainingIssues: report.remaining ?? [],
+        limitations: report.limitations ?? [],
+        completedAt,
+        source: { kind: 'AGENT', role: 'BUILDER' },
+        redactionStatus: 'VERIFIED_REDACTED',
+      })
+    // Check the whole report before writing anything, so a rejected finish leaves the Task as
+    // it was and the Builder can keep working toward the criteria.
+    const preview = draft(this.#timestamp(), aggregate.task.revision)
+    const invalid = validateCompletionReport(aggregate.task, preview)
+    if (invalid !== undefined) throw this.#domainError(request.correlationId, invalid)
+    this.#assertChangedCriteria(aggregate, preview, request.correlationId)
+    await this.#workspacePolicy.validateReferences(
+      aggregate.project,
+      preview,
+      request.correlationId,
+    )
+    for (const decision of toApply) {
+      const context = aggregate.liveContext
+      if (context === null) throw this.#domainError(request.correlationId, 'LIVE_CONTEXT_REQUIRED')
+      await this.#applyDecision(
+        builderApplyDecisionCommandSchema.parse({
+          schemaVersion: 1,
+          kind: 'BUILDER_APPLY_DECISION',
+          correlationId: request.correlationId,
+          actor: request.actor,
+          idempotencyKey: chatIdempotencyKey(),
+          projectId: request.projectId,
+          taskId: request.taskId,
+          decisionId: decision.id,
+          expectedTaskRevision: aggregate.task.revision,
+          expectedContextVersion: context.contextVersion,
+          appliedResult: how.get(decision.id),
+          sourceReferences: [],
+          context: {
+            stage: context.stage,
+            currentGoal: context.currentGoal,
+            recentChanges: context.recentChanges,
+            activeConceptNames: context.activeConceptNames,
+            relatedFiles: context.relatedFiles,
+            nextActions: context.nextActions,
+          },
+        }),
+      )
+      aggregate = this.#readBuilderAggregate(
+        request.projectId,
+        request.taskId,
+        request.correlationId,
+      )
+    }
+    const finished = aggregate.liveContext
+    if (finished === null) throw this.#domainError(request.correlationId, 'LIVE_CONTEXT_REQUIRED')
+    await this.#updateLiveContext(
+      builderUpdateLiveContextCommandSchema.parse({
+        schemaVersion: 1,
+        kind: 'BUILDER_UPDATE_LIVE_CONTEXT',
+        correlationId: request.correlationId,
+        actor: request.actor,
+        idempotencyKey: chatIdempotencyKey(),
+        context: chatLiveContext({
+          aggregate,
+          id: finished.id,
+          correlationId: request.correlationId,
+          checkpoint: 'TASK_COMPLETED',
+          stage: defaultStage('FINISH'),
+          summary: truncateText(report.implemented.join('\n'), 4_000),
+          note: {
+            ...(report.files === undefined ? {} : { files: report.files }),
+            concepts: finished.activeConceptNames,
+          },
+          updatedAt: this.#timestamp(),
+        }),
+      }),
+    )
+    const completed = await this.#completeTask(
+      builderCompleteTaskCommandSchema.parse({
+        schemaVersion: 1,
+        kind: 'BUILDER_COMPLETE_TASK',
+        correlationId: request.correlationId,
+        actor: request.actor,
+        idempotencyKey: chatIdempotencyKey(),
+        report: draft(this.#timestamp(), aggregate.task.revision),
+      }),
+    )
+    return receipt('COMPLETED', completed.resourceRevision, ignoredConcepts)
+  }
+
+  /** A criterion skipped as changed must name a Decision the learner resolved in this Task. */
+  #assertChangedCriteria(
+    aggregate: BuilderTaskAggregate,
+    report: TaskCompletionReport,
+    correlationId: string,
+  ): void {
+    const resolved = new Set(aggregate.decisionResolutions.map((item) => item.decisionId))
+    if (
+      report.acceptanceResults.some(
+        (result) =>
+          result.status === 'CHANGED_BY_DECISION' &&
+          (result.decisionId === undefined || !resolved.has(result.decisionId)),
+      )
+    ) {
+      throw this.#validationError(
+        correlationId,
+        'TASK_CRITERION_CHANGE_NOT_DECIDED',
+        "A criterion can be skipped only when one of the learner's resolved Decisions changed it.",
+      )
+    }
+  }
+
+  #recordBuilderChatTurn(
+    request: Extract<UiRequest, { kind: 'UI_RECORD_BUILDER_CHAT_TURN' }>,
+  ): ChatMessageReceipt {
+    const recordedAt = this.#timestamp()
+    return this.#storage.transaction((repository) =>
+      this.#idempotent(
+        repository,
+        request,
+        'ui.record_builder_chat_turn',
+        chatMessageReceiptSchema,
+        () => {
+          const recovery = repository.recoverProject(request.projectId)
+          if (recovery === null) throw this.#notFound(request.correlationId, 'PROJECT_NOT_FOUND')
+          const taskId = request.taskId ?? recovery.currentTask?.id
+          if (taskId === undefined) {
+            throw this.#notFound(request.correlationId, 'BUILDER_TASK_NOT_FOUND')
+          }
+          const aggregate = this.#requireBuilderAggregate(
+            repository,
+            request.projectId,
+            taskId,
+            request.correlationId,
+          )
+          const resolved = new Set(aggregate.decisionResolutions.map((item) => item.decisionId))
+          const openDecisionEpisodes = aggregate.decisionRequests.flatMap((decision) => {
+            if (resolved.has(decision.id)) return []
+            const episode = repository.readOpenEpisode(request.projectId, 'DECISION', {
+              decisionId: decision.id,
+            })
+            return episode === null ? [] : [{ decision, episode }]
+          })
+          // Same placement as a learner chat message: the one open Decision, else the Task.
+          const decisionTarget =
+            openDecisionEpisodes.length === 1 ? openDecisionEpisodes[0] : undefined
+          const targetEpisode =
+            decisionTarget?.episode ??
+            repository.readOpenEpisode(request.projectId, this.#taskEpisodeType(aggregate.task), {
+              taskId,
+            })
+          const messageId = this.#generateId('message')
+          const event = this.#appendActivityEvent(repository, {
+            projectId: request.projectId,
+            taskId,
+            ...(decisionTarget === undefined ? {} : { decisionId: decisionTarget.decision.id }),
+            conversationId: request.conversationId,
+            correlationId: targetEpisode?.correlationId ?? request.correlationId,
+            actor: { kind: 'AGENT', role: 'BUILDER' },
+            occurredAt: recordedAt,
+            payload: {
+              type: 'BUILDER_CHAT_TURN',
+              conversationId: request.conversationId,
+              messageId,
+              summary: truncateText(
+                redactSensitiveText(request.reply).replace(/\s+/g, ' ').trim(),
+                BUILDER_CHAT_TURN_MAX_CHARS,
+              ),
+            },
+            sourceReferences: [
+              { kind: 'AGENT_MESSAGE', conversationId: request.conversationId, messageId },
+            ],
+          })
+          const episode =
+            targetEpisode !== null && targetEpisode.eventIds.length < MAX_EPISODE_EVENTS
+              ? this.#appendEpisodeEvent(repository, targetEpisode, event)
+              : undefined
+          const response = chatMessageReceiptSchema.parse({
+            schemaVersion: 1,
+            correlationId: request.correlationId,
+            conversationId: request.conversationId,
+            messageId,
+            eventId: event.id,
+            ...(episode === undefined
+              ? {}
+              : {
+                  episode: {
+                    id: episode.id,
+                    revision: episode.revision,
+                    type: episode.type,
+                    ...(episode.decisionId === undefined ? {} : { decisionId: episode.decisionId }),
+                  },
+                }),
+          })
+          return { response, resourceId: event.id, resourceRevision: episode?.revision ?? 1 }
+        },
+      ),
+    )
+  }
+
   #retryAnalysis(request: Extract<UiRequest, { kind: 'UI_RETRY_ANALYSIS' }>): AnalysisJob {
     const retriedAt = this.#timestamp()
     return this.#storage.transaction((repository) =>
@@ -4471,11 +5458,12 @@ export class ApplicationService {
             'EPISODE_STALE',
           )
           const existingProposalIds = aggregate.evidenceProposals.map((proposal) => proposal.id)
-          const decisionResolutions =
+          const taskAggregate =
             aggregate.episode.taskId === undefined
-              ? []
-              : (repository.readBuilderTaskAggregate(projectId, aggregate.episode.taskId)
-                  ?.decisionResolutions ?? [])
+              ? null
+              : repository.readBuilderTaskAggregate(projectId, aggregate.episode.taskId)
+          const decisionResolutions = taskAggregate?.decisionResolutions ?? []
+          const decisionRequests = taskAggregate?.decisionRequests ?? []
           const outcomes: EvidenceBatchApplicationResult['outcomes'][number][] = []
           for (const proposal of request.batch.proposals) {
             const concept = this.#resolveConcept(repository, proposal, request.batch.submittedAt)
@@ -4490,6 +5478,7 @@ export class ApplicationService {
               episodeRevision: request.batch.episodeRevision,
               events: aggregate.events,
               decisionResolutions,
+              decisionRequests,
               concept,
               existingProposalIds: [
                 ...existingProposalIds,

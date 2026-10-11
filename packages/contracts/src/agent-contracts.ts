@@ -25,6 +25,13 @@ import {
   projectSchema,
 } from './discovery.js'
 import { conceptLedgerEntrySchema, evidenceProposalBatchSchema } from './evidence.js'
+import {
+  builderChatAskChoiceCommandSchema,
+  builderChatCheckProgressQuerySchema,
+  builderChatFinishTaskCommandSchema,
+  builderChatSaveChoiceCommandSchema,
+  builderChatSaveProgressCommandSchema,
+} from './kiro-chat.js'
 import { learningSpecRevisionSchema } from './learning-spec.js'
 import { personalizationTraceSchema } from './personalization.js'
 import {
@@ -365,6 +372,11 @@ export const builderAgentRequestSchema = z.discriminatedUnion('kind', [
   builderApplyDecisionCommandSchema,
   builderResolveDecisionFromChatCommandSchema,
   builderCompleteTaskCommandSchema,
+  builderChatCheckProgressQuerySchema,
+  builderChatSaveProgressCommandSchema,
+  builderChatAskChoiceCommandSchema,
+  builderChatSaveChoiceCommandSchema,
+  builderChatFinishTaskCommandSchema,
 ])
 
 export const helperAgentRequestSchema = z.discriminatedUnion('kind', [
@@ -392,6 +404,11 @@ export const agentRequestSchema = z.discriminatedUnion('kind', [
   builderApplyDecisionCommandSchema,
   builderResolveDecisionFromChatCommandSchema,
   builderCompleteTaskCommandSchema,
+  builderChatCheckProgressQuerySchema,
+  builderChatSaveProgressCommandSchema,
+  builderChatAskChoiceCommandSchema,
+  builderChatSaveChoiceCommandSchema,
+  builderChatFinishTaskCommandSchema,
   helperGetContextQuerySchema,
   helperRequestContextRefreshCommandSchema,
   analystGetEpisodeContextQuerySchema,

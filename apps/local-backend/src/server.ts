@@ -50,8 +50,9 @@ export function createLocalServer(options: {
   kiroBindings?: {
     bind(
       projectId: string,
-      request: { workspace?: string; allowCoreTools?: boolean },
+      request: { workspace?: string; approval?: 'PREAPPROVED' | 'MANUAL' },
     ): Promise<unknown>
+    setCommandApproval(approval: 'PREAPPROVED' | 'MANUAL'): Promise<unknown>
   }
 }) {
   if (!/^[0-9a-f]{64}$/.test(options.token)) throw new TypeError('LOCAL_TOKEN_INVALID')
@@ -269,19 +270,19 @@ export function createLocalServer(options: {
           : undefined
       const projectId = field('projectId')
       const workspace = field('workspace')
-      const allowCoreTools = field('allowCoreTools')
+      const approval = field('approval')
       if (
         typeof input !== 'object' ||
         input === null ||
         Object.keys(input).some(
-          (key) => !['protocolVersion', 'projectId', 'workspace', 'allowCoreTools'].includes(key),
+          (key) => !['protocolVersion', 'projectId', 'workspace', 'approval'].includes(key),
         ) ||
         field('protocolVersion') !== LOCAL_PROTOCOL_VERSION ||
         typeof projectId !== 'string' ||
         !/^project_[0-9a-f-]{36}$/.test(projectId) ||
         (workspace !== undefined &&
           (typeof workspace !== 'string' || workspace.length === 0 || workspace.length > 4096)) ||
-        (allowCoreTools !== undefined && typeof allowCoreTools !== 'boolean')
+        (approval !== undefined && approval !== 'PREAPPROVED' && approval !== 'MANUAL')
       ) {
         json(response, 400, { error: 'KIRO_BIND_REQUEST_INVALID' })
         return
@@ -289,7 +290,7 @@ export function createLocalServer(options: {
       try {
         const data = await options.kiroBindings.bind(projectId, {
           ...(workspace === undefined ? {} : { workspace }),
-          ...(allowCoreTools === undefined ? {} : { allowCoreTools }),
+          ...(approval === undefined ? {} : { approval }),
         })
         json(response, 200, { success: true, data })
       } catch (error) {
@@ -299,6 +300,33 @@ export function createLocalServer(options: {
             : 'KIRO_BIND_FAILED'
         json(response, 409, { success: false, error: code })
       }
+      return
+    }
+    if (url.pathname === '/api/kiro/approval' && request.method === 'POST' && !url.search) {
+      if (options.kiroBindings === undefined) {
+        json(response, 404, { error: 'KIRO_NATIVE_NOT_ENABLED' })
+        return
+      }
+      if (request.headers['content-type']?.split(';')[0] !== 'application/json') {
+        json(response, 415, { error: 'JSON_REQUIRED' })
+        return
+      }
+      const input: unknown = JSON.parse((await body(request)).toString('utf8'))
+      const record = typeof input === 'object' && input !== null ? input : {}
+      const approval = 'approval' in record ? record.approval : undefined
+      if (
+        Object.keys(record).length !== 2 ||
+        !('protocolVersion' in record) ||
+        record.protocolVersion !== LOCAL_PROTOCOL_VERSION ||
+        (approval !== 'PREAPPROVED' && approval !== 'MANUAL')
+      ) {
+        json(response, 400, { error: 'KIRO_APPROVAL_REQUEST_INVALID' })
+        return
+      }
+      json(response, 200, {
+        success: true,
+        data: await options.kiroBindings.setCommandApproval(approval),
+      })
       return
     }
     if (

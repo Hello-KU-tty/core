@@ -10,7 +10,7 @@
 > 본선 준비 중 사용자가 승인한 방향이다. 이 절과 충돌하는 아래 예선 기준 문장은 이 절을 따른다. 세부 근거는 [DECISIONS](docs/DECISIONS.md)의 본선 결정 세 건에 있다. 아래 구조의 실제 동작은 [K01 spike](docs/TASKS.md) 결과로 확정한다.
 
 - **원래 구상으로 복귀:** 사용자는 평소처럼 Kiro 자체 채팅·Spec·task 실행으로 바이브코딩하고, Vibe Helper는 Kiro의 Spec 파일, Steering, MCP, Hook과 확장 패널로 그 흐름에 개입한다. 예선의 "패널 안에서 Builder를 직접 운영하는 별도 바이브코딩 환경"은 본선 fallback으로 남긴다.
-- **Builder:** 사용자가 쓰는 Kiro Agent다. Vibe Helper는 Steering으로 행동을 조정하고 hook으로 Activity를 관찰하며, 실제 Decision은 Core Builder MCP `request_user_decision`으로 Kiro 채팅 안에서 사용자에게 묻게 한다. 학습자의 답은 Agent가 맥락으로 해석해 `resolve_decision_from_chat`으로 기록하되 학습자 원문을 인용해야 하고, LLM이 없는 Core는 인용·순서·명시 번호 모순만 검증한다. 이유는 학습자 원문 그대로 저장한다.
+- **Builder:** 사용자가 쓰는 Kiro Agent다. Vibe Helper는 Steering으로 행동을 조정하고 hook으로 Activity를 관찰하며, 실제 Decision은 Core Builder MCP `request_user_decision`으로 Kiro 채팅 안에서 사용자에게 묻게 한다. 학습자의 답은 Agent가 맥락으로 해석해 고른 안만 기록하고, LLM이 없는 Core가 범위 안의 학습자 원문(Builder 탭과 Helper 탭, 요청 전 발언 포함)을 Decision에 연결한다. Core는 학습자 발언이 있는지와 명시 번호 모순만 검증한다. 이유는 학습자 원문 그대로 저장한다(2026-10-10 K10 재설계, 사용자 승인).
 - **Helper:** 읽기 권한만 가진다(2026-10-09 사용자 결정으로 변경). 별도 채팅 탭의 Vibe Helper 에이전트는 파일 읽기·검색과 Helper Core 조회 도구만 받고, 코드 수정과 명령 실행은 Builder에게 맡긴다. Kiro 채팅에서 `/vibe-helper 질문`(manual Steering 슬래시 명령)이나 별도 채팅 탭의 Vibe Helper 에이전트로 부르고, 질문과 답 요약을 Helper 대화 Episode로 기록한다. Helper는 Builder 세션의 진행 중 활동을 기록으로 참고한다. 패널은 fallback이다.
 - **유지하는 강제 경계:** Evidence와 Concept State는 Core의 deterministic rule로만 바뀐다. Helper·Builder에는 Evidence·State 변경 도구를 주지 않고, Core는 Agent 출처 입력을 사용자 이해 근거로 받지 않는다. Analyst는 도구 없이 proposal만 낸다.
 - **Evidence 수집:** Kiro hook이 사용자가 채팅에 직접 친 발언을 USER Activity로 Core에 기록하고(일반 채팅도 Evidence 대상), 턴 종료로 Helper 교환을 마무리한다. Agent의 Core 도구 호출은 Core가 AGENT 출처로 기록한다. Event마다 추론하지 않고 Episode 종료 뒤 분석하는 원칙은 유지한다.

@@ -63,6 +63,74 @@ export function appendEpisodeEvent(input: AppendEpisodeEventInput): DomainResult
   })
 }
 
+const LINKABLE_CHAT_EVENT_TYPES: ReadonlySet<ActivityEvent['payload']['type']> = new Set([
+  'USER_MESSAGE',
+  'HELPER_RESPONSE',
+  'BUILDER_CHAT_TURN',
+])
+
+export interface LinkEpisodeChatEventsInput {
+  readonly current: Episode
+  /** The Episode's own events, so the linked result keeps activity order. */
+  readonly currentEvents: readonly ActivityEvent[]
+  readonly events: readonly ActivityEvent[]
+}
+
+/**
+ * Links chat events of the same Task to an open Decision Episode (K10): the learner's messages
+ * from before the question and from the Helper tab, with the Agent replies around them, so the
+ * Analyst reads the choice with what the learner said. A linked event may be older than the
+ * Episode; the Episode then starts at its earliest event. Events are kept in activity order.
+ */
+export function linkEpisodeChatEvents(input: LinkEpisodeChatEventsInput): DomainResult<Episode> {
+  const operation = 'EPISODE_CHAT_EVENTS_LINK'
+  const entityIds = [input.current.id, ...input.events.map((event) => event.id)]
+  if (input.current.status !== 'OPEN' || input.current.type !== 'DECISION') {
+    return rejected({ operation, reasonCode: 'EPISODE_NOT_OPEN', entityIds })
+  }
+  if (
+    input.currentEvents.length !== input.current.eventIds.length ||
+    input.currentEvents.some((event) => !input.current.eventIds.includes(event.id))
+  ) {
+    return rejected({ operation, reasonCode: 'EPISODE_EVENT_SET_INVALID', entityIds })
+  }
+  for (const event of input.events) {
+    if (
+      !LINKABLE_CHAT_EVENT_TYPES.has(event.payload.type) ||
+      event.projectId !== input.current.projectId ||
+      event.correlationId !== input.current.correlationId ||
+      input.current.taskId === undefined ||
+      event.taskId !== input.current.taskId ||
+      (event.decisionId !== undefined && event.decisionId !== input.current.decisionId)
+    ) {
+      return rejected({ operation, reasonCode: 'EPISODE_EVENT_SCOPE_INVALID', entityIds })
+    }
+  }
+  const added = input.events.filter((event) => !input.current.eventIds.includes(event.id))
+  if (added.length === 0) {
+    return noOp(input.current, { operation, reasonCode: 'EPISODE_EVENT_DUPLICATE', entityIds })
+  }
+  const ordered = [...input.currentEvents, ...added].sort(
+    (left, right) => left.sequence - right.sequence,
+  )
+  const earliest = ordered.reduce(
+    (start, event) => (compareUtc(event.occurredAt, start) < 0 ? event.occurredAt : start),
+    input.current.startedAt,
+  )
+  const next = episodeSchema.parse({
+    ...input.current,
+    revision: input.current.revision + 1,
+    startedAt: earliest,
+    eventIds: ordered.map((event) => event.id),
+  })
+  return applied(next, {
+    operation,
+    reasonCode: 'EPISODE_CHAT_EVENTS_LINKED',
+    entityIds,
+    supportingIds: next.eventIds,
+  })
+}
+
 export interface TransitionEpisodeAnalysisInput {
   readonly current: Episode
   readonly status: 'PENDING_ANALYSIS' | 'ANALYZED' | 'ANALYSIS_FAILED'

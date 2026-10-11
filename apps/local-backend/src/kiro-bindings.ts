@@ -5,10 +5,11 @@ import { join } from 'node:path'
 import type { ApplicationService, WorkspacePathPolicy } from '@vibe-helper/application'
 import { projectSessionSnapshotSchema } from '@vibe-helper/contracts'
 import {
-  allowKiroCoreTools,
   installKiroWorkspace,
+  type KiroCommandApproval,
   learnerScopeFrom,
   parseKiroSteeringTemplates,
+  setKiroCommandApproval,
 } from '@vibe-helper/kiro-adapter/kiro-workspace-node'
 import { privateDirectory } from '@vibe-helper/runtime'
 import type { LocalMcpHandler } from './agent-host.js'
@@ -18,6 +19,7 @@ import { folderHasWork, type WorkspaceRegistry } from './workspace-registry.js'
 
 interface ActiveBinding {
   readonly taskId: string
+  readonly workspace: string
   readonly revoke: () => void
   readonly builderActivity: () => Promise<string | null>
 }
@@ -25,9 +27,11 @@ interface ActiveBinding {
 export interface KiroBindRequest {
   /** The learner's open, empty Kiro folder to use as the Project folder. Omitted: generated one. */
   readonly workspace?: string
-  /** The learner agreed to stop Kiro asking before each Vibe Helper Core tool in this folder. */
-  readonly allowCoreTools?: boolean
+  /** The learner's command approval choice for this folder. Omitted: Kiro's rules stay as they are. */
+  readonly approval?: KiroCommandApproval
 }
+
+type KiroPermissionsResult = 'WRITTEN' | 'UNCHANGED' | 'UNRECOGNIZED'
 
 export interface KiroBindResult {
   readonly projectId: string
@@ -35,7 +39,7 @@ export interface KiroBindResult {
   readonly workspace: string
   readonly registered: boolean
   readonly spec: string
-  readonly coreTools: 'WRITTEN' | 'ALREADY_ALLOWED' | 'UNRECOGNIZED' | 'NOT_REQUESTED'
+  readonly permissions: KiroPermissionsResult | 'NOT_REQUESTED'
 }
 
 const PROJECT_ID = /^project_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
@@ -149,6 +153,7 @@ export class KiroBindingManager {
     const builder = createNativeCoreBinding({
       application: this.options.application,
       role: 'BUILDER',
+      surface: 'KIRO_CHAT',
       ...scope,
     })
     const helper = createNativeCoreBinding({
@@ -206,14 +211,13 @@ export class KiroBindingManager {
     await hook.syncProfile().catch(() => null)
     // Learner prompts queued while no Core was connected are recorded as soon as one is.
     await hook.drainQueue().catch(() => 0)
-    const coreTools = request.allowCoreTools
-      ? await allowKiroCoreTools({
-          homeDirectory: this.options.homeDirectory ?? homedir(),
-          workspace,
-        }).catch(() => 'UNRECOGNIZED' as const)
-      : 'NOT_REQUESTED'
+    const permissions =
+      request.approval === undefined
+        ? 'NOT_REQUESTED'
+        : await this.#applyApproval(workspace, request.approval)
     this.#active.set(projectId, {
       taskId: task.id,
+      workspace,
       builderActivity: () => hook.builderActivity(),
       // Descriptors stay: their tokens die with these handlers, and a later bind or a restore by
       // the next Core rewrites them. Hooks queue and bridges wait until then.
@@ -230,8 +234,29 @@ export class KiroBindingManager {
       workspace,
       registered: this.options.registry.get(projectId) === workspace,
       spec: installed.spec,
-      coreTools,
+      permissions,
     }
+  }
+
+  /**
+   * The learner changed the approval choice: every Project folder bound in this Core follows it
+   * now, so turning pre-approval off takes effect without reconnecting.
+   */
+  async setCommandApproval(
+    approval: KiroCommandApproval,
+  ): Promise<Readonly<Record<KiroPermissionsResult, number>>> {
+    const counts = { WRITTEN: 0, UNCHANGED: 0, UNRECOGNIZED: 0 }
+    const folders = new Set([...this.#active.values()].map((binding) => binding.workspace))
+    for (const workspace of folders) counts[await this.#applyApproval(workspace, approval)] += 1
+    return counts
+  }
+
+  #applyApproval(workspace: string, approval: KiroCommandApproval): Promise<KiroPermissionsResult> {
+    return setKiroCommandApproval({
+      homeDirectory: this.options.homeDirectory ?? homedir(),
+      workspace,
+      approval,
+    }).catch(() => 'UNRECOGNIZED' as const)
   }
 
   close(): void {

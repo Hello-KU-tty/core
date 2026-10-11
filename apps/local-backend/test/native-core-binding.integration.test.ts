@@ -29,8 +29,8 @@ import {
   liveContextFixture,
   projectFixture,
 } from '../../../packages/contracts/test/fixtures.js'
-import { createLocalServer } from '../src/server.js'
 import { createNativeCoreBinding } from '../src/native-core-binding.js'
+import { createLocalServer } from '../src/server.js'
 
 describe('experimental native Core binding', () => {
   it('issues a fresh Helper correlation for each turn while retaining task scope', async () => {
@@ -104,6 +104,138 @@ describe('experimental native Core binding', () => {
       storage.close()
     }
   })
+  it('serves the Kiro chat Builder tools with identity filled in from the binding (K10)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'vibe-native-kiro-chat-'))
+    const storage = await openInMemorySqliteStorage()
+    storage.transaction((repository) => {
+      repository.appendProject(projectSchema.parse(projectFixture))
+      repository.appendDiscoverySession(discoverySessionSchema.parse(discoverySessionFixture))
+      repository.appendCandidate(projectCandidateRevisionSchema.parse(candidateFixture))
+      repository.appendCandidateRound(candidateRoundSchema.parse(candidateRoundFixture))
+      repository.appendDiscoveryFeedback(discoveryFeedbackSchema.parse(discoveryFeedbackFixture))
+      repository.appendLearningSpec(learningSpecRevisionSchema.parse(draftLearningSpecFixture))
+      repository.appendLearningSpec(learningSpecRevisionSchema.parse(confirmedLearningSpecFixture))
+      repository.appendTask(builderTaskSchema.parse(builderTaskFixture))
+    })
+    const application = new ApplicationService({
+      storage,
+      workspacePolicy: await WorkspacePathPolicy.create(root),
+    })
+    const binding = createNativeCoreBinding({
+      application,
+      role: 'BUILDER',
+      surface: 'KIRO_CHAT',
+      projectId: ids.project,
+      correlationId: ids.correlation,
+      taskId: ids.task,
+    })
+    const runtime = new WorkflowRuntime({
+      application,
+      agents: {
+        invoke: async () => {
+          throw new Error('NATIVE_AGENT_NOT_ATTACHED')
+        },
+      },
+      instanceId: randomUUID(),
+    })
+    const server = createLocalServer({
+      application,
+      runtime,
+      token: randomBytes(32).toString('hex'),
+      instanceId: randomUUID(),
+      mcpHandlers: new Map([[binding.path, binding.handler]]),
+      runStartDisabledCode: 'NATIVE_RUNTIME_NOT_ATTACHED',
+    })
+    await new Promise<void>((done) => server.listen(0, '127.0.0.1', done))
+    const address = server.address()
+    if (!address || typeof address === 'string') throw new Error('LISTEN_FAILED')
+    const client = new Client({ name: 'kiro-chat-test', version: '0.1.0' })
+    const transport = new StreamableHTTPClientTransport(
+      new URL(`http://127.0.0.1:${address.port}${binding.path}`),
+      { requestInit: { headers: { Authorization: binding.authorization } } },
+    )
+    try {
+      await client.connect(transport)
+      const listed = await client.listTools()
+      expect(listed.tools.map((tool) => tool.name)).toEqual([
+        'check_progress',
+        'save_progress',
+        'ask_choice',
+        'save_choice',
+        'finish_task',
+      ])
+      const schemas = JSON.stringify(listed.tools.map((tool) => tool.inputSchema))
+      for (const field of ['projectId', 'taskId', 'correlationId', 'idempotencyKey', 'expected'])
+        expect(schemas).not.toContain(field)
+      // The whole Agent-facing input surface stays small (the panel catalog was about 29 KB).
+      expect(Buffer.byteLength(schemas, 'utf8')).toBeLessThan(12_000)
+
+      const progress = await client.callTool({ name: 'check_progress', arguments: {} })
+      expect(progress.isError).not.toBe(true)
+      expect(progress.structuredContent).toMatchObject({
+        task: { title: builderTaskFixture.title },
+        acceptanceCriteria: [{ key: 'valid_event' }],
+      })
+      const note = await client.callTool({
+        name: 'save_progress',
+        arguments: { kind: 'PLAN', summary: 'Parse the events, then render them.' },
+      })
+      expect(note.structuredContent).toMatchObject({ outcome: 'SAVED', contextVersion: 1 })
+      const asked = await client.callTool({
+        name: 'ask_choice',
+        arguments: {
+          category: 'DATA_MODEL',
+          question: 'Should unknown fields be rejected?',
+          whyNow: 'The parser needs this before it is written.',
+          options: [
+            { label: 'Reject them', description: 'Strict parser.' },
+            { label: 'Keep them', description: 'Show extra fields separately.' },
+          ],
+          recommended: 1,
+          recommendationReason: 'Typos fail early.',
+          blocksWork: true,
+        },
+      })
+      expect(asked.structuredContent).toMatchObject({ outcome: 'ASKED', recommendedNumber: 1 })
+      const early = await client.callTool({ name: 'save_choice', arguments: { choice: 1 } })
+      expect(early).toMatchObject({
+        isError: true,
+        structuredContent: { code: 'CHAT_DECISION_NO_LEARNER_REPLY' },
+      })
+      const said = await application.executeUi({
+        schemaVersion: 1,
+        kind: 'UI_RECORD_CHAT_MESSAGE',
+        correlationId: ids.correlation,
+        actor: { kind: 'UI' },
+        idempotencyKey: `idem_${randomUUID()}`,
+        projectId: ids.project,
+        taskId: ids.task,
+        conversationId: 'conversation_00000000-0000-4000-8000-000000000991',
+        message: '2번, 나중에 새 필드가 생겨도 보이면 좋겠어',
+      })
+      expect(said.success).toBe(true)
+      // A numeric string is read as the option number.
+      const saved = await client.callTool({ name: 'save_choice', arguments: { choice: '2' } })
+      expect(saved.isError).not.toBe(true)
+      expect(saved.structuredContent).toMatchObject({
+        outcome: 'SAVED',
+        chosen: { number: 2, label: 'Keep them' },
+        linkedMessageCount: 1,
+      })
+      expect(storage.repository.readBuilderTaskAggregate(ids.project, ids.task)?.task.status).toBe(
+        'ACTIVE',
+      )
+      // A revoked binding refuses the connection itself.
+      binding.revoke()
+      await expect(client.callTool({ name: 'check_progress', arguments: {} })).rejects.toThrow()
+    } finally {
+      await client.close().catch(() => {})
+      await new Promise<void>((done) => server.close(() => done()))
+      await runtime.close()
+      storage.close()
+    }
+  })
+
   it('uses real Core with one Builder Task scope and revokes the MCP authority', async () => {
     const root = await mkdtemp(join(tmpdir(), 'vibe-native-bound-core-'))
     const storage = await openInMemorySqliteStorage()

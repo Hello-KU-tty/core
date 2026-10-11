@@ -45,7 +45,8 @@ const CURRENT_FOLDER_REFUSALS = new Set(['WORKSPACE_FOLDER_NOT_EMPTY', 'WORKSPAC
   'WORKSPACE_FOLDER_OVERLAPS_CORE', 'WORKSPACE_FOLDER_INVALID'])
 // The Project already has its folder elsewhere; open that one instead of splitting the work.
 const PROJECT_FOLDER_ELSEWHERE = new Set(['PROJECT_REGISTERED_ELSEWHERE', 'PROJECT_HAS_GENERATED_FOLDER'])
-const CORE_TOOLS_CONSENT_KEY = 'vibeHelper.coreToolsConsent'
+// Replaces 0.2.x `vibeHelper.coreToolsConsent` (Core tools only); the wider choice is asked anew.
+const COMMAND_APPROVAL_KEY = 'vibeHelper.commandApproval'
 const BOUND_MARKER = '.kiro/hooks/vibe-helper.json'
 const inside = (parent, child) => {
   const part = relative(parent, child)
@@ -142,29 +143,38 @@ async function createFrontendHost(context) {
     if (!preparation) preparation = prepareOnce().finally(() => { preparation = null })
     return preparation
   }
-  async function bind(request) {
+  async function postKiro(path, request, failure) {
     const descriptor = await readLocalConnection(connectionFile)
-    const response = await fetch(`${descriptor.baseUrl}/api/kiro/bind`, {
+    const response = await fetch(`${descriptor.baseUrl}${path}`, {
       method: 'POST', headers: { authorization: `Bearer ${descriptor.token}`, 'content-type': 'application/json' },
       body: JSON.stringify({ protocolVersion: 1, ...request }), signal: AbortSignal.timeout(15000),
     })
     const body = await response.json().catch(() => ({}))
     if (!response.ok || body?.success !== true)
-      throw new Error(safeCode({ message: body?.error ?? 'KIRO_BIND_FAILED' }))
+      throw new Error(safeCode({ message: body?.error ?? failure }))
     return body.data
   }
-  // Asked once: whether Kiro may run Vibe Helper's Core tools in Project folders without asking.
-  async function coreToolsConsent() {
-    const saved = context.globalState?.get(CORE_TOOLS_CONSENT_KEY)
-    if (saved === 'ALLOW' || saved === 'ASK') return saved === 'ALLOW'
-    const allow = '허용', ask = '매번 묻기'
+  const bind = request => postKiro('/api/kiro/bind', request, 'KIRO_BIND_FAILED')
+  /**
+   * Asked once (again with `ask`): pre-approve the Core tools and common dev commands in Project
+   * folders, or let Kiro ask each time. Dismissing it decides nothing and asks again next time.
+   */
+  async function commandApproval({ ask = false } = {}) {
+    const saved = context.globalState?.get(COMMAND_APPROVAL_KEY)
+    if (!ask && (saved === 'PREAPPROVED' || saved === 'MANUAL')) return saved
+    const preapprove = '개발 명령 미리 승인', manual = '수동으로 승인'
     const choice = await vscode.window.showInformationMessage(
-      'Kiro 채팅이 Vibe Helper 도구(작업 상태와 Decision 기록)를 쓸 때마다 확인을 묻지 않도록 Project 폴더에서 허용할까요?',
-      { modal: true, detail: 'Vibe Helper 도구에만 적용돼요. 파일 수정과 명령 실행 확인은 그대로예요. 나중에 Kiro 권한 설정에서 바꿀 수 있어요.' },
-      allow, ask)
-    if (choice === allow || choice === ask)
-      await context.globalState?.update(CORE_TOOLS_CONSENT_KEY, choice === allow ? 'ALLOW' : 'ASK')
-    return choice === allow
+      'Kiro 채팅이 명령을 실행할 때 어떻게 승인할까요?',
+      { modal: true, detail: [
+        `${preapprove}: Vibe Helper가 연결한 Project 폴더에서 Vibe Helper 도구와 자주 쓰는 개발 명령(설치·빌드·테스트, 파일 보기, 폴더 만들기, git 커밋, 내 컴퓨터 서버 확인)은 묻지 않고 실행해요. 파일 삭제, 프로세스 종료, 배포, git push, 전역 설치, sudo, 다른 주소 접속은 계속 물어요. 실수를 줄이는 목록이지 격리 장치는 아니에요.`,
+        `${manual}: 명령과 도구마다 Kiro가 확인을 받아요.`,
+        '나중에 명령 팔레트의 "Vibe Helper: Change Command Approval"로 바꿀 수 있어요.',
+      ].join('\n\n') },
+      preapprove, manual)
+    if (choice !== preapprove && choice !== manual) return undefined
+    const approval = choice === preapprove ? 'PREAPPROVED' : 'MANUAL'
+    await context.globalState?.update(COMMAND_APPROVAL_KEY, approval)
+    return approval
   }
   /**
    * Connects the Project to Kiro chat. An empty open folder becomes the Project folder in this
@@ -177,11 +187,12 @@ async function createFrontendHost(context) {
     const folders = vscode.workspace.workspaceFolders ?? []
     const current = folders.length === 1 ? await realpath(folders[0].uri.fsPath).catch(() => null) : null
     const generatedRoot = await realpath(workspacesRoot)
-    const allowCoreTools = await coreToolsConsent()
+    const approval = await commandApproval()
+    const choice = approval === undefined ? {} : { approval }
     let data
     if (current !== null && !inside(generatedRoot, current) && current !== generatedRoot) {
       try {
-        data = await bind({ projectId, workspace: current, allowCoreTools })
+        data = await bind({ projectId, workspace: current, ...choice })
       } catch (error) {
         const code = safeCode(error)
         if (PROJECT_FOLDER_ELSEWHERE.has(code)) {
@@ -195,9 +206,9 @@ async function createFrontendHost(context) {
             { modal: true }, open)
           if (choice !== open) return { projectId, taskId: null, folder: 'CANCELLED', openedNewWindow: false }
         } else throw error
-        data = await bind({ projectId, allowCoreTools })
+        data = await bind({ projectId, ...choice })
       }
-    } else data = await bind({ projectId, allowCoreTools })
+    } else data = await bind({ projectId, ...choice })
     const workspace = await realpath(data.workspace)
     // Only the generated root or the folder Core just confirmed as this Project's registration opens.
     if (!(data.registered === true || inside(generatedRoot, workspace)))
@@ -205,8 +216,11 @@ async function createFrontendHost(context) {
     const alreadyOpen = current === workspace
     if (!alreadyOpen)
       await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(workspace), { forceNewWindow: true })
+    // A new window asks on start; this one asks now, before the learner opens a chat session.
+    else if (!vscode.workspace.isTrusted)
+      void askForTrust('이 폴더를 Vibe Helper Project로 연결했어요. ').catch(() => {})
     return { projectId: data.projectId, taskId: data.taskId, openedNewWindow: !alreadyOpen,
-      folder: data.registered === true ? 'REGISTERED' : 'GENERATED', coreTools: data.coreTools }
+      folder: data.registered === true ? 'REGISTERED' : 'GENERATED', permissions: data.permissions }
   }
   const openCommand = vscode.commands.registerCommand('vibeHelper.openInKiro', async () => {
     try {
@@ -220,26 +234,48 @@ async function createFrontendHost(context) {
       })), { placeHolder: 'Kiro 채팅으로 이어서 만들 Project를 고르세요' })
       if (!picked) return
       const opened = await openProjectInKiro(picked.projectId)
-      if (opened.folder !== 'CANCELLED' && !opened.openedNewWindow)
+      if (opened.folder !== 'CANCELLED' && !opened.openedNewWindow && vscode.workspace.isTrusted)
         void vscode.window.showInformationMessage('이 폴더를 Vibe Helper Project로 연결했어요. Kiro 채팅에서 새 세션(+)을 열어 시작하세요. Helper는 새 탭에서 vibe-helper 에이전트를 고르면 돼요.')
     } catch (error) {
       const code = safeCode(error)
       void vscode.window.showErrorMessage(BIND_MESSAGES[code] ?? `Kiro에서 열지 못했습니다 (${code}).`)
     }
   })
-  // Kiro skips hooks and steering in an untrusted folder and loads hooks when a session starts,
-  // so a bound folder needs trust and then a reload before chat reaches Vibe Helper.
+  // Changing the choice reaches every Project folder this Core has connected, so turning
+  // pre-approval off takes effect without reconnecting.
+  const approvalCommand = vscode.commands.registerCommand('vibeHelper.changeCommandApproval', async () => {
+    try {
+      const approval = await commandApproval({ ask: true })
+      if (approval === undefined) return
+      await prepare()
+      const counts = await postKiro('/api/kiro/approval', { approval }, 'KIRO_APPROVAL_FAILED')
+      const skipped = counts.UNRECOGNIZED > 0
+        ? ` Project 폴더 ${counts.UNRECOGNIZED}곳은 Kiro 권한 파일 모양이 달라 바꾸지 못했어요.` : ''
+      void vscode.window.showInformationMessage(approval === 'PREAPPROVED'
+        ? `이제 Project 폴더에서 자주 쓰는 개발 명령을 미리 승인해요.${skipped}`
+        : `이제 Kiro가 명령과 도구마다 확인을 받아요.${skipped}`)
+    } catch (error) {
+      const code = safeCode(error)
+      void vscode.window.showErrorMessage(BIND_MESSAGES[code] ?? `승인 방식을 바꾸지 못했습니다 (${code}).`)
+    }
+  })
+  // Kiro skips hooks and steering in an untrusted folder (and asks before every command even when
+  // pre-approved) and loads hooks when a session starts, so a bound folder needs trust and then a
+  // reload before chat reaches Vibe Helper.
   const boundFolder = async () => {
     const folders = vscode.workspace.workspaceFolders ?? []
     if (folders.length !== 1) return false
     return access(join(folders[0].uri.fsPath, BOUND_MARKER)).then(() => true, () => false)
   }
-  void boundFolder().then(async bound => {
-    if (!bound || vscode.workspace.isTrusted || stopped) return
+  async function askForTrust(lead = '') {
     const manage = '신뢰 설정 열기'
     const choice = await vscode.window.showWarningMessage(
-      '이 폴더를 신뢰해야 Vibe Helper가 Kiro 채팅에 연결돼요.', manage)
+      `${lead}이 폴더를 신뢰해야 Vibe Helper가 Kiro 채팅에 연결돼요.`, manage)
     if (choice === manage) await vscode.commands.executeCommand('workbench.trust.manage')
+  }
+  void boundFolder().then(async bound => {
+    if (!bound || vscode.workspace.isTrusted || stopped) return
+    await askForTrust()
   }).catch(() => {})
   const trust = vscode.workspace.onDidGrantWorkspaceTrust(() => {
     void prepare().catch(() => {})
@@ -253,7 +289,7 @@ async function createFrontendHost(context) {
   })
   async function dispose() {
     if (disposal) return disposal
-    stopped = true; trust.dispose(); openCommand.dispose()
+    stopped = true; trust.dispose(); openCommand.dispose(); approvalCommand.dispose()
     disposal = (async () => {
       await lifecycle.dispose()
       await preparation?.catch(() => {})

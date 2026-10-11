@@ -132,6 +132,7 @@ export const localResponseSchemas = {
   UI_PREPARE_BUILDER_SESSION: builderSessionBindingDescriptorSchema,
   UI_RECORD_HELPER_EXCHANGE: helperExchangeReceiptSchema,
   UI_RECORD_CHAT_MESSAGE: chatMessageReceiptSchema,
+  UI_RECORD_BUILDER_CHAT_TURN: chatMessageReceiptSchema,
   UI_RETRY_ANALYSIS: analysisJobSchema,
   UI_READ_ANALYSIS_JOBS: analysisJobSchema.array(),
   UI_READ_EVIDENCE_TRACE: projectEvidenceTraceSchema,

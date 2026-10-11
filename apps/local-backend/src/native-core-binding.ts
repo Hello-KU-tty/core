@@ -1,7 +1,10 @@
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import type { ApplicationService } from '@vibe-helper/application'
 import type { AgentRole } from '@vibe-helper/contracts'
-import { createRoleBoundMcpHttpHandler } from '@vibe-helper/mcp-server/role-server'
+import {
+  createRoleBoundMcpHttpHandler,
+  KIRO_CHAT_BUILDER_TOOL_NAMES,
+} from '@vibe-helper/mcp-server/role-server'
 import type { LocalMcpHandler } from './agent-host.js'
 
 const NATIVE_TOOLS: Partial<Record<AgentRole, readonly string[]>> = {
@@ -31,6 +34,8 @@ const NATIVE_TOOLS: Partial<Record<AgentRole, readonly string[]>> = {
 export function createNativeCoreBinding(options: {
   application: ApplicationService
   role: 'DISCOVERY' | 'BUILDER' | 'HELPER'
+  /** `KIRO_CHAT`: the learner's own Kiro chat Builder tools (K10); needs role BUILDER. */
+  surface?: 'KIRO_CHAT'
   projectId: string
   correlationId: string
   taskId?: string
@@ -43,7 +48,10 @@ export function createNativeCoreBinding(options: {
   handler: LocalMcpHandler
   revoke: () => void
 } {
-  const names = NATIVE_TOOLS[options.role]
+  if (options.surface === 'KIRO_CHAT' && options.role !== 'BUILDER')
+    throw new TypeError('NATIVE_ROLE_UNSUPPORTED')
+  const names =
+    options.surface === 'KIRO_CHAT' ? KIRO_CHAT_BUILDER_TOOL_NAMES : NATIVE_TOOLS[options.role]
   if (!names) throw new TypeError('NATIVE_ROLE_UNSUPPORTED')
   if (
     options.role === 'DISCOVERY'
@@ -60,6 +68,7 @@ export function createNativeCoreBinding(options: {
   const core = createRoleBoundMcpHttpHandler({
     role: options.role,
     application: options.application,
+    ...(options.surface === undefined ? {} : { surface: options.surface }),
     toolNames: selected,
     binding: {
       projectId: options.projectId,
