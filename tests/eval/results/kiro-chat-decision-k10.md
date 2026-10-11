@@ -46,3 +46,18 @@ K10+K11을 합친 Mac VSIX 0.2.7(backend `75c4fa7` 위 작업 트리, frontend `
 - **Kiro 단계의 형식 오류:** `ask_choice`와 `finish_task`의 첫 호출이 Kiro 도구 호출 단계에서 `Invalid input for tool_call — arguments: expected object, received string`으로 거절됐다(모델이 긴 한국어 입력을 JSON 문자열로 보냄). 두 번 모두 Builder가 바로 객체로 다시 보내 성공했다. 우리 Core가 거절한 호출은 0이다. Kiro 모델 동작이라 알려진 한계로 둔다.
 - **언어:** 1턴의 마지막 Builder 메시지가 영어였다(3턴은 한국어). Builder Steering에 학습자 언어로 답하라는 규칙이 없다. 후속 보완 거리.
 - 흐름 합계 8.92크레딧(채팅). 같은 비교로 첫 체험은 Vibe Helper 호출 25번 중 9번 실패, K09 재실측은 11번 중 0번이었다.
+
+## 3. 완료 뒤 이어서 만들기 (2026-10-11, `main` 0.2.7, Steering 0.6.2)
+
+frontend Windows 실측에서 완료 뒤 요청을 받을 경로가 없다는 것이 드러나 고친 뒤([DECISIONS](../../../docs/DECISIONS.md) "Kiro 채팅에서 완료 뒤 이어서 만들기와 늦은 신뢰 다시 로드"), 위 2절에서 완료한 Project에 `main` 빌드(backend `5f1257c`, frontend `88275f6`)를 설치해 확인했다. Kiro를 다시 연 뒤 새 Core가 완료한 Task로 연결을 복원했고, 새 채팅 세션에서 진행했다.
+
+| 턴 | 학습자 | Builder | Vibe Helper 도구 | 승인 창 | 크레딧 |
+| --- | --- | --- | --- | --- | --- |
+| 1 | "고마워! 써 보니까 산 물건은 목록에서 지울 수 있어야겠어. 지우는 버튼도 넣어 줘." | 코드를 읽고 항목별 삭제는 이미 있다고 알린 뒤, 산 물건 치우는 방식 Decision(1 한 번에 치우기 버튼, 2 지금 상태, 3 둘 다, 추천 3)을 기록 뒤 질문 | `check_progress`, `ask_choice` | 0 | 0.80 |
+| 2 | "3번! 하나씩 지울 때도 있고, 장 다 보고 나서 동생이랑 한 번에 정리하고 싶을 때도 있어서." | 기록, 구현, 테스트, 완료 | `save_choice`, `save_progress` ×2, `finish_task` ×2, `check_progress` | 0 | 5.02 |
+
+- **후속 Task:** 1턴의 `ask_choice`(완료 뒤 첫 쓰기)에서 Core가 학습자 요청 원문을 목표로 sequence 2 Task(이전 Task를 이어받음)를 만들었다. Builder·Helper MCP와 hook 연결이 그 Task로 옮겨 갔다. 첫 Task와 완료 보고서는 그대로다.
+- **확정 기록:** 2턴의 학습자 답이 새 Task의 `USER_MESSAGE`로 기록돼 Decision(OPTION 3)에 연결됐고(Builder 탭, 질문 뒤), 완료 때 적용됐다. Analyst 분석 2건 성공, 판단 근거 Evidence `JUSTIFIED_DECISION`·MEDIUM·LIGHT_HINT·EXPLAINED.
+- **언어:** Builder 메시지는 모두 한국어였다.
+- **한계:** 첫 `finish_task`가 이전 Task의 기준 키(`user_request`·`verified_outcome`가 아닌 키)로 와서 거절됐고, Builder가 `check_progress` 뒤 다시 보내 완료했다. 학습자 요청 메시지는 첫 Task의 발언으로 남는다.
+- 합계 5.82크레딧(채팅).

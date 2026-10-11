@@ -1,5 +1,21 @@
 # 결정 기록
 
+## 본선: 저장소 브랜치는 `main` 하나로
+
+- **맥락:** 본선 작업을 backend `finals/kiro-native`, frontend `finals/trial-feedback`에서 했다. frontend의 Windows 수정 PR이 backend `main`으로 병합되면서 `main`에 본선 이력이 들어갔고, 이후 Windows 0.2.6 릴리스와 수정은 병합되지 않은 브랜치에 남았다.
+- **결정(사용자 지시, 2026-10-11):** 앞으로 두 저장소 모두 `main` 하나로 작업한다. backend `main`에 K11·K10 브랜치와 frontend의 Windows 브랜치를, frontend `main`에 `finals/trial-feedback`(PR #10 포함)을 합쳤다. 새 작업은 `main`에서 브랜치를 따서 `main`으로 PR하고, 설치물은 `main`의 `releases/`에 올린다. 옛 `finals/*` 브랜치는 이력으로만 둔다.
+
+## 본선: Kiro 채팅에서 완료 뒤 이어서 만들기와 늦은 신뢰 다시 로드
+
+- **맥락(frontend Windows 실측, 2026-10-11):** (1) Builder가 Task를 마친 뒤 학습자가 "저장 방식을 번호 선택지로 물어봐"라고 하자 Decision 요청이 `LIVE_CONTEXT_TASK_NOT_RUNNING`으로 거절되고 학습자 답은 `USER_MESSAGE`로만 남았다. Kiro 채팅에는 SPEC FR-BLD-008(완료 뒤 명시 요청은 같은 workspace의 다음 Task)을 따를 경로가 없었다. (2) 신뢰하지 않은 상태로 연 창을 나중에 신뢰하고 연결하면 Kiro가 창을 열 때 꺼 둔 hook과 작업 공간 MCP를 다시 읽지 않는데, host는 연결 뒤 신뢰할 때만 다시 로드를 제안했다. 두 문제 모두 Windows 전용이 아니다.
+- **결정:**
+  1. Kiro 채팅 도구는 연결된 Task를 이어받은 최신 Task에서 일한다. 완료한 Task에 쓰기(`save_progress`, `ask_choice`)가 오면, 완료 뒤 Builder 탭 학습자 발언이 있을 때만 Core가 그 발언 원문을 목표로 후속 Task를 만든다(완료 Task와 보고서는 그대로). Builder 자신의 말과 Helper 탭 질문은 요청으로 보지 않고, 없으면 `CHAT_TASK_FINISHED`로 거절한다. 학습자 요청인지 판단하는 일은 Builder(Steering)에 맡기고, Core는 학습자 발언이 있었다는 사실만 확인한다. 새 도구는 만들지 않았다(도구 5개 유지).
+  2. local backend는 Builder 도구 호출 뒤 현재 Task가 연결된 Task를 이어받았으면 다시 연결한다. bridge는 0.2.4부터 같은 폴더·Project·역할의 새 연결을 따라가므로 창을 다시 로드하지 않는다. hook·Helper·Steering·Spec도 새 Task로 옮겨 간다.
+  3. host는 창이 열릴 때 신뢰되지 않았는지 기억하고, 그런 창에서 신뢰 뒤 연결하면 다시 로드를 제안한다. `openProjectInKiro` 결과에 `reloadRequired`를 더했다(선택 필드).
+  4. Steering 0.6.2: 완료 뒤 학습자가 더 요청하면 `save_progress` PLAN으로 시작하고, 요청하지 않은 일은 시작하지 않는다. 학습자 언어로 답한다(K10 실측에서 영어 답이 한 번 나왔다).
+- **검증:** Core 통합 테스트(완료 전 발언·Builder 턴·Helper 탭 질문은 요청이 아님, 요청 뒤 후속 Task 생성과 원본 보존, 옛 Task로 온 호출의 전달, 후속 Task의 Decision·완료), 연결 테스트(MCP 호출 뒤 descriptor 3개가 새 Task로 이동, 옛 경로 회수), host 테스트(늦은 신뢰 창의 다시 로드, 처음부터 신뢰한 창은 묻지 않음). 실제 Kiro(Mac 0.2.7): 완료한 Project에서 학습자 추가 요청 → 후속 Task 생성·연결 이동 → 학습자 번호 답 연결·확정 → 구현·완료, 답은 모두 한국어. 늦은 신뢰 알림의 실제 화면은 frontend Windows 0.2.7 확인 8로 남긴다.
+- **알려진 한계:** 후속 Task의 첫 `finish_task`에서 Builder가 이전 Task의 기준 키를 보내 한 번 거절됐다(바로 `check_progress` 뒤 성공). 학습자 요청 메시지는 이전 Task의 발언으로 남고 후속 Task의 Decision에는 연결되지 않는다.
+
 ## 본선: Kiro 채팅 Builder 워크플로 재설계(K10)
 
 - **맥락:** 첫 체험에서 Vibe Helper 도구 호출 25번 중 9번이 실패했고(멱등키 형식·필수 필드 3, 순서 2, 인용 한글 깨짐 1, 요청 전 발언 인용 1, 도구 없는 모드 2), 학습자의 실제 이유가 Decision 요청 전 발언이라 판단 근거 Evidence가 하나도 남지 않았다([Builder 워크플로 정리](spikes/KIRO_NATIVE_BUILDER_WORKFLOW_20261009.md)). 판정 규칙에도 실제 이해를 놓치는 곳이 있었다. 개념 표현이 학습자 말에 글자 그대로 있어야 했고, 선택지 장단점을 이유로 대면 DIRECTLY_LED가 됐으며, Analyst가 Builder 채팅 발언을 보지 못해 맥락 지칭을 보류했다.
@@ -28,7 +44,7 @@
 - **검증(2026-10-10, Node 24.19.0):** typecheck 오류 0, unit 177 통과·3 skip, integration 519 통과·8 skip(새 Core 통합 8개, MCP 1개, hook 1개, domain 단위 포함), eval 45 통과·1 skip(실제 모델), 패널 CJS 182 통과·2 skip, 바꾼 파일 Biome 통과. Analyst 1.1.0 평가(2026-10-11, Sonnet 5.5, [결과](../tests/eval/results/evidence-analyst-v1.1.0-k10.md)): K10 사례 11개 중 1차 10개 통과(놓침 6/7, 과대 방지 4/4), 실패 1개는 여러 발언을 이어 붙인 인용을 Core가 거절한 형식 문제라 위 인용 규칙으로 고친 뒤 통과. 기존 16개 회귀 15/16(1.0.8은 14/16). 9.01크레딧.
 - **실제 Kiro 확인(2026-10-11, K11과 합친 0.2.7, [기록](../tests/eval/results/kiro-chat-decision-k10.md)):** 채팅 Decision 평가 13개 중 11개 통과(망설임·모호한 부정·바꿀 만한 오해는 되묻고, 이유 일부만 틀리면 기록 뒤 같은 턴 정정, 선택 바꾸기는 새 Decision). "2시간(1번)"은 선택지에 없는 값이라 Builder가 되물었고, 직접 낸 안은 0.6.0에서 질문을 새로 열어 실패해 Steering 0.6.1로 보완한 뒤 실제 흐름에서 통과했다. 실제 흐름(처음 보는 목표 + Personal Need)은 학습자 발언 세 번(질문 전 사정, `/vibe-helper` 질문, 직접 낸 안)으로 Task 완료까지 갔고, 세 발언이 Decision에 연결돼 Analyst가 DEMONSTRATED 판단 Evidence를 받았다. Vibe Helper 도구 9번 중 Core 거절 0, 승인 창 0. Kiro 도구 호출 단계가 긴 한국어 입력을 문자열로 보낸 첫 호출 2번을 거절했고 Builder가 바로 다시 보내 성공했다(알려진 한계). Codex 화면 조작이 막혀 신뢰 화면 대신 `--disable-workspace-trust`로 띄웠고, Helper 경로는 `/vibe-helper`로 확인했다(별도 Helper 탭 모드 선택은 미확인).
 - **실측에서 고친 것:** (1) 고른 안의 적용을 완료로 미루면서 확정된 Decision이 활성 목록에 쌓여 계약 상한 10을 넘자 Core가 `TRANSACTION_FAILED`로 감췄다. 상한을 30(`MAX_ACTIVE_DECISIONS`)으로 올리고 닿으면 `CHAT_TOO_MANY_OPEN_CHOICES`를 낸다(회귀 테스트). (2) Steering 0.6.1: 학습자가 자기 안을 내면 그것이 선택이므로 `custom`으로 기록하고 질문을 새로 열지 않는다.
-- **상태:** 구현·자동 검사·Analyst 평가·실제 Kiro 확인 완료. 후속 거리: Builder Steering에 학습자 언어로 답하는 규칙(1턴 마지막 메시지가 영어), 개념 이름이 Spec과 정확히 같아야 기록되는 점, 별도 Helper 탭 실측(화면 조작 필요).
+- **상태:** 구현·자동 검사·Analyst 평가·실제 Kiro 확인 완료. 학습자 언어 규칙은 Steering 0.6.2에 넣었다("Kiro 채팅에서 완료 뒤 이어서 만들기와 늦은 신뢰 다시 로드"). 후속 거리: 개념 이름이 Spec과 정확히 같아야 기록되는 점, 별도 Helper 탭 실측(화면 조작 필요).
 
 ## 본선: 개발 명령 미리 승인(K11)
 
