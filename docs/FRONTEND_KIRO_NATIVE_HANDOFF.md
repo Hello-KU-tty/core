@@ -3,7 +3,7 @@
 본선 방향([PROJECT_BRIEF §0](../PROJECT_BRIEF.md))에 맞춰 Mac 설치물의 host를 Kiro-native로 바꿨다. 0.2.1은 첫 실사용 체험 피드백(K09)을 반영했고, 0.2.2는 본선 계정 재실측에서 나온 Analyst·Evidence 정책 변경을 더했고, 0.2.3은 Kiro 채팅 Helper 에이전트가 도구를 받지 못하던 문제를 고치고 Helper를 읽기 전용으로 바꿨고, 0.2.4는 Kiro 연결이 Core 재시작을 넘어 유지되게 하고 끊긴 동안의 학습자 발언을 큐로 보존하며, 0.2.5는 같은 코드로 Windows x64 설치물을 빌드할 수 있게 했다(Mac은 backend, Windows는 frontend가 빌드). 0.2.6은 버전 강제를 완화했고, 0.2.7은 Kiro 채팅 Builder 도구를 다시 설계하고(K10) 개발 명령 미리 승인(K11), 완료 뒤 이어서 만들기, frontend가 Windows에서 찾은 문제 수정을 더했다. 2026-10-11부터 두 저장소 모두 `main` 브랜치 하나로 작업한다.
 
 - 설치 파일: Mac [`releases/macos/kiro-native/builder-helper-agent-panel-0.2.7-darwin-arm64.vsix`](../releases/macos/kiro-native/builder-helper-agent-panel-0.2.7-darwin-arm64.vsix) · 41,566,133 bytes · SHA-256 `12022fe0c68df34baced6138d73a14246287dbc86d63ae16d63d63d3461c84ec` · [receipt](../releases/macos/kiro-native/macos-vsix-receipt.json) · [항목별 hash](../releases/macos/kiro-native/files.json)
-- 설치 파일: Windows는 아직 0.2.6이다: [`releases/windows/kiro-native/builder-helper-agent-panel-0.2.6-win32-x64.vsix`](../releases/windows/kiro-native/builder-helper-agent-panel-0.2.6-win32-x64.vsix) · 2,537,114 bytes · SHA-256 `b562dbba54f229db4c2bb71b5a19da9631cd7513bf483c283318c1dae74993c8` · [receipt](../releases/windows/kiro-native/windows-vsix-receipt.json) · [항목별 hash](../releases/windows/kiro-native/files.json). frontend가 backend `dca359b`와 패널 `edf1751`로 빌드하고 확인했다([0.2.6 Windows 확인](#026-windows-확인-2026-10-10)). **0.2.7은 frontend가 빌드한다([Windows 0.2.7 빌드 요청](#windows-027-빌드-요청-frontend)).**
+- 설치 파일: Windows [`releases/windows/kiro-native/builder-helper-agent-panel-0.2.7-win32-x64.vsix`](../releases/windows/kiro-native/builder-helper-agent-panel-0.2.7-win32-x64.vsix) · 2,560,952 bytes · SHA-256 `66bb080ee62e58bf1cdfc58d7a36a7088ed7831d4ed5b4943aef93a6c7393c04` · [receipt](../releases/windows/kiro-native/windows-vsix-receipt.json) · [항목별 hash](../releases/windows/kiro-native/files.json). frontend가 backend `4c6362c`와 frontend `88275f6`(두 저장소 `main`)으로 빌드하고 확인 1~10을 했다([0.2.7 Windows 확인](#027-windows-확인-2026-10-11)).
 - 빌드 출처(Mac 0.2.7): backend `5f1257c`, frontend `88275f6`(두 저장소 모두 `main`, 작업 트리 깨끗함). 0.2.6(backend `a18f718`), 0.2.5(backend `1f1eea4`), 0.2.4(backend `2b0487a`), 0.2.3(backend `7df50ec`), 0.2.2(backend `012c664`), 0.2.1(backend `4def349`)과 0.2.0(frontend `e65cd7f`)은 Git 이력에 있다.
 
 ## 프론트 담당자 빠른 시작
@@ -15,6 +15,8 @@
 - **패널 코드에 필요한 변경:** 필수는 없다. host API(`frontend-host.d.cts`)의 `openProjectInKiro` 결과에 선택 필드 `reloadRequired`가 생겼다(아래 [패널에서 다듬을 것](#패널에서-다듬을-것)). 0.2.2의 Evidence 표시 검토도 그대로다([0.2.2에서 바뀐 점](#022에서-바뀐-점-analystevidence-정책)).
 
 ## Windows 0.2.7 빌드 요청 (frontend)
+
+**완료(2026-10-11):** 결과는 [0.2.7 Windows 확인](#027-windows-확인-2026-10-11)에 있다. 아래는 원래 요청이다.
 
 backend `main`과 frontend `main`으로 Windows 0.2.7을 빌드해 확인하고 올려 주세요. 절차는 [Windows에서](#windows에서)의 1~4와 같다. 확인 1~7에 아래 세 가지를 더해 결과를 커밋 메시지와 이 문서의 Windows 확인 절에 남긴다.
 
@@ -110,7 +112,7 @@ Kiro를 껐다 켜거나 확장을 업데이트해도 0.2.4부터는 3번을 다
 
 **분담:** Mac 설치물은 backend가, Windows 설치물은 frontend가 빌드·확인·업로드한다([DECISIONS](DECISIONS.md) "본선: 플랫폼 분담"). 0.2.5부터 Kiro-native host·Core·hook·MCP bridge가 Windows x64를 지원한다. 본선 경로는 Kiro 내부 비공개 API 대신 공식 기능(Steering·hook·MCP·사용자 에이전트)과 kiro-cli를 쓰므로 frontend 코드는 그대로 빌드한다. 예선 Windows 설치물 0.0.18([WINDOWS_VSIX](WINDOWS_VSIX.md))은 Kiro 1.1.70 전용이라 본선 확인에 쓰지 않는다.
 
-**Windows에서 확인된 범위:** Windows 분기(kiro-cli 위치, Kiro 작업 폴더 해시의 소문자·슬래시 정규화, cmd.exe용 hook 명령 인용, 생성 폴더 터미널 PATH, 실제 Node로 Core 실행)는 Windows를 흉내 낸 테스트와 Kiro 1.2.56 코드로 확인했다. 2026-10-10 Windows 11 x64 실기기(Kiro 1.2.56)에서 아래 1~7을 모두 통과했다([0.2.6 Windows 확인](#026-windows-확인-2026-10-10)). 2차 실측에서 생성 폴더(새 창) 경로와 Builder 완료까지 확인했다. 채팅 Decision 기록은 Builder가 Decision을 열지 않거나 완료 뒤에 열려다 거절돼 아직 확인하지 못했다.
+**Windows에서 확인된 범위:** Windows 분기(kiro-cli 위치, Kiro 작업 폴더 해시의 소문자·슬래시 정규화, cmd.exe용 hook 명령 인용, 생성 폴더 터미널 PATH, 실제 Node로 Core 실행)는 Windows를 흉내 낸 테스트와 Kiro 1.2.56 코드로 확인했다. 2026-10-10 Windows 11 x64 실기기(Kiro 1.2.56)에서 아래 1~7을 모두 통과했다([0.2.6 Windows 확인](#026-windows-확인-2026-10-10)). 2차 실측에서 생성 폴더(새 창) 경로와 Builder 완료까지 확인했다. 0.2.7에서 늦은 신뢰 다시 로드, 채팅 Decision 기록, 완료 뒤 이어서 만들기까지 확인했다([0.2.7 Windows 확인](#027-windows-확인-2026-10-11)).
 
 ### 1. 준비 (Windows 11 x64)
 
@@ -173,12 +175,38 @@ host API 형식은 [`examples/kiro-panel/src/frontend-host.d.cts`](../examples/k
 - 연결은 Project당 하나다. 다시 연결하면 이전 연결 토큰은 폐기된다.
 - Builder 채팅 단계(같은 창 연결 뒤 hook 기록, Steering 0.5.0의 Decision 시점, `/vibe-helper`의 Builder 활동 사용, 허용 규칙으로 Vibe Helper 도구 승인 창 0회)는 0.2.1·Kiro 1.2.37로 본선 계정에서 확인했다([K09 재실측](spikes/KIRO_NATIVE_K09_REMEASURE_20261009.md)). 0.2.3의 Builder Steering 내용은 같고 버전 표기만 0.5.1이다. Kiro 1.2.56에서 Builder 턴은 다시 확인하지 않았다.
 - Core가 45초 넘게 뜨지 않으면 Builder·Helper MCP 시작이 실패하고 Kiro의 MCP 재연결이 필요하다. 끊긴 동안 친 학습자 발언은 큐로 보존되지만 Core가 받은 시각으로 기록되고, 끊긴 동안의 Helper 질문은 기록되지 않는다. 큐에는 redaction 전 원문이 Core가 읽을 때까지 사용자 전용 파일로 남는다(최대 1MB·200개).
-- 신뢰 안내·다시 로드 알림(늦은 신뢰 포함)은 host 테스트로 확인했고, 실제 화면에서는 아직 확인하지 못했다(Windows 0.2.7 확인 8). 도구 허용 동의와 새 창 확인(생성 폴더가 새 창으로 열림)은 기록으로 확인했다.
+- 신뢰 안내·다시 로드 알림(늦은 신뢰 포함)은 Windows 0.2.7 확인 8에서 실제 화면으로 확인했다. Windows에서는 새 폴더를 열면 신뢰 창이 Kiro 에이전트 초기화 뒤에 떠서, 열자마자 신뢰해도 Kiro는 신뢰 전 상태로 시작한다. 그래서 늦은 신뢰가 새 폴더의 기본 경로다. 도구 허용 동의와 새 창 확인(생성 폴더가 새 창으로 열림)은 기록으로 확인했다.
 - 셸 명령은 "개발 명령 미리 승인"을 고르면 자주 쓰는 개발 명령은 묻지 않고, 삭제·종료·배포·push 같은 명령은 계속 묻는다(K11).
 - Kiro 도구 호출 단계가 긴 한국어 입력을 문자열로 보낸 첫 호출을 거절할 때가 있다(`expected object, received string`). Builder가 바로 다시 보내 성공했다. 완료 뒤 이어서 만든 첫 Task에서는 Builder가 이전 Task의 기준 키로 `finish_task`를 한 번 보냈다가 거절되고, `check_progress` 뒤 다시 보내 완료했다.
 - Helper 답 수집은 Kiro 세션 기록 파일(비공개 형식)에 기대며, 못 읽으면 안내 문구로 기록한다.
-- 지원 플랫폼은 Apple Silicon Mac과 Windows x64다. 그 밖의 플랫폼에서는 host가 `KIRO_NATIVE_HOST_PLATFORM_UNSUPPORTED`로 시작하지 않는다. Windows는 0.2.6에서 실기기로 확인했다(채팅 Decision 기록 제외). 0.2.7은 frontend 확인 전이다.
+- 지원 플랫폼은 Apple Silicon Mac과 Windows x64다. 그 밖의 플랫폼에서는 host가 `KIRO_NATIVE_HOST_PLATFORM_UNSUPPORTED`로 시작하지 않는다. Windows는 0.2.7에서 실기기 확인 1~10을 했다.
 - Kiro는 최소 버전(VS Code 엔진 `^1.131.0`, 확인한 가장 오래된 Kiro 1.2.37)만 두고 최신판을 따라간다. 자동 업데이트되면 확인 루틴을 다시 돌린다. 데모 기기는 확인한 버전에서 자동 업데이트를 끈다. 1.2.4 → 1.2.37 → 1.2.56(2026-10-09)으로 바뀌었다. Builder 채팅 단계는 1.2.37에서, Helper 탭·hook 기록·도구 허용은 1.2.56에서 확인했다.
+
+## 0.2.7 Windows 확인 (2026-10-11)
+
+frontend가 Windows 11 x64(Kiro 1.2.56, kiro-cli 2.29.0, 본선 계정)에서 backend `main` `4c6362c`와 frontend `main` `88275f6`으로 빌드하고 0.2.6 위에 설치해 확인했다. 화면 조작은 사용자가 했고, 판정은 Kiro 로그, 세션 기록, Core SQLite로 했다.
+
+- **자동 검사(Windows):** `pnpm typecheck` 통과, unit 179 통과·1 skip, integration 524 통과·12 skip, 패널 CJS 188 통과·1 skip. frontend typecheck 통과, `npm test` 818 통과.
+- **`scripts/test-portable-core.mjs`:** 실패(`RUNTIME_PROBE_REJECTED`). Kiro 실행 파일로 Core를 띄우는 예선 단계에서 막혔다. Kiro 1.2.56 Electron은 Node 24.21.0이지만 모듈 ABI가 149라 Node 24(ABI 137)용 SQLite 모듈을 못 읽는다. 본선 host는 Core를 실제 Node로 실행하므로 이 단계를 본선 기준으로 바꿀지 backend가 정한다.
+- **확인 1~10 결과**
+
+| 단계 | 결과 |
+| --- | --- |
+| 1 | 통과. Core가 PATH의 Node 24.18.0으로 `managed-kiro --kiro-cli %LOCALAPPDATA%\Kiro-Cli\kiro-cli.exe`, 기존 History Project 8개 |
+| 2·3 | 통과. "이걸로 시작"이 같은 창에 연결(파일 10개), 다시 로드 뒤 `vibe-helper Connected (5 tools)`, hook 2개, Workspace Steering 2개. 이 창도 열 때는 신뢰 전 상태였다(위 알려진 제한) |
+| 4 | 통과. 도구 1회로 "간단한 메모장 만들기 PENDING", 승인 창 없음 |
+| 5 | 통과. `vibe-helper` 탭이 도구 1회로 확정 계획을 바탕으로 답함, 승인 창 없음 |
+| 6 | 통과. Kiro 완전 종료 뒤 새 Core, Open Project 없이 4 성공 |
+| 7 | 통과. 4·5·6 발언 `USER_MESSAGE`, `HELPER_RESPONSE`, `BUILDER_CHAT_TURN` 기록 |
+| 8 | 통과. 신뢰하지 않고 연 창(hook 꺼짐)을 나중에 신뢰하고 "이걸로 시작" → 다시 로드 알림이 뜸 → 다시 로드 뒤 hook 2개 등록 |
+| 9 | 통과(조건부). 첫 Builder 턴은 `ask_choice` 없이 Task를 완료했다(`openChoices` 빈 목록). 완료 뒤 "번호 선택지로 물어봐 줘"라고 하자 다음 Task에서 `ask_choice` → 학습자 "2번…" → `save_choice`. Decision 확정 `OPTION`, `chatSource.mappedBy: BUILDER`, Builder 탭 발언 1개 연결, 이후 적용까지 기록 |
+| 10 | 통과(조건부). 완료 뒤 요청으로 Task 2(sequence 2)가 생기고 연결이 옮겨 갔다. Builder는 구현 뒤 `finish_task` 없이 턴을 끝냈다. "완료로 기록해 줘" 요청 뒤 첫 `finish_task`는 `TASK_ACCEPTANCE_RESULTS_INCOMPLETE`로 거절됐고, `check_progress` 뒤 다시 보내 완료했다. 완료 보고서 2개, 분석 작업 3건 모두 `SUCCEEDED` |
+
+- **backend 검토 (Windows 전용 아님):**
+  - 첫 턴 Builder가 정할 거리를 열지 않는다(0.2.6 2차 실측과 같다).
+  - Builder가 구현 뒤 `finish_task`를 부르지 않고 턴을 끝낼 때가 있다.
+- **frontend 할 일:** `reloadRequired`일 때 패널의 `REGISTERED` 안내를 "창을 다시 로드한 뒤 새 세션(+)에서 시작하세요"로 바꾼다. Windows에서는 새 폴더마다 이 경우라서 필요하다.
+- **크레딧:** 이번 확인 약 15(계정 표시 15.1/50 이후 Builder 3턴 포함).
 
 ## 0.2.7 확인 (2026-10-11, Mac)
 
