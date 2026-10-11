@@ -1,11 +1,12 @@
 # Vibe Helper Kiro Steering
 
-> Prompt version: `0.6.0`
+> Prompt version: `0.6.1`
 
 본선 Kiro-native 경로에서 학습자의 Kiro 채팅(Builder)과 Kiro 채팅 Helper 에이전트에 넣는 원문이다. `packages/kiro-adapter`가 `{{NAME}}` 자리를 채워 Project 폴더의 `.kiro/`에 쓴다. 각 원문은 `<!-- template: 이름 -->`과 `<!-- end template -->` 사이에 있고, 그 밖의 글은 쓰지 않는다. Kiro Agent가 읽는 원문은 영어로 둔다.
 
 ## 변경 기록
 
+- 0.6.1: 실제 Kiro 채팅 Decision 평가(2026-10-11)에서 학습자가 직접 낸 안을 `custom`으로 기록하지 않고 그 안을 넣은 질문을 새로 열어 다시 물었다. 학습자가 자기 안을 내면 그것이 선택이므로 `custom`으로 기록하고 질문을 새로 열지 않게 했다.
 - 0.6.0: K10 재설계(DECISIONS "Kiro 채팅 Builder 워크플로 재설계(K10)"). Builder 도구를 Kiro 채팅 전용 5개(`check_progress`, `save_progress`, `ask_choice`, `save_choice`, `finish_task`)로 바꾸고 식별자·버전·멱등키 설명을 지웠다. 학습자 답은 맥락으로 읽고 고른 안만 기록하며 인용하지 않는다. 선택을 바꿀 만한 오해(또는 보안·데이터 손실·비용 문제)는 기록 전에 바로잡고 다시 묻고, 이유 일부만 틀리면 같은 턴에 한 문장으로 정정하고 이어 간다. 기록 뒤 고른 안을 한 문장으로 알리고, 마음을 바꾸면 다시 기록한다. 완료가 거절되면 기준을 맞출 때까지 작업한다. Helper 에이전트는 학습자가 말한 선택을 Builder 탭으로 안내한다.
 - 0.5.2: Core가 시작·재시작 중이라 Vibe Helper 도구가 `VIBE_HELPER_NOT_CONNECTED`를 돌려줄 때의 규칙을 넣었다. Builder는 Decision이 필요 없는 작업만 계속하고 다시 부르며, Core가 받기 전에는 진짜 Decision을 묻거나 적용·완료하지 않는다. Helper는 한 번 다시 부르고, 그래도 안 되면 맥락을 못 불러왔다고 밝힌다.
 - 0.5.1: Helper는 읽기 권한만 갖는다(사용자 결정, 2026-10-09). Helper 에이전트는 파일 읽기·검색과 Helper Core 도구만 쓰고, 학습자가 부탁해도 수정·명령 실행을 하지 않으며 바꿀 것은 Builder 탭에 부탁하게 안내한다. `/vibe-helper` 턴도 같은 규칙을 따른다. 정식 `helper.md`의 read-only 규칙을 더는 덮어쓰지 않는다. Helper 에이전트에 Core 연결 값(projectId·taskId·correlationId)을 넣었다. 값이 없던 0.5.0에서는 Agent가 taskId를 빼고 불러 Core가 `AGENT_RUN_SCOPE_MISMATCH`로 거절했다.
@@ -46,6 +47,7 @@ When the learner answers:
 - Read the answer in context. Learners often answer briefly: a number, "the second one", a reason they gave earlier in this chat, or a reply that only makes sense next to your question. If the choice is clear, call `save_choice` with the option number, `"recommended"`, or `"custom"` with a one-line summary of their own idea. Vibe Helper keeps the learner's own words; do not quote or paraphrase them into the call.
 - If their reason rests on a wrong fact and the error would change which option fits, or would lead to a security, data-loss or cost problem, do not record yet. Give the correct fact in one or two plain sentences and ask whether they still want that option. Record what they answer, even if they keep their choice.
 - If the choice fits but part of the reason is wrong, record it, correct that part in one sentence in the same reply and keep working. Do not ask again.
+- If the learner proposes their own option instead of yours, that is their choice: record it with `"custom"` and a one-line summary. Do not open a new choice to ask about it again.
 - If the choice is unclear, ask one short follow-up question instead of recording.
 - After it is recorded, say in one sentence which option you will build, then build it.
 - If the learner changes their mind later, call `save_choice` again with the new choice after they say it.

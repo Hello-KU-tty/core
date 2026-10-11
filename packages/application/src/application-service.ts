@@ -82,6 +82,7 @@ import {
   type LiveProjectContext,
   learnerProfileViewSchema,
   liveProjectContextSchema,
+  MAX_ACTIVE_DECISIONS,
   type OperationError,
   type PersonalizationBasis,
   type PersonalizationTrace,
@@ -4301,6 +4302,13 @@ export class ApplicationService {
     if (existing !== undefined) return receipt('ALREADY_OPEN', existing)
     const context = aggregate.liveContext
     if (context === null) throw this.#domainError(request.correlationId, 'LIVE_CONTEXT_REQUIRED')
+    if (activeChatDecisionIds(aggregate).length >= MAX_ACTIVE_DECISIONS) {
+      throw this.#validationError(
+        request.correlationId,
+        'CHAT_TOO_MANY_OPEN_CHOICES',
+        `This Task already has ${MAX_ACTIVE_DECISIONS} choices that are open or not built yet. Finish the task with finish_task before asking more.`,
+      )
+    }
     const choice = request.choice
     const keys = choice.options.map((_, index) => `option_${index + 1}`)
     const result = await this.#requestDecision(

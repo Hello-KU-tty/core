@@ -232,7 +232,7 @@ describe('Kiro-native workspace adapter', () => {
   })
 
   it('steers decisions to the moment they arise, recorded before they are asked (since 0.5.0)', () => {
-    expect(templates.version).toBe('0.6.0')
+    expect(templates.version).toBe('0.6.1')
     const scoped = renderLearnerSteering(templates, binding, {
       learnerFocus: [],
       expectedDecisions: [{ description: '메모를 누가 볼 수 있게 할지 정한다.' }],
@@ -264,6 +264,8 @@ describe('Kiro-native workspace adapter', () => {
       'correct that part in one sentence in the same reply and keep working',
     )
     expect(learner).toContain('call `save_choice` again with the new choice')
+    // 0.6.1: the learner's own option is their choice, recorded as custom without a new question.
+    expect(learner).toContain('Do not open a new choice to ask about it again')
   })
 
   it('fails closed on a missing, duplicated or unfilled steering template', () => {

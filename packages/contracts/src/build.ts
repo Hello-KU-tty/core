@@ -34,6 +34,12 @@ import {
   testResultReferenceSchema,
 } from './references.js'
 
+/**
+ * Decisions not applied yet in one Task. Kiro chat applies chosen options at finish (K10), so
+ * chosen ones stay active until then; the cap bounds the Live Context payload.
+ */
+export const MAX_ACTIVE_DECISIONS = 30
+
 export const builderTaskStatusSchema = z.enum([
   'PENDING',
   'ACTIVE',
@@ -102,7 +108,7 @@ export const liveProjectContextSchema = z
     stage: labelSchema,
     currentGoal: nonEmptyTextSchema,
     recentChanges: z.array(shortTextSchema).max(30),
-    activeDecisionIds: z.array(decisionIdSchema).max(10),
+    activeDecisionIds: z.array(decisionIdSchema).max(MAX_ACTIVE_DECISIONS),
     activeConceptNames: z.array(labelSchema).max(20),
     relatedFiles: z.array(codeReferenceSchema).max(30),
     nextActions: z.array(shortTextSchema).max(20),
@@ -198,7 +204,7 @@ export const builderUpdateLiveContextToolInputSchema = z.strictObject({
   stage: labelSchema,
   currentGoal: nonEmptyTextSchema,
   recentChanges: z.array(shortTextSchema).max(30),
-  activeDecisionIds: z.array(decisionIdSchema).max(10),
+  activeDecisionIds: z.array(decisionIdSchema).max(MAX_ACTIVE_DECISIONS),
   activeConceptNames: z.array(labelSchema).max(20),
   relatedFiles: z.array(codeReferenceSchema).max(30),
   nextActions: z.array(shortTextSchema).max(20),

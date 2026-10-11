@@ -24,7 +24,8 @@ const fixture = JSON.parse(
   await readFile(join(repository, 'tests/eval/fixtures/kiro-chat-decision/cases.json'), 'utf8'),
 )
 const binding = JSON.parse(await readFile(bindingPath, 'utf8'))
-const coreRoot = dirname(resolve(bindingPath))
+// A Kiro-native descriptor lives in <core>/kiro-bindings/<projectId>/; VIBE_EVAL_CORE_ROOT names <core>.
+const coreRoot = resolve(process.env.VIBE_EVAL_CORE_ROOT ?? dirname(resolve(bindingPath)))
 const connection = JSON.parse(await readFile(join(coreRoot, 'connection.json'), 'utf8'))
 const scope = {
   projectId: binding.projectId,
@@ -67,7 +68,9 @@ const inbox = join(probeLogs, 'inbox.jsonl')
 const outbox = join(probeLogs, 'outbox.jsonl')
 async function probe(cmd, args = [], waitForResult = true) {
   const id = `eval-${randomUUID()}`
-  await appendFile(inbox, `${JSON.stringify({ id, cmd, args })}\n`)
+  // The probe runs a job only in the window whose folder basename matches `folder`.
+  const folder = process.env.VIBE_EVAL_FOLDER
+  await appendFile(inbox, `${JSON.stringify({ id, cmd, args, ...(folder ? { folder } : {}) })}\n`)
   // sendPrompt resolves only when the turn ends; the session record is polled instead.
   if (!waitForResult) return null
   for (let attempt = 0; attempt < 60; attempt++) {

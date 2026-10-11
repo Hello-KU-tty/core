@@ -461,6 +461,25 @@ describe('Kiro chat Builder surface (K10)', () => {
     })
   })
 
+  it('keeps asking after more than ten chosen choices wait to be built, up to a clear cap', async () => {
+    // Chosen options are applied at finish (K10), so they stay active until then. A real Kiro
+    // eval hit the old ten-item Live Context cap as an opaque storage failure.
+    const harness = await createHarness()
+    for (let index = 0; index < 30; index += 1) {
+      const asked = await harness.ask({ question: `Choice ${index + 1}?` })
+      expect(asked, `ask ${index + 1}`).toMatchObject({ success: true, data: { outcome: 'ASKED' } })
+      await harness.say('1번')
+      expect(await harness.save({ choice: 1 }), `save ${index + 1}`).toMatchObject({
+        success: true,
+      })
+    }
+    expect(harness.aggregate().liveContext?.activeDecisionIds).toHaveLength(30)
+    expect(await harness.ask({ question: 'One too many?' })).toMatchObject({
+      success: false,
+      error: { code: 'CHAT_TOO_MANY_OPEN_CHOICES' },
+    })
+  })
+
   it('accepts a criterion the learner changed through a resolved Decision', async () => {
     const harness = await createHarness()
     const decisionId = await askedId(harness)
