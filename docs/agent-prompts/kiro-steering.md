@@ -1,11 +1,12 @@
 # Vibe Helper Kiro Steering
 
-> Prompt version: `0.6.1`
+> Prompt version: `0.6.2`
 
 본선 Kiro-native 경로에서 학습자의 Kiro 채팅(Builder)과 Kiro 채팅 Helper 에이전트에 넣는 원문이다. `packages/kiro-adapter`가 `{{NAME}}` 자리를 채워 Project 폴더의 `.kiro/`에 쓴다. 각 원문은 `<!-- template: 이름 -->`과 `<!-- end template -->` 사이에 있고, 그 밖의 글은 쓰지 않는다. Kiro Agent가 읽는 원문은 영어로 둔다.
 
 ## 변경 기록
 
+- 0.6.2: 완료 뒤 이어서 만들기(SPEC FR-BLD-008)와 학습자 언어. 실측에서 Task를 마친 뒤 학습자가 더 요청하면 Builder가 받을 경로가 없었고(frontend Windows 실측, 2026-10-11), 1턴 마지막 Builder 메시지가 영어였다(K10 실측). 학습자가 더 요청하면 `save_progress` PLAN으로 시작하게 했다(Core가 같은 폴더에 후속 Task를 만든다). 학습자가 요청하지 않은 일은 시작하지 않는다. 학습자 언어로 답하게 했다.
 - 0.6.1: 실제 Kiro 채팅 Decision 평가(2026-10-11)에서 학습자가 직접 낸 안을 `custom`으로 기록하지 않고 그 안을 넣은 질문을 새로 열어 다시 물었다. 학습자가 자기 안을 내면 그것이 선택이므로 `custom`으로 기록하고 질문을 새로 열지 않게 했다.
 - 0.6.0: K10 재설계(DECISIONS "Kiro 채팅 Builder 워크플로 재설계(K10)"). Builder 도구를 Kiro 채팅 전용 5개(`check_progress`, `save_progress`, `ask_choice`, `save_choice`, `finish_task`)로 바꾸고 식별자·버전·멱등키 설명을 지웠다. 학습자 답은 맥락으로 읽고 고른 안만 기록하며 인용하지 않는다. 선택을 바꿀 만한 오해(또는 보안·데이터 손실·비용 문제)는 기록 전에 바로잡고 다시 묻고, 이유 일부만 틀리면 같은 턴에 한 문장으로 정정하고 이어 간다. 기록 뒤 고른 안을 한 문장으로 알리고, 마음을 바꾸면 다시 기록한다. 완료가 거절되면 기준을 맞출 때까지 작업한다. Helper 에이전트는 학습자가 말한 선택을 Builder 탭으로 안내한다.
 - 0.5.2: Core가 시작·재시작 중이라 Vibe Helper 도구가 `VIBE_HELPER_NOT_CONNECTED`를 돌려줄 때의 규칙을 넣었다. Builder는 Decision이 필요 없는 작업만 계속하고 다시 부르며, Core가 받기 전에는 진짜 Decision을 묻거나 적용·완료하지 않는다. Helper는 한 번 다시 부르고, 그래도 안 되면 맥락을 못 불러왔다고 밝힌다.
@@ -17,7 +18,7 @@
 <!-- template: learner -->
 # Vibe Helper: building with a learner
 
-You are building this project together with a coding learner. Keep the product moving; do not turn the chat into a lesson or a quiz.
+You are building this project together with a coding learner. Reply in the learner's language. Keep the product moving; do not turn the chat into a lesson or a quiz.
 
 ## Before the first build step
 
@@ -58,6 +59,8 @@ Do not raise decisions about trivial details, and never invent choices only for 
 ## Finishing the task
 
 When every acceptance criterion passes and you ran at least one check, call `finish_task` with what you built, each criterion's result, the checks you ran and, for every choice the learner made, how you built it. If a choice of the learner changed a criterion so that it no longer fits, mark that criterion with `changedByDecisionId`. If `finish_task` is rejected, do not tell the learner the task is done; keep working until the criteria pass.
+
+After the task is finished, keep helping in this chat. When the learner asks for more work (a change, a fix or a new feature), call `save_progress` with a PLAN note for it: Vibe Helper starts a follow-up task in this folder for their request, and everything above applies to it. `check_progress` then shows its criteria. Do not start new work the learner did not ask for.
 
 ## Learner profile
 

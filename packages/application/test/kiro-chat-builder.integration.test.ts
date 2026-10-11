@@ -496,4 +496,98 @@ describe('Kiro chat Builder surface (K10)', () => {
       expect.objectContaining({ status: 'CHANGED_BY_DECISION', decisionId }),
     ])
   })
+
+  it('continues a finished Task as a follow-up only after the learner asks for more', async () => {
+    const harness = await createHarness()
+    await harness.say('메모 목록부터 만들어 줘')
+    expect(await harness.finish(completeReport)).toMatchObject({
+      success: true,
+      data: { outcome: 'COMPLETED' },
+    })
+    // Nothing the learner said in the Builder tab since: no new work starts, and neither the
+    // Builder's own turn nor a Helper-tab question counts as asking.
+    await harness.builderTurn('완료했어요. 더 필요한 게 있으면 말해 주세요.')
+    await harness.askHelper('이 코드 구조를 설명해 줘', 'The Helper explained the structure.')
+    expect(await harness.note({ kind: 'PLAN', summary: 'Add sharing.' })).toMatchObject({
+      success: false,
+      error: { code: 'CHAT_TASK_FINISHED' },
+    })
+    expect(await harness.check()).toMatchObject({
+      success: true,
+      data: { task: { status: 'COMPLETED' } },
+    })
+
+    await harness.say('이제 메모를 가족과 공유하는 기능도 넣어 줘')
+    expect(await harness.note({ kind: 'PLAN', summary: 'Add a share link.' })).toMatchObject({
+      success: true,
+      data: { outcome: 'SAVED', contextVersion: 1 },
+    })
+    const followUp = harness.storage.repository.readLatestTaskForProject(ids.project)
+    expect(followUp).toMatchObject({
+      status: 'ACTIVE',
+      productGoal: '이제 메모를 가족과 공유하는 기능도 넣어 줘',
+      prerequisiteTaskIds: [ids.task],
+      sequence: harness.aggregate().task.sequence + 1,
+    })
+    if (followUp === null) throw new Error('missing follow-up')
+    // The finished Task and its report stay as they were.
+    expect(harness.aggregate().task.status).toBe('COMPLETED')
+    expect(harness.aggregate().completionReport).not.toBeNull()
+
+    // Calls still carrying the first Task reach the follow-up; none starts another one.
+    expect(await harness.check()).toMatchObject({
+      success: true,
+      data: {
+        task: { status: 'ACTIVE' },
+        acceptanceCriteria: [{ key: 'user_request' }, { key: 'verified_outcome' }],
+        lastNote: 'Add a share link.',
+      },
+    })
+    expect(await harness.note({ kind: 'TEST_START', summary: 'Testing the link.' })).toMatchObject({
+      success: true,
+      data: { outcome: 'SAVED' },
+    })
+    const asked = await harness.ask({ question: 'Who can open a share link?' })
+    expect(asked).toMatchObject({ success: true, data: { outcome: 'ASKED' } })
+    const decisionId = (asked.data as { decisionId: string }).decisionId
+    const followUpAggregate = () => {
+      const aggregate = harness.storage.repository.readBuilderTaskAggregate(
+        ids.project,
+        followUp.id,
+      )
+      if (aggregate === null) throw new Error('missing follow-up')
+      return aggregate
+    }
+    expect(followUpAggregate().decisionRequests.map((item) => item.id)).toEqual([decisionId])
+    expect(harness.aggregate().decisionRequests).toHaveLength(0)
+    expect(
+      await harness.service.executeUi({
+        schemaVersion: 1,
+        correlationId: ids.correlation,
+        actor: { kind: 'UI' },
+        kind: 'UI_RECORD_CHAT_MESSAGE',
+        idempotencyKey: 'idem_00000000-0000-4000-8000-000000700001',
+        projectId: ids.project,
+        taskId: followUp.id,
+        conversationId: builderConversation,
+        message: '1번',
+      }),
+    ).toMatchObject({ success: true })
+    expect(await harness.save({ choice: 1 })).toMatchObject({
+      success: true,
+      data: { outcome: 'SAVED' },
+    })
+    expect(
+      await harness.finish({
+        ...completeReport,
+        acceptance: [
+          { key: 'user_request', passed: true },
+          { key: 'verified_outcome', passed: true },
+        ],
+        decisionsApplied: [{ decisionId, how: 'Only family members with the link can open it.' }],
+      }),
+    ).toMatchObject({ success: true, data: { outcome: 'COMPLETED' } })
+    expect(followUpAggregate().task.status).toBe('COMPLETED')
+    expect(harness.storage.repository.readLatestTaskForProject(ids.project)?.id).toBe(followUp.id)
+  })
 })

@@ -64,16 +64,19 @@ export interface FrontendHost {
    * Kiro-native: connects the Project to Kiro chat (Steering, hooks, MCP, Helper agent, Spec).
    * An empty open folder becomes the Project folder in this window (`REGISTERED`). A folder with
    * other files asks the learner, then opens a Core-generated folder in a new window
-   * (`GENERATED`); declining returns `CANCELLED`. The first call asks once whether Kiro may run
-   * Vibe Helper's Core tools without prompting. Rejects with a code such as
-   * `KIRO_BIND_TASK_NOT_READY`. Also available as the `vibeHelper.openInKiro` command.
+   * (`GENERATED`); declining returns `CANCELLED`. The first call asks once how Kiro should
+   * approve commands in Project folders (`permissions` reports the Kiro rule file). Rejects with a
+   * code such as `KIRO_BIND_TASK_NOT_READY`. Also available as the `vibeHelper.openInKiro` command.
+   * `reloadRequired`: this window must trust the folder and reload before Kiro chat reaches Vibe
+   * Helper (it opened untrusted); the host already shows the trust or reload prompt.
    */
   openProjectInKiro(projectId: string): Promise<{
     projectId: string
     taskId: string | null
     openedNewWindow: boolean
     folder: 'REGISTERED' | 'GENERATED' | 'CANCELLED'
-    coreTools?: 'WRITTEN' | 'ALREADY_ALLOWED' | 'UNRECOGNIZED' | 'NOT_REQUESTED'
+    permissions?: 'WRITTEN' | 'UNCHANGED' | 'UNRECOGNIZED' | 'NOT_REQUESTED'
+    reloadRequired?: boolean
   }>
   dispose(): Promise<void>
 }

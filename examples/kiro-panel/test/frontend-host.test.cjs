@@ -224,6 +224,44 @@ test('connecting an untrusted open folder asks for trust instead of saying chat 
   await host.dispose()
 })
 
+test('a window opened untrusted offers a reload after binding, since Kiro turned its hooks off at open', async () => {
+  const folder = '/Users/synthetic/memo'
+  const h = harness({ trusted: false, openFolders: [folder], consent: 'PREAPPROVED', answers: { '다시 로드': true },
+    binds: [ok({ workspace: folder, registered: true })] }), host = await h.create()
+  // Trusting an unbound folder asks nothing yet.
+  h.grantTrust()
+  await settle(); await settle()
+  assert.equal(h.dialogs.length, 0)
+  const opened = await host.openProjectInKiro(projectId)
+  await settle()
+  assert.equal(opened.reloadRequired, true)
+  const asked = h.dialogs.find(item => item.items.includes('다시 로드'))
+  assert.match(asked.text, /신뢰하기 전에 열려서 Kiro가 아직 Vibe Helper hook과 도구를 읽지 않았어요/)
+  assert.ok(h.executed.some(item => item.name === 'workbench.action.reloadWindow'))
+  await host.dispose()
+
+  // The command path shows the reload prompt instead of saying chat is ready.
+  const viaCommand = harness({ trusted: false, openFolders: [folder], consent: 'PREAPPROVED',
+    binds: [ok({ workspace: folder, registered: true })] })
+  const other = await viaCommand.create()
+  viaCommand.grantTrust()
+  await viaCommand.commands.get('vibeHelper.openInKiro')()
+  await settle()
+  assert.equal(viaCommand.messages.some(([, text]) => /새 세션\(\+\)/.test(text)), false)
+  assert.ok(viaCommand.dialogs.some(item => item.items.includes('다시 로드')))
+  assert.equal(viaCommand.executed.some(item => item.name === 'workbench.action.reloadWindow'), false)
+  await other.dispose()
+
+  // A window that opened trusted needs no reload: Kiro picks the new hooks and MCP up.
+  const trusted = harness({ openFolders: [folder], consent: 'PREAPPROVED', binds: [ok({ workspace: folder, registered: true })] })
+  const third = await trusted.create()
+  await third.prepare()
+  assert.equal((await third.openProjectInKiro(projectId)).reloadRequired, false)
+  await settle()
+  assert.equal(trusted.dialogs.some(item => item.items.includes('다시 로드')), false)
+  await third.dispose()
+})
+
 test('a dismissed approval question decides nothing and leaves Kiro rules alone', async () => {
   const h = harness({ consent: undefined }), host = await h.create()
   h.globalState.set('vibeHelper.coreToolsConsent', 'ALLOW')

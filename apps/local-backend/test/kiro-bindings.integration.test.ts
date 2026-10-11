@@ -2,6 +2,7 @@ import { lstat, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } fro
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
 import { ApplicationService, WorkspacePathPolicy } from '@vibe-helper/application'
 import {
   builderTaskSchema,
@@ -88,6 +89,8 @@ async function setup() {
   const { handlers, manager } = startCore('http://127.0.0.1:47831')
   const generated = join(workspaceRoot, 'projects', ids.project)
   return {
+    application,
+    storage,
     base,
     root,
     home,
@@ -145,7 +148,7 @@ describe('Kiro binding manager', () => {
     expect(steering).not.toContain(ids.task)
     expect(steering).toContain('`save_choice`')
     expect(steering).toContain('What the learner owns')
-    expect(steering).toContain('steering 0.6.1.')
+    expect(steering).toContain('steering 0.6.2.')
     const agent = await readFile(join(first.workspace, '.kiro/agents/vibe-helper.json'), 'utf8')
     expect(JSON.parse(agent).mcpServers['vibe-helper-helper'].args[1]).toBe(
       join(directory, 'helper-mcp.json'),
@@ -316,6 +319,77 @@ describe('Kiro binding manager', () => {
     manager.close()
     // Core stopping leaves the descriptors for the next Core to rewrite; hooks queue meanwhile.
     expect((await descriptors(root)).builder).toEqual(after.builder)
+  })
+
+  it('moves the connection to the follow-up Task the learner asked for after completion', async () => {
+    const { application, storage, root, handlers, manager } = await setup()
+    await manager.bind(ids.project)
+    const before = await descriptors(root)
+    const builder = {
+      schemaVersion: 1,
+      correlationId: ids.correlation,
+      actor: { kind: 'AGENT', role: 'BUILDER' },
+      projectId: ids.project,
+      taskId: ids.task,
+    } as const
+    const key = (n: number) =>
+      `idem_00000000-0000-4000-8000-${String(800_000 + n).padStart(12, '0')}`
+    expect(
+      await application.executeAgent('BUILDER', {
+        ...builder,
+        kind: 'BUILDER_CHAT_FINISH_TASK',
+        idempotencyKey: key(1),
+        report: {
+          implemented: ['Event cards with variant fields.'],
+          acceptance: [{ key: 'valid_event', passed: true }],
+          checks: [{ name: 'unit tests', passed: true, summary: '3 passed.' }],
+        },
+      }),
+    ).toMatchObject({ success: true, data: { outcome: 'COMPLETED' } })
+    // The hook records the learner's next request against the Task the folder is bound to.
+    expect(
+      await application.executeUi({
+        schemaVersion: 1,
+        correlationId: ids.correlation,
+        actor: { kind: 'UI' },
+        kind: 'UI_RECORD_CHAT_MESSAGE',
+        idempotencyKey: key(2),
+        projectId: ids.project,
+        taskId: ids.task,
+        conversationId: 'conversation_00000000-0000-4000-8000-000000000901',
+        message: '이제 날짜로 거르는 기능도 넣어 줘',
+      }),
+    ).toMatchObject({ success: true })
+    const client = new Client({ name: 'kiro-follow-up-test', version: '0.1.0' })
+    const transport = new StreamableHTTPClientTransport(new URL(before.builder.url), {
+      requestInit: { headers: { Authorization: before.builder.authorization } },
+      fetch: (url, init) => {
+        const handler = handlers.get(new URL(url).pathname)
+        return handler === undefined
+          ? Promise.resolve(new Response(null, { status: 404 }))
+          : handler.fetch(new Request(url, init))
+      },
+    })
+    await client.connect(transport)
+    const saved = await client.callTool({
+      name: 'save_progress',
+      arguments: { kind: 'PLAN', summary: 'Add a date filter to the event list.' },
+    })
+    expect(saved.isError).not.toBe(true)
+    await client.close()
+    await manager.settled()
+
+    const followUp = storage.repository.readLatestTaskForProject(ids.project)
+    expect(followUp).toMatchObject({ prerequisiteTaskIds: [ids.task], status: 'ACTIVE' })
+    const after = await descriptors(root)
+    for (const descriptor of [after.builder, after.helper, after.hook])
+      expect(descriptor.taskId).toBe(followUp?.id)
+    expect(after.builder.url).not.toBe(before.builder.url)
+    expect(handlers.has(new URL(before.builder.url).pathname)).toBe(false)
+    expect(handlers.size).toBe(3)
+    // A later call through the new connection does not move it again.
+    await manager.settled()
+    expect((await descriptors(root)).builder.url).toBe(after.builder.url)
   })
 
   it('a new Core restores the Project connection, and leaves a removed folder alone', async () => {

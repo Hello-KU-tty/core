@@ -57,6 +57,7 @@ async function writePrivateJson(path: string, value: unknown): Promise<void> {
  */
 export class KiroBindingManager {
   readonly #active = new Map<string, ActiveBinding>()
+  readonly #following = new Map<string, Promise<void>>()
 
   constructor(
     private readonly options: {
@@ -170,8 +171,17 @@ export class KiroBindingManager {
         ? {}
         : { homeDirectory: this.options.homeDirectory }),
     })
-    for (const binding of [builder, helper, hook])
-      this.options.handlers.set(binding.path, binding.handler)
+    for (const binding of [helper, hook]) this.options.handlers.set(binding.path, binding.handler)
+    // A Builder chat call may have started a follow-up Task (FR-BLD-008); the connection then
+    // moves to it, so hooks record the learner's messages there and Steering and Spec show it.
+    this.options.handlers.set(builder.path, {
+      fetch: async (request) => {
+        const response = await builder.handler.fetch(request)
+        if (response.status !== 401) this.#followLatestTask(projectId, task.id)
+        return response
+      },
+      close: () => builder.handler.close(),
+    })
     const bindingDescriptor = join(directory, 'builder-mcp.json')
     const helperDescriptor = join(directory, 'helper-mcp.json')
     const hookDescriptor = join(directory, 'hook.json')
@@ -236,6 +246,41 @@ export class KiroBindingManager {
       spec: installed.spec,
       permissions,
     }
+  }
+
+  /**
+   * Binds again when the Project's current Task continues the bound one. Checks run one after
+   * another per Project, so a follow-up started while a check is running is still followed.
+   */
+  #followLatestTask(projectId: string, boundTaskId: string): void {
+    const check = async () => {
+      if (this.#active.get(projectId)?.taskId !== boundTaskId) return
+      const restored = await this.options.application.executeUi({
+        schemaVersion: 1,
+        kind: 'UI_RESTORE_PROJECT_SESSION',
+        correlationId: `corr_${randomUUID()}`,
+        actor: { kind: 'UI' },
+        projectId,
+        helperConversationLimit: 1,
+      })
+      if (!restored.success) return
+      const current = projectSessionSnapshotSchema.parse(restored.data).currentTask
+      if (current === null || current.id === boundTaskId) return
+      if (!current.prerequisiteTaskIds.includes(boundTaskId)) return
+      if (this.#active.get(projectId)?.taskId === boundTaskId) await this.bind(projectId)
+    }
+    const next = (this.#following.get(projectId) ?? Promise.resolve())
+      .then(check)
+      .catch(() => undefined)
+    this.#following.set(projectId, next)
+    void next.finally(() => {
+      if (this.#following.get(projectId) === next) this.#following.delete(projectId)
+    })
+  }
+
+  /** Settles once every pending follow of a new Task has finished (tests and shutdown). */
+  async settled(): Promise<void> {
+    await Promise.all([...this.#following.values()])
   }
 
   /**

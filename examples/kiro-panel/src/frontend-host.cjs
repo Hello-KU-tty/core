@@ -48,6 +48,7 @@ const PROJECT_FOLDER_ELSEWHERE = new Set(['PROJECT_REGISTERED_ELSEWHERE', 'PROJE
 // Replaces 0.2.x `vibeHelper.coreToolsConsent` (Core tools only); the wider choice is asked anew.
 const COMMAND_APPROVAL_KEY = 'vibeHelper.commandApproval'
 const BOUND_MARKER = '.kiro/hooks/vibe-helper.json'
+const RELOAD_AFTER_LATE_TRUST = '이 폴더를 Vibe Helper Project로 연결했어요. 이 창은 폴더를 신뢰하기 전에 열려서 Kiro가 아직 Vibe Helper hook과 도구를 읽지 않았어요. 창을 다시 로드할까요? 그 뒤 새 채팅 세션에서 시작하세요.'
 const inside = (parent, child) => {
   const part = relative(parent, child)
   return part !== '' && part !== '..' && !part.startsWith(`..${sep}`) && !isAbsolute(part)
@@ -88,6 +89,9 @@ async function createFrontendHost(context) {
   // Kiro-native mode has no IDE-internal worker; the handle reports no status and no questions.
   const worker = createNativeWorkerHandle()
   let preparation, disposal, terminalPrepared = false, stopped = false
+  // Kiro reads hooks and workspace MCP when a window opens. In a window opened untrusted they stay
+  // off after trust is granted, until the window reloads.
+  const openedUntrusted = !vscode.workspace.isTrusted
   let status = Object.freeze({ phase: 'IDLE', native: 'NOT_READY' })
   const listeners = new Set()
   const emit = value => {
@@ -219,8 +223,11 @@ async function createFrontendHost(context) {
     // A new window asks on start; this one asks now, before the learner opens a chat session.
     else if (!vscode.workspace.isTrusted)
       void askForTrust('이 폴더를 Vibe Helper Project로 연결했어요. ').catch(() => {})
+    else if (openedUntrusted) void offerReload(RELOAD_AFTER_LATE_TRUST).catch(() => {})
+    const reloadRequired = alreadyOpen && (openedUntrusted || !vscode.workspace.isTrusted)
     return { projectId: data.projectId, taskId: data.taskId, openedNewWindow: !alreadyOpen,
-      folder: data.registered === true ? 'REGISTERED' : 'GENERATED', permissions: data.permissions }
+      folder: data.registered === true ? 'REGISTERED' : 'GENERATED', permissions: data.permissions,
+      reloadRequired }
   }
   const openCommand = vscode.commands.registerCommand('vibeHelper.openInKiro', async () => {
     try {
@@ -234,7 +241,7 @@ async function createFrontendHost(context) {
       })), { placeHolder: 'Kiro 채팅으로 이어서 만들 Project를 고르세요' })
       if (!picked) return
       const opened = await openProjectInKiro(picked.projectId)
-      if (opened.folder !== 'CANCELLED' && !opened.openedNewWindow && vscode.workspace.isTrusted)
+      if (opened.folder !== 'CANCELLED' && !opened.openedNewWindow && !opened.reloadRequired)
         void vscode.window.showInformationMessage('이 폴더를 Vibe Helper Project로 연결했어요. Kiro 채팅에서 새 세션(+)을 열어 시작하세요. Helper는 새 탭에서 vibe-helper 에이전트를 고르면 돼요.')
     } catch (error) {
       const code = safeCode(error)
@@ -267,6 +274,11 @@ async function createFrontendHost(context) {
     if (folders.length !== 1) return false
     return access(join(folders[0].uri.fsPath, BOUND_MARKER)).then(() => true, () => false)
   }
+  async function offerReload(text) {
+    const reload = '다시 로드'
+    const choice = await vscode.window.showInformationMessage(text, reload)
+    if (choice === reload) await vscode.commands.executeCommand('workbench.action.reloadWindow')
+  }
   async function askForTrust(lead = '') {
     const manage = '신뢰 설정 열기'
     const choice = await vscode.window.showWarningMessage(
@@ -281,10 +293,7 @@ async function createFrontendHost(context) {
     void prepare().catch(() => {})
     void boundFolder().then(async bound => {
       if (!bound || stopped) return
-      const reload = '다시 로드'
-      const choice = await vscode.window.showInformationMessage(
-        '신뢰가 Kiro 채팅에 적용되도록 창을 다시 로드할까요? 그 뒤 새 채팅 세션에서 시작하세요.', reload)
-      if (choice === reload) await vscode.commands.executeCommand('workbench.action.reloadWindow')
+      await offerReload('신뢰가 Kiro 채팅에 적용되도록 창을 다시 로드할까요? 그 뒤 새 채팅 세션에서 시작하세요.')
     }).catch(() => {})
   })
   async function dispose() {

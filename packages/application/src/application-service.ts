@@ -461,15 +461,15 @@ export class ApplicationService {
       case 'BUILDER_COMPLETE_TASK':
         return this.#completeTask(request)
       case 'BUILDER_CHAT_CHECK_PROGRESS':
-        return this.#chatCheckProgress(request)
+        return this.#chatCheckProgress(this.#chatRoute(request))
       case 'BUILDER_CHAT_SAVE_PROGRESS':
-        return this.#chatSaveProgress(request)
+        return this.#chatSaveProgress(this.#chatRoute(request, true))
       case 'BUILDER_CHAT_ASK_CHOICE':
-        return this.#chatAskChoice(request)
+        return this.#chatAskChoice(this.#chatRoute(request, true))
       case 'BUILDER_CHAT_SAVE_CHOICE':
-        return this.#chatSaveChoice(request)
+        return this.#chatSaveChoice(this.#chatRoute(request))
       case 'BUILDER_CHAT_FINISH_TASK':
-        return this.#chatFinishTask(request)
+        return this.#chatFinishTask(this.#chatRoute(request))
       case 'HELPER_GET_CONTEXT':
         return this.#getHelperContext(request)
       case 'HELPER_REQUEST_CONTEXT_REFRESH':
@@ -4129,6 +4129,102 @@ export class ApplicationService {
     return this.#storage.transaction((repository) =>
       this.#requireBuilderAggregate(repository, projectId, taskId, correlationId),
     )
+  }
+
+  /**
+   * The Task a Kiro chat binding works on: the bound Task, or the later Task that continued it
+   * (the binding follows it, but a call may arrive before that). Once that Task is finished, a
+   * write starts a follow-up Task in the same folder only if the learner asked for more in the
+   * Builder chat since (FR-BLD-008); the learner's own message becomes its goal.
+   */
+  #chatRoute<
+    T extends {
+      readonly projectId: string
+      readonly taskId: string
+      readonly correlationId: string
+      readonly actor: { readonly kind: 'AGENT'; readonly role: 'BUILDER' }
+    },
+  >(request: T, startFollowUp = false): T {
+    return this.#storage.transaction((repository) => {
+      let aggregate = this.#requireBuilderAggregate(
+        repository,
+        request.projectId,
+        request.taskId,
+        request.correlationId,
+      )
+      const latest = repository.readLatestTaskForProject(request.projectId)
+      if (latest !== null && latest.id !== aggregate.task.id) {
+        const seen = new Set<string>()
+        let cursor: BuilderTask | undefined = latest
+        while (cursor !== undefined && cursor.id !== aggregate.task.id && !seen.has(cursor.id)) {
+          seen.add(cursor.id)
+          const previous: string | undefined = cursor.prerequisiteTaskIds[0]
+          cursor =
+            previous === undefined
+              ? undefined
+              : repository.readBuilderTaskAggregate(request.projectId, previous)?.task
+        }
+        if (cursor?.id === aggregate.task.id)
+          aggregate = this.#requireBuilderAggregate(
+            repository,
+            request.projectId,
+            latest.id,
+            request.correlationId,
+          )
+      }
+      if (!startFollowUp || aggregate.task.status !== 'COMPLETED')
+        return aggregate.task.id === request.taskId
+          ? request
+          : { ...request, taskId: aggregate.task.id }
+      const completedAt = aggregate.completionReport?.completedAt ?? aggregate.task.updatedAt
+      const asked = [...new Set([request.taskId, aggregate.task.id])]
+        .flatMap((taskId) => repository.readTaskChatEvents(request.projectId, taskId, completedAt))
+        .flatMap(({ event, helperTab }) =>
+          !helperTab &&
+          event.payload.type === 'USER_MESSAGE' &&
+          event.actor.kind === 'USER' &&
+          Date.parse(event.occurredAt) > Date.parse(completedAt)
+            ? [{ event, text: event.payload.redactedExcerpt }]
+            : [],
+        )
+        .sort((left, right) => left.event.sequence - right.event.sequence)
+        .at(-1)
+      if (asked === undefined)
+        throw this.#validationError(
+          request.correlationId,
+          'CHAT_TASK_FINISHED',
+          'This task is finished. Start more work only after the learner asks for it in the Builder chat; then call save_progress with a PLAN note.',
+        )
+      if (latest?.id !== aggregate.task.id || aggregate.completionReport === null)
+        throw this.#validationError(
+          request.correlationId,
+          'FOLLOW_UP_SOURCE_NOT_CURRENT',
+          'A follow-up requires the latest completed Task and its completion report.',
+        )
+      const preparedAt = this.#timestamp()
+      const planned = planFollowUpTask({
+        project: aggregate.project,
+        spec: aggregate.learningSpec,
+        sourceTask: aggregate.task,
+        userGoal: asked.text,
+        taskId: this.#generateId('task'),
+        now: preparedAt,
+      })
+      if (planned.outcome === 'REJECTED')
+        throw this.#domainError(request.correlationId, planned.reasonCode)
+      repository.appendTask(planned.value)
+      this.#appendAudit(repository, {
+        correlationId: request.correlationId,
+        actor: request.actor,
+        action: 'CREATED',
+        resource: { type: 'BUILDER_TASK', id: planned.value.id, revision: 1 },
+        summary:
+          "Prepared a follow-up Task from the learner's Builder chat request after completion.",
+        changedFields: ['productGoal', 'prerequisiteTaskIds', 'sequence', 'status'],
+        occurredAt: preparedAt,
+      })
+      return { ...request, taskId: planned.value.id }
+    })
   }
 
   #chatCheckProgress(
