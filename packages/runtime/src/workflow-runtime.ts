@@ -1,26 +1,33 @@
 import { randomUUID } from 'node:crypto'
-import type { ApplicationService, ApplicationResult } from '@vibe-helper/application'
+import type { ApplicationResult, ApplicationService } from '@vibe-helper/application'
 import { redactSensitiveText, SensitiveTextStream } from '@vibe-helper/application/redaction'
 import {
   LOCAL_PROTOCOL_VERSION,
-  localRunRequestSchema,
-  localRunSchema,
-  projectSessionSnapshotSchema,
   type LocalRun,
   type LocalRunEvent,
   type LocalRunRequest,
+  localRunRequestSchema,
+  localRunSchema,
   type ProjectSessionSnapshot,
+  projectSessionSnapshotSchema,
   type UiRequest,
 } from '@vibe-helper/contracts'
+import type { KiroAcpEvent } from '@vibe-helper/kiro-adapter/acp-node'
 import {
   createDiscoveryEphemeralContext,
   type DiscoveryAgentPhase,
 } from '@vibe-helper/kiro-adapter/crew-app'
 import { EvidenceAnalystJobAdapter } from '@vibe-helper/kiro-adapter/evidence-analyst'
-import type { KiroAcpEvent } from '@vibe-helper/kiro-adapter/acp-node'
+import { createNextMoveMessage, NextMoveJobAdapter } from '@vibe-helper/kiro-adapter/next-move'
 
 export interface AgentInvocation {
-  readonly mode: DiscoveryAgentPhase | 'SPEC_RECOVERY' | 'BUILDER' | 'HELPER' | 'EVIDENCE_ANALYST'
+  readonly mode:
+    | DiscoveryAgentPhase
+    | 'SPEC_RECOVERY'
+    | 'BUILDER'
+    | 'HELPER'
+    | 'EVIDENCE_ANALYST'
+    | 'NEXT_MOVE'
   readonly projectId: string
   readonly correlationId: string
   readonly discoverySessionId?: string
@@ -76,6 +83,9 @@ export class WorkflowRuntime {
   #closed = false
   #worker: ReturnType<typeof setTimeout> | undefined
   #analysisWork: Promise<void> = Promise.resolve()
+  readonly #nextMove: NextMoveJobAdapter
+  #nextMoveWorker: ReturnType<typeof setTimeout> | undefined
+  #nextMoveWork: Promise<void> = Promise.resolve()
   constructor(options: {
     application: ApplicationService
     agents: WorkflowAgentPort
@@ -85,6 +95,7 @@ export class WorkflowRuntime {
     this.#agents = options.agents
     this.#instanceId = options.instanceId
     this.#analyst = new EvidenceAnalystJobAdapter(options.application)
+    this.#nextMove = new NextMoveJobAdapter(options.application)
   }
   get(id: string): LocalRun {
     const entry = this.#entry(id)
@@ -216,13 +227,30 @@ export class WorkflowRuntime {
     }
     this.#worker = setTimeout(tick, 0)
   }
+  /**
+   * Next Move suggestions run beside the Analyst, not after it: the learner should see them
+   * while checking the result, and the Analyst may take its time (DECISIONS: Next Move).
+   */
+  startNextMoveWorker(): void {
+    if (this.#nextMoveWorker !== undefined || this.#closed) return
+    const tick = (): void => {
+      this.#nextMoveWork = this.#runNextMove()
+        .catch(() => undefined)
+        .finally(() => {
+          if (!this.#closed) this.#nextMoveWorker = setTimeout(tick, 2_000)
+        })
+    }
+    this.#nextMoveWorker = setTimeout(tick, 0)
+  }
   async close(): Promise<void> {
     this.#closed = true
     if (this.#worker !== undefined) clearTimeout(this.#worker)
+    if (this.#nextMoveWorker !== undefined) clearTimeout(this.#nextMoveWorker)
     this.#analystAbort.abort()
     for (const entry of this.#entries.values()) entry.controller.abort()
     await Promise.all([...this.#entries.values()].map((e) => e.operation))
     await this.#analysisWork
+    await this.#nextMoveWork
   }
   #entry(id: string): Entry {
     const entry = this.#entries.get(id)
@@ -593,6 +621,37 @@ export class WorkflowRuntime {
     } finally {
       controller.abort()
       // A lease timeout is not process completion. Await owned Agent cleanup.
+      await invocation?.catch(() => undefined)
+      this.#analystAbort.signal.removeEventListener('abort', abort)
+    }
+  }
+  async #runNextMove(): Promise<void> {
+    if (this.#closed) return
+    const correlationId = id('corr')
+    await this.#nextMove.recoverExpired(correlationId)
+    const job = (await this.#nextMove.listPending(correlationId, 1))[0]
+    if (job === undefined || this.#closed) return
+    const controller = new AbortController()
+    let invocation: ReturnType<WorkflowAgentPort['invoke']> | undefined
+    const abort = () => controller.abort()
+    this.#analystAbort.signal.addEventListener('abort', abort, { once: true })
+    try {
+      await this.#nextMove.runJob(job, {
+        runtimeHandle: `local-${this.#instanceId}`,
+        invoke: async (context) => {
+          invocation = this.#agents.invoke({
+            mode: 'NEXT_MOVE',
+            projectId: job.projectId,
+            correlationId: job.correlationId,
+            message: createNextMoveMessage(context),
+            signal: controller.signal,
+            onEvent: () => undefined,
+          })
+          return (await invocation).text
+        },
+      })
+    } finally {
+      controller.abort()
       await invocation?.catch(() => undefined)
       this.#analystAbort.signal.removeEventListener('abort', abort)
     }

@@ -38,6 +38,10 @@
       "types": "./dist/evidence-analyst-agent.d.ts",
       "import": "./dist/evidence-analyst-agent.js"
     },
+    "./next-move": {
+      "types": "./dist/next-move-agent.d.ts",
+      "import": "./dist/next-move-agent.js"
+    },
     "./crew-app": {
       "types": "./dist/crew-app-client.d.ts",
       "import": "./dist/crew-app-client.js"

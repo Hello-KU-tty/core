@@ -802,6 +802,59 @@ export const analysisJobRevisions = sqliteTable(
   ],
 )
 
+// Next Move (SPEC 5.8.1): one suggestion job per finished Task, leased like an Analysis Job.
+export const nextMoveJobs = sqliteTable(
+  'next_move_jobs',
+  {
+    id: text('id').primaryKey(),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'restrict' }),
+    sourceTaskId: text('source_task_id')
+      .notNull()
+      .unique()
+      .references(() => tasks.id, { onDelete: 'restrict' }),
+    headRevision: integer('head_revision').notNull(),
+    status: text('status').notNull(),
+    attempt: integer('attempt').notNull(),
+    correlationId: text('correlation_id').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    revisionCheck('next_move_jobs_head_revision_positive', table.headRevision),
+    check('next_move_jobs_attempt_nonnegative', sql`${table.attempt} >= 0`),
+    index('next_move_jobs_status_updated_idx').on(table.status, table.updatedAt),
+    index('next_move_jobs_project_idx').on(table.projectId),
+  ],
+)
+
+export const nextMoveJobRevisions = sqliteTable(
+  'next_move_job_revisions',
+  {
+    nextMoveJobId: text('next_move_job_id')
+      .notNull()
+      .references(() => nextMoveJobs.id, { onDelete: 'restrict' }),
+    revision: integer('revision').notNull(),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'restrict' }),
+    sourceTaskId: text('source_task_id')
+      .notNull()
+      .references(() => tasks.id, { onDelete: 'restrict' }),
+    status: text('status').notNull(),
+    attempt: integer('attempt').notNull(),
+    correlationId: text('correlation_id').notNull(),
+    updatedAt: text('updated_at').notNull(),
+    ...payloadColumns(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.nextMoveJobId, table.revision] }),
+    revisionCheck('next_move_job_revisions_revision_positive', table.revision),
+    check('next_move_job_revisions_attempt_nonnegative', sql`${table.attempt} >= 0`),
+    check('next_move_job_revisions_payload_json_valid', sql`json_valid(${table.payloadJson})`),
+  ],
+)
+
 export const canonicalConcepts = sqliteTable(
   'canonical_concepts',
   {

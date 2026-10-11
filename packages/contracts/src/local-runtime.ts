@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { commandReceiptSchema, helperContextSchema } from './agent-contracts.js'
 import { analysisJobSchema } from './analysis.js'
+import { nextMoveViewSchema } from './next-move.js'
 import { projectEvidenceTraceSchema } from './personalization.js'
 import {
   candidateIdSchema,
@@ -135,6 +136,8 @@ export const localResponseSchemas = {
   UI_RECORD_BUILDER_CHAT_TURN: chatMessageReceiptSchema,
   UI_RETRY_ANALYSIS: analysisJobSchema,
   UI_READ_ANALYSIS_JOBS: analysisJobSchema.array(),
+  UI_READ_NEXT_MOVE: nextMoveViewSchema,
+  UI_RETRY_NEXT_MOVE: nextMoveViewSchema,
   UI_READ_EVIDENCE_TRACE: projectEvidenceTraceSchema,
   UI_READ_LEARNER_PROFILE: learnerProfileViewSchema,
   UI_LAUNCH_RESULT: generatedResultDescriptorSchema,

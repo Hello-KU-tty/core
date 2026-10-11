@@ -271,7 +271,7 @@ export const KIRO_CHAT_BUILDER_TOOLS: readonly KiroChatToolDefinition[] = [
     name: 'check_progress',
     title: 'Check progress',
     description:
-      'Read the task, its acceptance criteria and the choices still open with numbered options. Call it when you start and whenever you need the decisionId of an open choice.',
+      'Read the task, its acceptance criteria and the choices still open with numbered options. Call it when you start and whenever you need the decisionId of an open choice. After the task is finished it has nextMove: numbered suggestions to grow the project, or that they are still being generated.',
     inputSchema: kiroChatCheckProgressToolInputSchema,
     readOnly: true,
     command: () => ({ kind: 'BUILDER_CHAT_CHECK_PROGRESS' }),
@@ -280,7 +280,7 @@ export const KIRO_CHAT_BUILDER_TOOLS: readonly KiroChatToolDefinition[] = [
     name: 'save_progress',
     title: 'Save progress',
     description:
-      "Save a short progress note that the learner's helper tab reads: your plan, a change of direction, a new plan after an error, or the start of a test run. After a finished task, a PLAN note for the learner's new request starts a follow-up task; the result then has followUpTask with the acceptance criteria to finish against.",
+      "Save a short progress note that the learner's helper tab reads: your plan, a change of direction, a new plan after an error, or the start of a test run. After a finished task, a PLAN note for the learner's new request starts a follow-up task; the result then has followUpTask with the acceptance criteria to finish against. If the learner picked a nextMove suggestion, add nextMove with its number.",
     inputSchema: kiroChatSaveProgressToolInputSchema,
     readOnly: false,
     command: (input) => ({ kind: 'BUILDER_CHAT_SAVE_PROGRESS', note: withoutToolPurpose(input) }),

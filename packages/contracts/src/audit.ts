@@ -44,6 +44,7 @@ export const auditRecordSchema = z.strictObject({
       'EVENT',
       'EPISODE',
       'ANALYSIS_JOB',
+      'NEXT_MOVE_JOB',
       'EVIDENCE_PROPOSAL',
       'EVIDENCE',
       'CONCEPT_LEDGER',

@@ -33,6 +33,7 @@ import {
   builderChatSaveProgressCommandSchema,
 } from './kiro-chat.js'
 import { learningSpecRevisionSchema } from './learning-spec.js'
+import { nextMoveViewSchema } from './next-move.js'
 import { personalizationTraceSchema } from './personalization.js'
 import {
   analysisJobIdSchema,
@@ -483,6 +484,8 @@ export const helperContextSchema = z.strictObject({
   referenceDetails: z.array(helperReferenceDetailSchema).max(30),
   sourceExcerpts: z.array(helperSourceExcerptSchema).max(3),
   pendingContextRefreshRequests: z.array(contextRefreshRequestSchema).max(20),
+  /** The Project's current Next Move suggestions, read-only, for comparison questions. */
+  nextMove: nextMoveViewSchema.optional(),
   freshness: z.strictObject({
     currentContextVersion: entityRevisionSchema.nullable(),
     observedContextVersion: entityRevisionSchema.nullable(),

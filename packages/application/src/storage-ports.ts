@@ -24,6 +24,7 @@ import type {
   LearningSpecRevision,
   LiveProjectContext,
   MisconceptionIssue,
+  NextMoveJob,
   PersonalizationTrace,
   Project,
   ProjectCandidateRevision,
@@ -155,6 +156,7 @@ export interface PersistenceRepository {
   appendActivityEvent(record: ActivityEvent): PersistenceWriteResult
   appendEpisode(record: Episode): PersistenceWriteResult
   appendAnalysisJob(record: AnalysisJob): PersistenceWriteResult
+  appendNextMoveJob(record: NextMoveJob): PersistenceWriteResult
 
   appendCanonicalConcept(record: CanonicalConcept): PersistenceWriteResult
   appendConceptAliasProposal(record: ConceptAliasProposal): PersistenceWriteResult
@@ -181,6 +183,10 @@ export interface PersistenceRepository {
   readAnalysisJob(projectId: string, analysisJobId: string): AnalysisJob | null
   readAnalysisJobForEpisode(projectId: string, episodeId: string): AnalysisJob | null
   readPendingAnalysisJobs(limit: number): readonly AnalysisJob[]
+  readNextMoveJob(projectId: string, nextMoveJobId: string): NextMoveJob | null
+  readNextMoveJobForTask(projectId: string, taskId: string): NextMoveJob | null
+  readPendingNextMoveJobs(limit: number): readonly NextMoveJob[]
+  readExpiredRunningNextMoveJobs(asOf: string, limit: number): readonly NextMoveJob[]
   readExpiredRunningAnalysisJobs(asOf: string, limit: number): readonly AnalysisJob[]
   readAnalysisJobsForProject(
     projectId: string,

@@ -17,6 +17,7 @@ import {
   idempotencyKeySchema,
   learningSpecIdSchema,
   messageIdSchema,
+  nextMoveJobIdSchema,
   nonEmptyTextSchema,
   personalizationTraceIdSchema,
   projectIdSchema,
@@ -222,6 +223,23 @@ export const uiReadAnalysisJobsQuerySchema = z.strictObject({
   limit: z.int().min(1).max(100),
 })
 
+/** Next Move suggestions for the Project's latest finished Task (SPEC 5.8.1). */
+export const uiReadNextMoveQuerySchema = z.strictObject({
+  ...uiRequestMetadata,
+  kind: z.literal('UI_READ_NEXT_MOVE'),
+  projectId: projectIdSchema,
+})
+
+/** Starts a new attempt after both automatic attempts failed; the only Next Move button. */
+export const uiRetryNextMoveCommandSchema = z.strictObject({
+  ...uiRequestMetadata,
+  kind: z.literal('UI_RETRY_NEXT_MOVE'),
+  idempotencyKey: idempotencyKeySchema,
+  projectId: projectIdSchema,
+  nextMoveJobId: nextMoveJobIdSchema,
+  expectedJobRevision: entityRevisionSchema,
+})
+
 export const uiReadEvidenceTraceQuerySchema = z.strictObject({
   ...uiRequestMetadata,
   kind: z.literal('UI_READ_EVIDENCE_TRACE'),
@@ -348,6 +366,8 @@ export const uiRequestSchema = z.discriminatedUnion('kind', [
   uiRecordBuilderChatTurnCommandSchema,
   uiRetryAnalysisCommandSchema,
   uiReadAnalysisJobsQuerySchema,
+  uiReadNextMoveQuerySchema,
+  uiRetryNextMoveCommandSchema,
   uiReadEvidenceTraceQuerySchema,
   uiReadLearnerProfileQuerySchema,
   uiLaunchResultCommandSchema,

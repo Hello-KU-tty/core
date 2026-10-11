@@ -65,6 +65,8 @@ import {
   liveProjectContextSchema,
   type MisconceptionIssue,
   misconceptionIssueSchema,
+  type NextMoveJob,
+  nextMoveJobSchema,
   type PersonalizationTrace,
   type Project,
   type ProjectCandidateRevision,
@@ -1074,6 +1076,71 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
     )
   }
 
+  appendNextMoveJob(input: NextMoveJob): PersistenceWriteResult {
+    const prepared = prepareRecord(nextMoveJobSchema, input)
+    const record = prepared.record
+    return this.#write(record.id, () =>
+      this.#appendVersioned({
+        recordId: record.id,
+        revision: record.revision,
+        prepared,
+        existingSql:
+          'SELECT payload_json, payload_hash FROM next_move_job_revisions WHERE next_move_job_id = ? AND revision = ?',
+        existingParams: [record.id, record.revision],
+        headSql: 'SELECT head_revision FROM next_move_jobs WHERE id = ?',
+        headParams: [record.id],
+        insertStable: () => {
+          this.#sqlite
+            .prepare(
+              'INSERT INTO next_move_jobs (id, project_id, source_task_id, head_revision, status, attempt, correlation_id, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            )
+            .run(
+              record.id,
+              record.projectId,
+              record.sourceTaskId,
+              record.revision,
+              record.status,
+              record.attempt,
+              record.correlationId,
+              record.updatedAt,
+            )
+        },
+        insertHistory: () => {
+          this.#sqlite
+            .prepare(
+              'INSERT INTO next_move_job_revisions (next_move_job_id, revision, project_id, source_task_id, status, attempt, correlation_id, updated_at, payload_json, payload_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            )
+            .run(
+              record.id,
+              record.revision,
+              record.projectId,
+              record.sourceTaskId,
+              record.status,
+              record.attempt,
+              record.correlationId,
+              record.updatedAt,
+              prepared.payloadJson,
+              prepared.payloadHash,
+            )
+        },
+        updateHead: () => {
+          this.#sqlite
+            .prepare(
+              'UPDATE next_move_jobs SET head_revision = ?, status = ?, attempt = ?, correlation_id = ?, updated_at = ? WHERE id = ?',
+            )
+            .run(
+              record.revision,
+              record.status,
+              record.attempt,
+              record.correlationId,
+              record.updatedAt,
+              record.id,
+            )
+        },
+      }),
+    )
+  }
+
   appendCanonicalConcept(input: CanonicalConcept): PersistenceWriteResult {
     const prepared = prepareRecord(canonicalConceptSchema, input)
     const record = prepared.record
@@ -1937,6 +2004,84 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
         [projectId, analysisJobId],
         analysisJobSchema,
       ),
+    )
+  }
+
+  readNextMoveJob(projectId: string, nextMoveJobId: string): NextMoveJob | null {
+    if (
+      !projectSchema.shape.id.safeParse(projectId).success ||
+      !nextMoveJobSchema.shape.id.safeParse(nextMoveJobId).success
+    ) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Next Move Job identity is invalid')
+    }
+    return this.#read(() =>
+      this.#headRecord(
+        `SELECT revisions.payload_json, revisions.payload_hash
+         FROM next_move_jobs heads
+         JOIN next_move_job_revisions revisions
+           ON revisions.next_move_job_id = heads.id AND revisions.revision = heads.head_revision
+         WHERE heads.project_id = ? AND heads.id = ?`,
+        [projectId, nextMoveJobId],
+        nextMoveJobSchema,
+      ),
+    )
+  }
+
+  readNextMoveJobForTask(projectId: string, taskId: string): NextMoveJob | null {
+    if (
+      !projectSchema.shape.id.safeParse(projectId).success ||
+      !builderTaskSchema.shape.id.safeParse(taskId).success
+    ) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Next Move Task identity is invalid')
+    }
+    return this.#read(() =>
+      this.#headRecord(
+        `SELECT revisions.payload_json, revisions.payload_hash
+         FROM next_move_jobs heads
+         JOIN next_move_job_revisions revisions
+           ON revisions.next_move_job_id = heads.id AND revisions.revision = heads.head_revision
+         WHERE heads.project_id = ? AND heads.source_task_id = ?`,
+        [projectId, taskId],
+        nextMoveJobSchema,
+      ),
+    )
+  }
+
+  readPendingNextMoveJobs(limit: number): readonly NextMoveJob[] {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Pending Next Move Job limit is invalid')
+    }
+    return this.#read(() =>
+      this.#recordList(
+        `SELECT revisions.payload_json, revisions.payload_hash
+         FROM next_move_jobs heads
+         JOIN next_move_job_revisions revisions
+           ON revisions.next_move_job_id = heads.id AND revisions.revision = heads.head_revision
+         WHERE heads.status = 'PENDING' ORDER BY heads.updated_at ASC LIMIT ?`,
+        [limit],
+        nextMoveJobSchema,
+      ),
+    )
+  }
+
+  readExpiredRunningNextMoveJobs(asOf: string, limit: number): readonly NextMoveJob[] {
+    if (Number.isNaN(Date.parse(asOf)) || !Number.isInteger(limit) || limit < 1 || limit > 100) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Expired Next Move Job query is invalid')
+    }
+    return this.#read(() =>
+      this.#recordList(
+        `SELECT revisions.payload_json, revisions.payload_hash
+         FROM next_move_jobs heads
+         JOIN next_move_job_revisions revisions
+           ON revisions.next_move_job_id = heads.id AND revisions.revision = heads.head_revision
+         WHERE heads.status = 'RUNNING' ORDER BY heads.updated_at ASC LIMIT 100`,
+        [],
+        nextMoveJobSchema,
+      )
+        .filter(
+          (job) => job.deadlineAt !== undefined && Date.parse(job.deadlineAt) <= Date.parse(asOf),
+        )
+        .slice(0, limit),
     )
   }
 

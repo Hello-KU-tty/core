@@ -36,6 +36,7 @@ import {
   builderSessionBindingDescriptorSchema,
   builderStartTaskCommandSchema,
   builderTaskContextSchema,
+  builderTaskSchema,
   builderUpdateLiveContextCommandSchema,
   buildStatusSchema,
   type CandidateRound,
@@ -83,6 +84,16 @@ import {
   learnerProfileViewSchema,
   liveProjectContextSchema,
   MAX_ACTIVE_DECISIONS,
+  NEXT_MOVE_MAX_ATTEMPTS,
+  NEXT_MOVE_SOFT_TIMEOUT_MS,
+  type NextMoveContext,
+  type NextMoveJob,
+  type NextMoveRuntimeRequest,
+  type NextMoveView,
+  nextMoveContextSchema,
+  nextMoveJobSchema,
+  nextMoveRuntimeRequestSchema,
+  nextMoveViewSchema,
   type OperationError,
   type PersonalizationBasis,
   type PersonalizationTrace,
@@ -109,12 +120,14 @@ import {
   applyDecision,
   applyMisconceptionProposal,
   buildLearnerProfile,
+  clearNextMoveAnswer,
   closeEpisode,
   confirmLearningSpec,
   evaluateEvidenceProposal,
   findClearOptionAnswer,
   findExplicitOptionMentions,
   linkEpisodeChatEvents,
+  nextMoveView,
   openDecision,
   planBuilderTask,
   planFinalUpgradeTask,
@@ -127,6 +140,7 @@ import {
   transitionAnalysisJob,
   transitionBuilderTask,
   transitionEpisodeAnalysis,
+  transitionNextMoveJob,
   validateCompletionReport,
   writeLearningSpecDraft,
 } from '@vibe-helper/domain'
@@ -202,11 +216,14 @@ export type UiApplicationResponse =
   | GeneratedResultDescriptor
   | ProjectHistory
   | ProjectSessionSnapshot
+  | NextMoveView
 
 export type AnalysisApplicationResponse =
   | AnalysisJob
   | readonly AnalysisJob[]
   | EvidenceBatchApplicationResult
+
+export type NextMoveApplicationResponse = NextMoveJob | readonly NextMoveJob[] | NextMoveContext
 
 const MAX_EPISODE_EVENTS = 500
 
@@ -226,6 +243,7 @@ type IdPrefix =
   | 'event'
   | 'episode'
   | 'analysis_job'
+  | 'next_move_job'
   | 'audit'
   | 'concept'
   | 'evidence_proposal'
@@ -430,6 +448,24 @@ export class ApplicationService {
     }
   }
 
+  async executeNextMove(input: unknown): Promise<ApplicationResult<NextMoveApplicationResponse>> {
+    const sizeError = this.#sizeError(input)
+    if (sizeError !== null) return { success: false, error: sizeError }
+    const validated = validateContract(nextMoveRuntimeRequestSchema, input)
+    if (!validated.success) return validated
+    try {
+      const redacted = redactContractText(validated.data)
+      const safe =
+        redacted === validated.data
+          ? validated
+          : validateContract(nextMoveRuntimeRequestSchema, redacted)
+      if (!safe.success) return safe
+      return { success: true, data: this.#dispatchNextMove(safe.data) }
+    } catch (error) {
+      return { success: false, error: this.#mapError(error, validated.data.correlationId) }
+    }
+  }
+
   async #dispatchAgent(request: AgentRequest): Promise<AgentApplicationResponse> {
     switch (request.kind) {
       case 'DISCOVERY_GET_CONTEXT':
@@ -531,6 +567,10 @@ export class ApplicationService {
         return this.#readLearnerProfile(request)
       case 'UI_RETRY_ANALYSIS':
         return this.#retryAnalysis(request)
+      case 'UI_READ_NEXT_MOVE':
+        return this.#readNextMove(request)
+      case 'UI_RETRY_NEXT_MOVE':
+        return this.#retryNextMove(request)
       case 'UI_READ_ANALYSIS_JOBS':
         return this.#readAnalysisJobs(request)
       case 'UI_READ_EVIDENCE_TRACE':
@@ -3357,6 +3397,13 @@ export class ApplicationService {
           'Builder Task completed.',
           proposed.correlationId,
         )
+        this.#queueNextMove(
+          repository,
+          proposed,
+          request.report.completedAt,
+          request.correlationId,
+          request.actor,
+        )
         for (const usage of request.report.conceptUsage) {
           const contextSources =
             usage.codeReferences.length > 0
@@ -3601,6 +3648,9 @@ export class ApplicationService {
     const pendingContextRefreshRequests = aggregate.contextRefreshRequests.filter(
       (refresh) => refresh.status === 'PENDING',
     )
+    const nextMove = this.#storage.transaction((repository) =>
+      this.#currentNextMoveView(repository, request.projectId),
+    )
     const response = helperContextSchema.parse({
       schemaVersion: 1,
       correlationId: request.correlationId,
@@ -3617,6 +3667,7 @@ export class ApplicationService {
       referenceDetails,
       sourceExcerpts,
       pendingContextRefreshRequests,
+      ...(nextMove.status === 'NONE' ? {} : { nextMove }),
       freshness: {
         currentContextVersion: currentVersion,
         observedContextVersion: request.observedContextVersion ?? null,
@@ -4211,30 +4262,95 @@ export class ApplicationService {
           'FOLLOW_UP_SOURCE_NOT_CURRENT',
           'A follow-up requires the latest completed Task and its completion report.',
         )
+      const move = this.#chosenNextMove(repository, request, aggregate.task, asked.text)
       const preparedAt = this.#timestamp()
       const planned = planFollowUpTask({
         project: aggregate.project,
         spec: aggregate.learningSpec,
         sourceTask: aggregate.task,
-        userGoal: asked.text,
+        userGoal:
+          move === undefined
+            ? asked.text
+            : `다음 한 걸음 ${move.number}번 "${move.title}": ${move.summary}\n학습자 요청: ${truncateText(asked.text, 3_000)}`,
         taskId: this.#generateId('task'),
         now: preparedAt,
       })
       if (planned.outcome === 'REJECTED')
         throw this.#domainError(request.correlationId, planned.reasonCode)
-      repository.appendTask(planned.value)
+      const followUp =
+        move === undefined
+          ? planned.value
+          : builderTaskSchema.parse({
+              ...planned.value,
+              nextMove: {
+                nextMoveJobId: move.nextMoveJobId,
+                number: move.number,
+                title: move.title,
+                summary: move.summary,
+                source: { kind: 'AGENT', role: 'DISCOVERY' },
+              },
+            })
+      repository.appendTask(followUp)
       this.#appendAudit(repository, {
         correlationId: request.correlationId,
         actor: request.actor,
         action: 'CREATED',
-        resource: { type: 'BUILDER_TASK', id: planned.value.id, revision: 1 },
+        resource: { type: 'BUILDER_TASK', id: followUp.id, revision: 1 },
         summary:
-          "Prepared a follow-up Task from the learner's Builder chat request after completion.",
+          move === undefined
+            ? "Prepared a follow-up Task from the learner's Builder chat request after completion."
+            : 'Prepared a follow-up Task from the Next Move suggestion the learner chose in chat.',
         changedFields: ['productGoal', 'prerequisiteTaskIds', 'sequence', 'status'],
         occurredAt: preparedAt,
       })
-      return { ...request, taskId: planned.value.id }
+      return { ...request, taskId: followUp.id }
     })
+  }
+
+  /**
+   * The Next Move suggestion a follow-up starts from (SPEC FR-NXT-009). The Builder names the
+   * number the learner chose; Core only checks it against the shown suggestions and against a
+   * clear numbered answer in the learner's own words.
+   */
+  #chosenNextMove(
+    repository: PersistenceRepository,
+    request: { readonly projectId: string; readonly correlationId: string },
+    sourceTask: BuilderTask,
+    learnerText: string,
+  ): { nextMoveJobId: string; number: number; title: string; summary: string } | undefined {
+    const chosen =
+      'note' in request ? (request.note as KiroChatProgressNote | undefined)?.nextMove : undefined
+    const job = repository.readNextMoveJobForTask(request.projectId, sourceTask.id)
+    const view = nextMoveView({ latestTask: sourceTask, job })
+    const clear = view.status === 'READY' ? clearNextMoveAnswer(view.moves, learnerText) : undefined
+    if (chosen === undefined) {
+      if (clear === undefined) return undefined
+      throw this.#validationError(
+        request.correlationId,
+        'NEXT_MOVE_NUMBER_REQUIRED',
+        `The learner chose Next Move ${clear}. Call save_progress with a PLAN note and nextMove: ${clear}.`,
+      )
+    }
+    if (view.status !== 'READY')
+      throw this.#validationError(
+        request.correlationId,
+        'NEXT_MOVE_NOT_READY',
+        "There are no Next Move suggestions ready for this Task. Leave nextMove out and work from the learner's own words.",
+      )
+    if (clear !== undefined && clear !== chosen)
+      throw this.#validationError(
+        request.correlationId,
+        'NEXT_MOVE_NUMBER_CONFLICT',
+        `The learner's reply chooses Next Move ${clear}, not ${chosen}.`,
+      )
+    const move = job?.moves?.find((item) => item.number === chosen)
+    if (job === null || move === undefined)
+      throw this.#validationError(
+        request.correlationId,
+        'NEXT_MOVE_NUMBER_INVALID',
+        'That Next Move number is not one of the suggestions.',
+      )
+    return { nextMoveJobId: job.id, number: move.number, title: move.title, summary: move.summary }
   }
 
   /**
@@ -4302,6 +4418,13 @@ export class ApplicationService {
       }),
       omittedOpenChoiceCount: Math.max(0, open.length - 10),
       ...(aggregate.liveContext === null ? {} : { lastNote: aggregate.liveContext.currentGoal }),
+      ...(aggregate.task.status === 'COMPLETED'
+        ? {
+            nextMove: this.#storage.transaction((repository) =>
+              this.#currentNextMoveView(repository, request.projectId),
+            ),
+          }
+        : {}),
     })
   }
 
@@ -4874,6 +4997,9 @@ export class ApplicationService {
         outcome,
         taskRevision,
         ignoredConcepts,
+        nextMove: this.#storage.transaction((repository) =>
+          this.#currentNextMoveView(repository, request.projectId),
+        ),
       })
     const before = this.#readBuilderAggregate(
       request.projectId,
@@ -5238,6 +5364,396 @@ export class ApplicationService {
           response: jobResult.value,
           resourceId: jobResult.value.id,
           resourceRevision: jobResult.value.revision,
+        }
+      }),
+    )
+  }
+
+  // Next Move (SPEC 5.8.1): suggestions after each finished Task, leased like an Analysis Job.
+
+  /** Queues the suggestions for a Task finished in this transaction; one job per Task. */
+  #queueNextMove(
+    repository: PersistenceRepository,
+    task: BuilderTask,
+    queuedAt: string,
+    correlationId: string,
+    actor: AuditRecord['actor'],
+  ): void {
+    if (repository.readNextMoveJobForTask(task.projectId, task.id) !== null) return
+    const job = nextMoveJobSchema.parse({
+      schemaVersion: 1,
+      id: this.#generateId('next_move_job'),
+      projectId: task.projectId,
+      sourceTaskId: task.id,
+      correlationId: task.correlationId,
+      revision: 1,
+      status: 'PENDING',
+      attempt: 0,
+      maxAttempts: NEXT_MOVE_MAX_ATTEMPTS,
+      timeoutMs: NEXT_MOVE_SOFT_TIMEOUT_MS,
+      createdAt: queuedAt,
+      updatedAt: queuedAt,
+      source: { kind: 'CORE' },
+      redactionStatus: 'NOT_REQUIRED',
+    })
+    repository.appendNextMoveJob(job)
+    this.#appendAudit(repository, {
+      correlationId,
+      actor,
+      action: 'CREATED',
+      resource: { type: 'NEXT_MOVE_JOB', id: job.id, revision: job.revision },
+      summary: 'Queued Next Move suggestions for a finished Builder Task.',
+      changedFields: ['status'],
+      occurredAt: queuedAt,
+    })
+  }
+
+  #currentNextMoveView(repository: PersistenceRepository, projectId: string): NextMoveView {
+    const latestTask = repository.readLatestTaskForProject(projectId)
+    return nextMoveView({
+      latestTask,
+      job: latestTask === null ? null : repository.readNextMoveJobForTask(projectId, latestTask.id),
+    })
+  }
+
+  #dispatchNextMove(request: NextMoveRuntimeRequest): NextMoveApplicationResponse {
+    switch (request.kind) {
+      case 'NEXT_MOVE_LIST_PENDING':
+        return this.#storage.transaction((repository) =>
+          repository.readPendingNextMoveJobs(request.limit),
+        )
+      case 'NEXT_MOVE_RECOVER_EXPIRED':
+        return this.#recoverExpiredNextMoveJobs(request)
+      case 'NEXT_MOVE_CLAIM_JOB':
+        return this.#claimNextMoveJob(request)
+      case 'NEXT_MOVE_GET_CONTEXT':
+        return this.#getNextMoveContext(request)
+      case 'NEXT_MOVE_FAIL_ATTEMPT':
+        return this.#failNextMoveAttempt(request)
+      case 'NEXT_MOVE_SUBMIT_RESULT':
+        return this.#submitNextMoveResult(request)
+    }
+  }
+
+  #requireNextMoveJob(
+    repository: PersistenceRepository,
+    request: {
+      readonly projectId: string
+      readonly nextMoveJobId: string
+      readonly expectedJobRevision: number
+      readonly correlationId: string
+    },
+  ): NextMoveJob {
+    const current = repository.readNextMoveJob(request.projectId, request.nextMoveJobId)
+    if (current === null) throw this.#notFound(request.correlationId, 'NEXT_MOVE_JOB_NOT_FOUND')
+    this.#assertRevision(
+      request.expectedJobRevision,
+      current.revision,
+      request.correlationId,
+      'NEXT_MOVE_JOB_STALE',
+    )
+    return current
+  }
+
+  #transitionNextMove(
+    repository: PersistenceRepository,
+    current: NextMoveJob,
+    proposed: Record<string, unknown>,
+    audit: {
+      readonly correlationId: string
+      readonly actor: AuditRecord['actor']
+      readonly summary: string
+      readonly changedFields: readonly string[]
+      readonly occurredAt: string
+    },
+  ): NextMoveJob {
+    const result = transitionNextMoveJob({
+      current,
+      proposed: { ...current, revision: current.revision + 1, ...proposed },
+    })
+    if (result.outcome === 'REJECTED')
+      throw this.#domainError(audit.correlationId, result.reasonCode)
+    repository.appendNextMoveJob(result.value)
+    this.#appendAudit(repository, {
+      correlationId: audit.correlationId,
+      actor: audit.actor,
+      action: 'UPDATED',
+      resource: { type: 'NEXT_MOVE_JOB', id: result.value.id, revision: result.value.revision },
+      summary: audit.summary,
+      changedFields: [...audit.changedFields],
+      occurredAt: audit.occurredAt,
+    })
+    return result.value
+  }
+
+  /** True while the job's Task is still the Project's latest finished Task. */
+  #nextMoveIsCurrent(repository: PersistenceRepository, job: NextMoveJob): boolean {
+    const latest = repository.readLatestTaskForProject(job.projectId)
+    return latest?.id === job.sourceTaskId && latest.status === 'COMPLETED'
+  }
+
+  #claimNextMoveJob(
+    request: Extract<NextMoveRuntimeRequest, { kind: 'NEXT_MOVE_CLAIM_JOB' }>,
+  ): NextMoveJob {
+    const startedAt = this.#timestamp()
+    return this.#storage.transaction((repository) => {
+      const current = this.#requireNextMoveJob(repository, request)
+      const audit = { correlationId: request.correlationId, actor: request.actor }
+      const running = this.#transitionNextMove(
+        repository,
+        current,
+        {
+          status: 'RUNNING',
+          attempt: current.attempt + 1,
+          runtimeHandle: request.runtimeHandle,
+          deadlineAt: new Date(Date.parse(startedAt) + current.timeoutMs).toISOString(),
+          lastFailure: undefined,
+          updatedAt: startedAt,
+          startedAt,
+          completedAt: undefined,
+        },
+        {
+          ...audit,
+          summary: 'Claimed a pending Next Move Job for one bounded attempt.',
+          changedFields: ['status', 'attempt', 'revision'],
+          occurredAt: startedAt,
+        },
+      )
+      if (this.#nextMoveIsCurrent(repository, running)) return running
+      // The learner already started another Task: the suggestions would never be shown.
+      return this.#transitionNextMove(
+        repository,
+        running,
+        {
+          status: 'FAILED',
+          runtimeHandle: undefined,
+          deadlineAt: undefined,
+          lastFailure: {
+            code: 'NEXT_MOVE_SOURCE_NOT_CURRENT',
+            message: 'A later Task started before the suggestions were generated.',
+            retryable: false,
+          },
+          updatedAt: startedAt,
+          completedAt: startedAt,
+        },
+        {
+          ...audit,
+          summary: 'Closed a Next Move Job whose Task is no longer the latest finished Task.',
+          changedFields: ['status', 'revision', 'lastFailure'],
+          occurredAt: startedAt,
+        },
+      )
+    })
+  }
+
+  #recoverExpiredNextMoveJobs(
+    request: Extract<NextMoveRuntimeRequest, { kind: 'NEXT_MOVE_RECOVER_EXPIRED' }>,
+  ): readonly NextMoveJob[] {
+    const recoveredAt = this.#timestamp()
+    return this.#storage.transaction((repository) =>
+      repository.readExpiredRunningNextMoveJobs(recoveredAt, request.limit).map((current) => {
+        const terminal = current.attempt >= current.maxAttempts
+        return this.#transitionNextMove(
+          repository,
+          current,
+          {
+            status: terminal ? 'FAILED' : 'PENDING',
+            runtimeHandle: undefined,
+            deadlineAt: undefined,
+            lastFailure: {
+              code: 'NEXT_MOVE_TIMEOUT',
+              message: 'Recovered an expired Next Move attempt after runtime interruption.',
+              retryable: true,
+            },
+            updatedAt: recoveredAt,
+            completedAt: terminal ? recoveredAt : undefined,
+          },
+          {
+            correlationId: current.correlationId,
+            actor: request.actor,
+            summary: terminal
+              ? 'Recovered an expired Next Move Job as a terminal failure.'
+              : 'Recovered an expired Next Move Job for its remaining retry.',
+            changedFields: ['status', 'revision', 'lastFailure'],
+            occurredAt: recoveredAt,
+          },
+        )
+      }),
+    )
+  }
+
+  #getNextMoveContext(
+    request: Extract<NextMoveRuntimeRequest, { kind: 'NEXT_MOVE_GET_CONTEXT' }>,
+  ): NextMoveContext {
+    return this.#storage.transaction((repository) => {
+      const job = this.#requireNextMoveJob(repository, request)
+      const source = repository.readBuilderTaskAggregate(job.projectId, job.sourceTaskId)
+      if (source === null) throw this.#notFound(request.correlationId, 'BUILDER_TASK_NOT_FOUND')
+      const chain: BuilderTaskAggregate[] = []
+      const seen = new Set<string>()
+      let cursor: BuilderTaskAggregate | null = source
+      while (cursor !== null && chain.length < 20 && !seen.has(cursor.task.id)) {
+        seen.add(cursor.task.id)
+        chain.unshift(cursor)
+        const previous: string | undefined = cursor.task.prerequisiteTaskIds[0]
+        cursor =
+          previous === undefined
+            ? null
+            : repository.readBuilderTaskAggregate(job.projectId, previous)
+      }
+      const profile = buildLearnerProfile({
+        entries: repository.readRecentConceptLedgers(100),
+        maxConcepts: 20,
+      })
+      return nextMoveContextSchema.parse({
+        schemaVersion: 1,
+        correlationId: request.correlationId,
+        nextMoveJobId: job.id,
+        projectTitle: source.project.title,
+        learningSpec: source.learningSpec,
+        tasks: chain.map(({ task, completionReport }) => ({
+          sequence: task.sequence,
+          title: task.title,
+          goal: task.productGoal,
+          implemented: completionReport?.implementedFeatures ?? [],
+          remaining: completionReport?.remainingIssues ?? [],
+          limitations: completionReport?.limitations ?? [],
+          ...(task.nextMove === undefined
+            ? {}
+            : { fromNextMove: { title: task.nextMove.title, summary: task.nextMove.summary } }),
+        })),
+        learnerProfile: profile.conceptIds.length === 0 ? null : profile.text,
+      })
+    })
+  }
+
+  #requireRunningNextMove(
+    repository: PersistenceRepository,
+    request: Extract<
+      NextMoveRuntimeRequest,
+      { kind: 'NEXT_MOVE_FAIL_ATTEMPT' | 'NEXT_MOVE_SUBMIT_RESULT' }
+    >,
+  ): NextMoveJob {
+    const current = this.#requireNextMoveJob(repository, request)
+    if (current.status !== 'RUNNING' || current.attempt !== request.attempt)
+      throw this.#validationError(
+        request.correlationId,
+        'NEXT_MOVE_RESULT_STALE',
+        'The Next Move result does not match the current running attempt.',
+      )
+    return current
+  }
+
+  #failNextMoveAttempt(
+    request: Extract<NextMoveRuntimeRequest, { kind: 'NEXT_MOVE_FAIL_ATTEMPT' }>,
+  ): NextMoveJob {
+    const failedAt = this.#timestamp()
+    return this.#storage.transaction((repository) => {
+      const current = this.#requireRunningNextMove(repository, request)
+      const terminal = !request.failure.retryable || current.attempt >= current.maxAttempts
+      return this.#transitionNextMove(
+        repository,
+        current,
+        {
+          status: terminal ? 'FAILED' : 'PENDING',
+          runtimeHandle: undefined,
+          deadlineAt: undefined,
+          lastFailure: request.failure,
+          updatedAt: failedAt,
+          completedAt: terminal ? failedAt : undefined,
+        },
+        {
+          correlationId: request.correlationId,
+          actor: request.actor,
+          summary: terminal
+            ? 'Recorded a terminal Next Move failure after the retry budget was exhausted.'
+            : 'Recorded a retryable Next Move attempt failure.',
+          changedFields: ['status', 'revision', 'lastFailure'],
+          occurredAt: failedAt,
+        },
+      )
+    })
+  }
+
+  #submitNextMoveResult(
+    request: Extract<NextMoveRuntimeRequest, { kind: 'NEXT_MOVE_SUBMIT_RESULT' }>,
+  ): NextMoveJob {
+    const submittedAt = this.#timestamp()
+    return this.#storage.transaction((repository) => {
+      const current = this.#requireRunningNextMove(repository, request)
+      const titles = new Set(request.result.moves.map((move) => move.title.toLocaleLowerCase()))
+      if (titles.size !== request.result.moves.length)
+        throw this.#validationError(
+          request.correlationId,
+          'NEXT_MOVE_DUPLICATE_SUGGESTION',
+          'Next Move suggestions must be three different directions.',
+        )
+      return this.#transitionNextMove(
+        repository,
+        current,
+        {
+          status: 'SUCCEEDED',
+          runtimeHandle: undefined,
+          deadlineAt: undefined,
+          lastFailure: undefined,
+          moves: request.result.moves.map((move, index) => ({ ...move, number: index + 1 })),
+          author: { kind: 'AGENT', role: 'DISCOVERY', promptVersion: request.promptVersion },
+          updatedAt: submittedAt,
+          completedAt: submittedAt,
+        },
+        {
+          correlationId: request.correlationId,
+          actor: request.actor,
+          summary: 'Stored three Agent-authored Next Move suggestions.',
+          changedFields: ['status', 'revision', 'moves'],
+          occurredAt: submittedAt,
+        },
+      )
+    })
+  }
+
+  #readNextMove(request: Extract<UiRequest, { kind: 'UI_READ_NEXT_MOVE' }>): NextMoveView {
+    return this.#storage.transaction((repository) => {
+      if (repository.recoverProject(request.projectId) === null)
+        throw this.#notFound(request.correlationId, 'PROJECT_NOT_FOUND')
+      return this.#currentNextMoveView(repository, request.projectId)
+    })
+  }
+
+  #retryNextMove(request: Extract<UiRequest, { kind: 'UI_RETRY_NEXT_MOVE' }>): NextMoveView {
+    const retriedAt = this.#timestamp()
+    return this.#storage.transaction((repository) =>
+      this.#idempotent(repository, request, 'ui.retry_next_move', nextMoveViewSchema, () => {
+        const current = this.#requireNextMoveJob(repository, request)
+        if (current.status !== 'FAILED' || !this.#nextMoveIsCurrent(repository, current))
+          throw this.#validationError(
+            request.correlationId,
+            'NEXT_MOVE_RETRY_NOT_ALLOWED',
+            'Only failed suggestions for the latest finished Task can be generated again.',
+          )
+        const retried = this.#transitionNextMove(
+          repository,
+          current,
+          {
+            status: 'PENDING',
+            attempt: 0,
+            lastFailure: undefined,
+            startedAt: undefined,
+            completedAt: undefined,
+            updatedAt: retriedAt,
+          },
+          {
+            correlationId: request.correlationId,
+            actor: request.actor,
+            summary: 'Reset failed Next Move suggestions for an explicit user retry.',
+            changedFields: ['status', 'attempt', 'revision'],
+            occurredAt: retriedAt,
+          },
+        )
+        return {
+          response: this.#currentNextMoveView(repository, request.projectId),
+          resourceId: retried.id,
+          resourceRevision: retried.revision,
         }
       }),
     )

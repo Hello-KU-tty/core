@@ -76,7 +76,7 @@ const OPTION_MENTION =
  * Core uses it only to reject a Builder mapping that contradicts a single explicit choice.
  */
 export function findExplicitOptionMentions(
-  request: Pick<DecisionRequest, 'options'>,
+  request: { readonly options: readonly { readonly id: string }[] },
   messages: readonly string[],
 ): readonly string[] {
   const mentioned = new Set<string>()
@@ -104,7 +104,7 @@ const BARE_OPTION_ANSWER = /^\s*([1-6])\s*[.!]?\s*$/u
  * left to the Builder's reading and its one-sentence confirmation in chat.
  */
 export function findClearOptionAnswer(
-  request: Pick<DecisionRequest, 'options'>,
+  request: { readonly options: readonly { readonly id: string }[] },
   reply: string,
 ): string | undefined {
   const match = CLEAR_OPTION_ANSWER.exec(reply) ?? BARE_OPTION_ANSWER.exec(reply)

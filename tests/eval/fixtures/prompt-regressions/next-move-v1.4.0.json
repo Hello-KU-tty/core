@@ -1,0 +1,179 @@
+{
+  "promptVersion": "1.4.0",
+  "purpose": "Next Move turn of the Discovery prompt (SPEC 5.8.1). Synthetic, personal-data-free projects: the Campus Drop Golden Path plus two unseen goals, with and without a Personal Need. Campus Drop runs a second round after the learner starts suggestion 1, so the second suggestions must not repeat it.",
+  "scenarios": [
+    {
+      "id": "campus-drop",
+      "personalNeed": true,
+      "secondRound": true,
+      "project": {
+        "title": "Campus Drop",
+        "learningGoal": "TypeScript로 만료되는 파일 공유 흐름을 만들며 데이터 모델과 접근 제어를 배우고 싶다"
+      },
+      "spec": {
+        "productPurpose": "공용 PC와 개인 기기 사이에서 로그인 없이 파일을 주고받는다.",
+        "targetUsers": ["학교 공용 PC를 쓰는 대학생"],
+        "primaryUsageMoment": "공용 PC에서 과제 파일을 휴대폰으로 옮길 때",
+        "successMoment": "받은 링크로 파일을 내려받고, 시간이 지나면 링크가 막힌다.",
+        "mvpFeatures": ["파일 업로드", "만료되는 공유 링크 생성", "만료된 링크 차단"],
+        "scope": [
+          {
+            "category": "LEARNER_FOCUS",
+            "title": "만료되는 공유 링크와 접근 토큰",
+            "rationale": "링크를 얼마나 열어 둘지와 위조를 막는 방법이 서비스의 핵심 판단이다.",
+            "conceptNames": ["link expiry", "access token"]
+          },
+          {
+            "category": "AGENT_SUPPORT",
+            "title": "로컬 서버와 파일 저장",
+            "rationale": "필요하지만 이번 학습 목표는 아니다.",
+            "conceptNames": []
+          },
+          {
+            "category": "EXCLUDED",
+            "title": "로그인, 영구 보관, 대용량 업로드",
+            "rationale": "MVP 범위를 넘는다.",
+            "conceptNames": []
+          }
+        ],
+        "expectedDecisions": [
+          {
+            "category": "PRODUCT_BEHAVIOR",
+            "description": "공유 링크를 얼마 동안 열 수 있게 할지 정한다.",
+            "whyUserInputMatters": "보안과 편의가 직접 바뀌는 학습자의 판단이다."
+          }
+        ]
+      },
+      "task": {
+        "title": "만료되는 공유 링크 만들기",
+        "productGoal": "파일마다 일정 시간 뒤 만료되는 다운로드 링크를 만든다.",
+        "acceptance": { "key": "expiring_link", "description": "만료 시각이 지난 링크는 거절된다." },
+        "expectedConcepts": ["link expiry", "access token"]
+      },
+      "learnerMessages": ["과제 파일을 휴대폰으로 옮길 수 있게 만들어 줘", "링크는 10분이면 충분해. 공용 PC라 오래 열려 있으면 불안해"],
+      "report": {
+        "implemented": ["파일 업로드와 10분 뒤 만료되는 다운로드 링크", "만료된 링크는 410으로 거절"],
+        "remaining": ["업로드한 파일을 링크 만료 뒤 지우지 않아 디스크에 남는다"],
+        "limitations": ["한 번에 파일 하나만 올릴 수 있다"]
+      },
+      "followUp": {
+        "learnerMessage": "1번 해 보자",
+        "report": {
+          "implemented": ["선택한 다음 한 걸음을 구현했다"],
+          "remaining": [],
+          "limitations": []
+        }
+      }
+    },
+    {
+      "id": "club-dues",
+      "personalNeed": true,
+      "secondRound": false,
+      "project": {
+        "title": "동아리 회비 장부",
+        "learningGoal": "TypeScript로 금액을 정확하게 다루는 데이터 모델과 검증을 배우고 싶다"
+      },
+      "spec": {
+        "productPurpose": "동아리 총무가 회비를 누가 냈는지 한눈에 확인한다.",
+        "targetUsers": ["회비를 걷는 동아리 총무"],
+        "primaryUsageMoment": "정기 모임 뒤 입금 내역을 정리할 때",
+        "successMoment": "안 낸 사람과 남은 금액이 바로 보인다.",
+        "mvpFeatures": ["회원별 납부 기록", "미납자 목록"],
+        "scope": [
+          {
+            "category": "LEARNER_FOCUS",
+            "title": "금액 표현과 입력 검증",
+            "rationale": "원 단위 금액을 정확히 저장하고 잘못된 입력을 막는 것이 핵심이다.",
+            "conceptNames": ["integer money", "input validation"]
+          },
+          {
+            "category": "AGENT_SUPPORT",
+            "title": "로컬 웹 화면과 JSON 저장",
+            "rationale": "필요하지만 이번 학습 목표는 아니다.",
+            "conceptNames": []
+          },
+          {
+            "category": "EXCLUDED",
+            "title": "은행 계좌 연동과 자동 입금 확인",
+            "rationale": "외부 계정과 인증이 필요하다.",
+            "conceptNames": []
+          }
+        ],
+        "expectedDecisions": [
+          {
+            "category": "DATA_MODEL",
+            "description": "부분 납부를 허용할지 정한다.",
+            "whyUserInputMatters": "장부가 보여 주는 미납 상태가 달라진다."
+          }
+        ]
+      },
+      "task": {
+        "title": "회비 납부 기록 만들기",
+        "productGoal": "회원별 납부 금액을 기록하고 미납자를 보여 준다.",
+        "acceptance": { "key": "unpaid_list", "description": "다 내지 않은 회원이 미납 목록에 보인다." },
+        "expectedConcepts": ["integer money", "input validation"]
+      },
+      "learnerMessages": ["우리 동아리 회비 정리하는 거 만들고 싶어", "부분 납부는 허용하자. 반만 내는 사람이 꽤 있어"],
+      "report": {
+        "implemented": ["회원별 납부 금액 기록(정수 원 단위)", "부분 납부를 포함한 미납자 목록"],
+        "remaining": ["회비 금액이 학기마다 바뀌는데 지금은 한 가지 금액만 쓴다"],
+        "limitations": ["회원 목록을 직접 입력해야 한다"]
+      }
+    },
+    {
+      "id": "drawing-quiz",
+      "personalNeed": false,
+      "secondRound": false,
+      "project": {
+        "title": "실시간 그림 퀴즈",
+        "learningGoal": "TypeScript로 WebSocket 실시간 통신을 배우고 싶다"
+      },
+      "spec": {
+        "productPurpose": "한 사람이 그리는 그림을 다른 사람들이 실시간으로 보며 맞힌다.",
+        "targetUsers": ["친구들과 쉬는 시간에 놀고 싶은 학생"],
+        "primaryUsageMoment": "같은 와이파이에서 친구들과 모였을 때",
+        "successMoment": "그리는 선이 바로 다른 화면에 나타나고 정답을 맞힌다.",
+        "mvpFeatures": ["실시간 그림 공유", "정답 맞히기"],
+        "scope": [
+          {
+            "category": "LEARNER_FOCUS",
+            "title": "WebSocket 메시지와 방 상태",
+            "rationale": "선 데이터를 어떻게 보내고 방 상태를 맞출지가 핵심이다.",
+            "conceptNames": ["WebSocket", "broadcast"]
+          },
+          {
+            "category": "AGENT_SUPPORT",
+            "title": "캔버스 그리기 화면",
+            "rationale": "필요하지만 이번 학습 목표는 아니다.",
+            "conceptNames": []
+          },
+          {
+            "category": "EXCLUDED",
+            "title": "인터넷 공개 서버와 계정",
+            "rationale": "같은 네트워크 안에서만 쓴다.",
+            "conceptNames": []
+          }
+        ],
+        "expectedDecisions": [
+          {
+            "category": "API_CONTRACT",
+            "description": "선을 점마다 보낼지 묶어서 보낼지 정한다.",
+            "whyUserInputMatters": "반응 속도와 네트워크 부담이 달라진다."
+          }
+        ]
+      },
+      "task": {
+        "title": "실시간 그림 공유 만들기",
+        "productGoal": "그리는 선을 같은 방의 다른 화면에 실시간으로 보여 준다.",
+        "acceptance": { "key": "live_stroke", "description": "한 화면에서 그린 선이 다른 화면에 1초 안에 나타난다." },
+        "expectedConcepts": ["WebSocket", "broadcast"]
+      },
+      "learnerMessages": ["친구들이랑 하는 그림 퀴즈 만들어 줘", "선은 묶어서 보내자. 점마다 보내면 느려질 것 같아"],
+      "report": {
+        "implemented": ["방 하나에서 그린 선을 50ms 단위로 묶어 다른 화면에 전송", "정답 입력과 정답 알림"],
+        "remaining": ["새로 들어온 사람은 이미 그린 선을 못 본다"],
+        "limitations": ["방이 하나뿐이다"]
+      }
+    }
+  ]
+}

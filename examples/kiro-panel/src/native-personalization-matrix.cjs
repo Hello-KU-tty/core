@@ -397,7 +397,7 @@ function validateRunDependencies(input) {
   if (typeof helperRolePrompt !== 'string' ||
       !helperRolePrompt.includes('> Prompt version: `1.2.0`') ||
       typeof discoveryRolePrompt !== 'string' ||
-      !discoveryRolePrompt.includes('> Prompt version: `1.3.5`') ||
+      !discoveryRolePrompt.includes('> Prompt version: `1.4.0`') ||
       typeof composeHelperPrompt !== 'function' ||
       typeof composeDiscoveryPrompt !== 'function' ||
       !model || typeof model.id !== 'string' || !model.id || model.confirmed !== true ||
@@ -543,7 +543,7 @@ async function runNativePersonalizationMatrix(input) {
       model: { id: model.id, confirmed: true, source: model.source,
         configuration: model.configuration ?? 'NOT_EXPOSED' },
       expectedWindowId, helperPromptVersion: '1.2.0',
-      helperPromptSha256: digest(helperRolePrompt), discoveryPromptVersion: '1.3.5',
+      helperPromptSha256: digest(helperRolePrompt), discoveryPromptVersion: '1.4.0',
       discoveryPromptShape: 'FULL_CANONICAL_STANDALONE',
       discoveryPromptSha256: digest(discoveryRolePrompt),
       fixtureSha256: digest(JSON.stringify(fixture)),

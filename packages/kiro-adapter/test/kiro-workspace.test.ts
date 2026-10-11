@@ -238,7 +238,7 @@ describe('Kiro-native workspace adapter', () => {
   })
 
   it('steers decisions to the moment they arise, recorded before they are asked (since 0.5.0)', () => {
-    expect(templates.version).toBe('0.7.0')
+    expect(templates.version).toBe('0.8.0')
     const scoped = renderLearnerSteering(templates, binding, {
       learnerFocus: [],
       agentSupport: [],

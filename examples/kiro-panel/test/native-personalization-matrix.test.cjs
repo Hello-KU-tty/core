@@ -240,7 +240,7 @@ test('runs six fresh attested H cells with one confirmed model and leaves review
   assert.equal(result.metadata.coreMutationCount, 0)
   assert.equal(result.metadata.model.id, MODEL_ID)
   assert.equal(result.metadata.model.configuration, 'NOT_EXPOSED')
-  assert.equal(result.metadata.discoveryPromptVersion, '1.3.5')
+  assert.equal(result.metadata.discoveryPromptVersion, '1.4.0')
   assert.equal(result.metadata.discoveryPromptShape, 'FULL_CANONICAL_STANDALONE')
   assert.equal(result.metadata.personalNeedPresent, true)
   assert.ok(result.metadata.cells.every(cell =>
@@ -269,7 +269,7 @@ test('rejects a different canonical version before starting a matrix cell', asyn
   const input = await sample()
   const host = fakeHost()
   await assert.rejects(runNativePersonalizationMatrix({ ...input, ...host,
-    discoveryRolePrompt: input.discoveryRolePrompt.replace('`1.3.5`', '`1.3.6`'),
+    discoveryRolePrompt: input.discoveryRolePrompt.replace('`1.4.0`', '`1.4.1`'),
   }), /PERSONALIZATION_MATRIX_RUN_DEPENDENCIES_INVALID/)
   assert.equal(host.sessions.length, 0)
 })

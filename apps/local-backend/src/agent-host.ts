@@ -56,6 +56,8 @@ const definitions = {
   ],
   HELPER: ['helper', 'HELPER', ['get_helper_context', 'request_builder_context_refresh']],
   EVIDENCE_ANALYST: ['evidence-analyst', 'EVIDENCE_ANALYST', []],
+  // A Discovery sub-agent with no tools: Core claims, validates and stores its single JSON reply.
+  NEXT_MOVE: ['next-move', 'DISCOVERY', []],
 } as const
 
 export class LocalAgentHost implements WorkflowAgentPort {
@@ -164,7 +166,7 @@ export class LocalAgentHost implements WorkflowAgentPort {
     request.signal.addEventListener('abort', revoke, { once: true })
     try {
       if (request.signal.aborted) throw new WorkflowError('CANCELLED')
-      if (role !== 'EVIDENCE_ANALYST') {
+      if (toolNames.length > 0) {
         const core = createRoleBoundMcpHttpHandler({
           role,
           application: this.options.application,

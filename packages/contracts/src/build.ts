@@ -18,6 +18,7 @@ import {
   learningSpecIdSchema,
   liveContextIdSchema,
   messageIdSchema,
+  nextMoveJobIdSchema,
   nonEmptyTextSchema,
   personalizationTraceIdSchema,
   projectIdSchema,
@@ -75,6 +76,16 @@ export const builderTaskSchema = z.strictObject({
       sourceTaskId: taskIdSchema,
       personalizationTraceId: personalizationTraceIdSchema,
       userGoal: nonEmptyTextSchema,
+    })
+    .optional(),
+  /** The Next Move suggestion (Agent-authored) the learner chose in chat to start this Task. */
+  nextMove: z
+    .strictObject({
+      nextMoveJobId: nextMoveJobIdSchema,
+      number: z.int().min(1).max(3),
+      title: labelSchema,
+      summary: nonEmptyTextSchema,
+      source: z.strictObject({ kind: z.literal('AGENT'), role: z.literal('DISCOVERY') }),
     })
     .optional(),
   sequence: z.int().positive(),

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { builderTaskStatusSchema } from './build.js'
+import { NEXT_MOVE_COUNT, nextMoveViewSchema } from './next-move.js'
 import {
   correlationIdSchema,
   decisionCategorySchema,
@@ -33,6 +34,13 @@ export const kiroChatProgressKindSchema = z.enum([
   'TEST_START',
 ])
 
+/** A number is accepted as a JSON number or a numeric string, since models send both. */
+const boundedNumberSchema = (max: number) =>
+  z.preprocess(
+    (value) => (typeof value === 'string' && /^\s*[1-9]\s*$/.test(value) ? Number(value) : value),
+    z.int().min(1).max(max),
+  )
+
 export const kiroChatProgressNoteSchema = z.strictObject({
   kind: kiroChatProgressKindSchema,
   summary: nonEmptyTextSchema,
@@ -41,6 +49,8 @@ export const kiroChatProgressNoteSchema = z.strictObject({
   nextSteps: z.array(shortTextSchema).max(20).optional(),
   files: filesSchema(30).optional(),
   concepts: z.array(labelSchema).max(20).optional(),
+  /** The Next Move number the learner chose after the Task was finished (SPEC FR-NXT-009). */
+  nextMove: boundedNumberSchema(NEXT_MOVE_COUNT).optional(),
 })
 
 export const kiroChatChoiceOptionSchema = z.strictObject({
@@ -67,11 +77,7 @@ export const kiroChatAskChoiceSchema = z
     message: 'The recommended option number must be one of the options',
   })
 
-/** A number is accepted as a JSON number or a numeric string, since models send both. */
-const optionNumberSchema = z.preprocess(
-  (value) => (typeof value === 'string' && /^\s*[1-6]\s*$/.test(value) ? Number(value) : value),
-  z.int().min(1).max(6),
-)
+const optionNumberSchema = boundedNumberSchema(6)
 
 export const kiroChatSaveChoiceSchema = z
   .strictObject({
@@ -210,6 +216,8 @@ export const builderChatProgressSchema = z.strictObject({
     .max(10),
   omittedOpenChoiceCount: z.int().nonnegative(),
   lastNote: nonEmptyTextSchema.optional(),
+  /** Present once the Task is finished: suggestions to grow the project, or their state. */
+  nextMove: nextMoveViewSchema.optional(),
 })
 
 /**
@@ -259,6 +267,8 @@ export const builderChatFinishTaskReceiptSchema = z.strictObject({
   taskRevision: entityRevisionSchema,
   /** Concepts the Agent named that the confirmed Learning Spec does not list; not recorded. */
   ignoredConcepts: z.array(labelSchema).max(30),
+  /** Next Move suggestions are generated in the background after this Task (SPEC FR-NXT-008). */
+  nextMove: nextMoveViewSchema.optional(),
 })
 
 export type KiroChatProgressNote = z.infer<typeof kiroChatProgressNoteSchema>

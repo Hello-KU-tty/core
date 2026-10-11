@@ -26,6 +26,10 @@ import { requiredEvidenceConceptNames } from '@vibe-helper/domain'
 import { describe, expect, it } from 'vitest'
 import { BUILDER_PROMPT_VERSION } from '../../packages/kiro-adapter/src/builder-agent.js'
 import { DISCOVERY_PROMPT_VERSION } from '../../packages/kiro-adapter/src/discovery-agent.js'
+import {
+  NEXT_MOVE_PROMPT_VERSION,
+  parseNextMoveResult,
+} from '../../packages/kiro-adapter/src/next-move-agent.js'
 
 import {
   createCalibrationArtifacts,
@@ -1417,7 +1421,7 @@ describe('T19 runtime and rejected final-check candidates', () => {
       path.join(workspaceRoot, 'docs/agent-prompts/discovery.md'),
       'utf8',
     )
-    expect(canonical).toContain('Prompt version: `1.3.5`')
+    expect(canonical).toContain('Prompt version: `1.4.0`')
     expect(canonical).not.toContain('## 제출 직전 점검')
   })
 })
@@ -2273,5 +2277,51 @@ describe('T13 Evidence Analyst prompt regression', () => {
         expect.objectContaining({ criterionKey: 'analyst_mixed_strength', status: 'PASSED' }),
       ]),
     )
+  })
+})
+
+describe('K15 Next Move turn of the Discovery prompt', () => {
+  it('keeps the canonical rules, the fixture and the strict result contract together', async () => {
+    const prompt = await readFile(
+      path.join(workspaceRoot, 'docs/agent-prompts/discovery.md'),
+      'utf8',
+    )
+    const turn = prompt.slice(prompt.indexOf('## NEXT MOVE turn'), prompt.indexOf('## 표현 방식'))
+    expect(DISCOVERY_PROMPT_VERSION).toBe(NEXT_MOVE_PROMPT_VERSION)
+    for (const rule of [
+      '이 turn에는 도구가 없다',
+      '`moves`는 정확히 3개다',
+      'hosted 배포, 결제, 실제 외부 계정이나 API 키',
+      '이미 있는 일은 다시 제안하지 마라',
+      '`learnerProfile`은 보조 신호다',
+      '퀴즈·점수·진도 같은 교육 장치는 만들지 마라',
+    ])
+      expect(turn).toContain(rule)
+    const fixture = JSON.parse(
+      await readFile(
+        path.join(workspaceRoot, 'tests/eval/fixtures/prompt-regressions/next-move-v1.4.0.json'),
+        'utf8',
+      ),
+    ) as { promptVersion: string; scenarios: { id: string; personalNeed: boolean }[] }
+    expect(fixture.promptVersion).toBe(NEXT_MOVE_PROMPT_VERSION)
+    // Campus Drop plus unseen goals, with and without a Personal Need (AGENTS.md).
+    expect(fixture.scenarios.map((scenario) => scenario.id)).toContain('campus-drop')
+    expect(new Set(fixture.scenarios.map((scenario) => scenario.personalNeed))).toEqual(
+      new Set([true, false]),
+    )
+    const move = {
+      title: '만료 후 자동 정리',
+      summary: '만료된 파일을 지워 디스크 공간을 되찾아요',
+      benefit: '저장 공간이 차지 않아요',
+      size: 'SMALL',
+      concepts: [],
+    }
+    expect(
+      parseNextMoveResult(`\`\`\`json\n${JSON.stringify({ moves: [move, move, move] })}\n\`\`\``),
+    ).toMatchObject({ moves: [move, move, move] })
+    // Two suggestions, a third size or an extra field are not a usable result.
+    expect(() => parseNextMoveResult({ moves: [move, move] })).toThrow()
+    expect(() => parseNextMoveResult({ moves: [move, move, { ...move, size: 'LARGE' }] })).toThrow()
+    expect(() => parseNextMoveResult({ moves: [move, move, { ...move, number: 3 }] })).toThrow()
   })
 })

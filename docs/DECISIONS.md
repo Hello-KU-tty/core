@@ -17,7 +17,8 @@
   - Analyst가 끝난 뒤 생성: 방금 Task의 Evidence까지 반영되지만, 학습자가 결과를 확인하는 동안 후보가 늦게 뜬다.
   - 학습자가 요청할 때만 생성: "계속 제시"하는 느낌이 약하다.
   - 패널 시작 버튼: Task를 미리 만들고 채팅을 여는 것까지만 가능해 학습자가 채팅에 한 번 더 입력해야 하고, 시작 경로가 둘이 된다.
-- **계약 변경(계획):** 새 표 `next_move_jobs`·`next_move_job_revisions`(migration 0008, 기존 표는 그대로), Core UI 조회 `UI_GET_NEXT_MOVE`·다시 만들기 명령, Kiro 채팅 `check_progress`·`finish_task` 응답의 선택 필드 `nextMove`, `save_progress`의 선택 필드(고른 번호), `get_helper_context`의 `nextMove`, local-backend `NEXT_MOVE` mode, `discovery.md`의 Next Move 절과 Steering 버전 올림. 새 의존성·install script·범용 도구는 없다.
+- **계약 변경:** 새 표 `next_move_jobs`·`next_move_job_revisions`(migration 0008, 기존 표는 그대로), Core UI 조회 `UI_READ_NEXT_MOVE`·다시 만들기 `UI_RETRY_NEXT_MOVE`, worker용 `NEXT_MOVE_*` 명령(목록·회수·lease·context·실패·결과), Task의 선택 필드 `nextMove`(고른 후보의 Agent 출처), Kiro 채팅 `check_progress`·`finish_task` 응답의 선택 필드 `nextMove`, `save_progress`의 선택 필드(고른 번호), `get_helper_context`의 `nextMove`, local-backend `NEXT_MOVE` mode, `discovery.md`의 Next Move 절과 Steering 버전 올림. 새 의존성·install script·범용 도구는 없다.
+- **실측(2026-10-12):** 제품 경로에서 Task 완료부터 후보 저장까지 7.2~9.3초, 동시에 돈 Analyst는 7.4~9.7초, Next Move 한 번에 약 0.036크레딧(Haiku 4.5)이었다([결과](../tests/eval/results/next-move-v1.4.0.md)).
 - **위험:** Task마다 kiro-cli 호출이 1~2회 늘어난다(K12에서 측정). migration 0008을 적용한 DB는 이전 설치물(0.2.7 이하)로 되돌릴 수 없다(`DATABASE_NEWER_THAN_PACKAGE`). Builder가 Steering을 따르지 않고 자기 목록을 만들 수 있다. 후보 품질은 평가 fixture로만 확인할 수 있다.
 
 ## 본선: Builder가 학습자에게 묻는 기준
