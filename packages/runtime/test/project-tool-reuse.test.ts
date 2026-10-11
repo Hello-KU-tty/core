@@ -1,6 +1,9 @@
+import { execFile } from 'node:child_process'
 import {
   copyFile,
+  lstat,
   mkdir,
+  readdir,
   mkdtemp,
   readFile,
   realpath,
@@ -11,12 +14,14 @@ import {
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { promisify } from 'node:util'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { type CoreResources, sha256 } from '../src/portable-core.js'
 import {
   type ProjectToolchain,
   preparePnpmShim,
   prepareProjectTools,
+  projectEnvironment,
   selectProjectToolchain,
   verifyProjectTools,
 } from '../src/project-toolchain.js'
@@ -74,6 +79,36 @@ async function firstSelection(): Promise<ProjectToolchain> {
 describe.skipIf(
   process.platform !== 'win32' && !(process.platform === 'darwin' && process.arch === 'arm64'),
 )('recorded project tools across launch environments', () => {
+  it('creates the home folders projectEnvironment points to', async () => {
+    const env = projectEnvironment(await firstSelection(), {})
+    for (const name of ['USERPROFILE', 'APPDATA', 'LOCALAPPDATA'] as const)
+      expect((await lstat(env[name] ?? '')).isDirectory()).toBe(true)
+  })
+
+  it.skipIf(process.platform !== 'win32')(
+    'Windows PowerShell in a Project terminal keeps its cache out of the Project folder',
+    async () => {
+      const env = projectEnvironment(await firstSelection(), process.env)
+      const powershell = join(
+        process.env.SystemRoot ?? 'C:\\Windows',
+        'System32/WindowsPowerShell/v1.0/powershell.exe',
+      )
+      const { stdout } = await promisify(execFile)(
+        powershell,
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          "[Environment]::GetFolderPath('LocalApplicationData'); Get-Command vibe-missing-command -ErrorAction SilentlyContinue; exit 0",
+        ],
+        { cwd: workspace, env, windowsHide: true, timeout: 60_000 },
+      )
+      expect(stdout.trim().toLowerCase()).toBe((env.LOCALAPPDATA ?? '').toLowerCase())
+      expect((await readdir(workspace)).filter((name) => name === 'Microsoft')).toEqual([])
+    },
+    90_000,
+  )
+
   it('keeps the recorded tools after restart with no developer PATH', async () => {
     const original = await firstSelection()
     vi.stubEnv('PATH', join(process.env.SystemRoot ?? 'C:\\Windows', 'System32'))
