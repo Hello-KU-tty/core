@@ -630,8 +630,10 @@ describe('Kiro-native workspace adapter', () => {
     expect(fresh.text).toContain('      - open http://localhost:*\n')
     expect(fresh.text).toContain('      - Start-Process http://localhost:*\n')
     expect(fresh.text).toContain('      - open *@*\n')
+    expect(fresh.text).toContain('      - curl -s -X POST http://localhost:*\n')
+    expect(fresh.text).toContain('      - lsof *\n')
     // 0.2.7–0.2.8 wrote the same rule without the browser commands.
-    const browser = /^ {6}- (open|Start-Process|start) /
+    const browser = /^ {6}- (open|Start-Process|start|lsof|curl(\.exe)? (-s )?-X) /
     const earlier = fresh.text
       .split('\n')
       .filter((line) => !browser.test(line))

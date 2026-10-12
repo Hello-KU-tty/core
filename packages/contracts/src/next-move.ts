@@ -28,11 +28,15 @@ export const NEXT_MOVE_SOFT_TIMEOUT_MS = 120_000 as const
 export const nextMoveSizeSchema = z.enum(['SMALL', 'MEDIUM'])
 
 // The prompt asks for 16/45/35 characters; the bounds leave room so a slightly long line is not
-// a failed attempt.
+// a failed attempt. The adapter shortens a line past them (K17 live check: a 50-character benefit
+// failed both attempts).
+export const NEXT_MOVE_TEXT_LIMITS = { title: 24, summary: 64, benefit: 48 } as const
+export const NEXT_MOVE_CONCEPT_LIMIT = 5
+
 const moveContent = {
-  title: z.string().trim().min(1).max(24),
-  summary: z.string().trim().min(1).max(64),
-  benefit: z.string().trim().min(1).max(48),
+  title: z.string().trim().min(1).max(NEXT_MOVE_TEXT_LIMITS.title),
+  summary: z.string().trim().min(1).max(NEXT_MOVE_TEXT_LIMITS.summary),
+  benefit: z.string().trim().min(1).max(NEXT_MOVE_TEXT_LIMITS.benefit),
   size: nextMoveSizeSchema,
 } as const
 
@@ -40,7 +44,7 @@ const moveContent = {
 export const nextMoveProposalSchema = z.strictObject({
   ...moveContent,
   /** Concepts this suggestion would naturally use; kept as provenance, never shown or scored. */
-  concepts: z.array(labelSchema).max(5),
+  concepts: z.array(labelSchema).max(NEXT_MOVE_CONCEPT_LIMIT),
 })
 
 export const nextMoveSemanticResultSchema = z.strictObject({

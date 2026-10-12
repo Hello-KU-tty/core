@@ -1,5 +1,7 @@
 import type { ApplicationResult, NextMoveApplicationResponse } from '@vibe-helper/application'
 import {
+  NEXT_MOVE_CONCEPT_LIMIT,
+  NEXT_MOVE_TEXT_LIMITS,
   type NextMoveContext,
   type NextMoveJob,
   type NextMoveRuntimeRequest,
@@ -37,6 +39,40 @@ export class NextMoveAdapterError extends Error {
 }
 
 /** Exactly one JSON value or one fenced JSON block, as for the Evidence Analyst. */
+/**
+ * The suggestions are Agent-authored text shown in the panel. A line a little past its bound is
+ * shortened with an ellipsis and extra concepts are dropped, instead of failing the attempt
+ * (K17 live check). Everything else stays strict.
+ */
+function shortenOverlongMoves(value: unknown): unknown {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    !Array.isArray((value as { moves?: unknown }).moves)
+  )
+    return value
+  const shorten = (text: unknown, max: number) =>
+    typeof text === 'string' && text.trim().length > max
+      ? `${text.trim().slice(0, max - 1)}…`
+      : text
+  return {
+    ...value,
+    moves: (value as { moves: unknown[] }).moves.map((move) => {
+      if (typeof move !== 'object' || move === null) return move
+      const item = move as Record<string, unknown>
+      return {
+        ...item,
+        title: shorten(item.title, NEXT_MOVE_TEXT_LIMITS.title),
+        summary: shorten(item.summary, NEXT_MOVE_TEXT_LIMITS.summary),
+        benefit: shorten(item.benefit, NEXT_MOVE_TEXT_LIMITS.benefit),
+        ...(Array.isArray(item.concepts)
+          ? { concepts: item.concepts.slice(0, NEXT_MOVE_CONCEPT_LIMIT) }
+          : {}),
+      }
+    }),
+  }
+}
+
 export function parseNextMoveResult(value: unknown): NextMoveSemanticResult {
   let candidate = value
   if (typeof value === 'string') {
@@ -60,7 +96,7 @@ export function parseNextMoveResult(value: unknown): NextMoveSemanticResult {
       }
     }
   }
-  const parsed = nextMoveSemanticResultSchema.safeParse(candidate)
+  const parsed = nextMoveSemanticResultSchema.safeParse(shortenOverlongMoves(candidate))
   if (!parsed.success)
     throw new NextMoveAdapterError(
       'INVALID_RESULT',

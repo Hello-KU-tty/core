@@ -2323,5 +2323,14 @@ describe('K15 Next Move turn of the Discovery prompt', () => {
     expect(() => parseNextMoveResult({ moves: [move, move] })).toThrow()
     expect(() => parseNextMoveResult({ moves: [move, move, { ...move, size: 'LARGE' }] })).toThrow()
     expect(() => parseNextMoveResult({ moves: [move, move, { ...move, number: 3 }] })).toThrow()
+    // K17 live check: a line a little past its bound is shortened, not a failed attempt.
+    const benefit =
+      '학생이 단순히 예약하는 것 이상으로 자신의 선호에 맞는 자리를 전략적으로 고를 수 있다.'
+    expect(benefit.length).toBeGreaterThan(48)
+    const long = { ...move, benefit, concepts: ['a', 'b', 'c', 'd', 'e', 'f'] }
+    const shortened = parseNextMoveResult({ moves: [move, move, long] }).moves[2]
+    expect(shortened?.benefit).toHaveLength(48)
+    expect(shortened?.benefit.endsWith('…')).toBe(true)
+    expect(shortened?.concepts).toEqual(['a', 'b', 'c', 'd', 'e'])
   })
 })

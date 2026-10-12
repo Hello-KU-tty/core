@@ -497,12 +497,23 @@ export const KIRO_PREAPPROVED_RULES: readonly KiroAllowRule[] = [
   {
     capability: 'shell',
     // K17: open the finished app on this computer in the browser (macOS `open`, PowerShell
-    // `Start-Process` and its `start` alias), only for this computer's addresses.
+    // `Start-Process` and its `start` alias), only for this computer's addresses; list ports; and
+    // call the app's own API with a method.
     match: [
       ...K11_SHELL_RULE.match,
       ...['open http://localhost:*', 'open http://127.0.0.1:*'],
       ...['Start-Process http://localhost:*', 'Start-Process http://127.0.0.1:*'],
       ...['start http://localhost:*', 'start http://127.0.0.1:*'],
+      // K17 live check: the Builder checks which port is free and calls its own API with a method.
+      'lsof *',
+      ...['POST', 'PUT', 'PATCH', 'DELETE'].flatMap((method) => [
+        `curl -X ${method} http://localhost:*`,
+        `curl -s -X ${method} http://localhost:*`,
+        `curl -X ${method} http://127.0.0.1:*`,
+        `curl -s -X ${method} http://127.0.0.1:*`,
+        `curl.exe -X ${method} http://localhost:*`,
+        `curl.exe -s -X ${method} http://localhost:*`,
+      ]),
     ],
     exclude: [...K11_SHELL_RULE.exclude, 'open *@*', 'Start-Process *@*', 'start *@*'],
   },
