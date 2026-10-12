@@ -253,8 +253,8 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
   - **남은 것:**
     - 채팅 Decision 평가 재실행: 새 fixture(곁가지 질문, 거절 뒤 멈춤, 되돌리기). 실제 Kiro 흐름에서는 각 한 번씩 확인했다.
     - 새 미리 승인 항목(`lsof`, 메서드 `curl`)의 Kiro 판정.
-    - push(backend `main`, frontend `feat/k17-panel`)와 frontend의 Windows 0.2.9 빌드.
-    - 사용자 체험 환경을 0.2.9로 올리기(체험 Kiro가 켜져 있어 사용자 확인 뒤).
+    - frontend의 `feat/k17-panel` 합치기와 Windows 0.2.9 빌드. 요청은 [0.2.9 프론트 인계](FRONTEND_HANDOFF_0.2.9.md).
+  - **push와 체험 환경(2026-10-13):** backend `main`과 frontend `feat/k17-panel`(`4906b36`)을 push했다. 체험 환경을 0.2.9로 올렸다. 올리기 전 Core DB·`.kiro`·권한 파일은 `backup-before-0.2.9/`에 두었다. 다시 열 때 migration 0009, Steering 0.9.0, 도우미 에이전트 파일 삭제, 미리 승인 규칙 갱신이 일어났고 기록(이벤트 47개, 완료 Task 1개)은 그대로다. 이미 미리 승인을 고른 설치라 Autopilot은 저절로 켜지지 않는다(인계 "알려진 제한").
 
 ## 3. 예선 작업 요약
 

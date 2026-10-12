@@ -8,6 +8,7 @@
 
 ## 프론트 담당자 빠른 시작
 
+- **이번에 할 일(0.2.9):** [0.2.9 프론트 인계](FRONTEND_HANDOFF_0.2.9.md)에 패널 브랜치 합치기, 리뷰할 곳, Windows 빌드에서 특히 볼 곳을 모았다.
 - **코드:** backend `Hello-KU-tty/core`의 `main`(이 문서와 설치 파일), frontend `Hello-KU-tty/program`의 `main`(PR #10의 "Kiro 채팅에서 열기" 패널 포함). `finals/kiro-native`·`finals/trial-feedback`은 `main`에 합쳤고 더 쓰지 않는다. 새 작업은 `main`에서 브랜치를 따서 `main`으로 PR한다.
 - **설치 파일 바로 받기:** [0.2.9 Mac VSIX](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/kiro-native/builder-helper-agent-panel-0.2.9-darwin-arm64.vsix). 받은 뒤 `shasum -a 256 <파일>`이 위 SHA-256과 같은지 확인한다. 학습자용 설치·사용 안내는 [설치 가이드](DOWNLOAD_GUIDE.md)에 따로 있고, 이 문서는 빌드·확인·패널 계약을 다룬다.
 - **Mac(Apple Silicon):** 아래 [설치 전 준비](#설치-전-준비)와 [설치와 사용 흐름](#설치와-사용-흐름)대로 쓴다.
@@ -16,14 +17,14 @@
 
 ## Windows 0.2.9 빌드 요청 (frontend)
 
-backend가 Mac 0.2.9를 만들고 실제 Kiro에서 확인했다([0.2.9 확인](#029-확인-2026-10-12-mac)). Windows 0.2.8은 만들지 않고 0.2.9로 건너뛴다. 아래 순서로 부탁해요.
+backend가 Mac 0.2.9를 만들고 실제 Kiro에서 확인했다([0.2.9 확인](#029-확인-2026-10-12-mac)). Windows 0.2.8은 만들지 않고 0.2.9로 건너뛴다. 아래 순서로 부탁해요. 리뷰할 곳과 Windows에서 특히 볼 곳은 [0.2.9 프론트 인계](FRONTEND_HANDOFF_0.2.9.md)에 있다.
 
 1. **frontend 브랜치 합치기:** `Hello-KU-tty/program`의 `feat/k17-panel`(커밋 `4906b36`)을 `main`에 합친다. 이 브랜치는 `feat/next-move-card`(`6a6a557`)에서 분기했고 `feat/reload-required-notice`(`9ef88d6`)를 합쳐 두었다(충돌은 안내 문구 두 곳, backend가 풀었다). 합친 결과에서 typecheck 통과와 `npm test` 838개 통과를 backend가 확인했다.
 2. **빌드:** backend `main`(`3721a76` 이후)과 합친 frontend `main`으로 [Windows에서](#windows에서)의 1~4대로 빌드한다. 버전은 `0.2.9`로 나온다.
 3. **확인:** 0.2.7 확인 1~10과 아래 11~17을 한다. 0.2.9는 DB를 migration 0009까지 올리므로 설치 뒤 이전 버전으로 되돌리면 Core가 DB를 열지 못한다.
    11. **Next Move 카드:** Task를 마친 직후 빌더 탭에 "다음 한 걸음" 카드가 생기고 10초 안팎에 후보 3개로 바뀐다. 시작 버튼이 없다. Builder 완료 메시지 끝에 아이디어를 준비 중이라는 한 줄이 있다.
    12. **번호로 시작:** "다음엔 뭘 해 보면 좋을까?"에 Builder가 같은 후보를 번호로 전하고, "2번 해 보자"로 후속 Task가 생기며 카드가 사라진다.
-   13. **새 세션과 Autopilot:** 신뢰하지 않은 빈 폴더를 열고 연결한다. "개발 명령 미리 승인"을 고르면 Kiro 설정 `kiroAgent.agentAutonomy`가 `Autopilot`이 된다. 신뢰 → "다시 로드" → 4초쯤 뒤 Kiro 채팅에 새 세션이 열리고, 첫 턴이 파일 검토 없이(Autopilot) 돈다.
+   13. **새 세션과 Autopilot:** 신뢰하지 않은 빈 폴더를 열고 연결한다. "개발 명령 미리 승인"을 고르면 Kiro 설정 `kiroAgent.agentAutonomy`가 `Autopilot`이 된다. 신뢰 → "다시 로드" → 4초쯤 뒤 Kiro 채팅에 새 세션이 열리고, 첫 턴이 파일 검토 없이(Autopilot) 돈다. 0.2.7에서 올린 설치는 승인 방식을 이미 골라 다시 묻지 않으므로, 먼저 명령 팔레트 "Vibe Helper: Change Command Approval"에서 미리 승인을 다시 고른다.
    14. **선택 위조 방지와 되돌리기:** Builder가 번호로 물으면 먼저 곁가지 질문을 한다. 기록되지 않고 다시 물어야 한다. 답한 뒤 "그건 내가 고른 게 아니야"라고 하면 같은 질문이 다시 열린다(패널 결정 줄이 "Kiro 채팅에서 답을 기다려요").
    15. **중단된 턴:** Builder가 만드는 중에 채팅의 Cancel로 멈춘 뒤 다음 발언을 보낸다. Core `activity_events`에 멈춘 턴의 `BUILDER_CHAT_TURN`(`interrupted: true`)이 새 발언보다 먼저 있다.
    16. **완료 뒤 서버와 브라우저:** Task가 끝나면 서버가 켜진 채 브라우저가 열리고(`Start-Process http://localhost:…`, 승인 창 없음) 메시지 끝에 주소가 있다.
@@ -185,9 +186,9 @@ pnpm panel:pack:kiro-windows C:\dev\program
 
 1. Extensions(`Ctrl+Shift+X`) → `…` → **Install from VSIX…** → 다시 로드. Agent Panel이 Core에 연결된다. kiro-cli를 못 찾으면 `KIRO_CLI_NOT_INSTALLED`(이때 `where.exe kiro-cli` 결과를 남긴다), 로그인이 없으면 `KIRO_CLI_LOGIN_REQUIRED`.
 2. 빈 폴더를 열고 신뢰한다. Agent Panel에서 학습 목표 → 후보 선택 → 계획 확정.
-3. `Ctrl+Shift+P` → **Vibe Helper: Open Project in Kiro Chat** → Project 선택. 같은 창에 연결되고 `.kiro\hooks\vibe-helper.json`, `.kiro\agents\vibe-helper.json`, `.kiro\settings\mcp.json`이 생긴다. Kiro의 MCP 서버 목록에 `vibe-helper Connected (5 tools)`가 보여야 한다(0.2.6까지는 9 tools).
+3. `Ctrl+Shift+P` → **Vibe Helper: Open Project in Kiro Chat** → Project 선택. 같은 창에 연결되고 `.kiro\hooks\vibe-helper.json`, `.kiro\settings\mcp.json`, `.kiro\steering\vibe-helper.md`가 생긴다(0.2.8까지는 `.kiro\agents\vibe-helper.json`도 생겼다). Kiro의 MCP 서버 목록에 `vibe-helper Connected (5 tools)`가 보여야 한다(0.2.6까지는 9 tools).
 4. Kiro 채팅 새 세션에서 "Vibe Helper 도구로 작업 상태만 확인해서 한 줄로 알려줘. 코드는 만들지 마." → 답에 Task 상태(PENDING 등)가 나온다.
-5. 새 채팅 탭에서 에이전트 목록의 `vibe-helper`를 고르고 질문한다 → 확정 계획을 바탕으로 답하고 승인 창이 뜨지 않는다.
+5. 같은 채팅에 `/vibe-helper 이 프로젝트에서 뭘 배우게 돼?`처럼 묻는다 → 확정 계획을 바탕으로 답하고, 파일을 고치지 않으며, 승인 창이 뜨지 않는다(0.2.8까지는 새 채팅 탭에서 에이전트 목록의 `vibe-helper`를 골랐다).
 6. Kiro를 완전히 종료했다가 같은 폴더를 다시 열고 4를 반복한다. Open Project를 다시 하지 않아도 동작해야 한다.
 7. Agent Panel의 History에서 4·5의 학습자 발언이 기록됐는지 본다.
 
@@ -230,6 +231,7 @@ host API 형식은 [`examples/kiro-panel/src/frontend-host.d.cts`](../examples/k
 - Core가 45초 넘게 뜨지 않으면 Builder·Helper MCP 시작이 실패하고 Kiro의 MCP 재연결이 필요하다. 끊긴 동안 친 학습자 발언은 큐로 보존되지만 Core가 받은 시각으로 기록되고, 끊긴 동안의 Helper 질문은 기록되지 않는다. 큐에는 redaction 전 원문이 Core가 읽을 때까지 사용자 전용 파일로 남는다(최대 1MB·200개).
 - 신뢰 안내·다시 로드 알림(늦은 신뢰 포함)은 Windows 0.2.7 확인 8에서 실제 화면으로 확인했다. Windows에서는 새 폴더를 열면 신뢰 창이 Kiro 에이전트 초기화 뒤에 떠서, 열자마자 신뢰해도 Kiro는 신뢰 전 상태로 시작한다. 그래서 늦은 신뢰가 새 폴더의 기본 경로다. 도구 허용 동의와 새 창 확인(생성 폴더가 새 창으로 열림)은 기록으로 확인했다.
 - 셸 명령은 "개발 명령 미리 승인"을 고르면 자주 쓰는 개발 명령은 묻지 않고, 삭제·종료·배포·push 같은 명령은 계속 묻는다(K11).
+- Autopilot 설정(0.2.9)은 승인 방식을 고르는 순간에만 쓴다. 0.2.7~0.2.8에서 미리 승인을 고른 뒤 올린 설치는 규칙만 새 목록으로 바뀌고 Autopilot은 켜지지 않는다. "Vibe Helper: Change Command Approval"에서 다시 고르면 켜진다. Windows 포트 확인 명령(`netstat` 등)은 미리 승인 목록에 없다.
 - Kiro 도구 호출 단계가 긴 한국어 입력을 문자열로 보낸 첫 호출을 거절할 때가 있다(`expected object, received string`). Builder가 바로 다시 보내 성공했다. 완료 뒤 이어서 만든 첫 Task에서는 Builder가 이전 Task의 기준 키로 `finish_task`를 한 번 보냈다가 거절되고, `check_progress` 뒤 다시 보내 완료했다.
 - Helper 답 수집은 Kiro 세션 기록 파일(비공개 형식)에 기대며, 못 읽으면 안내 문구로 기록한다.
 - 지원 플랫폼은 Apple Silicon Mac과 Windows x64다. 그 밖의 플랫폼에서는 host가 `KIRO_NATIVE_HOST_PLATFORM_UNSUPPORTED`로 시작하지 않는다. Windows는 0.2.7에서 실기기 확인 1~10을 했다.
