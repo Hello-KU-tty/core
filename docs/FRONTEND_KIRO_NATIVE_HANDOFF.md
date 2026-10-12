@@ -9,7 +9,7 @@
 ## 프론트 담당자 빠른 시작
 
 - **코드:** backend `Hello-KU-tty/core`의 `main`(이 문서와 설치 파일), frontend `Hello-KU-tty/program`의 `main`(PR #10의 "Kiro 채팅에서 열기" 패널 포함). `finals/kiro-native`·`finals/trial-feedback`은 `main`에 합쳤고 더 쓰지 않는다. 새 작업은 `main`에서 브랜치를 따서 `main`으로 PR한다.
-- **설치 파일 바로 받기:** [0.2.8 Mac VSIX](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/kiro-native/builder-helper-agent-panel-0.2.8-darwin-arm64.vsix). 받은 뒤 `shasum -a 256 <파일>`이 위 SHA-256과 같은지 확인한다.
+- **설치 파일 바로 받기:** [0.2.8 Mac VSIX](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/kiro-native/builder-helper-agent-panel-0.2.8-darwin-arm64.vsix). 받은 뒤 `shasum -a 256 <파일>`이 위 SHA-256과 같은지 확인한다. 학습자용 설치·사용 안내는 [설치 가이드](DOWNLOAD_GUIDE.md)에 따로 있고, 이 문서는 빌드·확인·패널 계약을 다룬다.
 - **Mac(Apple Silicon):** 아래 [설치 전 준비](#설치-전-준비)와 [설치와 사용 흐름](#설치와-사용-흐름)대로 쓴다.
 - **Windows:** frontend가 빌드·확인·업로드한다. 절차는 [Windows에서](#windows에서)에 있다(0.2.5부터).
 - **패널 코드에 필요한 변경(0.2.8):** backend가 frontend 저장소에 Next Move 카드를 브랜치 `feat/next-move-card`로 올렸다. Windows 0.2.8을 빌드하기 전에 이 브랜치를 `main`에 합쳐 주세요(아래 [Windows 0.2.8 빌드 요청](#windows-028-빌드-요청-frontend)). host API(`frontend-host.d.cts`)는 0.2.7과 같다(`reloadRequired`는 frontend `feat/reload-required-notice`가 반영). 0.2.2의 Evidence 표시 검토도 그대로다([0.2.2에서 바뀐 점](#022에서-바뀐-점-analystevidence-정책)).
@@ -24,6 +24,7 @@ backend가 Mac 0.2.8을 만들고 실제 Kiro에서 확인했다([0.2.8 확인](
    11. **Next Move 카드:** Task를 마친 직후 Agent Panel의 빌더 탭에 "다음 한 걸음" 카드가 생기고 "고르고 있어요…"가 보였다가 10초 안팎에 후보 3개(번호·제목·한 줄 설명·좋아지는 점·크기)로 바뀌는지 본다. 시작 버튼이 없어야 한다. Builder 완료 메시지 끝에 아이디어를 준비 중이라는 한 줄이 있어야 한다.
    12. **번호로 시작:** 같은 채팅에서 "다음엔 뭘 해 보면 좋을까?"라고 물으면 Builder가 같은 후보 3개를 번호로 전한다. "2번 해 보자"라고 하면 후속 Task가 생기고(목표가 "다음 한 걸음 2번 …"으로 시작) 카드가 사라진다. 그 Task를 마치면 고른 것을 반복하지 않는 새 후보가 뜬다.
 4. **올리기:** 확인한 VSIX와 `receipt.json`, `files.json`을 `releases/windows/kiro-native/`에 넣어 `main`에 올린다(0.2.7 파일은 교체). 커밋 메시지와 이 문서의 Windows 확인 절에 1~12 결과를 남긴다.
+5. **설치 가이드 고치기:** 학습자용 [설치 가이드](DOWNLOAD_GUIDE.md)의 Windows 내려받기 링크·크기·SHA-256과 "Windows용 0.2.8은 준비 중" 문장, README "다운로드·설치"의 Windows 링크를 0.2.8로 바꾼다. 0.2.7 파일을 지우면 지금 링크가 끊기므로 4와 같은 커밋에서 바꾼다. 포스터의 설치 QR이 이 가이드를 가리킨다.
 
 ## Windows 0.2.7 빌드 요청 (frontend)
 

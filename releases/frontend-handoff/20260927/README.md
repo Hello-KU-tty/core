@@ -9,7 +9,7 @@
 - Core 소스: commit `d8768d166dbe6d763bce13bd000c2fd54140407f`와 후속 문서·소스 묶음 목록 보완. Mac Node cache·구 설치 제거/프로젝트 이동 복구와 임시 경로 native 설정 충돌 수정을 포함한다.
 - 프론트 소스: [e65cd7f](https://github.com/Hello-KU-tty/program/commit/e65cd7ff341e34bd6b160c468225819b0ab02254); 기능 기준 a61d408, 버전 0.0.18, [kit 출처](frontend-handoff-receipt.json).
 - SOURCE_MANIFEST.json에 모든 backend/frontend 파일의 SHA-256을 기록했다. 문서의 개인 경로만 일반화했고 실행 소스와 테스트는 그대로다. Core dirty 표시는 제외된 로컬 자료·배포 파일 갱신도 반영하며 Git 이력·PDF/PPTX·DB·대화·개발 node_modules는 포함하지 않는다. 파일 hash가 snapshot의 정확한 기준이다.
-- Node.js 24.19.0·pnpm 11.13.1을 사용한다. ZIP 최상위 README 및 [다운로드·빌드 안내](../../../docs/DOWNLOAD_GUIDE.md#7-vsix가-작동하지-않을-때-개발자용-대안)를 따른다.
+- Node.js 24.19.0·pnpm 11.13.1을 사용한다. ZIP 최상위 README 및 [다운로드·빌드 안내](../../../docs/archive/preliminary/DOWNLOAD_GUIDE_PRELIMINARY.md#7-vsix가-작동하지-않을-때-개발자용-대안)를 따른다.
 - Windows portable은 공개 frontend의 원본 자산·라이선스를 포함한다. Mac은 backend/에서 `pnpm panel:pack:macos ../frontend`로 별도 빌드한다.
 - Mac 압축 해제본의 전체 check·807개 프론트 테스트·Mac 재빌드를 검증했다. VSIX0.1.3 재빌드72항목 hash가 로컬 Mac 후보와 일치한다. 최종 ZIP에는 실행 소스가 같은 상태에서 후속 문서와 소스 선택 목록·회귀만 추가했다. 새 Windows 설치나 실제 모델 완주를 이번 자동 검사로 주장하지 않는다. ZIP 내부 보고는10:57까지의 동결 기록이며, 이후 승인된 Decision 반영·취소·재개 결과는 저장소의 [실제 설치본 검증 보고](../../../docs/archive/preliminary/MAC_NATIVE_VERIFICATION_20260930.md)에 추가했다. 검증 후 제품 소스·ZIP bytes/hash는 변경하지 않았다.
 

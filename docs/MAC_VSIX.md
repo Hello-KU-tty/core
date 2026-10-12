@@ -1,5 +1,7 @@
 # Mac VSIX 설치
 
+> **예선 설치물 기록:** Kiro 1.1.70 전용 예선 설치물이다. 본선 설치물(Kiro-native 0.2.x)은 [설치 가이드](DOWNLOAD_GUIDE.md)를 따른다.
+
 현재 설치물은 Apple Silicon Mac(`darwin-arm64`)용 Hello Vibe **0.1.4**다. 공개 frontend **0.0.18 (`a61d408`, checkout `e65cd7f`)**과 Core `d8768d1`의 복구 변경, `f3abfae`의 권한 거부 수정을 포함한다. 0.1.4는 도구 요청 하나가 거부돼도 Builder 턴이 취소되지 않는다([수정 기록](archive/preliminary/PERMISSION_DENIAL_FIX_20260930.md)). 완료 뒤 지속 대화·중복 요약 제거, 구 설치 제거·프로젝트 이동 후 도구 복구와 임시 경로에서 개발용 receipt가 native 설정 검사에 충돌하는 문제를 보완했다. Kiro IDE 1.1.70 / 내장 Agent 1.1.158 / API 1.131.0의 source hash를 확인한다. Kiro는 `/Applications/Kiro.app`에 설치하고 본인 계정으로 로그인한다. Intel Mac은 지원 대상이 아니다.
 
 [Mac용 VSIX 고정 경로](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/0.1.0/builder-helper-agent-panel-0.1.0-darwin-arm64.vsix) · 41,583,526 bytes · SHA-256 `aeee42e22b6b829064b605a973c4c078b5aaccc7b71f6806fbec1fda3bdafa27`
@@ -40,7 +42,7 @@ Core/SQLite는 확장 전용 global storage 아래 `core-data`, 생성 프로젝
 
 ## 재현
 
-Mac 패키징 구현은 이 저장소와 최신 [개발자 ZIP](DOWNLOAD_GUIDE.md#7-vsix가-작동하지-않을-때-개발자용-대안)에 포함된다. 프론트 경로는 반드시 명시한다. 과거 ZIP에 덮어쓰지 않는다.
+Mac 패키징 구현은 이 저장소와 최신 [개발자 ZIP](archive/preliminary/DOWNLOAD_GUIDE_PRELIMINARY.md#7-vsix가-작동하지-않을-때-개발자용-대안)에 포함된다. 프론트 경로는 반드시 명시한다. 과거 ZIP에 덮어쓰지 않는다.
 
 고정 Node 24.19.0·pnpm 11.13.1 환경에서 frontend 의존성을 `npm ci --ignore-scripts`로 설치한 후, backend 폴더에서:
 

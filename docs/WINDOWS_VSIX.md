@@ -1,5 +1,7 @@
 # Windows VSIX 설치
 
+> **예선 설치물 기록:** Kiro 1.1.70 전용 예선 설치물이다. 본선 설치물(Kiro-native 0.2.x)은 [설치 가이드](DOWNLOAD_GUIDE.md)를 따른다.
+
 현재 설치 후보는 Windows x64용 Vibe Helper **0.0.18**이다. 지원 기준은 Kiro IDE **1.1.70** / 내장 Agent **1.1.158**이다. Windows ARM64와 다른 Kiro·Agent 버전은 이번 검증 대상이 아니다.
 
 **[Windows용 VSIX 0.0.18 다운로드](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/windows/0.0.18/builder-helper-agent-panel-0.0.18-win32-x64-74208fffa5c0.vsix)** · 2,573,191 bytes · [패키지 검증 receipt](../releases/windows/0.0.18/program-vsix-receipt.json)
@@ -38,7 +40,7 @@ Core는 확장이 자동으로 준비한다. Node·pnpm 수동 설치나 별도 
 - 저장된 도구가 사라지거나 변조되면 원인을 표시한다. `PROJECT_RECORDED_NODE_UNAVAILABLE` 또는 `PROJECT_RECORDED_PNPM_UNAVAILABLE`이면 기존 도구 설치 상태를 확인한다. `PROJECT_RECORDED_TOOLCHAIN_INVALID`이면 저장된 도구 설정과 실행기 변경 여부를 확인한다. 로컬 DB나 프로젝트를 삭제하지 않는다.
 - 도우미 답변 끝부분을 다시 표시하던 `도우미 답변 요약` 영역을 제거했다. 실시간 답변, 사용자 질문과 대화 상태는 유지한다. 재접속 후 전체 답변 복원을 새로 추가한 버전은 아니다.
 
-Core 연결 실패는 명령 팔레트(`Ctrl+Shift+P`)의 **Vibe Helper: Retry Core Connection**으로 재시도한다. 지원 버전·Agent 오류 등은 [공통 문제 해결](DOWNLOAD_GUIDE.md#6-업데이트와-문제-해결)을 확인한다.
+Core 연결 실패는 명령 팔레트(`Ctrl+Shift+P`)의 **Vibe Helper: Retry Core Connection**으로 재시도한다. 지원 버전·Agent 오류 등은 [공통 문제 해결](archive/preliminary/DOWNLOAD_GUIDE_PRELIMINARY.md#6-업데이트와-문제-해결)을 확인한다.
 
 ## 검증 범위
 

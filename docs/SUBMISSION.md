@@ -76,7 +76,7 @@ npm run build
 - 실제 사용 후 정성 인터뷰는 있으나 일반 Kiro 비교와 정량 학습 효과 검증은 없다. 학습 향상·완주율·비용 우월성을 주장하지 않는다.
 - Analyst는 미래 계획을 실제 수행으로 잘못 분류할 수 있다. Core의 구조·출처 검증이 자연어 의미까지 보장하지 않는다. [기존 전표본 결과](spikes/t19-analyst-prompt-experiments/README.md)를 보존하며, 모델 품질 전체 PASS로 표시하지 않는다.
 - Helper의 실제 설명에서 평점 동률 책 순서 오류가 있었다. 실행 결과와 설명을 각각 검증해야 한다.
-- 9/29의 Windows0.0.10은 과거 검사 대상이다. 현재 Windows0.0.18과 Mac 후보의 정확한 버전·hash·검증 범위는 [설치 안내](DOWNLOAD_GUIDE.md)를 따른다. 새 Mac 설치본 native 전체 흐름은 미검증이다.
+- 9/29의 Windows0.0.10은 과거 검사 대상이다. 현재 Windows0.0.18과 Mac 후보의 정확한 버전·hash·검증 범위는 [설치 안내](archive/preliminary/DOWNLOAD_GUIDE_PRELIMINARY.md)를 따른다. 새 Mac 설치본 native 전체 흐름은 미검증이다.
 - Mac Apple Silicon 설치 parser·실제 Core/SQLite·도구는 자동 검증했다. Intel Mac, 모든 키보드/보조공학 조합, 장기 안정성과 모든 Kiro 버전의 호환성은 인증하지 않았다. 생성 코드는 OS 수준 sandbox가 아니다.
 - redaction은 알려진 형태 중심이며 모든 개인정보를 탐지하지 못한다. 비밀정보를 입력하지 않아야 한다. local reset/export/자동 삭제는 아직 제공하지 않는다.
 

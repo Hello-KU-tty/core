@@ -74,24 +74,15 @@ Kiro IDE
 
 ## 다운로드·설치
 
-Mac **0.1.4**와 개발자 ZIP을 제공한다. 개발자 ZIP은 0.1.3 기준이며 0.1.4의 권한 거부 수정은 이 저장소 소스에 있다. Windows 설치물은 **0.0.18**을 유지한다. [현재 제출·검증 상태](docs/archive/preliminary/VALIDATION_STATUS_20260930.md)에서 설치물, 사람 인터뷰와 미검증 범위를 구분한다.
+본선 설치물은 Kiro-native **0.2.8**(Apple Silicon Mac)과 **0.2.7**(Windows x64)이다. 준비물, 내려받기, 첫 프로젝트, 업데이트와 문제 해결은 **[설치 가이드](docs/DOWNLOAD_GUIDE.md)**에 있다.
 
-다운로드 파일 선택부터 첫 실행·업데이트·오류 해결까지는 **[다운로드·설치 가이드](docs/DOWNLOAD_GUIDE.md)**를 참고한다.
+**[Mac용 0.2.8 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/kiro-native/builder-helper-agent-panel-0.2.8-darwin-arm64.vsix)** · **[Windows용 0.2.7 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/windows/kiro-native/builder-helper-agent-panel-0.2.7-win32-x64.vsix)**
 
-**[Windows용 VSIX 0.0.18 다운로드](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/windows/0.0.18/builder-helper-agent-panel-0.0.18-win32-x64-74208fffa5c0.vsix)** · Windows x64용. Kiro IDE 1.1.70 / 내장 Agent 1.1.158 기준이며 [Windows 설치 안내·검증 범위](docs/WINDOWS_VSIX.md)를 확인한다.
+1. [Kiro IDE](https://kiro.dev/downloads/) 최신판과 Kiro CLI(2.21.1 이상)를 설치하고 둘 다 로그인한다.
+2. Kiro Extensions → `…` → `Install from VSIX…`로 설치한 뒤 다시 로드한다.
+3. Agent Panel에서 배우고 싶은 것을 입력해 프로젝트를 고르고, **이걸로 시작** 뒤 Kiro 채팅의 새 세션에서 만든다.
 
-**[Mac용 VSIX 0.1.4 고정 다운로드 경로](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/0.1.0/builder-helper-agent-panel-0.1.0-darwin-arm64.vsix)** · Apple Silicon(M1 이상)용. 기존 주소·파일명의 `0.1.0`은 호환 경로이며 설치 파일 내부 버전은 **0.1.4**이다. 버전·hash로 구분한다. Intel Mac은 지원 대상이 아니다. [Mac 설치 안내·검증 범위](docs/MAC_VSIX.md)를 확인한다.
-
-1. [Kiro IDE](https://kiro.dev/downloads/)를 설치하고 본인 계정으로 로그인한다.
-2. Windows x64에서는 위 `win32-x64.vsix`를 받는다. Mac에서는 Kiro를 `/Applications/Kiro.app`에 설치하고 위 `darwin-arm64.vsix`를 받는다.
-3. Kiro에서 Extensions → `…` → `Install from VSIX…`로 설치한 뒤 다시 로드한다.
-4. Agent Panel을 열고 배우고 싶은 기술을 입력한다.
-
-별도 서비스 로그인이나 API Key는 없다. 모델 사용량은 사용자 본인의 Kiro 계정에서 차감된다. 첫 실행 때 생성 앱의 도구·의존성 준비를 위해 network가 필요할 수 있다. VSIX 사용에는 Node·pnpm 수동 설치나 백엔드 수동 실행이 필요하지 않다. Mac 설치 후보의 검증 기준은 Kiro IDE 1.1.70 / Agent 1.1.158이다. 설치·Core 자동 검사와 실제 앱 생성·실행, Decision 선택·반영, 별도 Helper, 재시작 복원·취소 후 재개를 확인했다. 검증 범위와 복구 과정의 실패는 [실제 설치본 검증 보고](docs/archive/preliminary/MAC_NATIVE_VERIFICATION_20260930.md)에 구분한다.
-
-VSIX가 작동하지 않으면 먼저 [연결 오류 해결](docs/DOWNLOAD_GUIDE.md#6-업데이트와-문제-해결)을 확인한다. [개발자용 ZIP](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/frontend-handoff/20260927/frontend-handoff-20260927.zip)은 백엔드·프론트 전체 실행 소스로 갱신했다. 새 폴더에 풀어 [소스 재빌드 안내](docs/DOWNLOAD_GUIDE.md#7-vsix가-작동하지-않을-때-개발자용-대안)를 따른다. ZIP 자체는 확장 설치 파일이 아니다.
-
-Mac과 개발자 ZIP은 공개 frontend `a61d408`(0.0.18)과 대응 Core를 기준으로 한다. 완료 뒤 Builder·Helper 대화 유지, 기록된 Node·pnpm 재사용, 중복 Helper 요약 제거를 포함한다. Mac0.1.3에는 구 설치 제거·프로젝트 이동 뒤 도구 복구와 임시 경로 설치 시 native 역할 설정 충돌 수정을 포함한다. Mac0.1.4는 도구 요청 하나가 거부돼도 Builder 턴이 취소되지 않도록 고쳤다([수정 기록](docs/archive/preliminary/PERMISSION_DENIAL_FIX_20260930.md)). Mac 패키지 버전과 Windows 패키지 버전은 별도로 관리한다.
+별도 서비스 계정이나 API Key는 없고, 모델 사용량은 본인 Kiro 계정에서 차감된다. Node·pnpm 수동 설치도 필요 없다. 예선 설치물(Mac 0.1.4, Windows 0.0.18, Kiro 1.1.70 전용)과 개발자 ZIP은 [예선 다운로드 가이드](docs/archive/preliminary/DOWNLOAD_GUIDE_PRELIMINARY.md)에 남아 있다. 아래 "최근 검증 결과"는 예선 설치물 기준이고, 본선 설치물의 확인 기록은 [본선 인계 문서](docs/FRONTEND_KIRO_NATIVE_HANDOFF.md)에 있다.
 
 ## 개발 환경과 검증
 
