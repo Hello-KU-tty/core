@@ -1,6 +1,6 @@
 # Hello Vibe 설치 가이드
 
-Hello Vibe는 Kiro IDE 확장입니다. Agent Panel에서 배우고 싶은 것을 바탕으로 만들 프로젝트를 고르고, 실제 만들기는 Kiro 채팅에서 합니다. 이 문서는 본선 설치물 **0.2.8**(Mac) 기준입니다.
+Hello Vibe는 Kiro IDE 확장입니다. Agent Panel에서 배우고 싶은 것을 바탕으로 만들 프로젝트를 고르고, 실제 만들기는 Kiro 채팅에서 합니다. 이 문서는 본선 설치물 **0.2.9**(Mac) 기준입니다.
 
 ## 1. 준비물
 
@@ -16,23 +16,23 @@ Hello Vibe 계정이나 API 키는 없습니다. Node.js, pnpm 같은 개발 도
 
 | 운영체제 | 설치 파일 |
 | --- | --- |
-| Mac (Apple Silicon) | **[0.2.8 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/kiro-native/builder-helper-agent-panel-0.2.8-darwin-arm64.vsix)** (약 40MB) |
+| Mac (Apple Silicon) | **[0.2.9 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/kiro-native/builder-helper-agent-panel-0.2.9-darwin-arm64.vsix)** (약 40MB) |
 | Windows (x64) | **[0.2.7 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/windows/kiro-native/builder-helper-agent-panel-0.2.7-win32-x64.vsix)** (약 2.5MB) |
 
-링크를 누르면 `.vsix` 파일이 바로 내려받아집니다. Windows용 0.2.8은 준비 중입니다. 0.2.7에는 아래 4단계 8번의 "다음 한 걸음" 카드가 없고, 나머지 흐름은 같습니다. 새 파일이 올라오면 [Windows 설치 파일 폴더](../releases/windows/kiro-native/)에서도 받을 수 있습니다.
+링크를 누르면 `.vsix` 파일이 바로 내려받아집니다. Windows용 0.2.9는 준비 중입니다. 0.2.7에는 아래 4단계 8번의 "다음 한 걸음" 카드, 새 채팅 세션 자동 열기, "내가 고른 게 아니야" 되돌리기가 없고, 나머지 흐름은 같습니다. 새 파일이 올라오면 [Windows 설치 파일 폴더](../releases/windows/kiro-native/)에서도 받을 수 있습니다.
 
 <details>
 <summary>파일이 온전한지 확인하기 (선택)</summary>
 
 | 파일 | SHA-256 |
 | --- | --- |
-| Mac 0.2.8 | `5d955debd430f24485f92970a8e285ad98ef83c57a6de907d8ceae82b216ccef` |
+| Mac 0.2.9 | `922d73b7afcfb39f144c257c41ae5d95ad7fd63cbfc8fd45e55771c7e3603239` |
 | Windows 0.2.7 | `66bb080ee62e58bf1cdfc58d7a36a7088ed7831d4ed5b4943aef93a6c7393c04` |
 
 Mac 터미널:
 
 ```sh
-shasum -a 256 ~/Downloads/builder-helper-agent-panel-0.2.8-darwin-arm64.vsix
+shasum -a 256 ~/Downloads/builder-helper-agent-panel-0.2.9-darwin-arm64.vsix
 ```
 
 Windows PowerShell:
@@ -85,14 +85,15 @@ Windows에서 Node.js 24가 없으면 첫 실행 때 Hello Vibe가 Node.js 24.19
 3. 마음에 드는 후보에서 **이걸로 진행**을 누릅니다. 원하는 게 없으면 방향을 적고 **보완하기**를 누릅니다.
 4. 계획(이번 프로젝트의 범위, 만들면서 정하게 될 것들)을 읽고, 고칠 곳이 있으면 적어서 **이 내용으로 고치기**, 괜찮으면 **이걸로 시작**을 누릅니다.
 5. 처음 한 번 명령 승인 방식을 묻습니다.
-   - **개발 명령 미리 승인:** 설치·빌드·테스트 같은 자주 쓰는 명령은 묻지 않습니다. 파일 삭제, 배포, git push 같은 명령은 계속 묻습니다.
+   - **개발 명령 미리 승인:** 설치·빌드·테스트, 내 컴퓨터 서버 확인과 브라우저로 열기 같은 자주 쓰는 명령은 묻지 않습니다. 파일 삭제, 배포, git push 같은 명령은 계속 묻습니다. Kiro 채팅도 Autopilot으로 시작해서 파일 수정을 하나씩 검토하지 않아도 됩니다(Kiro 채팅에서 직접 모드를 바꾼 적이 있으면 그 선택을 따릅니다).
    - **수동으로 승인:** 명령마다 Kiro가 확인을 받습니다.
    - 나중에 명령 팔레트의 **Vibe Helper: Change Command Approval**로 바꿀 수 있습니다.
-6. Hello Vibe가 이 프로젝트를 Kiro 채팅에 연결합니다. 신뢰나 다시 로드 안내가 나오면 따릅니다. 그다음 Kiro 채팅의 **+** 버튼으로 새 세션을 열고 "시작하자"처럼 말하면 Kiro가 계획대로 만들기 시작합니다.
-7. 만들다가 정해야 할 것이 생기면 Kiro가 번호가 붙은 선택지로 묻습니다. 번호와 함께 **고른 이유를 한 문장** 적어 주세요. 그 이유가 학습 기록의 근거가 됩니다. "응"이나 버튼 클릭만으로는 이해했다고 기록하지 않습니다.
-8. 작업 하나가 끝나면 Agent Panel **빌더** 탭에 "다음 한 걸음" 카드가 10초 안팎에 뜹니다(0.2.8부터). 이 프로젝트를 키울 방향 3개가 나옵니다. 하고 싶은 것이 있으면 Kiro 채팅에 번호를 말하면 이어서 만듭니다. 그냥 두거나, 원하는 기능을 직접 말해도 됩니다.
+6. Hello Vibe가 이 프로젝트를 Kiro 채팅에 연결합니다. 신뢰나 다시 로드 안내가 나오면 따릅니다. 연결이 끝나면 Hello Vibe가 Kiro 채팅에 새 세션을 열어 줍니다(0.2.9부터). 거기서 "시작하자"처럼 말하면 Kiro가 계획대로 만들기 시작합니다. 새 세션이 열리지 않았으면 Kiro 채팅의 **+** 버튼으로 엽니다.
+7. 만들다가 정해야 할 것이 생기면 Kiro가 번호가 붙은 선택지로 묻고 기다립니다. 번호와 함께 **고른 이유를 한 문장** 적어 주세요. 그 이유가 학습 기록의 근거가 됩니다. "응"이나 버튼 클릭만으로는 이해했다고 기록하지 않습니다. 묻는 중에 궁금한 걸 물어봐도 선택으로 기록되지 않습니다. 고르지 않은 선택이 기록됐다면 채팅에 "그건 내가 고른 게 아니야"라고 말하세요. 그 선택을 기록에서 빼고 다시 물어봅니다(0.2.9부터).
+8. 작업이 끝나면 Kiro가 만든 앱의 서버를 켜 둔 채 브라우저로 열어 주고 주소를 알려 줍니다.
+9. 작업 하나가 끝나면 Agent Panel **빌더** 탭에 "다음 한 걸음" 카드가 10초 안팎에 뜹니다(0.2.8부터). 빌더 탭에는 지금 Kiro 채팅이 기다리는 질문, 이번 작업에서 인정된 학습 기록, 이번 작업의 결정도 한 줄씩 보입니다. 이 프로젝트를 키울 방향 3개가 나옵니다. 하고 싶은 것이 있으면 Kiro 채팅에 번호를 말하면 이어서 만듭니다. 그냥 두거나, 원하는 기능을 직접 말해도 됩니다.
 
-**질문하기:** Kiro 채팅에서 새 탭을 열고 에이전트 목록에서 `vibe-helper`를 고르거나, 채팅에 `/vibe-helper 질문`을 입력합니다. 도우미는 코드를 읽고 설명만 하며 수정하지 않습니다. 고칠 것은 만들기를 하던 채팅 탭에 부탁합니다.
+**질문하기:** 만들기를 하던 채팅에 `/vibe-helper 질문`을 입력합니다. 그 질문에는 코드를 읽고 설명만 하며 수정하지 않습니다. 고칠 것은 `/vibe-helper` 없이 이어서 부탁합니다.
 
 **기록 보기:** Agent Panel의 **학습 기록** 탭에서 내 발언과 선택, 분석 결과를 봅니다. 학습 요약은 프로젝트 폴더의 `.vibe-helper/learner-profile.md`에 저장되고, **새 채팅 세션부터** Kiro의 설명에 반영됩니다.
 
@@ -104,7 +105,9 @@ Windows에서 Node.js 24가 없으면 첫 실행 때 Hello Vibe가 Node.js 24.19
 2. 열려 있는 Kiro 창을 모두 닫았다가 다시 엽니다. 이전 Core가 끝나기 전에는 "이전 버전의 Core를 사용하는 Kiro 창이 종료되기를 기다리고 있어요"가 보일 수 있습니다. 다른 Kiro 창을 닫고 **Vibe Helper: Retry Core Connection**을 실행합니다.
 3. 이전 프로젝트와 Kiro 채팅 연결은 그대로 남습니다. 다시 연결하지 않아도 됩니다.
 
-0.2.8을 한 번 실행하면 저장소 형식이 바뀌어 0.2.7 이하로 되돌릴 수 없습니다.
+0.2.9를 한 번 실행하면 저장소 형식이 바뀌어 0.2.8 이하로 되돌릴 수 없습니다.
+
+이전 버전이 터미널과 출력 창을 Kiro 채팅 자리로 옮겼을 수 있습니다. 0.2.9를 처음 열 때 "원래 배치로 되돌리기"를 물으면 누르세요(Kiro 화면 배치가 처음 상태로 돌아갑니다).
 
 ## 6. 문제가 생기면
 
@@ -126,7 +129,7 @@ Windows에서 Node.js 24가 없으면 첫 실행 때 Hello Vibe가 Node.js 24.19
 
 - **저장 위치:** 학습 목표, 채팅 발언, 선택과 이유, 분석 결과는 이 컴퓨터의 로컬 SQLite(Kiro의 확장 전용 저장 공간)에 저장됩니다. 클라우드 동기화는 없습니다. 자동 삭제와 내보내기 기능은 아직 없습니다.
 - **채팅 기록:** 연결한 프로젝트 폴더의 Kiro 채팅 발언은 학습 기록으로 저장됩니다. 저장 전에 알려진 형태의 비밀 정보는 가리지만 완벽하지 않습니다. 토큰, 비밀번호, 개인정보는 입력하지 마세요.
-- **프로젝트 폴더에 생기는 파일:** `.kiro/`(Kiro 설정: steering, hook, MCP, 도우미 에이전트, Spec)와 `.vibe-helper/`(학습 요약)입니다.
+- **프로젝트 폴더에 생기는 파일:** `.kiro/`(Kiro 설정: steering, hook, MCP, Spec)와 `.vibe-helper/`(학습 요약)입니다. 0.2.8 이하가 만든 도우미 에이전트 파일(`.kiro/agents/vibe-helper.json`)은 0.2.9가 다시 연결할 때 지웁니다.
 - **모델 사용량:** 본인 Kiro 계정의 크레딧이 쓰입니다. Kiro 채팅(만들기, 도우미)은 Kiro IDE 계정, 후보 찾기·계획·학습 분석·다음 한 걸음은 Kiro CLI 계정에서 차감됩니다.
 - **삭제:** 확장 화면에서 Hello Vibe를 제거해도 기록과 프로젝트 폴더는 남습니다.
 
@@ -144,7 +147,7 @@ pnpm panel:pack:macos <program 폴더>          # Mac
 pnpm panel:pack:kiro-windows <program 폴더>   # Windows
 ```
 
-결과는 core 폴더의 `dist/`에 생깁니다. 0.2.8의 "다음 한 걸음" 카드는 program의 `feat/next-move-card` 브랜치에 있고, `main`에 합쳐지기 전까지는 그 브랜치로 빌드합니다. Windows 빌드와 확인 절차는 [본선 인계 문서](FRONTEND_KIRO_NATIVE_HANDOFF.md#windows에서), 저장소 검증은 [README](../README.md#개발-환경과-검증)에 있습니다.
+결과는 core 폴더의 `dist/`에 생깁니다. 0.2.9의 패널(다음 한 걸음 카드, 빌더 탭 정리, 남은 시간 표시)은 program의 `feat/k17-panel` 브랜치에 있고, `main`에 합쳐지기 전까지는 그 브랜치로 빌드합니다. Windows 빌드와 확인 절차는 [본선 인계 문서](FRONTEND_KIRO_NATIVE_HANDOFF.md#windows에서), 저장소 검증은 [README](../README.md#개발-환경과-검증)에 있습니다.
 
 ## 예선 설치물
 

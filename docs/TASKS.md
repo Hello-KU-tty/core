@@ -136,6 +136,126 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - **기한:** 내부 10/18, 본선 발표 10/19 전.
 - **진행:** backend 구현과 자동 검사 완료(2026-10-12, Node 24.19.0): 계약(`next-move.ts`, Task `nextMove`, Kiro 채팅 `nextMove`, Helper context, `UI_READ_NEXT_MOVE`·`UI_RETRY_NEXT_MOVE`, worker용 `NEXT_MOVE_*`), domain 전이·view·번호 판정, migration 0008, Core(완료 때 job, lease·회수·재시도·실패, 최신 Task가 아니면 닫기, 고른 번호 검증과 후속 Task provenance), kiro-adapter `NextMoveJobAdapter`, Analyst와 따로 도는 Next Move worker, local-backend `NEXT_MOVE` mode, Discovery prompt 1.4.0(NEXT MOVE turn), Steering 0.8.0. `pnpm typecheck`·`db:check` 통과, unit 177 통과·3 skip, integration 542 통과·9 skip(새 Next Move 14개 포함), eval 47 통과·1 skip, 패널 CJS 187 통과·2 skip, 바꾼 파일 Biome 통과(기존 `application-service.ts` 287행 지적 1건 제외). 제품 경로 실측([결과](../tests/eval/results/next-move-v1.4.0.md)): Task 완료부터 후보 저장까지 7.2~9.3초, 동시에 돈 Analyst 7.4~9.7초, 4번 모두 첫 시도 READY, 회당 약 0.036크레딧. 패널 카드는 frontend 저장소 `feat/next-move-card`(`6a6a557`, `main`에서 분기)에 backend가 구현했다(사용자 결정, 2026-10-12): 빌더 탭의 생성 중 한 줄·후보 3개와 Kiro 채팅 안내·실패와 "다시 만들기", Kiro-native에서 Final Upgrade 숨김, 생성 중 1.5초·그 밖 4초 간격 다시 읽기, `vendor/frontend-client`를 backend `main`으로 갱신. frontend typecheck 통과, `npm test` 828 통과(새 10개), headless Chromium 1280·420·300px 미리보기에서 가로 넘침·콘솔 오류 없음. Mac 설치물 0.2.8(backend `10eaafb`, frontend `6a6a557`, 두 checkout 깨끗함, 포장 검사 9 PASS)을 실제 Kiro에서 확인했다([결과](../tests/eval/results/next-move-v1.4.0.md#실제-kiro-확인-028-2026-10-12)): 기존 K14 DB가 0008로 올라가며 기록 유지, Task 완료 → 패널 생성 중(1.9초) → 후보 3개(9.8초) → 학습자 질문에 Builder가 같은 후보 전달 → "2번 해 보자"로 후속 Task(출처 보존, 카드 사라짐) → 완료 → 고른 것을 반복하지 않는 새 후보(10.3초). job 8.3·8.9초, 같이 돈 Analyst 7.8·6.5초, 약 7.5크레딧. Windows 0.2.8은 frontend가 `feat/next-move-card`를 `main`에 합친 뒤 빌드한다([인계](FRONTEND_KIRO_NATIVE_HANDOFF.md#windows-028-빌드-요청-frontend)). 알려진 점: Builder가 크기를 영어 값("SMALL")으로 전함, 실패·다시 만들기는 실제 화면이 아니라 테스트로만 확인.
 
+### [ ] K16. 첫 후보 화면에서 바구니 없이 방향만 적어 보완하기
+
+- **출처:** 사용자 직접 체험(2026-10-12, 체험 빌드 backend `57ef752`·frontend `88275f6`). 처음 받은 후보 10개 화면에서 바구니를 비운 채 방향을 적고 "보완하기"를 누르자 "요청을 처리하지 못했습니다. 다시 시도해 주세요."가 떴다. 사용자 판단: 마음에 드는 후보가 없을 때 방향만 적어 요청하는 것도 정상 사용이다.
+- **원인:** 첫 화면의 후보는 미리보기뿐이고 Core에는 후보 라운드가 아직 없다. Core는 피드백이 가리키는 후보를 채워 첫 라운드를 만들 수 있을 때만 받는다(`#recordDiscoveryFeedback`의 `canMaterializeReferencedPreviews`, 대상 1개 이상 필요). 패널은 글만 있는 보완을 대상 없는 `REGENERATE`로 보내고 그 전에 라운드를 준비하지 않아 `DISCOVERY_ROUND_NOT_CURRENT`로 거절된다. 패널은 이 코드를 몰라 일반 문구를 보인다. 모델 호출 전 거절이라 크레딧은 쓰지 않는다. 입력 없이 누르는 `MORE`는 먼저 `ENRICH_ALL`로 라운드 1을 만들므로 통과하고, 라운드가 생긴 뒤에는 글만 적어도 통과한다. 0.2.7 배포본에도 같은 문제가 있다(frontend `c2c873c`부터 보완 버튼이 하나). frontend 테스트는 라운드가 이미 있는 상태만 다뤘다.
+- **재현:** 모델 호출 없는 Core 테스트에서 미리보기만 있는 상태의 대상 없는 `REGENERATE`는 `DISCOVERY_ROUND_NOT_CURRENT`, 후보 1개를 채운 뒤 `REVISE`는 통과, 라운드 1이 생긴 뒤 대상 없는 `REGENERATE`는 통과.
+- **범위(초안):** 미리보기만 있는 상태에서 바구니 없이 글만 적은 보완이 새 후보 라운드로 이어지게 한다(패널이 먼저 라운드를 준비할지, Core가 미리보기 상태의 대상 없는 피드백을 받을지는 구현 전에 정한다). 크레딧이 덜 드는 쪽을 우선한다. 알 수 없는 오류 코드도 쓸 수 있는 안내로 보인다.
+- **완료 조건:** 미리보기 상태의 대상 없는 보완을 다루는 Core integration·frontend 테스트, 기존 Discovery 회귀 없음, 실제 Kiro 패널에서 첫 화면 → 방향만 적어 보완하기 → 새 후보 1회, Mac VSIX 재생성.
+
+### [~] K17. 직접 체험 후속: 선택 위조 방지, 중단된 턴, 시작 흐름과 패널 정리
+
+- **출처:** 사용자 직접 체험(2026-10-12, 체험 빌드 backend `57ef752`·frontend `88275f6`, Kiro 1.2.56)과 Kiro 세션 기록·체험 Core DB 분석.
+  - Builder(Kiro Auto)가 자기 답변 끝에 학습자 차례를 지어내고("user2번으로 가자") 바로 `save_choice`를 불렀다.
+  - Core는 질문 뒤 Builder 탭 학습자 발언이 하나라도 있으면 기록을 받는다. 그래서 잠금 방식 Decision이 학습자 선택으로 남았고, 그 위에 "SQLite Locking: 설명함" Evidence가 섰다.
+  - 두 번째로 지어낸 답은 같은 턴이라 거절됐지만, Builder는 멈추지 않고 구현을 이어 갔다.
+  - 같은 체험에서 나온 문제:
+    - 중단된 턴의 Builder 답이 Core에 들어가지 않는다.
+    - 신뢰 전에 만들어진 채팅 세션이 Supervised로 남는다.
+    - 패널이 하단 패널 전체를 채팅 자리로 옮긴다.
+    - `/vibe-helper`가 두 개로 보인다.
+    - Builder가 완료 뒤 서버를 끄고 데이터를 지운다.
+    - 패널이 채팅 중에 무엇을 보여 줄지 흐리다.
+- **결정(사용자, 2026-10-12):**
+  - Core 판정을 "가장 최근 발언만 답"처럼 좁히지 않는다. 위조는 Steering으로 막는다.
+  - 위조는 형태가 다양하다. 그래서 학습자가 "내가 고른 게 아니다"라고 하면 되돌리는 경로를 둔다.
+  - 미리 승인 목록에 브라우저 열기를 더한다.
+  - 고친 뒤 Next Move를 포함한 버전으로 다시 빌드한다.
+  - 나머지는 분석 때 낸 제안을 따른다. 구현 전에 DECISIONS(필요하면 SPEC)에 기록한다.
+- **범위와 순서:**
+  1. **선택 위조 방지(Steering 0.9.0):**
+     - 선택지를 보여 준 응답은 질문으로 끝낸다. 학습자의 말이나 차례는 어떤 형태로도 쓰지 않는다.
+     - 질문 뒤 학습자가 다시 묻거나 설명을 정리한 것은 선택이 아니다.
+     - `save_choice`가 거절되면 그 선택에 기대는 구현을 멈추고, 다시 물은 뒤 턴을 끝낸다.
+  2. **선택 되돌리기(Core·Steering):**
+     - 학습자가 기록된 선택을 자기가 고르지 않았다고 하면(말투 무관), Builder가 기존 `save_choice`로 알린다. 새 도구는 만들지 않는다.
+     - Core는 그 해결을 "학습자 확인 안 됨"으로 무르고 Decision을 다시 연다. 그 선택을 출처로 쓴 Evidence를 빼고 Concept State를 다시 계산한다.
+     - Builder는 다시 묻고, 답에 맞게 코드를 고친다.
+     - 되돌리기는 상태를 낮추는 쪽이다. 그래서 Core는 해결 뒤 Builder 탭 학습자 발언이 있는지만 확인한다.
+     - Core에는 지금 Evidence를 빼는 상태가 없다. 계약과 저장소 변경을 SPEC·DECISIONS에 먼저 정한다.
+  3. **중단된 턴 기록(hook·Core):**
+     - Kiro는 중단된 턴에 Stop hook을 부르지 않는다. 대신 세션 기록에 `turn_end stopReason: "cancelled"`를 남긴다.
+     - 다음 UserPromptSubmit에서 hook이 이 기록을 읽는다. Stop hook이 이미 쓰는 `lastAssistantReply` 경로를 재사용한다.
+     - 직전 턴이 중단으로 끝났으면 그 턴의 Builder 답을 "중단됨" 표시와 함께 새 학습자 발언보다 먼저 기록한다. Kiro 실행 ID로 한 번만 기록한다.
+     - 다음 정상 Stop까지 미루면 학습자의 다음 발언보다 뒤에 기록돼 순서가 틀어진다.
+     - 중단된 `/vibe-helper` 질문이 다음 Builder 턴의 답과 짝지어지는 문제도 같이 고친다.
+  4. **미리 승인과 Autopilot(host·adapter):**
+     - "개발 명령 미리 승인"을 고르면 `kiroAgent.agentAutonomy`를 Autopilot으로 쓴다. 연결 뒤에는 `kiroAgent.newSession`(채팅 + 버튼과 같은 Kiro 명령)으로 새 세션을 열어, 지금의 "+ 새 세션" 안내를 대신한다.
+     - 새 세션이 필요한 이유: 신뢰 전에 창이 열리면 Kiro가 3초 안에 세션을 만든다. 신뢰 뒤 다시 로드해도 그 세션을 그대로 불러와서 Supervised로 남는다. 체험 기록: 01:10:35 `session/new`(신뢰 전), 11:26:39 `session/load`.
+     - "수동으로 승인"은 손대지 않는다. Kiro가 기억한 학습자의 마지막 모드 선택이 있으면 그쪽이 이긴다.
+     - 미리 승인 목록에 다음을 더한다.
+       - Mac: `open http://localhost:*`, `open http://127.0.0.1:*`
+       - Windows: `Start-Process http://localhost:*`, `start http://localhost:*`
+       - `*@*` 형태는 뺀다.
+  5. **완료 뒤 서버 켜 두기(Steering):**
+     - 마지막 확인 뒤 개발 서버를 끄지 않고, 학습자가 볼 데이터를 지우지 않는다.
+     - 브라우저로 앱을 열어 주고 주소를 한 줄로 알린다.
+     - 서버는 미리 승인에 걸리는 형태로 띄운다. 예: `PORT=3100 npm start`처럼 앞에 환경 변수를 붙이지 않는다.
+  6. **`/vibe-helper` 하나로(adapter):**
+     - 체험 기록상 두 번째 `/vibe-helper`(11:31)는 Helper 지침 없이, 같은 Builder 세션의 같은 에이전트(`chat-agent`)로 실행됐다.
+     - 슬래시 메뉴에서 봇을 고르면 Helper 에이전트로 넘어가는지 실제 Kiro에서 확인한다.
+     - 넘어가지 않으면 `.kiro/agents/vibe-helper.json`을 더는 쓰지 않고, 다시 연결할 때 지운다. md 하나만 남긴다. DECISIONS 2026-10-09 "Kiro 채팅 Helper 에이전트"를 고친다.
+  7. **패널(frontend 저장소 기능 브랜치, frontend가 합침):**
+     - **터미널 이동 문제:**
+       - `revealAgentPanelOnRight`에서 하단 패널 전체를 옮기는 `movePanelToSecondarySideBar` 대체 경로를 없앤다.
+       - Kiro에 있는 `vscode.moveViews`로 우리 뷰 하나만 옮긴다. 목적지 container는 실측으로 정한다.
+       - 이미 옮겨진 터미널을 되돌리는 방법은 구현 전에 정한다.
+     - **Kiro-native 빌더 탭:** 채팅에 없는 것만 보인다.
+       - 지금 상태 한 줄(진행 중 Task, 기다리는 선택 하나)
+       - 이번 Task에서 새로 인정된 학습 근거
+       - 완료 뒤 Next Move 카드
+       - 한 줄씩 접은 결정 목록
+     - **Discovery·Spec:**
+       - 로딩 중에 예상 시간에서 1초씩 줄어드는 카운트다운을 보인다. 예상 시간을 넘기면 "조금 더 걸리고 있어요"로 바꾼다. 예상 시간은 실측으로 정한다(빈 입력 보완하기 약 2분).
+       - Spec 맨 위 '이대로 시작'을 없애고 footer에만 둔다.
+  8. **0.2.9 빌드:**
+     - `main`(K15 Next Move 포함)으로 Mac VSIX 0.2.9를 만든다.
+     - 체험 환경(`experiments/kiro-user-trial-20261012`)을 DB를 보존하며 올린다.
+     - Windows 0.2.9는 frontend에 요청한다.
+- **완료 조건:**
+  - **평가:** 채팅 Decision 평가 재실행. 새 fixture: 질문 뒤 곁가지 질문이나 설명 정리만 있을 때 기록하지 않음, 거절 뒤 멈춤, 되돌리기. Steering 버전과 결과를 기록한다.
+  - **Core:** 되돌리기 unit·integration(Decision 다시 열림, 연결 Evidence 제외, Concept State 재계산, 되돌린 뒤 다시 기록). 스키마가 바뀌면 기존 DB를 보존하는 migration 테스트.
+  - **hook:** 세션 기록 파싱 unit(정상 종료·중단·오류 종료), 연결 integration(기록 순서, 한 번만 기록, 중단된 Helper 질문).
+  - **host·adapter:** 미리 승인 때 설정과 새 세션, 수동 승인 때 변화 없음. 새 허용 규칙의 Kiro 판정(`*@*`와 묶인 위험 명령은 계속 묻기).
+  - **회귀:** 기존 unit·integration·eval·패널 CJS 회귀 없음. frontend 테스트와 1280·420·300px 화면 확인.
+  - **실제 Kiro(Mac 0.2.9) 1회:**
+    - 새 폴더 신뢰 → 미리 승인 → 새 세션이 Autopilot
+    - 선택 질문 뒤 곁가지 질문에 기록하지 않음
+    - "내가 고른 게 아니야"로 되돌린 뒤 다시 고름
+    - 턴 중단 뒤 다음 발언에서 중단된 답이 기록됨
+    - 긴 명령 중 채팅이 터미널로 바뀌지 않음
+    - `/vibe-helper` 한 개
+    - 완료 뒤 서버가 켜져 있고 브라우저가 열림
+    - 패널에 Next Move
+- **진행:**
+  - **1·2 구현과 자동 검사 완료(2026-10-12, Node 24.19.0):**
+    - 결정 기록: DECISIONS "학습자 선택 위조 방지와 되돌리기(K17)", SPEC `FR-DEC-007`.
+    - Steering 0.9.0: 질문으로 끝내기, 학습자 말 대신 쓰지 않기, 곁가지 질문은 답이 아님, 거절 뒤 멈춤, `"not_mine"`.
+    - `save_choice`의 `"not_mine"`과 `UNDONE` 응답.
+    - Core 되돌리기: 진행 중이면 다시 열기, 결정 이력 유지, `USER_DECISION`을 출처로 쓴 이해 Evidence 빼기, Concept State 재계산(근거가 없으면 Core 관찰로 OBSERVED), 해결한 오해 issue 다시 열기, 늦게 온 분석 거절.
+    - migration 0009(`decision_disputes`·`evidence_withdrawals`).
+    - 검증: `pnpm typecheck`·`db:check` 통과, unit 177 통과·3 skip, integration 548 통과·9 skip(새 6개: 되돌리기 3, reducer 1, 정책 1, 0008→0009 migration 1), eval 47 통과·1 skip, 패널 CJS 187 통과·2 skip. 바꾼 파일 Biome는 원래 있던 지적 3건(`useTemplate` 1, import 순서 2)만 남음.
+  - **3~8 구현과 자동 검사 완료(2026-10-12):**
+    - 중단된 턴: hook binding이 다음 프롬프트 때 Kiro 세션 기록의 `turn_end`(정상 종료 아님, Stop hook 기록 없음)를 읽어 그 턴의 Builder 답을 `interrupted`로 먼저 기록한다. Kiro 실행 ID 멱등키로 한 번만 기록하고, 멈춘 `/vibe-helper` 질문은 다음 Builder 답과 짝짓지 않는다.
+    - 미리 승인: Kiro 설정 `kiroAgent.agentAutonomy`를 Autopilot으로 쓰고, 막 연결했거나 신뢰한 폴더에서 `kiroAgent.newSession`으로 새 세션을 연다. 브라우저 열기·`lsof *`·메서드가 붙은 로컬 `curl`을 미리 승인한다. 0.2.7~0.2.8 규칙은 다시 연결할 때(`UPGRADE`) 새 목록으로 바뀐다.
+    - `/vibe-helper` 하나: Helper 에이전트 파일을 더 쓰지 않고, 예전에 쓴 것은 지운다.
+    - Steering 0.9.0: 완료 뒤 서버를 켜 두고 브라우저로 연다.
+    - 패널(frontend `feat/k17-panel`): 하단 패널 이동 제거와 배치 되돌리기 안내, Kiro-native 빌더 탭 정리(상태·이번 작업의 학습 기록·다음 한 걸음·결정 줄), Discovery·Spec 남은 시간, Spec 시작 버튼 하나. `feat/next-move-card`·`feat/reload-required-notice`를 합쳐 둠(`4906b36`).
+    - 결정 기록: DECISIONS "체험 후속 정리(K17)".
+  - **실제 Kiro 확인과 0.2.9(2026-10-12):** 격리 프로필(Kiro 1.2.56, 0.2.8에서 업그레이드, 신뢰 켬)에서 계획의 실측 항목을 모두 봤다(결과는 [인계 0.2.9 확인](FRONTEND_KIRO_NATIVE_HANDOFF.md#029-확인-2026-10-12-mac)). 실측에서 버그 세 건을 찾아 고쳤다.
+    - 다른 막는 선택이 열려 있으면 되돌리기·선택 바꾸기가 거절됨 → `372628b`.
+    - 대체된 결정 때문에 완료한 Task가 '결정이 있어요'로 보임 → frontend `b4b8831`.
+    - Next Move 한 줄 길이 초과로 두 번 다 실패 → `3721a76`.
+    - Mac 0.2.9(backend `3721a76`, frontend `4906b36`, 두 checkout 깨끗함, 포장 검사 9 PASS)를 `releases/macos/kiro-native/`에 넣었다.
+    - 최종 검사: unit 177 통과·3 skip, integration 552 통과·9 skip, eval 47 통과·1 skip, 패널 CJS 187 통과·2 skip, frontend 838 통과.
+    - 이 단계 약 14.4크레딧(계정 누적 144.18).
+  - **남은 것:**
+    - 채팅 Decision 평가 재실행: 새 fixture(곁가지 질문, 거절 뒤 멈춤, 되돌리기). 실제 Kiro 흐름에서는 각 한 번씩 확인했다.
+    - 새 미리 승인 항목(`lsof`, 메서드 `curl`)의 Kiro 판정.
+    - push(backend `main`, frontend `feat/k17-panel`)와 frontend의 Windows 0.2.9 빌드.
+    - 사용자 체험 환경을 0.2.9로 올리기(체험 Kiro가 켜져 있어 사용자 확인 뒤).
+
 ## 3. 예선 작업 요약
 
 상세 기록은 [예선 작업 기록](archive/preliminary/TASKS_PRELIMINARY.md)에 있다.
