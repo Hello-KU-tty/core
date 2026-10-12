@@ -17,11 +17,13 @@ import { type ApplicationService, redactSensitiveText } from '@vibe-helper/appli
 import {
   builderChatTurnRequest,
   helperExchangeRequest,
+  interruptedKiroTurn,
   KIRO_HELPER_AGENT_NAME,
   type KiroCoreBinding,
   kiroSessionAgentMode,
   kiroSessionsDirectory,
   kiroSessionTranscriptPath,
+  kiroTurnIdempotencyKey,
   LEARNER_PROFILE_FILE,
   parseKiroHookInput,
   renderKiroSessionActivity,
@@ -136,6 +138,36 @@ export function createKiroHookBinding(options: {
     const activity = record === null ? null : summarizeKiroSessionActivity(record)
     if (activity === null || activity.items.length === 0) return null
     return redactSensitiveText(renderKiroSessionActivity(activity), options.workspace)
+  }
+
+  // Kiro runs no Stop hook for a turn the learner cancels (K17). When the learner writes again,
+  // the turn before this prompt is read back from the session record and recorded first, so the
+  // Builder's words keep their place before the new message. A `/vibe-helper` question whose turn
+  // never stopped is recorded with what the Helper said, never paired with a later reply.
+  const recordInterruptedTurn = async (sessionId: string): Promise<void> => {
+    const pending = pendingHelperQuestions.get(sessionId)
+    pendingHelperQuestions.delete(sessionId)
+    const record =
+      options.workspace === undefined || !SESSION_ID.test(sessionId)
+        ? null
+        : await readTail(
+            kiroSessionTranscriptPath(home, options.workspace, sessionId),
+            MAX_TRANSCRIPT_TAIL_BYTES,
+          ).catch(() => null)
+    const turn = record === null ? null : interruptedKiroTurn(record)
+    const key = turn === null ? undefined : kiroTurnIdempotencyKey(turn.executionId)
+    if (pending !== undefined) {
+      await options.application.executeUi(
+        helperExchangeRequest(options.binding, pending, turn?.reply ?? null, key),
+      )
+      return
+    }
+    if (turn?.reply == null || key === undefined) return
+    if ((await agentModeOf(sessionId)) === KIRO_HELPER_AGENT_NAME) return
+    const request = builderChatTurnRequest(options.binding, sessionId, turn.reply, key, {
+      interrupted: true,
+    })
+    if (request !== null) await options.application.executeUi(request)
   }
 
   const syncProfile = async (): Promise<{ digest: string; text: string } | null> => {
@@ -273,6 +305,8 @@ export function createKiroHookBinding(options: {
         }
         // Prompts queued while Core was away are older than this one; keep their order.
         await drainQueue().catch(() => 0)
+        if (input.hook_event_name === 'UserPromptSubmit')
+          await recordInterruptedTurn(input.session_id).catch(() => {})
         const helperSession =
           input.hook_event_name === 'UserPromptSubmit' &&
           (await agentModeOf(input.session_id)) === KIRO_HELPER_AGENT_NAME

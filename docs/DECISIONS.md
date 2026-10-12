@@ -1,5 +1,74 @@
 # 결정 기록
 
+## 본선: 학습자 선택 위조 방지와 "내가 고른 게 아니야" 되돌리기(K17)
+
+- **맥락(사용자 직접 체험, 2026-10-12, Kiro 1.2.56, 채팅 모델 Auto):**
+  - Builder가 잠금 방식 질문 뒤 학습자의 곁가지 질문에 답하면서, 답변 끝에 학습자 차례를 지어냈다("user2번으로 가자"). 그리고 바로 `save_choice`를 불렀다.
+  - Core는 질문 뒤 Builder 탭 학습자 발언이 하나라도 있는지만 본다. 곁가지 질문이 있었으므로 기록을 받았다.
+  - 그 결과 학습자가 고르지 않은 선택(IMMEDIATE)이 학습자 선택으로 남았다. 그 선택을 출처로 "SQLite Locking: 설명함" Evidence도 인정됐다.
+  - 같은 턴에서 한 번 더 지어낸 답은 질문 뒤 발언이 없어 거절됐다. 그래도 Builder는 멈추지 않고 구현을 이어 갔다.
+  - 지어낸 문장은 모델 출력이라 hook을 거치지 않았다. Core에는 들어오지 않았고, 학습자 화면에만 사용자 말처럼 보였다.
+- **결정(사용자, 2026-10-12):**
+  1. **Core 판정은 좁히지 않는다.** "가장 최근 발언만 답"처럼 바꾸면 질문 뒤 곁가지 질문을 하고 답하는 정상 흐름이 막힌다. 그러면서도 위조 자체는 막지 못한다.
+  2. **Steering 0.9.0으로 막는다.**
+     - 선택지를 보여 준 응답은 질문으로 끝낸다. 학습자의 말이나 차례는 어떤 형태로도 쓰지 않는다.
+     - 질문 뒤 학습자가 다시 묻거나 설명을 정리한 것은 선택이 아니다.
+     - 기록이 거절되면 그 선택에 기대는 구현을 멈추고, 다시 물은 뒤 턴을 끝낸다.
+  3. **되돌리기 경로를 둔다.** 위조는 형태가 다양해 글자 패턴으로 잡지 않는다. 학습자가 기록된 선택을 자기가 고르지 않았다고 하면(말투 무관), Builder가 `save_choice`에 `"not_mine"`을 보낸다. 새 도구는 만들지 않는다.
+     - **Core가 확인하는 것:** 그 선택이 학습자 선택으로 기록돼 있는지, 기록 뒤 Builder 탭 학습자 발언이 있는지. 상태를 낮추는 쪽이라 발언 내용은 보지 않는다.
+     - **기록:** 되돌림을 `decision_disputes`에 남긴다. 원래 해결은 이력으로 둔다.
+     - **다시 묻기:** 아직 반영 전(Task 진행 중)이면 같은 질문을 새 Decision으로 다시 연다. 선택 바꾸기와 같은 `replacesDecisionId` 사슬이다. 그러면 Builder가 다시 묻는다. 이미 반영됐으면(완료한 Task) 다시 열지 않는다. 바꾸고 싶으면 기존 "완료 뒤 이어서 만들기"로 간다.
+     - **Evidence 빼기:** 그 선택을 출처(`USER_DECISION`)로 쓴 이해 Evidence(`USER_UNDERSTANDING`)를 뺀다(`evidence_withdrawals`). 학습자 발언만 출처로 쓴 Evidence는 남긴다.
+     - **Concept State 다시 계산:** 영향받은 개념을 남은 Evidence로 다시 계산한다. Concept State가 내려갈 수 있는 경우는 이것뿐이다. 남은 근거가 없으면 Core가 그 질문을 출처로 한 관찰 Evidence(`CONCEPT_OBSERVATION`, OBSERVED)를 남긴다. "다뤘지만 이해 근거는 없음" 상태다.
+     - **오해 issue:** 뺀 Evidence가 해결한 오해 issue는 다시 연다.
+     - **늦게 온 분석:** 되돌린 뒤 도착한 그 선택의 Analyst 제안은 `INVALID_REFERENCE`로 거절한다.
+  4. **이번에 하지 않는 것:** 되돌린 선택을 출처로 한 오해 신호(`MISCONCEPTION_SIGNAL`)는 그대로 둔다. 이해를 부풀리지 않는 쪽이기 때문이다.
+- **기각한 대안:**
+  - **가장 최근 발언만 답으로 인정:** 정상 흐름을 막고, 위조는 막지 못한다.
+  - **Builder 답의 "user…" 줄 감지:** 형태가 다양해 쉽게 우회된다.
+  - **Builder가 인용한 원문을 hook 메시지와 대조:** 짧은 답이나 맥락으로만 뜻이 통하는 답에서 막힌다. K10에서 인용을 없앤 이유와 같다.
+- **계약 변경:**
+  - `save_choice`의 `choice` 값 `"not_mine"`
+  - 응답 `outcome: "UNDONE"`: 다시 물을 Decision, 다시 열었는지, 뺀 Evidence 수
+  - 새 표 `decision_disputes`·`evidence_withdrawals`(migration 0009, 기존 표는 그대로)
+  - Concept State reducer의 되돌림 재계산
+  - Evidence 조회에서 뺀 Evidence 제외
+  - 새 의존성과 범용 도구는 없다.
+- **위험:**
+  - 학습자가 실제로 고른 선택을 실수로 되돌릴 수 있다. 다시 고르면 된다.
+  - Builder가 Steering을 어기면 위조는 여전히 가능하다. 되돌리기는 학습자가 알아챘을 때만 작동한다.
+  - 0009를 적용한 DB는 0.2.8 이하로 되돌릴 수 없다.
+
+## 본선: 체험 후속 정리 — 중단된 턴, 미리 승인과 Autopilot, `/vibe-helper` 하나, 완료 뒤 서버(K17)
+
+- **맥락:** 같은 날 사용자 직접 체험(2026-10-12)에서 나온 문제들이다.
+- **결정(사용자, 2026-10-12):**
+  1. **중단된 턴:**
+     - Kiro(1.2.56)는 학습자가 멈춘 턴에 Stop hook을 부르지 않는다. 그래서 그 턴의 Builder 답이 Core에 들어오지 않았다.
+     - 세션 기록에는 `turn_end`(`stopReason: "cancelled"`)가 남는다. 학습자가 다음 프롬프트를 보낼 때 Core 연결(hook binding)이 기록을 읽는다. 마지막 턴이 정상 종료가 아니고 Stop hook 기록도 없으면, 그 턴의 Builder 답을 "중단됨"(`interrupted`) 표시와 함께 새 발언보다 먼저 기록한다.
+     - 다음 정상 종료 때 처리하지 않는 이유: 그러면 학습자의 다음 발언보다 뒤에 기록돼 순서가 틀어진다.
+     - Kiro 실행 ID에서 만든 멱등키로 한 번만 기록한다.
+     - 멈춘 `/vibe-helper` 질문은 그때까지의 Helper 답과 함께 기록한다. 다음 Builder 턴의 답과 짝짓지 않는다(이전 버그).
+  2. **미리 승인과 Autopilot:**
+     - "개발 명령 미리 승인"을 고르면 Kiro 설정 `kiroAgent.agentAutonomy`를 Autopilot으로 쓴다.
+     - Kiro는 세션을 만들 때만 이 설정을 읽는다. 학습자가 Kiro 채팅에서 직접 고른 모드가 있으면 그쪽이 이긴다.
+     - Kiro는 창이 열리면 신뢰 전에도 바로 세션을 만들고, 신뢰 뒤 다시 로드해도 그 세션을 불러온다(체험: 01:10:35 `session/new`, 11:26:39 `session/load`). 그 세션은 Supervised이고 Vibe Helper hook도 없다.
+     - 그래서 Project를 막 연결했거나 막 신뢰한 폴더에서는 host가 한 번 `kiroAgent.newSession`(채팅의 +와 같은 명령)을 부른다. 시점은 같은 창이면 바로, 새 창·다시 로드면 창이 열리고 4초 뒤다. 이전의 "새 세션(+)을 열어 시작하세요" 안내를 대신한다.
+     - 미리 승인 목록에 브라우저 열기를 더한다: `open`·`Start-Process`·`start` 뒤 `http://localhost:*`·`http://127.0.0.1:*`. `*@*` 형태는 뺀다.
+     - 0.2.7–0.2.8이 쓴 규칙도 우리 것으로 알아본다. 업그레이드한 폴더는 다시 연결할 때 새 목록으로 바뀌고(`UPGRADE`), 수동 승인으로 바꾸면 예전 규칙도 지워진다.
+  3. **`/vibe-helper` 하나:**
+     - Kiro는 작업 공간 에이전트를 `/` 메뉴에 "task to delegate" 항목으로 늘 보여 준다. 고르면 질문을 하위 에이전트에 맡기는데, 이때 채팅 맥락은 넘어가지 않는다.
+     - 체험자는 Steering(`/vibe-helper`)만으로 Helper 질문을 했고, 두 항목이 헷갈렸다.
+     - Helper 에이전트 파일(`.kiro/agents/vibe-helper.json`)을 더는 쓰지 않는다. 예전 버전이 쓴 파일(이름과 Helper MCP 서버로 확인)은 다시 연결할 때 지운다. 학습자가 만든 같은 이름의 파일은 그대로 둔다.
+     - `/vibe-helper` 턴은 계속 프롬프트로만 읽기 전용을 지킨다. Helper 질문 기록은 그대로다.
+  4. **완료 뒤 서버(Steering 0.9.0):** 웹 앱·API는 서버를 켜 둔 채 브라우저로 열고, 주소를 링크로 알린다. 서버는 프로젝트 시작 스크립트로 띄운다. 포트는 명령 앞 환경 변수가 아니라 코드·설정에서 정한다.
+- **바뀐 결정:** "본선: Kiro-native 개입 구조로 전환"의 "Kiro 채팅의 Helper 에이전트" 항목은 3으로 대체된다.
+- **계약 변경:** `UI_RECORD_BUILDER_CHAT_TURN`과 Activity `BUILDER_CHAT_TURN`에 선택 필드 `interrupted`가 생긴다. 새 의존성·범용 도구는 없다.
+- **위험:**
+  - Kiro 세션 기록과 `turn_end` 형식은 비공개라 Kiro가 바뀌면 깨질 수 있다. 깨지면 이전처럼 중단된 턴만 빠진다.
+  - `kiroAgent.newSession`은 채팅 화면이 아직 없으면 아무 일도 하지 않을 수 있다. 실측으로 확인한다.
+  - Kiro 설정을 쓰므로 학습자가 Kiro 설정에서 Supervised를 골라 둔 경우를 덮을 수 있다. 미리 승인을 고를 때만 쓰고, 안내 문구에 밝힌다.
+
 ## 본선: Final Upgrade 대신 Next Move(다음 한 걸음)
 
 - **맥락:** 원래 구상의 Final Upgrade는 "배포 전 마지막 업그레이드"였다(PROJECT_SPEC §13.6). T18에서 Core 계약(`UI_PREPARE_FINAL_UPGRADE_TASK`, `FINAL_UPGRADE` Episode)과 예선 패널 화면까지 만들었지만, 본선 Kiro-native 경로와 K 작업에는 연결되지 않았다. MVP에는 배포 단계가 없어(hosted 배포는 범위 밖) "배포 직전"을 알 수 있는 사건이 없고, 언제 추천할지도 정하지 못한 채 미뤄 왔다. 개념을 그대로 지키려면 배포 도우미가 필요해 본선 일정에 비해 크다.
@@ -155,7 +224,7 @@
 - **Project 폴더(범위 변경):** 사용자가 Kiro에서 연 폴더가 비어 있으면(편집기·VCS 메타데이터만 허용) 그 폴더를 Project 폴더로 등록해 같은 창에서 진행한다. 파일이 있으면 Core 생성 폴더를 새 창으로 여는 것을 묻는다. 등록은 local-backend의 private 파일(`registered-workspaces.json`)에 두는 host adapter 상태이고, Core 경로 정책은 등록 폴더를 canonical·디렉터리·생성 루트와 겹치지 않음으로 다시 확인한다. 소유자, 홈·루트 자체, Core 데이터와의 겹침, symlink를 거절한다. 다른 폴더에서 이미 작업 중인 Project는 옮기지 않는다. 패널의 결과 실행은 생성 폴더 전용으로 남긴다. 기존 프로젝트 import는 여전히 범위 밖이다.
 - **Steering 0.5.0과 원문 위치:** Kiro Steering 원문을 `docs/agent-prompts/kiro-steering.md`(버전 포함)로 옮기고 adapter는 자리만 채운다. 예상 Decision은 예고로만 주고 구현이 닿을 때 하나씩 묻게 했다. 묻기 전에 기록하게 했다. `start_task` 직후와 계획 변경·적용·검증·완료 때 작업 맥락을 남기게 했다. 첫 빌드 전에 실행 환경을 확인해 있는 도구로 만들게 했다(패키지 관리자를 고정하지 않음). 평가는 크레딧 확보 뒤 K09 재실측에서 한다.
 - **Helper가 Builder 진행 중 활동을 봄:** Helper 질문이 다른 탭에서 오면 hook이 Builder 세션 기록(Kiro 비공개 형식)의 최근 두 턴을 읽어 질문 맥락에 붙인다. 진행 중인 턴도 포함한다. 패널 Helper(kiro-cli)에도 같은 기록을 붙인다. Agent 출처 기록이라고 표시하고 redaction한다. Core에 저장하지 않으며 Evidence가 아니다. 기록을 못 읽으면 붙이지 않는다.
-- **Kiro 채팅의 Helper 에이전트:** 연결 때 Project 폴더에 `.kiro/agents/vibe-helper.json`을 쓴다. 이 에이전트는 작업 공간 MCP 파일을 쓰지 않고(`includeMcpJson: false`) 자기 Helper 역할 Core 서버(`get_helper_context`만)를 쓴다. 역할은 프롬프트로 제한한다(정식 `helper.md`에 본선 규칙을 앞에 붙임). 이 탭의 모든 질문을 Helper 질문으로 기록한다. 탭 자동 생성은 공개 API가 없어 하지 않는다.
+- **Kiro 채팅의 Helper 에이전트(K17에서 폐지, 위 "체험 후속 정리" 3):** 연결 때 Project 폴더에 `.kiro/agents/vibe-helper.json`을 쓴다. 이 에이전트는 작업 공간 MCP 파일을 쓰지 않고(`includeMcpJson: false`) 자기 Helper 역할 Core 서버(`get_helper_context`만)를 쓴다. 역할은 프롬프트로 제한한다(정식 `helper.md`에 본선 규칙을 앞에 붙임). 이 탭의 모든 질문을 Helper 질문으로 기록한다. 탭 자동 생성은 공개 API가 없어 하지 않는다.
 - **Vibe Helper 도구 허용:** 연결 때 한 번 동의를 받으면 Kiro 작업 공간 권한 파일에 `vibe-helper/*`, `vibe-helper-helper/*` 허용 규칙 한 줄을 더한다. Kiro가 직접 쓴 모양의 파일만 고치고, 그 밖의 모양이면 손대지 않는다. 내부 형식이라 깨지면 Kiro가 다시 묻는 상태로 돌아간다.
 - **신뢰 안내:** 연결된 폴더가 신뢰되지 않았으면 신뢰가 필요하다고 알리고, 신뢰 직후 창 다시 로드를 제안한다. Kiro는 신뢰 전 hook·Steering을 적용하지 않고 hook을 세션 시작 때 읽기 때문이다.
 - **정리:** 예선 때 `~/.kiro/agents/`에 남은 Vibe Helper 전역 에이전트 12개를 `/Users/hurdoo/coding/archives/kiro-agents-legacy-20260913/`으로 옮겼다. KiroCrew 에이전트는 그대로 두었다.

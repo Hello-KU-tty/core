@@ -63,6 +63,8 @@ export const activityPayloadSchema = z.discriminatedUnion('type', [
     conversationId: conversationIdSchema,
     messageId: messageIdSchema,
     summary: nonEmptyTextSchema.max(BUILDER_CHAT_TURN_MAX_CHARS),
+    /** The learner stopped the turn before it finished (K17). */
+    interrupted: z.literal(true).optional(),
   }),
   z.strictObject({ type: z.literal('DECISION_REQUESTED'), decisionId: decisionIdSchema }),
   z.strictObject({

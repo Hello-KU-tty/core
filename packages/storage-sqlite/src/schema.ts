@@ -628,6 +628,35 @@ export const decisionStates = sqliteTable(
   ],
 )
 
+/** The learner said a recorded choice was not theirs (K17). One per resolution. */
+export const decisionDisputes = sqliteTable(
+  'decision_disputes',
+  {
+    id: text('id').primaryKey(),
+    decisionId: text('decision_id')
+      .notNull()
+      .unique()
+      .references(() => decisionRequests.id, { onDelete: 'restrict' }),
+    resolutionId: text('resolution_id')
+      .notNull()
+      .unique()
+      .references(() => decisionResolutions.id, { onDelete: 'restrict' }),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'restrict' }),
+    taskId: text('task_id')
+      .notNull()
+      .references(() => tasks.id, { onDelete: 'restrict' }),
+    correlationId: text('correlation_id').notNull(),
+    disputedAt: text('disputed_at').notNull(),
+    ...payloadColumns(),
+  },
+  (table) => [
+    check('decision_disputes_payload_json_valid', sql`json_valid(${table.payloadJson})`),
+    index('decision_disputes_project_idx').on(table.projectId, table.disputedAt),
+  ],
+)
+
 export const completionReports = sqliteTable(
   'completion_reports',
   {
@@ -981,6 +1010,31 @@ export const acceptedEvidence = sqliteTable(
   (table) => [
     check('accepted_evidence_payload_json_valid', sql`json_valid(${table.payloadJson})`),
     index('accepted_evidence_concept_idx').on(table.conceptId, table.acceptedAt),
+  ],
+)
+
+/** Accepted Evidence that no longer counts because its source choice was disputed (K17). */
+export const evidenceWithdrawals = sqliteTable(
+  'evidence_withdrawals',
+  {
+    evidenceId: text('evidence_id')
+      .primaryKey()
+      .references(() => acceptedEvidence.id, { onDelete: 'restrict' }),
+    conceptId: text('concept_id')
+      .notNull()
+      .references(() => canonicalConcepts.id, { onDelete: 'restrict' }),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'restrict' }),
+    decisionDisputeId: text('decision_dispute_id')
+      .notNull()
+      .references(() => decisionDisputes.id, { onDelete: 'restrict' }),
+    withdrawnAt: text('withdrawn_at').notNull(),
+    ...payloadColumns(),
+  },
+  (table) => [
+    check('evidence_withdrawals_payload_json_valid', sql`json_valid(${table.payloadJson})`),
+    index('evidence_withdrawals_concept_idx').on(table.conceptId),
   ],
 )
 

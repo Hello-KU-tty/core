@@ -16,6 +16,7 @@ function harness({ trusted = true, installed = true, loggedIn = true, fail = fal
   let listener, trustListener, stopped = 0, starts = 0, mutations = 0, terminals = 0
   const commands = new Map(), executed = [], messages = [], fetches = [], whoami = [], dialogs = []
   const globalState = new Map(consent ? [['vibeHelper.commandApproval', consent]] : [])
+  const settings = new Map([['kiroAgent.agentAutonomy', 'Supervised']])
   let lifecycleOptions
   const runtimeCalls = []
   const code = readFileSync(join(__dirname, '../src/frontend-host.cjs'), 'utf8')
@@ -40,7 +41,13 @@ function harness({ trusted = true, installed = true, loggedIn = true, fail = fal
   const modules = {
     vscode: {
       workspace: { isTrusted: trusted, workspaceFolders: openFolders.map(fsPath => ({ uri: { fsPath } })),
-        onDidGrantWorkspaceTrust(fn) { trustListener = fn; return { dispose() { trustListener = undefined } } } },
+        onDidGrantWorkspaceTrust(fn) { trustListener = fn; return { dispose() { trustListener = undefined } } },
+        getConfiguration: section => ({
+          inspect: key => (settings.has(`${section}.${key}`) ? { key } : undefined),
+          get: key => settings.get(`${section}.${key}`),
+          update: async (key, value, target) => { settings.set(`${section}.${key}`, value); settings.set('target', target) },
+        }) },
+      ConfigurationTarget: { Global: 1 },
       commands: {
         registerCommand(name, fn) { commands.set(name, fn); return { dispose() { commands.delete(name) } } },
         async executeCommand(name, uri, options) { executed.push({ name, path: uri?.fsPath, options }) },
@@ -83,7 +90,7 @@ function harness({ trusted = true, installed = true, loggedIn = true, fail = fal
     globalState: { get: key => globalState.get(key), update: async (key, value) => { globalState.set(key, value) } } }
   return { create: () => module.exports.createFrontendHost(context),
     grantTrust() { modules.vscode.workspace.isTrusted = true; trustListener?.() },
-    lifecycleOptions: () => lifecycleOptions, runtimeCalls, commands, executed, messages, fetches, whoami, dialogs, globalState,
+    lifecycleOptions: () => lifecycleOptions, runtimeCalls, commands, executed, messages, fetches, whoami, dialogs, globalState, settings,
     opened: () => executed.filter(item => item.name === 'vscode.openFolder'),
     counters: () => ({ stopped, starts, mutations, terminals }) }
 }
@@ -196,6 +203,12 @@ test('Open in Kiro without an open folder binds the generated folder and opens i
   assert.equal(h.opened()[0].path, workspace)
   assert.equal(h.opened()[0].options.forceNewWindow, true)
   assert.equal(h.globalState.get('vibeHelper.commandApproval'), 'PREAPPROVED')
+  // K17: pre-approval also starts Kiro chat sessions in Autopilot, as a user setting.
+  assert.equal(h.settings.get('kiroAgent.agentAutonomy'), 'Autopilot')
+  assert.equal(h.settings.get('target'), 1)
+  // The new window starts its own chat session once it is trusted; this one does not.
+  assert.equal(JSON.stringify(h.globalState.get('vibeHelper.freshChatSessionFolders')), JSON.stringify([workspace]))
+  assert.equal(h.executed.some(item => item.name === 'kiroAgent.newSession'), false)
   await host.dispose()
 })
 
@@ -207,7 +220,12 @@ test('Open in Kiro uses the empty open folder as the Project folder in this wind
   assert.equal(JSON.stringify(h.fetches[0].body), JSON.stringify({ protocolVersion: 1, projectId, workspace: folder, approval: 'MANUAL' }))
   assert.equal(h.opened().length, 0)
   assert.equal(h.dialogs.some(item => item.items.includes('개발 명령 미리 승인')), false)
-  assert.match(h.messages.at(-1)[1], /이 폴더를 Vibe Helper Project로 연결했어요/)
+  // K17: this trusted window reads the hooks already, so the new chat session opens now.
+  assert.ok(h.executed.some(item => item.name === 'kiroAgent.newSession'))
+  assert.match(h.messages.at(-1)[1], /새 세션을 열었어요/)
+  assert.equal(JSON.stringify(h.globalState.get('vibeHelper.freshChatSessionFolders')), '[]')
+  // Manual approval leaves Kiro's chat mode alone.
+  assert.equal(h.settings.get('kiroAgent.agentAutonomy'), 'Supervised')
   await host.dispose()
 })
 
@@ -353,6 +371,9 @@ test('a bound folder asks for trust, then offers a reload once trust is granted'
   h.grantTrust()
   await settle(); await settle()
   assert.ok(h.executed.some(item => item.name === 'workbench.action.reloadWindow'))
+  // The reloaded window starts a new session; this one, still holding the old session, does not.
+  assert.equal(JSON.stringify(h.globalState.get('vibeHelper.freshChatSessionFolders')), JSON.stringify([workspace]))
+  assert.equal(h.executed.some(item => item.name === 'kiroAgent.newSession'), false)
   await host.dispose()
   const plain = harness({ trusted: false, bound: false })
   const other = await plain.create()

@@ -77,6 +77,8 @@ export interface FrontendHost {
     folder: 'REGISTERED' | 'GENERATED' | 'CANCELLED'
     permissions?: 'WRITTEN' | 'UNCHANGED' | 'UNRECOGNIZED' | 'NOT_REQUESTED'
     reloadRequired?: boolean
+    /** K17: a new Kiro chat session was started in this trusted window (the chat's +). */
+    freshSession?: boolean
   }>
   dispose(): Promise<void>
 }

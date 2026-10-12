@@ -47,8 +47,12 @@ const CURRENT_FOLDER_REFUSALS = new Set(['WORKSPACE_FOLDER_NOT_EMPTY', 'WORKSPAC
 const PROJECT_FOLDER_ELSEWHERE = new Set(['PROJECT_REGISTERED_ELSEWHERE', 'PROJECT_HAS_GENERATED_FOLDER'])
 // Replaces 0.2.x `vibeHelper.coreToolsConsent` (Core tools only); the wider choice is asked anew.
 const COMMAND_APPROVAL_KEY = 'vibeHelper.commandApproval'
+// Project folders whose next trusted window should start a new Kiro chat session (K17).
+const FRESH_SESSION_KEY = 'vibeHelper.freshChatSessionFolders'
+// Kiro opens its chat view a few seconds after the window; the + command needs that view.
+const FRESH_SESSION_DELAY_MS = 4000
 const BOUND_MARKER = '.kiro/hooks/vibe-helper.json'
-const RELOAD_AFTER_LATE_TRUST = '이 폴더를 Vibe Helper Project로 연결했어요. 이 창은 폴더를 신뢰하기 전에 열려서 Kiro가 아직 Vibe Helper hook과 도구를 읽지 않았어요. 창을 다시 로드할까요? 그 뒤 새 채팅 세션에서 시작하세요.'
+const RELOAD_AFTER_LATE_TRUST = '이 폴더를 Vibe Helper Project로 연결했어요. 이 창은 폴더를 신뢰하기 전에 열려서 Kiro가 아직 Vibe Helper hook과 도구를 읽지 않았어요. 창을 다시 로드할까요? 다시 로드하면 새 채팅 세션이 열려요.'
 const inside = (parent, child) => {
   const part = relative(parent, child)
   return part !== '' && part !== '..' && !part.startsWith(`..${sep}`) && !isAbsolute(part)
@@ -170,7 +174,7 @@ async function createFrontendHost(context) {
     const choice = await vscode.window.showInformationMessage(
       'Kiro 채팅이 명령을 실행할 때 어떻게 승인할까요?',
       { modal: true, detail: [
-        `${preapprove}: Vibe Helper가 연결한 Project 폴더에서 Vibe Helper 도구와 자주 쓰는 개발 명령(설치·빌드·테스트, 파일 보기, 폴더 만들기, git 커밋, 내 컴퓨터 서버 확인)은 묻지 않고 실행해요. 파일 삭제, 프로세스 종료, 배포, git push, 전역 설치, sudo, 다른 주소 접속은 계속 물어요. 실수를 줄이는 목록이지 격리 장치는 아니에요.`,
+        `${preapprove}: Vibe Helper가 연결한 Project 폴더에서 Vibe Helper 도구와 자주 쓰는 개발 명령(설치·빌드·테스트, 파일 보기, 폴더 만들기, git 커밋, 내 컴퓨터 서버 확인과 브라우저로 열기)은 묻지 않고 실행해요. 파일 삭제, 프로세스 종료, 배포, git push, 전역 설치, sudo, 다른 주소 접속은 계속 물어요. 실수를 줄이는 목록이지 격리 장치는 아니에요. Kiro 채팅도 Autopilot으로 시작해서 파일 수정을 하나씩 검토하지 않아도 돼요.`,
         `${manual}: 명령과 도구마다 Kiro가 확인을 받아요.`,
         '나중에 명령 팔레트의 "Vibe Helper: Change Command Approval"로 바꿀 수 있어요.',
       ].join('\n\n') },
@@ -178,7 +182,44 @@ async function createFrontendHost(context) {
     if (choice !== preapprove && choice !== manual) return undefined
     const approval = choice === preapprove ? 'PREAPPROVED' : 'MANUAL'
     await context.globalState?.update(COMMAND_APPROVAL_KEY, approval)
+    if (approval === 'PREAPPROVED') await enableAutopilot()
     return approval
+  }
+  /**
+   * Pre-approval also starts new Kiro chat sessions in Autopilot, so the learner does not review
+   * every file edit (K17). Kiro reads the setting when it creates a session, and a mode the learner
+   * picked in Kiro's chat wins over it; manual approval leaves the setting alone.
+   */
+  async function enableAutopilot() {
+    try {
+      const config = vscode.workspace.getConfiguration('kiroAgent')
+      if (config.inspect('agentAutonomy') === undefined || config.get('agentAutonomy') === 'Autopilot') return
+      await config.update('agentAutonomy', 'Autopilot', vscode.ConfigurationTarget.Global)
+    } catch {}
+  }
+  const folderKey = folder => (process.platform === 'win32' ? folder.toLowerCase() : folder)
+  async function markFreshSession(folder) {
+    const folders = context.globalState?.get(FRESH_SESSION_KEY) ?? []
+    const key = folderKey(folder)
+    if (!folders.includes(key)) await context.globalState?.update(FRESH_SESSION_KEY, [...folders, key].slice(-20))
+  }
+  /**
+   * Kiro opens a chat session as soon as a window opens, before the learner trusts the folder,
+   * and keeps it after the reload. That session asks to review every edit and has no Vibe Helper
+   * hooks. Right after a Project folder is connected or trusted, start a new session once, the
+   * same as the chat's + button (K17).
+   */
+  async function startFreshSession(folder) {
+    const key = folderKey(folder)
+    const folders = context.globalState?.get(FRESH_SESSION_KEY) ?? []
+    if (!folders.includes(key) || !vscode.workspace.isTrusted) return false
+    await context.globalState?.update(FRESH_SESSION_KEY, folders.filter(item => item !== key))
+    try {
+      await vscode.commands.executeCommand('kiroAgent.newSession')
+      return true
+    } catch {
+      return false
+    }
   }
   /**
    * Connects the Project to Kiro chat. An empty open folder becomes the Project folder in this
@@ -218,6 +259,7 @@ async function createFrontendHost(context) {
     if (!(data.registered === true || inside(generatedRoot, workspace)))
       throw new Error('KIRO_BIND_WORKSPACE_UNSAFE')
     const alreadyOpen = current === workspace
+    await markFreshSession(workspace)
     if (!alreadyOpen)
       await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(workspace), { forceNewWindow: true })
     // A new window asks on start; this one asks now, before the learner opens a chat session.
@@ -225,9 +267,11 @@ async function createFrontendHost(context) {
       void askForTrust('이 폴더를 Vibe Helper Project로 연결했어요. ').catch(() => {})
     else if (openedUntrusted) void offerReload(RELOAD_AFTER_LATE_TRUST).catch(() => {})
     const reloadRequired = alreadyOpen && (openedUntrusted || !vscode.workspace.isTrusted)
+    // This window is trusted and already reads the hooks: start the new chat session now.
+    const freshSession = alreadyOpen && !reloadRequired ? await startFreshSession(workspace) : false
     return { projectId: data.projectId, taskId: data.taskId, openedNewWindow: !alreadyOpen,
       folder: data.registered === true ? 'REGISTERED' : 'GENERATED', permissions: data.permissions,
-      reloadRequired }
+      reloadRequired, freshSession }
   }
   const openCommand = vscode.commands.registerCommand('vibeHelper.openInKiro', async () => {
     try {
@@ -241,8 +285,11 @@ async function createFrontendHost(context) {
       })), { placeHolder: 'Kiro 채팅으로 이어서 만들 Project를 고르세요' })
       if (!picked) return
       const opened = await openProjectInKiro(picked.projectId)
-      if (opened.folder !== 'CANCELLED' && !opened.openedNewWindow && !opened.reloadRequired)
-        void vscode.window.showInformationMessage('이 폴더를 Vibe Helper Project로 연결했어요. Kiro 채팅에서 새 세션(+)을 열어 시작하세요. Helper는 새 탭에서 vibe-helper 에이전트를 고르면 돼요.')
+      if (opened.folder !== 'CANCELLED' && !opened.openedNewWindow && !opened.reloadRequired) {
+        void vscode.window.showInformationMessage(opened.freshSession
+          ? '이 폴더를 Vibe Helper Project로 연결하고 Kiro 채팅에 새 세션을 열었어요. 거기서 시작하세요.'
+          : '이 폴더를 Vibe Helper Project로 연결했어요. Kiro 채팅에서 새 세션(+)을 열어 시작하세요.')
+      }
     } catch (error) {
       const code = safeCode(error)
       void vscode.window.showErrorMessage(BIND_MESSAGES[code] ?? `Kiro에서 열지 못했습니다 (${code}).`)
@@ -274,6 +321,10 @@ async function createFrontendHost(context) {
     if (folders.length !== 1) return false
     return access(join(folders[0].uri.fsPath, BOUND_MARKER)).then(() => true, () => false)
   }
+  const currentFolder = async () => {
+    const folders = vscode.workspace.workspaceFolders ?? []
+    return folders.length === 1 ? await realpath(folders[0].uri.fsPath).catch(() => folders[0].uri.fsPath) : ''
+  }
   async function offerReload(text) {
     const reload = '다시 로드'
     const choice = await vscode.window.showInformationMessage(text, reload)
@@ -286,14 +337,19 @@ async function createFrontendHost(context) {
     if (choice === manage) await vscode.commands.executeCommand('workbench.trust.manage')
   }
   void boundFolder().then(async bound => {
-    if (!bound || vscode.workspace.isTrusted || stopped) return
-    await askForTrust()
+    if (!bound || stopped) return
+    if (!vscode.workspace.isTrusted) return askForTrust()
+    // A folder just connected (new window) or just trusted (after the reload) starts a new session.
+    const folder = await currentFolder()
+    const timer = setTimeout(() => { if (!stopped) void startFreshSession(folder).catch(() => {}) }, FRESH_SESSION_DELAY_MS)
+    timer.unref?.()
   }).catch(() => {})
   const trust = vscode.workspace.onDidGrantWorkspaceTrust(() => {
     void prepare().catch(() => {})
     void boundFolder().then(async bound => {
       if (!bound || stopped) return
-      await offerReload('신뢰가 Kiro 채팅에 적용되도록 창을 다시 로드할까요? 그 뒤 새 채팅 세션에서 시작하세요.')
+      await markFreshSession(await currentFolder())
+      await offerReload('신뢰가 Kiro 채팅에 적용되도록 창을 다시 로드할까요? 다시 로드하면 새 채팅 세션이 열려요.')
     }).catch(() => {})
   })
   async function dispose() {

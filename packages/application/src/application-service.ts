@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 
 import {
+  type AcceptedEvidence,
   type ActivityEvent,
   type AgentRequest,
   type AgentRole,
@@ -50,12 +51,14 @@ import {
   contextRefreshRequestSchema,
   correlationIdSchema,
   type DecisionCommandReceipt,
+  type DecisionDispute,
   type DecisionRequest,
   type DecisionResult,
   type DiscoveryContext,
   type DiscoveryFeedback,
   decisionApplicationSchema,
   decisionCommandReceiptSchema,
+  decisionDisputeSchema,
   decisionRequestSchema,
   decisionResolutionSchema,
   decisionResultSchema,
@@ -69,6 +72,7 @@ import {
   evidenceBatchApplicationResultSchema,
   evidenceProposalBatchSchema,
   evidenceProposalSchema,
+  evidenceWithdrawalSchema,
   type GeneratedResultDescriptor,
   generatedResultDescriptorSchema,
   type HelperContext,
@@ -84,6 +88,7 @@ import {
   learnerProfileViewSchema,
   liveProjectContextSchema,
   MAX_ACTIVE_DECISIONS,
+  misconceptionIssueSchema,
   NEXT_MOVE_MAX_ATTEMPTS,
   NEXT_MOVE_SOFT_TIMEOUT_MS,
   type NextMoveContext,
@@ -235,6 +240,7 @@ type IdPrefix =
   | 'decision_option'
   | 'decision_resolution'
   | 'decision_application'
+  | 'decision_dispute'
   | 'context_refresh'
   | 'context'
   | 'completion_report'
@@ -4626,6 +4632,8 @@ export class ApplicationService {
   #chatSaveChoice(
     request: Extract<AgentRequest, { kind: 'BUILDER_CHAT_SAVE_CHOICE' }>,
   ): BuilderChatSaveChoiceReceipt {
+    const choice = request.answer.choice
+    if (choice === 'not_mine') return this.#chatUndoChoice(request)
     return this.#storage.transaction((repository) =>
       this.#idempotent(
         repository,
@@ -4646,7 +4654,7 @@ export class ApplicationService {
           if (aggregate.decisionApplications.some((item) => item.decisionId === decision.id)) {
             throw this.#domainError(request.correlationId, 'DECISION_ALREADY_APPLIED')
           }
-          const selection = chatSelection(decision, request.answer.choice)
+          const selection = chatSelection(decision, choice)
           if (selection === undefined) {
             throw this.#validationError(
               request.correlationId,
@@ -4751,7 +4759,13 @@ export class ApplicationService {
           const target =
             resolution === undefined
               ? decision
-              : this.#reopenChangedDecision(repository, aggregate, decision, request)
+              : this.#reopenChangedDecision(
+                  repository,
+                  aggregate,
+                  decision,
+                  request,
+                  'Reopened a chosen Decision because the learner changed their choice in chat.',
+                )
           const current =
             target === decision
               ? aggregate
@@ -4820,6 +4834,328 @@ export class ApplicationService {
     )
   }
 
+  /**
+   * The learner said a recorded choice was not theirs (K17, SPEC FR-DEC-007). Undoing never raises
+   * anything, so Core checks only that the choice is recorded and that the learner wrote in the
+   * Builder chat after it. The resolution stays in history. The question is asked again when the
+   * choice is not built yet, and learner Evidence that cited the choice stops counting.
+   */
+  #chatUndoChoice(
+    request: Extract<AgentRequest, { kind: 'BUILDER_CHAT_SAVE_CHOICE' }>,
+  ): BuilderChatSaveChoiceReceipt {
+    return this.#storage.transaction((repository) =>
+      this.#idempotent(
+        repository,
+        request,
+        'builder.chat_undo_choice',
+        builderChatSaveChoiceReceiptSchema,
+        () => {
+          const routed = this.#requireBuilderAggregate(
+            repository,
+            request.projectId,
+            request.taskId,
+            request.correlationId,
+          )
+          const { aggregate, decision } = this.#chatChosenDecision(repository, routed, request)
+          const resolution = aggregate.decisionResolutions.find(
+            (item) => item.decisionId === decision.id,
+          )
+          if (resolution === undefined) {
+            throw this.#validationError(
+              request.correlationId,
+              'CHAT_DECISION_NOT_CHOSEN',
+              'No choice is recorded for this question, so there is nothing to undo. Ask it and record what the learner answers.',
+            )
+          }
+          const receipt = (decisionId: string, reopened: boolean, withdrawn: number) =>
+            builderChatSaveChoiceReceiptSchema.parse({
+              schemaVersion: 1,
+              correlationId: request.correlationId,
+              outcome: 'UNDONE',
+              decisionId,
+              reopened,
+              withdrawnEvidenceCount: withdrawn,
+            })
+          const earlier = repository
+            .readDecisionDisputes(request.projectId)
+            .find((item) => item.resolutionId === resolution.id)
+          if (earlier !== undefined) {
+            return {
+              response: receipt(
+                earlier.reopenedDecisionId ?? decision.id,
+                earlier.reopenedDecisionId !== undefined,
+                0,
+              ),
+              resourceId: earlier.id,
+              resourceRevision: routed.task.revision,
+            }
+          }
+          const replies = unique([decision.taskId, routed.task.id])
+            .flatMap((taskId) =>
+              repository.readTaskChatEvents(request.projectId, taskId, resolution.resolvedAt),
+            )
+            .flatMap(({ event, helperTab }) =>
+              !helperTab &&
+              event.payload.type === 'USER_MESSAGE' &&
+              event.actor.kind === 'USER' &&
+              Date.parse(event.occurredAt) > Date.parse(resolution.resolvedAt)
+                ? [{ event, payload: event.payload }]
+                : [],
+            )
+            .sort((left, right) => left.event.sequence - right.event.sequence)
+          if (replies.length === 0) {
+            throw this.#validationError(
+              request.correlationId,
+              'CHAT_DECISION_NO_LEARNER_REPLY',
+              'The learner has not said anything in the Builder chat since this choice was recorded. Undo it only after they say it was not theirs.',
+            )
+          }
+          const applied = aggregate.decisionApplications.some(
+            (item) => item.decisionId === decision.id,
+          )
+          const latest = latestDecisionInChain(aggregate.decisionRequests, decision.id)
+          const reopened =
+            !applied && latest?.id === decision.id && aggregate.task.status !== 'COMPLETED'
+              ? this.#reopenChangedDecision(
+                  repository,
+                  aggregate,
+                  decision,
+                  request,
+                  'Reopened a Decision because the learner said the recorded choice was not theirs.',
+                )
+              : undefined
+          const disputedAt = this.#timestamp()
+          const dispute = decisionDisputeSchema.parse({
+            schemaVersion: 1,
+            id: this.#generateId('decision_dispute'),
+            decisionId: decision.id,
+            resolutionId: resolution.id,
+            projectId: decision.projectId,
+            taskId: decision.taskId,
+            correlationId: decision.correlationId,
+            learnerMessageIds: unique(replies.map(({ payload }) => payload.messageId)).slice(-5),
+            ...(reopened === undefined ? {} : { reopenedDecisionId: reopened.id }),
+            disputedAt,
+            source: { kind: 'USER', mappedBy: 'BUILDER' },
+          })
+          repository.appendDecisionDispute(dispute)
+          this.#appendAudit(repository, {
+            correlationId: request.correlationId,
+            actor: request.actor,
+            action: 'UPDATED',
+            resource: { type: 'DECISION', id: decision.id },
+            reasonCode: 'DECISION_NOT_CHOSEN_BY_LEARNER',
+            summary:
+              'The learner said the recorded choice was not theirs; Core stopped counting it as their choice.',
+            changedFields: ['status'],
+            occurredAt: disputedAt,
+          })
+          const withdrawn = this.#withdrawDisputedEvidence(repository, dispute, request)
+          return {
+            response: receipt(reopened?.id ?? decision.id, reopened !== undefined, withdrawn),
+            resourceId: dispute.id,
+            resourceRevision: routed.task.revision,
+          }
+        },
+      ),
+    )
+  }
+
+  /**
+   * The chosen Decision a `not_mine` answer names: by ID in this Task or an earlier Task of the
+   * same chain, or the only chosen one still open in this Task.
+   */
+  #chatChosenDecision(
+    repository: PersistenceRepository,
+    routed: BuilderTaskAggregate,
+    request: Extract<AgentRequest, { kind: 'BUILDER_CHAT_SAVE_CHOICE' }>,
+  ): { readonly aggregate: BuilderTaskAggregate; readonly decision: DecisionRequest } {
+    const named = request.answer.decisionId
+    if (named !== undefined) {
+      let current: BuilderTaskAggregate | null = routed
+      const seen = new Set<string>()
+      while (current !== null && !seen.has(current.task.id)) {
+        seen.add(current.task.id)
+        const decision = current.decisionRequests.find((item) => item.id === named)
+        if (decision !== undefined) return { aggregate: current, decision }
+        const previous: string | undefined = current.task.prerequisiteTaskIds[0]
+        current =
+          previous === undefined
+            ? null
+            : repository.readBuilderTaskAggregate(request.projectId, previous)
+      }
+      throw this.#notFound(request.correlationId, 'DECISION_NOT_FOUND')
+    }
+    const resolved = new Set(routed.decisionResolutions.map((item) => item.decisionId))
+    const active = new Set(activeChatDecisionIds(routed))
+    const chosen = currentDecisions(routed).filter(
+      (decision) => active.has(decision.id) && resolved.has(decision.id),
+    )
+    const only = chosen.length === 1 ? chosen[0] : undefined
+    if (only === undefined) {
+      throw this.#validationError(
+        request.correlationId,
+        'CHAT_DECISION_ID_REQUIRED',
+        'Pass the decisionId of the choice the learner says was not theirs; check_progress lists the open ones.',
+      )
+    }
+    return { aggregate: routed, decision: only }
+  }
+
+  /**
+   * Stops counting learner Evidence that cited a disputed choice and recalculates each affected
+   * Concept State from what remains (K17). Evidence that cites only the learner's own messages
+   * stays. Returns how many Evidence records were withdrawn.
+   */
+  #withdrawDisputedEvidence(
+    repository: PersistenceRepository,
+    dispute: DecisionDispute,
+    request: Extract<AgentRequest, { kind: 'BUILDER_CHAT_SAVE_CHOICE' }>,
+  ): number {
+    const withdrawn = repository
+      .readCountedEvidenceCitingDecision(dispute.projectId, dispute.decisionId)
+      .filter((evidence) => evidence.kind === 'USER_UNDERSTANDING')
+    for (const evidence of withdrawn) {
+      repository.appendEvidenceWithdrawal(
+        evidenceWithdrawalSchema.parse({
+          schemaVersion: 1,
+          evidenceId: evidence.id,
+          conceptId: evidence.conceptId,
+          projectId: evidence.projectId,
+          decisionDisputeId: dispute.id,
+          reasonCode: 'DECISION_NOT_CHOSEN_BY_LEARNER',
+          withdrawnAt: dispute.disputedAt,
+          source: { kind: 'CORE' },
+        }),
+      )
+      this.#appendAudit(repository, {
+        correlationId: request.correlationId,
+        actor: { kind: 'CORE' },
+        action: 'UPDATED',
+        resource: { type: 'EVIDENCE', id: evidence.id },
+        reasonCode: 'DECISION_NOT_CHOSEN_BY_LEARNER',
+        summary: 'Stopped counting Evidence whose source choice the learner said was not theirs.',
+        changedFields: [],
+        occurredAt: dispute.disputedAt,
+      })
+    }
+    for (const conceptId of unique(withdrawn.map((evidence) => evidence.conceptId))) {
+      this.#recalculateConceptWithout(
+        repository,
+        conceptId,
+        withdrawn.filter((evidence) => evidence.conceptId === conceptId),
+        dispute,
+        request.correlationId,
+      )
+    }
+    return withdrawn.length
+  }
+
+  /**
+   * Recalculates one Concept State after Evidence was withdrawn. With no understanding Evidence
+   * left, Core records that the concept came up in the Builder's question (OBSERVED), so the
+   * Ledger keeps a source. Misconception issues the withdrawn Evidence resolved open again.
+   */
+  #recalculateConceptWithout(
+    repository: PersistenceRepository,
+    conceptId: string,
+    withdrawn: readonly AcceptedEvidence[],
+    dispute: DecisionDispute,
+    correlationId: string,
+  ): void {
+    const trace = repository.readEvidenceTrace(conceptId)
+    const ledger = trace?.ledger ?? null
+    if (trace === null || ledger === null) return
+    const withdrawnIds = withdrawn.map((evidence) => evidence.id)
+    let acceptedEvidence = trace.acceptedEvidence
+    if (!acceptedEvidence.some((evidence) => evidence.kind !== 'MISCONCEPTION_SIGNAL')) {
+      const source = withdrawn[0]
+      if (source === undefined) return
+      const observation = acceptedEvidenceSchema.parse({
+        schemaVersion: 1,
+        id: this.#generateId('evidence'),
+        kind: 'CONCEPT_OBSERVATION',
+        projectId: dispute.projectId,
+        taskId: dispute.taskId,
+        episodeId: source.episodeId,
+        conceptId,
+        correlationId: dispute.correlationId,
+        supportsState: 'OBSERVED',
+        contextSources: [this.#decisionQuestionSource(repository, dispute, source.episodeId)],
+        acceptedAt: dispute.disputedAt,
+        source: { kind: 'CORE' },
+        redactionStatus: 'VERIFIED_REDACTED',
+      })
+      repository.appendAcceptedEvidence(observation)
+      acceptedEvidence = [...acceptedEvidence, observation]
+    }
+    const stateResult = reduceConceptState({
+      conceptId,
+      current: ledger.state,
+      acceptedEvidence,
+      nextRevision: ledger.state.revision + 1,
+      updatedAt: dispute.disputedAt,
+      withdrawnEvidenceIds: withdrawnIds,
+    })
+    if (stateResult.outcome === 'REJECTED') {
+      throw this.#domainError(correlationId, stateResult.reasonCode)
+    }
+    const reopenedIssues = trace.misconceptionIssues.flatMap((issue) => {
+      if (
+        issue.status !== 'RESOLVED' ||
+        issue.resolvedByEvidenceId === undefined ||
+        !withdrawnIds.includes(issue.resolvedByEvidenceId)
+      ) {
+        return []
+      }
+      const { resolvedByEvidenceId: _evidence, resolvedAt: _at, ...open } = issue
+      return [misconceptionIssueSchema.parse({ ...open, status: 'OPEN' })]
+    })
+    for (const issue of reopenedIssues) repository.appendMisconceptionIssue(issue)
+    if (stateResult.outcome === 'NO_OP' && reopenedIssues.length === 0) return
+    const next = {
+      ...ledger,
+      state: stateResult.value,
+      openIssues: [
+        ...ledger.openIssues.filter(
+          (issue) => !reopenedIssues.some((reopened) => reopened.id === issue.id),
+        ),
+        ...reopenedIssues,
+      ],
+      revision: ledger.revision + 1,
+      updatedAt: dispute.disputedAt,
+    }
+    repository.appendConceptLedger(next)
+    this.#appendAudit(repository, {
+      correlationId,
+      actor: { kind: 'CORE' },
+      action: 'UPDATED',
+      resource: { type: 'CONCEPT_LEDGER', id: ledger.id, revision: next.revision },
+      reasonCode: 'DECISION_NOT_CHOSEN_BY_LEARNER',
+      summary:
+        'Recalculated Concept State without Evidence from a choice the learner said was not theirs.',
+      changedFields: ['state.state', 'state.acceptedEvidenceIds', 'openIssues'],
+      occurredAt: dispute.disputedAt,
+    })
+  }
+
+  /** Where the disputed question was asked: its DECISION_REQUESTED event in the Episode. */
+  #decisionQuestionSource(
+    repository: PersistenceRepository,
+    dispute: DecisionDispute,
+    episodeId: string,
+  ): { readonly kind: 'EVENT'; readonly eventId: string } {
+    const history = repository.readEpisodeHistory(dispute.projectId, episodeId)
+    const event =
+      history?.events.find(
+        (item) =>
+          item.payload.type === 'DECISION_REQUESTED' &&
+          item.payload.decisionId === dispute.decisionId,
+      ) ?? history?.events.find((item) => item.actor.kind !== 'USER')
+    if (event === undefined) throw this.#notFound(dispute.correlationId, 'EPISODE_NOT_FOUND')
+    return { kind: 'EVENT', eventId: event.id }
+  }
+
   /** The Decision a chat answer belongs to: named, or the only one the learner can answer. */
   #chatTargetDecision(
     aggregate: BuilderTaskAggregate,
@@ -4855,6 +5191,7 @@ export class ApplicationService {
     aggregate: BuilderTaskAggregate,
     decision: DecisionRequest,
     request: Extract<AgentRequest, { kind: 'BUILDER_CHAT_SAVE_CHOICE' }>,
+    auditSummary: string,
   ): DecisionRequest {
     const liveContext = aggregate.liveContext
     if (liveContext === null)
@@ -4870,7 +5207,8 @@ export class ApplicationService {
       contextVersion,
       options: decision.options.map((option, index) => ({ ...option, id: optionIds[index] })),
       recommendedOptionId: optionIds[recommendedIndex],
-      // The learner already chose; the replacement never blocks the Task.
+      // The learner already chose, or is asked again after undoing a choice that was not theirs;
+      // the replacement never blocks the Task.
       independentWorkCanContinue: true,
       replacesDecisionId: decision.id,
       requestedAt: reopenedAt,
@@ -4951,7 +5289,7 @@ export class ApplicationService {
       actor: request.actor,
       action: 'SUBMITTED',
       resource: { type: 'DECISION', id: replacement.id },
-      summary: 'Reopened a chosen Decision because the learner changed their choice in chat.',
+      summary: auditSummary,
       changedFields: ['status'],
       occurredAt: reopenedAt,
     })
@@ -5269,6 +5607,7 @@ export class ApplicationService {
                 redactSensitiveText(request.reply).replace(/\s+/g, ' ').trim(),
                 BUILDER_CHAT_TURN_MAX_CHARS,
               ),
+              ...(request.interrupted === true ? { interrupted: true as const } : {}),
             },
             sourceReferences: [
               { kind: 'AGENT_MESSAGE', conversationId: request.conversationId, messageId },
@@ -6120,6 +6459,9 @@ export class ApplicationService {
               : repository.readBuilderTaskAggregate(projectId, aggregate.episode.taskId)
           const decisionResolutions = taskAggregate?.decisionResolutions ?? []
           const decisionRequests = taskAggregate?.decisionRequests ?? []
+          const disputedDecisionIds = repository
+            .readDecisionDisputes(projectId)
+            .map((dispute) => dispute.decisionId)
           const outcomes: EvidenceBatchApplicationResult['outcomes'][number][] = []
           for (const proposal of request.batch.proposals) {
             const concept = this.#resolveConcept(repository, proposal, request.batch.submittedAt)
@@ -6135,6 +6477,7 @@ export class ApplicationService {
               events: aggregate.events,
               decisionResolutions,
               decisionRequests,
+              disputedDecisionIds,
               concept,
               existingProposalIds: [
                 ...existingProposalIds,

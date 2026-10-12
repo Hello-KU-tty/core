@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
-import { conversationIdSchema, uiRequestSchema } from '@vibe-helper/contracts'
+import { conversationIdSchema, idempotencyKeySchema, uiRequestSchema } from '@vibe-helper/contracts'
 import { describe, expect, it } from 'vitest'
 
 import {
   applyKiroCommandApproval,
   helperExchangeRequest,
+  interruptedKiroTurn,
   KIRO_HELPER_AGENT_NAME,
   KIRO_HELPER_MCP_SERVER_NAME,
   KIRO_MCP_SERVER_NAME,
@@ -14,6 +15,7 @@ import {
   kiroPermissionsFile,
   kiroSessionAgentMode,
   kiroSessionTranscriptPath,
+  kiroTurnIdempotencyKey,
   kiroWorkspaceHash,
   lastAssistantReply,
   mergeKiroMcpConfig,
@@ -238,7 +240,7 @@ describe('Kiro-native workspace adapter', () => {
   })
 
   it('steers decisions to the moment they arise, recorded before they are asked (since 0.5.0)', () => {
-    expect(templates.version).toBe('0.8.0')
+    expect(templates.version).toBe('0.9.0')
     const scoped = renderLearnerSteering(templates, binding, {
       learnerFocus: [],
       agentSupport: [],
@@ -456,6 +458,48 @@ describe('Kiro-native workspace adapter', () => {
     expect(exchange.helperResponseSummary).toHaveLength(240)
   })
 
+  it('reads back the last turn the Stop hook did not capture (K17)', () => {
+    const line = (payload: unknown) => JSON.stringify({ payload })
+    const turn = (executionId: string, stopReason: string, said: string[], captured = false) => [
+      line({ type: 'turn_start', executionId }),
+      ...said.map((content) =>
+        line({ type: 'assistant', operationType: 'Say', executionId, content }),
+      ),
+      line({ type: 'assistant', operationType: 'Reasoning', executionId, content: '...' }),
+      ...(captured
+        ? [line({ type: 'ContextualHookInvoked', name: 'vibe-helper-turn-end', executionId })]
+        : []),
+      line({ type: 'turn_end', stopReason, executionId }),
+    ]
+    const done = turn('e1', 'end_turn', ['끝난 답'], true)
+    const cancelled = turn('e2', 'cancelled', ['ACK와 닮은 점은', 'user2번으로 가자'])
+    const next = [
+      line({ type: 'user', content: '왜 맘대로 선택함?' }),
+      line({ type: 'turn_start', executionId: 'e3' }),
+    ]
+    expect(interruptedKiroTurn([...done, ...cancelled, ...next].join('\n'))).toEqual({
+      executionId: 'e2',
+      stopReason: 'cancelled',
+      reply: 'ACK와 닮은 점은\nuser2번으로 가자',
+    })
+    // A line Kiro is still writing does not hide the finished turns.
+    expect(
+      interruptedKiroTurn([...cancelled, '{"payload":{"type":"us'].join('\n'))?.executionId,
+    ).toBe('e2')
+    expect(interruptedKiroTurn([...cancelled, ...done].join('\n'))).toBeNull()
+    expect(interruptedKiroTurn(turn('e4', 'cancelled', ['x'], true).join('\n'))).toBeNull()
+    expect(interruptedKiroTurn(turn('e5', 'cancelled', []).join('\n'))).toEqual({
+      executionId: 'e5',
+      stopReason: 'cancelled',
+      reply: null,
+    })
+    expect(interruptedKiroTurn('')).toBeNull()
+    const key = kiroTurnIdempotencyKey('bb7ea481-6149-4941-94f0-f92694eea937')
+    expect(idempotencyKeySchema.safeParse(key).success).toBe(true)
+    expect(kiroTurnIdempotencyKey('bb7ea481-6149-4941-94f0-f92694eea937')).toBe(key)
+    expect(kiroTurnIdempotencyKey('other')).not.toBe(key)
+  })
+
   it('reads the reply after the last user message from a Kiro session record', () => {
     const record = [
       { payload: { type: 'user', content: '첫 질문' } },
@@ -578,6 +622,43 @@ describe('Kiro-native workspace adapter', () => {
     // Kiro may quote values when it rewrites the file.
     const quoted = fresh.replace('      - npm *\n', '      - "npm *"\n').replaceAll('\n', '\r\n')
     expect(applyKiroCommandApproval(quoted, 'PREAPPROVED')).toEqual({ status: 'UNCHANGED' })
+  })
+
+  it('replaces the rule an earlier installer wrote and still removes it on manual approval (K17)', () => {
+    const fresh = applyKiroCommandApproval(null, 'PREAPPROVED')
+    if (fresh.status !== 'WRITE') throw new Error(fresh.status)
+    expect(fresh.text).toContain('      - open http://localhost:*\n')
+    expect(fresh.text).toContain('      - Start-Process http://localhost:*\n')
+    expect(fresh.text).toContain('      - open *@*\n')
+    // 0.2.7–0.2.8 wrote the same rule without the browser commands.
+    const browser = /^ {6}- (open|Start-Process|start) /
+    const earlier = fresh.text
+      .split('\n')
+      .filter((line) => !browser.test(line))
+      .join('\n')
+    expect(earlier).not.toBe(fresh.text)
+    expect(applyKiroCommandApproval(earlier, 'PREAPPROVED')).toEqual({
+      status: 'WRITE',
+      text: fresh.text,
+    })
+    expect(applyKiroCommandApproval(earlier, 'MANUAL')).toEqual({
+      status: 'WRITE',
+      text: 'rules: []\n',
+    })
+    // An "always allow" Kiro added inside the earlier rule stays.
+    const merged = earlier.replace('      - git *\n', '      - git *\n      - rm -rf dist\n')
+    const upgraded = applyKiroCommandApproval(merged, 'PREAPPROVED')
+    if (upgraded.status !== 'WRITE') throw new Error(upgraded.status)
+    expect(upgraded.text).toContain('      - rm -rf dist\n')
+    expect(upgraded.text.match(/- npm \*\n/g)).toHaveLength(1)
+    // Reconnecting without a new choice upgrades only a pre-approved folder.
+    expect(applyKiroCommandApproval(earlier, 'UPGRADE')).toEqual({
+      status: 'WRITE',
+      text: fresh.text,
+    })
+    expect(applyKiroCommandApproval(fresh.text, 'UPGRADE')).toEqual({ status: 'UNCHANGED' })
+    expect(applyKiroCommandApproval(null, 'UPGRADE')).toEqual({ status: 'UNCHANGED' })
+    expect(applyKiroCommandApproval('rules: []\n', 'UPGRADE')).toEqual({ status: 'UNCHANGED' })
   })
 
   it("manual approval removes only the Vibe Helper entries and keeps the learner's own", () => {

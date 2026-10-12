@@ -40,11 +40,14 @@ import {
   contextRefreshRequestSchema,
   correlationIdSchema,
   type DecisionApplication,
+  type DecisionDispute,
   type DecisionRequest,
   type DecisionResolution,
   type DiscoveryFeedback,
   type DiscoverySession,
   decisionApplicationSchema,
+  decisionDisputeSchema,
+  decisionIdSchema,
   decisionRequestSchema,
   decisionResolutionSchema,
   discoveryFeedbackSchema,
@@ -53,11 +56,13 @@ import {
   type EvaluationRun,
   type EvidenceDecision,
   type EvidenceProposal,
+  type EvidenceWithdrawal,
   episodeSchema,
   evaluationRunIdSchema,
   evaluationRunSchema,
   evidenceDecisionSchema,
   evidenceProposalSchema,
+  evidenceWithdrawalSchema,
   idempotencyKeySchema,
   type LearningSpecRevision,
   type LiveProjectContext,
@@ -1316,6 +1321,64 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
     )
   }
 
+  appendDecisionDispute(input: DecisionDispute): PersistenceWriteResult {
+    const prepared = prepareRecord(decisionDisputeSchema, input)
+    const record = prepared.record
+    return this.#write(record.id, () =>
+      this.#appendImmutable(
+        record.id,
+        prepared,
+        'SELECT payload_json, payload_hash FROM decision_disputes WHERE id = ?',
+        [record.id],
+        () => {
+          this.#sqlite
+            .prepare(
+              'INSERT INTO decision_disputes (id, decision_id, resolution_id, project_id, task_id, correlation_id, disputed_at, payload_json, payload_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            )
+            .run(
+              record.id,
+              record.decisionId,
+              record.resolutionId,
+              record.projectId,
+              record.taskId,
+              record.correlationId,
+              record.disputedAt,
+              prepared.payloadJson,
+              prepared.payloadHash,
+            )
+        },
+      ),
+    )
+  }
+
+  appendEvidenceWithdrawal(input: EvidenceWithdrawal): PersistenceWriteResult {
+    const prepared = prepareRecord(evidenceWithdrawalSchema, input)
+    const record = prepared.record
+    return this.#write(record.evidenceId, () =>
+      this.#appendImmutable(
+        record.evidenceId,
+        prepared,
+        'SELECT payload_json, payload_hash FROM evidence_withdrawals WHERE evidence_id = ?',
+        [record.evidenceId],
+        () => {
+          this.#sqlite
+            .prepare(
+              'INSERT INTO evidence_withdrawals (evidence_id, concept_id, project_id, decision_dispute_id, withdrawn_at, payload_json, payload_hash) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            )
+            .run(
+              record.evidenceId,
+              record.conceptId,
+              record.projectId,
+              record.decisionDisputeId,
+              record.withdrawnAt,
+              prepared.payloadJson,
+              prepared.payloadHash,
+            )
+        },
+      ),
+    )
+  }
+
   appendMisconceptionIssue(input: MisconceptionIssue): PersistenceWriteResult {
     const prepared = prepareRecord(misconceptionIssueSchema, input)
     const record = prepared.record
@@ -2565,7 +2628,9 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
         evidenceDecisionSchema,
       )
       const acceptedEvidenceRecords = this.#recordList(
-        'SELECT payload_json, payload_hash FROM accepted_evidence WHERE concept_id = ? ORDER BY accepted_at ASC',
+        `SELECT payload_json, payload_hash FROM accepted_evidence
+         WHERE concept_id = ? AND id NOT IN (SELECT evidence_id FROM evidence_withdrawals)
+         ORDER BY accepted_at ASC`,
         [conceptId],
         acceptedEvidenceSchema,
       )
@@ -2636,6 +2701,46 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
     })
   }
 
+  readDecisionDisputes(projectId: string): readonly DecisionDispute[] {
+    if (!projectSchema.shape.id.safeParse(projectId).success) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Project ID is invalid')
+    }
+    return this.#read(() =>
+      this.#recordList(
+        'SELECT payload_json, payload_hash FROM decision_disputes WHERE project_id = ? ORDER BY disputed_at ASC',
+        [projectId],
+        decisionDisputeSchema,
+      ),
+    )
+  }
+
+  readCountedEvidenceCitingDecision(
+    projectId: string,
+    decisionId: string,
+  ): readonly AcceptedEvidence[] {
+    if (
+      !projectSchema.shape.id.safeParse(projectId).success ||
+      !decisionIdSchema.safeParse(decisionId).success
+    ) {
+      throw new PersistenceError('VALIDATION_FAILED', 'Decision Evidence query identity is invalid')
+    }
+    return this.#read(() =>
+      this.#recordList(
+        `SELECT evidence.payload_json, evidence.payload_hash FROM accepted_evidence evidence
+         WHERE evidence.project_id = ?
+           AND evidence.id NOT IN (SELECT evidence_id FROM evidence_withdrawals)
+           AND EXISTS (
+             SELECT 1 FROM json_each(evidence.payload_json, '$.userEvidenceSources') source
+             WHERE json_extract(source.value, '$.kind') = 'USER_DECISION'
+               AND json_extract(source.value, '$.decisionId') = ?
+           )
+         ORDER BY evidence.accepted_at ASC, evidence.id ASC`,
+        [projectId, decisionId],
+        acceptedEvidenceSchema,
+      ),
+    )
+  }
+
   readRecentConceptLedgers(limit: number): readonly ConceptLedgerEntry[] {
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
       throw new PersistenceError('VALIDATION_FAILED', 'Concept Ledger limit is invalid')
@@ -2675,6 +2780,7 @@ export class SqlitePersistenceRepository implements PersistenceRepository {
           `SELECT concept_id FROM accepted_evidence
            WHERE project_id = ? AND kind = 'USER_UNDERSTANDING'
              AND task_id IN (${placeholders})
+             AND id NOT IN (SELECT evidence_id FROM evidence_withdrawals)
            GROUP BY concept_id
            ORDER BY MAX(accepted_at) DESC, concept_id ASC LIMIT ?`,
         )

@@ -106,6 +106,17 @@ describe('Evidence acceptance policy', () => {
     expect(result.decision.reasonCode).toBe('INSUFFICIENT_EVIDENCE')
   })
 
+  it('rejects Evidence that cites a choice the learner said was not theirs (K17)', () => {
+    const result = evaluate(reasonedDecisionProposal, {
+      episode: { ...episodeFixture, eventIds: [reasonedDecisionEvent.id] },
+      events: [reasonedDecisionEvent],
+      decisionResolutions: [decisionResolutionFixture],
+      disputedDecisionIds: [ids.decision],
+    })
+    expect(result.outcome).toBe('REJECTED')
+    expect(result.decision.reasonCode).toBe('INVALID_REFERENCE')
+  })
+
   it('rejects JUSTIFIED_DECISION when the cited Decision has no stored Resolution', () => {
     const result = evaluate(reasonedDecisionProposal, {
       episode: { ...episodeFixture, eventIds: [reasonedDecisionEvent.id] },
@@ -714,6 +725,74 @@ describe('Concept State and misconception reducers', () => {
     expect(replay.outcome).toBe('NO_OP')
     if (replay.outcome !== 'NO_OP') return
     expect(replay.value.state).toBe('DEMONSTRATED')
+  })
+
+  it('goes down only when Evidence from a disputed choice is withdrawn (K17)', () => {
+    const positive = evaluate(reasonedDecisionProposal, {
+      episode: { ...episodeFixture, eventIds: [reasonedDecisionEvent.id] },
+      events: [reasonedDecisionEvent],
+      decisionResolutions: [decisionResolutionFixture],
+    })
+    expect(positive.outcome).toBe('ACCEPTED')
+    if (positive.outcome !== 'ACCEPTED') return
+    const observation = {
+      schemaVersion: 1,
+      id: observationEvidenceId,
+      kind: 'CONCEPT_OBSERVATION',
+      projectId: ids.project,
+      taskId: ids.task,
+      episodeId: ids.episode,
+      conceptId: ids.concept,
+      correlationId: ids.correlation,
+      supportsState: 'OBSERVED',
+      contextSources: [codeReferenceFixture],
+      acceptedAt: timestamp,
+      source: { kind: 'CORE' },
+      redactionStatus: 'VERIFIED_REDACTED',
+    } as const
+    const first = reduceConceptState({
+      conceptId: ids.concept,
+      acceptedEvidence: [observation, positive.evidence],
+      nextRevision: 1,
+      updatedAt: timestamp,
+    })
+    if (first.outcome !== 'APPLIED') throw new Error('first reduction failed')
+    expect(first.value.state).toBe('DEMONSTRATED')
+
+    // Leaving Evidence out without a withdrawal is still an incomplete replay.
+    expect(
+      reduceConceptState({
+        conceptId: ids.concept,
+        current: first.value,
+        acceptedEvidence: [observation],
+        nextRevision: 2,
+        updatedAt: timestamp,
+      }),
+    ).toMatchObject({ outcome: 'REJECTED', reasonCode: 'CONCEPT_REPLAY_LOG_INCOMPLETE' })
+    // Withdrawn Evidence cannot be counted again.
+    expect(
+      reduceConceptState({
+        conceptId: ids.concept,
+        current: first.value,
+        acceptedEvidence: [observation, positive.evidence],
+        nextRevision: 2,
+        updatedAt: timestamp,
+        withdrawnEvidenceIds: [positive.evidence.id],
+      }),
+    ).toMatchObject({ outcome: 'REJECTED', reasonCode: 'CONCEPT_WITHDRAWN_EVIDENCE_COUNTED' })
+
+    const recalculated = reduceConceptState({
+      conceptId: ids.concept,
+      current: first.value,
+      acceptedEvidence: [observation],
+      nextRevision: 2,
+      updatedAt: timestamp,
+      withdrawnEvidenceIds: [positive.evidence.id],
+    })
+    expect(recalculated).toMatchObject({
+      outcome: 'APPLIED',
+      value: { state: 'OBSERVED', acceptedEvidenceIds: [observationEvidenceId], revision: 2 },
+    })
   })
 
   it('opens, supports and resolves a misconception issue without downgrading State', () => {

@@ -120,6 +120,44 @@ describe('SQLite initialization and migrations', () => {
     original.close()
   })
 
+  it('adds the undo tables (0009) to a 0.2.8 database and keeps its records (K17)', async () => {
+    const dataDirectory = await mkdtemp(join(tmpdir(), 'vibe-helper-0009-'))
+    const shipped = fileURLToPath(new URL('../drizzle/', import.meta.url))
+    const released = join(dataDirectory, 'released-migrations')
+    await mkdir(join(released, 'meta'), { recursive: true })
+    const current = JSON.parse(await readFile(join(shipped, 'meta', '_journal.json'), 'utf8')) as {
+      readonly entries: readonly {
+        readonly idx: number
+        readonly when: number
+        readonly tag: string
+      }[]
+    }
+    const before = current.entries.filter((entry) => entry.idx <= 8)
+    expect(before.at(-1)?.tag).toBe('0008_tidy_next_avengers')
+    for (const entry of before)
+      await copyFile(join(shipped, `${entry.tag}.sql`), join(released, `${entry.tag}.sql`))
+    await writeFile(join(released, 'meta', '_journal.json'), journal(before))
+    const raw = new Database(join(dataDirectory, 'vibe-helper.sqlite'))
+    raw.pragma('foreign_keys = ON')
+    runMigrations(raw, released)
+    new SqlitePersistenceRepository(raw).appendProject(projectFixture)
+    raw.close()
+
+    const migrated = await openSqliteStorage({ dataDirectory })
+    expect(migrated.repository.recoverProject(projectFixture.id)?.project).toEqual(projectFixture)
+    expect(migrated.repository.readDecisionDisputes(projectFixture.id)).toEqual([])
+    migrated.close()
+    const database = new Database(join(dataDirectory, 'vibe-helper.sqlite'), { readonly: true })
+    expect(
+      database
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('decision_disputes', 'evidence_withdrawals') ORDER BY name",
+        )
+        .all(),
+    ).toEqual([{ name: 'decision_disputes' }, { name: 'evidence_withdrawals' }])
+    database.close()
+  })
+
   it('rolls back a migration that fails after an earlier statement', async () => {
     const temporaryRoot = await mkdtemp(join(tmpdir(), 'vibe-helper-migration-'))
     const migrationsDirectory = join(temporaryRoot, 'drizzle')

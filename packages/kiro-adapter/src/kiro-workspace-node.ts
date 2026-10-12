@@ -160,6 +160,7 @@ export function builderChatTurnRequest(
   sessionId: string,
   reply: string,
   idempotencyKey: string = `idem_${randomUUID()}`,
+  options: { readonly interrupted?: boolean } = {},
 ): Extract<UiRequest, { kind: 'UI_RECORD_BUILDER_CHAT_TURN' }> | null {
   const text = reply.trim().slice(0, MAX_CHAT_MESSAGE_CHARS)
   if (text.length === 0) return null
@@ -173,6 +174,7 @@ export function builderChatTurnRequest(
     taskId: binding.taskId,
     conversationId: kiroConversationId(sessionId),
     reply: text,
+    ...(options.interrupted === true ? { interrupted: true as const } : {}),
   }
 }
 
@@ -204,6 +206,65 @@ export function helperExchangeRequest(
     origin: 'FREE_TEXT',
     closeConversation: false,
   }
+}
+
+/** The Stop hook Vibe Helper installs; its record in a session marks a turn already captured. */
+export const KIRO_TURN_END_HOOK_NAME = 'vibe-helper-turn-end'
+
+export interface KiroInterruptedTurn {
+  readonly executionId: string
+  readonly stopReason: string
+  /** What the Agent said in the turn before it stopped, or null when it said nothing. */
+  readonly reply: string | null
+}
+
+/**
+ * The last finished turn of a Kiro session record when the Stop hook did not capture it (K17).
+ * Kiro runs no Stop hook for a turn the learner cancels, but still writes its `turn_end`
+ * (Kiro 1.2.56: `stopReason: "cancelled"`). Null when that turn ended normally or the Stop hook
+ * already ran for it.
+ */
+export function interruptedKiroTurn(messagesJsonl: string): KiroInterruptedTurn | null {
+  const payloads: Array<Record<string, unknown>> = []
+  for (const line of messagesJsonl.split('\n')) {
+    if (line.trim().length === 0) continue
+    try {
+      const record = JSON.parse(line) as { payload?: unknown }
+      if (typeof record.payload === 'object' && record.payload !== null)
+        payloads.push(record.payload as Record<string, unknown>)
+    } catch {
+      // A line Kiro is still writing; the turns before it are complete.
+    }
+  }
+  const turnEnd = payloads.findLast((payload) => payload.type === 'turn_end')
+  const executionId = turnEnd?.executionId
+  if (typeof executionId !== 'string' || !/^[A-Za-z0-9-]{1,100}$/.test(executionId)) return null
+  const stopReason = typeof turnEnd?.stopReason === 'string' ? turnEnd.stopReason : 'unknown'
+  if (stopReason === 'end_turn') return null
+  const captured = payloads.some(
+    (payload) =>
+      payload.type === 'ContextualHookInvoked' &&
+      payload.name === KIRO_TURN_END_HOOK_NAME &&
+      payload.executionId === executionId,
+  )
+  if (captured) return null
+  const said = payloads
+    .filter(
+      (payload) =>
+        payload.type === 'assistant' &&
+        payload.operationType === 'Say' &&
+        payload.executionId === executionId &&
+        typeof payload.content === 'string',
+    )
+    .map((payload) => payload.content as string)
+  return { executionId, stopReason, reply: said.length === 0 ? null : said.join('\n') }
+}
+
+/** One idempotency key per Kiro turn, so a turn read back twice is recorded once. */
+export function kiroTurnIdempotencyKey(executionId: string): string {
+  const hex = createHash('sha256').update(`kiro-turn:${executionId}`).digest('hex')
+  const variant = ((Number.parseInt(hex.slice(16, 17), 16) & 0x3) | 0x8).toString(16)
+  return `idem_${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`
 }
 
 /** Kiro IDE 1.2.4 session record location (private format; verified in the K01 spike). */
@@ -399,6 +460,34 @@ export interface KiroAllowRule {
  * mistakes; it is not a sandbox: `node`, package scripts, `cat` and redirections reach outside the
  * folder. PowerShell names cover Windows, where Kiro uses the default terminal profile.
  */
+const K11_SHELL_RULE: KiroAllowRule = {
+  capability: 'shell',
+  match: [
+    ...['ls', 'ls *', 'pwd', 'cd *', 'cat *', 'head *', 'tail *', 'wc *', 'grep *', 'sort *'],
+    ...['find *', 'which *', 'echo *', 'sleep *', 'uname *'],
+    ...['mkdir *', 'touch *', 'cp *', 'mv *'],
+    ...['node *', 'npm *', 'npx *', 'pnpm *', 'yarn', 'yarn *', 'bun *', 'tsc *', 'python3 *'],
+    'git *',
+    ...['curl http://localhost:*', 'curl -s http://localhost:*'],
+    ...['curl http://127.0.0.1:*', 'curl -s http://127.0.0.1:*'],
+    ...['Get-ChildItem*', 'Get-Content *', 'Select-Object *', 'Select-String *'],
+    ...['Measure-Object*', 'Test-Path *', 'Get-Location', 'Set-Location *', 'New-Item *'],
+    ...['Copy-Item *', 'Move-Item *', 'Start-Sleep *', 'Write-Output *', 'where.exe *'],
+    ...['py *', 'python *', 'curl.exe http://localhost:*', 'curl.exe -s http://localhost:*'],
+    ...['Invoke-WebRequest http://localhost:*', 'Invoke-RestMethod http://localhost:*'],
+  ],
+  exclude: [
+    ...['npm publish*', 'npm * -g*', 'npm * --global*', 'npm -g*', 'npm --global*'],
+    'npm *--location=global*',
+    ...['pnpm publish*', 'pnpm * -g*', 'pnpm * --global*', 'pnpm -g*', 'pnpm --global*'],
+    ...['yarn publish*', 'yarn npm publish*', 'yarn global*'],
+    ...['bun publish*', 'bun * -g*', 'bun * --global*'],
+    ...['git push*', 'git * push*', 'git reset --hard*', 'git clean*', 'git config --global*'],
+    ...['find * -exec*', 'find * -delete*', 'find * -ok*'],
+    ...['curl *@*', 'curl.exe *@*', 'Invoke-WebRequest *@*', 'Invoke-RestMethod *@*'],
+  ],
+}
+
 export const KIRO_PREAPPROVED_RULES: readonly KiroAllowRule[] = [
   {
     capability: 'mcp',
@@ -407,31 +496,26 @@ export const KIRO_PREAPPROVED_RULES: readonly KiroAllowRule[] = [
   },
   {
     capability: 'shell',
+    // K17: open the finished app on this computer in the browser (macOS `open`, PowerShell
+    // `Start-Process` and its `start` alias), only for this computer's addresses.
     match: [
-      ...['ls', 'ls *', 'pwd', 'cd *', 'cat *', 'head *', 'tail *', 'wc *', 'grep *', 'sort *'],
-      ...['find *', 'which *', 'echo *', 'sleep *', 'uname *'],
-      ...['mkdir *', 'touch *', 'cp *', 'mv *'],
-      ...['node *', 'npm *', 'npx *', 'pnpm *', 'yarn', 'yarn *', 'bun *', 'tsc *', 'python3 *'],
-      'git *',
-      ...['curl http://localhost:*', 'curl -s http://localhost:*'],
-      ...['curl http://127.0.0.1:*', 'curl -s http://127.0.0.1:*'],
-      ...['Get-ChildItem*', 'Get-Content *', 'Select-Object *', 'Select-String *'],
-      ...['Measure-Object*', 'Test-Path *', 'Get-Location', 'Set-Location *', 'New-Item *'],
-      ...['Copy-Item *', 'Move-Item *', 'Start-Sleep *', 'Write-Output *', 'where.exe *'],
-      ...['py *', 'python *', 'curl.exe http://localhost:*', 'curl.exe -s http://localhost:*'],
-      ...['Invoke-WebRequest http://localhost:*', 'Invoke-RestMethod http://localhost:*'],
+      ...K11_SHELL_RULE.match,
+      ...['open http://localhost:*', 'open http://127.0.0.1:*'],
+      ...['Start-Process http://localhost:*', 'Start-Process http://127.0.0.1:*'],
+      ...['start http://localhost:*', 'start http://127.0.0.1:*'],
     ],
-    exclude: [
-      ...['npm publish*', 'npm * -g*', 'npm * --global*', 'npm -g*', 'npm --global*'],
-      'npm *--location=global*',
-      ...['pnpm publish*', 'pnpm * -g*', 'pnpm * --global*', 'pnpm -g*', 'pnpm --global*'],
-      ...['yarn publish*', 'yarn npm publish*', 'yarn global*'],
-      ...['bun publish*', 'bun * -g*', 'bun * --global*'],
-      ...['git push*', 'git * push*', 'git reset --hard*', 'git clean*', 'git config --global*'],
-      ...['find * -exec*', 'find * -delete*', 'find * -ok*'],
-      ...['curl *@*', 'curl.exe *@*', 'Invoke-WebRequest *@*', 'Invoke-RestMethod *@*'],
-    ],
+    exclude: [...K11_SHELL_RULE.exclude, 'open *@*', 'Start-Process *@*', 'start *@*'],
   },
+]
+
+/**
+ * Our rules in the order they are recognized: the current ones first, then what earlier
+ * installers wrote (0.2.7–0.2.8, K11), so an upgrade replaces an earlier rule and manual approval
+ * still removes it.
+ */
+const RECOGNIZED_PREAPPROVED_RULES: readonly KiroAllowRule[] = [
+  ...KIRO_PREAPPROVED_RULES,
+  K11_SHELL_RULE,
 ]
 
 interface ParsedKiroRule {
@@ -536,11 +620,12 @@ function renderKiroAllowRule(rule: KiroAllowRule): string {
  * the Vibe Helper rules; manual approval removes their entries and any rule left empty, keeping
  * every other rule and "always" choice. Only a file shaped like Kiro's own output is changed;
  * anything else is left alone, so Kiro keeps asking. Kiro's format is public but its file
- * location is not, so a failure only means prompts.
+ * location is not, so a failure only means prompts. `UPGRADE` brings a folder that holds an
+ * earlier version of our rules to the current ones and leaves every other folder as it is.
  */
 export function applyKiroCommandApproval(
   existing: string | null,
-  approval: KiroCommandApproval,
+  choice: KiroCommandApproval | 'UPGRADE',
 ):
   | { readonly status: 'WRITE'; readonly text: string }
   | { readonly status: 'UNCHANGED' | 'UNRECOGNIZED' } {
@@ -554,14 +639,17 @@ export function applyKiroCommandApproval(
         ours.exclude.every((value) => listValues(rule, 'exclude').includes(value)),
     )
   const owned = rules.filter((rule) =>
-    KIRO_PREAPPROVED_RULES.some((ours) => holdsOurEntries(rule, ours)),
+    RECOGNIZED_PREAPPROVED_RULES.some((ours) => holdsOurEntries(rule, ours)),
   )
+  // `UPGRADE` keeps the learner's earlier choice: only a pre-approved folder gets current rules.
+  if (choice === 'UPGRADE' && owned.length === 0) return { status: 'UNCHANGED' }
+  const approval: KiroCommandApproval = choice === 'UPGRADE' ? 'PREAPPROVED' : choice
   if (approval === 'PREAPPROVED' ? KIRO_PREAPPROVED_RULES.every(present) : owned.length === 0)
     return { status: 'UNCHANGED' }
   // Our entries leave first; a rule keeps only the "always" entries Kiro added to it, if any.
   const removed = new Set<number>()
   for (const rule of owned) {
-    const ours = KIRO_PREAPPROVED_RULES.find((candidate) => holdsOurEntries(rule, candidate))
+    const ours = RECOGNIZED_PREAPPROVED_RULES.find((candidate) => holdsOurEntries(rule, candidate))
     const match = rule.lists.get('match') ?? []
     const kept = match.filter((item) => !ours?.match.includes(item.value))
     if (kept.length === 0) for (let line = rule.start; line < rule.end; line++) removed.add(line)
@@ -617,7 +705,7 @@ export function renderKiroHooksConfig(
         action: { type: 'command', command, timeout: 5 },
       },
       {
-        name: 'vibe-helper-turn-end',
+        name: KIRO_TURN_END_HOOK_NAME,
         trigger: 'Stop',
         action: { type: 'command', command, timeout: 5 },
       },
@@ -965,20 +1053,40 @@ export interface KiroWorkspaceInstallOptions {
   readonly bindingDescriptor: string
   readonly learnerScope?: KiroLearnerScope
   readonly spec?: KiroSpecSource
-  /** Writes the Helper chat agent with its own Helper-role Core server when given. */
+  /**
+   * Writes the Helper chat agent with its own Helper-role Core server when given. Without it, an
+   * agent file an earlier Vibe Helper wrote is removed (K17): Kiro lists a workspace agent in the
+   * `/` menu next to the `/vibe-helper` steering, where picking it delegates the question to a
+   * sub-agent without the chat's context.
+   */
   readonly helperAgent?: { readonly helperPrompt: string; readonly helperDescriptor: string }
+}
+
+/** True for the Helper agent file Vibe Helper wrote, never for a learner's own agent. */
+function isOurHelperAgent(text: string): boolean {
+  try {
+    const agent = JSON.parse(text) as { name?: unknown; mcpServers?: Record<string, unknown> }
+    return (
+      agent.name === KIRO_HELPER_AGENT_NAME &&
+      typeof agent.mcpServers === 'object' &&
+      agent.mcpServers !== null &&
+      KIRO_HELPER_MCP_SERVER_NAME in agent.mcpServers
+    )
+  } catch {
+    return false
+  }
 }
 
 /**
  * Writes Vibe Helper's Kiro files into one Project folder: steering, hooks, the MCP server entry
- * (other servers kept), the Helper chat agent, an initial learner profile and, when absent, the
- * Kiro Spec.
+ * (other servers kept), the Helper chat agent when asked, an initial learner profile and, when
+ * absent, the Kiro Spec.
  * Credentials stay in the private descriptors the commands point to, never in the workspace.
  */
 export async function installKiroWorkspace(
   options: KiroWorkspaceInstallOptions,
 ): Promise<{ readonly spec: string }> {
-  const { access, mkdir, readFile, writeFile } = await import('node:fs/promises')
+  const { access, mkdir, readFile, rm, writeFile } = await import('node:fs/promises')
   const { dirname } = await import('node:path')
   const write = async (relative: string, content: string) => {
     const target = join(options.workspace, relative)
@@ -1002,6 +1110,11 @@ export async function installKiroWorkspace(
         binding: options.binding,
       }),
     )
+  else {
+    const agentFile = join(options.workspace, KIRO_HELPER_AGENT_FILE)
+    const agent = await readFile(agentFile, 'utf8').catch(() => null)
+    if (agent !== null && isOurHelperAgent(agent)) await rm(agentFile, { force: true })
+  }
   await write(
     KIRO_HOOK_FILE,
     `${JSON.stringify(
@@ -1057,7 +1170,8 @@ export async function installKiroWorkspace(
 export async function setKiroCommandApproval(options: {
   readonly homeDirectory: string
   readonly workspace: string
-  readonly approval: KiroCommandApproval
+  /** `UPGRADE`: a folder pre-approved by an earlier installer gets the current rules. */
+  readonly approval: KiroCommandApproval | 'UPGRADE'
 }): Promise<'WRITTEN' | 'UNCHANGED' | 'UNRECOGNIZED'> {
   const { access, mkdir, readFile, rename, writeFile } = await import('node:fs/promises')
   const { dirname } = await import('node:path')

@@ -148,19 +148,28 @@ describe('Kiro binding manager', () => {
     expect(steering).not.toContain(ids.task)
     expect(steering).toContain('`save_choice`')
     expect(steering).toContain('What the learner owns')
-    expect(steering).toContain('steering 0.8.0.')
+    expect(steering).toContain('steering 0.9.0.')
     // 0.7.0: the Spec's agent-support areas reach the Builder, which decides there itself.
     expect(steering).toContain(
       'Agent support (decide here and state what you chose):\n- Local application shell',
     )
-    const agent = await readFile(join(first.workspace, '.kiro/agents/vibe-helper.json'), 'utf8')
-    expect(JSON.parse(agent).mcpServers['vibe-helper-helper'].args[1]).toBe(
-      join(directory, 'helper-mcp.json'),
+    // K17: `/vibe-helper` is the steering turn only; no Helper agent beside it in Kiro's menu.
+    const agentFile = join(first.workspace, '.kiro/agents/vibe-helper.json')
+    await expect(readFile(agentFile, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
+    expect(await readFile(join(first.workspace, '.kiro/settings/mcp.json'), 'utf8')).not.toContain(
+      'Bearer',
     )
-    for (const file of ['.kiro/settings/mcp.json', '.kiro/agents/vibe-helper.json'])
-      expect(await readFile(join(first.workspace, file), 'utf8')).not.toContain('Bearer')
+    // An agent file an earlier version wrote goes on the next bind; a learner's own stays.
+    const ours = JSON.stringify({ name: 'vibe-helper', mcpServers: { 'vibe-helper-helper': {} } })
+    await mkdir(join(first.workspace, '.kiro/agents'), { recursive: true })
+    await writeFile(agentFile, ours)
+    await manager.bind(ids.project)
+    await expect(readFile(agentFile, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
+    const own = JSON.stringify({ name: 'vibe-helper', prompt: 'my own helper' })
+    await writeFile(agentFile, own)
 
     await manager.bind(ids.project)
+    expect(await readFile(agentFile, 'utf8')).toBe(own)
     expect(handlers.size).toBe(3)
     manager.close()
     expect(handlers.size).toBe(0)

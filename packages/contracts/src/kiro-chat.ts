@@ -82,7 +82,13 @@ const optionNumberSchema = boundedNumberSchema(6)
 export const kiroChatSaveChoiceSchema = z
   .strictObject({
     decisionId: decisionIdSchema.optional(),
-    choice: z.union([optionNumberSchema, z.literal('recommended'), z.literal('custom')]),
+    /** `not_mine`: the learner says a recorded choice was not theirs (K17). */
+    choice: z.union([
+      optionNumberSchema,
+      z.literal('recommended'),
+      z.literal('custom'),
+      z.literal('not_mine'),
+    ]),
     customSummary: nonEmptyTextSchema.optional(),
   })
   .refine((answer) => answer.choice !== 'custom' || answer.customSummary !== undefined, {
@@ -247,18 +253,32 @@ export const builderChatAskChoiceReceiptSchema = z.strictObject({
   followUpTask: followUpTaskSchema.optional(),
 })
 
-export const builderChatSaveChoiceReceiptSchema = z.strictObject({
-  schemaVersion: schemaVersionSchema,
-  correlationId: correlationIdSchema,
-  outcome: z.enum(['SAVED', 'CHANGED', 'UNCHANGED']),
-  decisionId: decisionIdSchema,
-  chosen: z.strictObject({
-    number: z.int().min(1).max(6).optional(),
-    label: nonEmptyTextSchema,
-    custom: z.boolean(),
+export const builderChatSaveChoiceReceiptSchema = z.union([
+  z.strictObject({
+    schemaVersion: schemaVersionSchema,
+    correlationId: correlationIdSchema,
+    outcome: z.enum(['SAVED', 'CHANGED', 'UNCHANGED']),
+    decisionId: decisionIdSchema,
+    chosen: z.strictObject({
+      number: z.int().min(1).max(6).optional(),
+      label: nonEmptyTextSchema,
+      custom: z.boolean(),
+    }),
+    linkedMessageCount: z.int().min(0).max(20),
   }),
-  linkedMessageCount: z.int().min(0).max(20),
-})
+  z.strictObject({
+    schemaVersion: schemaVersionSchema,
+    correlationId: correlationIdSchema,
+    /** The choice no longer counts as the learner's (`not_mine`). */
+    outcome: z.literal('UNDONE'),
+    /** The question to ask again when `reopened`, otherwise the choice that was undone. */
+    decisionId: decisionIdSchema,
+    /** False when the choice was already built: the task was finished with it. */
+    reopened: z.boolean(),
+    /** Learner Evidence that rested on this choice and no longer counts. */
+    withdrawnEvidenceCount: z.int().min(0).max(500),
+  }),
+])
 
 export const builderChatFinishTaskReceiptSchema = z.strictObject({
   schemaVersion: schemaVersionSchema,

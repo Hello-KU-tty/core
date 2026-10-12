@@ -7,6 +7,7 @@ import {
   correlationIdSchema,
   decisionApplicationIdSchema,
   decisionCategorySchema,
+  decisionDisputeIdSchema,
   decisionIdSchema,
   decisionOptionIdSchema,
   decisionResolutionIdSchema,
@@ -426,6 +427,27 @@ export const decisionApplicationSchema = z.strictObject({
   redactionStatus: redactionStatusSchema,
 })
 
+/**
+ * The learner said a recorded choice was not theirs (K17, SPEC FR-DEC-007). The resolution stays
+ * in history. Core asks the question again when the choice is not built yet, and stops counting
+ * Evidence that cited the choice.
+ */
+export const decisionDisputeSchema = z.strictObject({
+  schemaVersion: schemaVersionSchema,
+  id: decisionDisputeIdSchema,
+  decisionId: decisionIdSchema,
+  resolutionId: decisionResolutionIdSchema,
+  projectId: projectIdSchema,
+  taskId: taskIdSchema,
+  correlationId: correlationIdSchema,
+  /** The learner's Builder-tab messages after the choice was recorded, newest last. */
+  learnerMessageIds: z.array(messageIdSchema).min(1).max(5),
+  /** The same question asked again; absent when the choice was already built. */
+  reopenedDecisionId: decisionIdSchema.optional(),
+  disputedAt: utcTimestampSchema,
+  source: z.strictObject({ kind: z.literal('USER'), mappedBy: z.literal('BUILDER') }),
+})
+
 export const builderApplyDecisionToolInputSchema = z.strictObject({
   __tool_use_purpose: nonEmptyTextSchema.optional(),
   schemaVersion: schemaVersionSchema,
@@ -564,6 +586,7 @@ export type DecisionRequestDraft = z.infer<typeof decisionRequestDraftSchema>
 export type DecisionRequest = z.infer<typeof decisionRequestSchema>
 export type DecisionResolution = z.infer<typeof decisionResolutionSchema>
 export type DecisionApplication = z.infer<typeof decisionApplicationSchema>
+export type DecisionDispute = z.infer<typeof decisionDisputeSchema>
 export type TaskCompletionReport = z.infer<typeof taskCompletionReportSchema>
 export type BuilderUpdateLiveContextToolInput = z.infer<
   typeof builderUpdateLiveContextToolInputSchema

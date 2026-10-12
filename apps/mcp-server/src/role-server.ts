@@ -298,7 +298,7 @@ export const KIRO_CHAT_BUILDER_TOOLS: readonly KiroChatToolDefinition[] = [
     name: 'save_choice',
     title: "Save the learner's choice",
     description:
-      'Record the learner\'s answer after they reply in this chat: the option number, "recommended", or "custom" with a short summary of their own idea. Vibe Helper links the learner\'s own words, so do not quote them. Call it again if the learner changes their mind.',
+      'Record the learner\'s answer after they reply in this chat: the option number, "recommended", or "custom" with a short summary of their own idea. Vibe Helper links the learner\'s own words, so do not quote them. Call it again if the learner changes their mind. If the learner says a recorded choice was not theirs, send "not_mine" with its decisionId: it stops counting as their choice and, when it is not built yet, the question opens again (reopened).',
     inputSchema: kiroChatSaveChoiceToolInputSchema,
     readOnly: false,
     command: (input) => ({ kind: 'BUILDER_CHAT_SAVE_CHOICE', answer: withoutToolPurpose(input) }),

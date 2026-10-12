@@ -72,6 +72,7 @@ export class KiroBindingManager {
       readonly registry: WorkspaceRegistry
       /** `kiro-steering.md` and the canonical `helper.md` (repository or packaged copies). */
       readonly steeringTemplate: string
+      /** Unused since K17 removed the Kiro chat Helper agent; packaged installs still pass it. */
       readonly helperPrompt: string
       readonly homeDirectory?: string
     },
@@ -121,7 +122,6 @@ export class KiroBindingManager {
     const templates = parseKiroSteeringTemplates(
       await readFile(this.options.steeringTemplate, 'utf8'),
     )
-    const helperPrompt = await readFile(this.options.helperPrompt, 'utf8')
     if (request.workspace !== undefined) {
       // Work already started in the generated folder stays there instead of being split.
       if (this.options.registry.get(projectId) === undefined) {
@@ -216,11 +216,13 @@ export class KiroBindingManager {
       bindingDescriptor,
       learnerScope: learnerScopeFrom(snapshot.learningSpec),
       spec: { project: snapshot.project, learningSpec: snapshot.learningSpec, task },
-      helperAgent: { helperPrompt, helperDescriptor },
+      // K17: one `/vibe-helper` in Kiro's menu, the steering turn; no separate Helper agent.
     })
     await hook.syncProfile().catch(() => null)
     // Learner prompts queued while no Core was connected are recorded as soon as one is.
     await hook.drainQueue().catch(() => 0)
+    // Without a new choice, a folder pre-approved by an earlier installer gets the current rules.
+    if (request.approval === undefined) await this.#applyApproval(workspace, 'UPGRADE')
     const permissions =
       request.approval === undefined
         ? 'NOT_REQUESTED'
@@ -296,7 +298,10 @@ export class KiroBindingManager {
     return counts
   }
 
-  #applyApproval(workspace: string, approval: KiroCommandApproval): Promise<KiroPermissionsResult> {
+  #applyApproval(
+    workspace: string,
+    approval: KiroCommandApproval | 'UPGRADE',
+  ): Promise<KiroPermissionsResult> {
     return setKiroCommandApproval({
       homeDirectory: this.options.homeDirectory ?? homedir(),
       workspace,

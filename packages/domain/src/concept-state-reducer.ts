@@ -23,6 +23,11 @@ export interface ReduceConceptStateInput {
   readonly acceptedEvidence: readonly AcceptedEvidence[]
   readonly nextRevision: number
   readonly updatedAt: string
+  /**
+   * Evidence Core stopped counting because its source choice was not the learner's (K17). The
+   * current snapshot may still list it; recalculating without it is the only way State goes down.
+   */
+  readonly withdrawnEvidenceIds?: readonly string[]
 }
 
 function supportingState(evidence: AcceptedEvidence): ConceptState | undefined {
@@ -34,8 +39,16 @@ export function reduceConceptState(
   input: ReduceConceptStateInput,
 ): DomainResult<ConceptStateSnapshot> {
   const entityIds = [input.conceptId]
+  const withdrawn = new Set(input.withdrawnEvidenceIds ?? [])
   const evidenceById = new Map<string, AcceptedEvidence>()
   for (const evidence of input.acceptedEvidence) {
+    if (withdrawn.has(evidence.id)) {
+      return rejected({
+        operation: OPERATION,
+        reasonCode: 'CONCEPT_WITHDRAWN_EVIDENCE_COUNTED',
+        entityIds,
+      })
+    }
     if (evidence.conceptId !== input.conceptId) {
       return rejected({ operation: OPERATION, reasonCode: 'CONCEPT_EVIDENCE_MISMATCH', entityIds })
     }
@@ -60,7 +73,9 @@ export function reduceConceptState(
       entityIds,
     })
   }
-  if (input.current?.acceptedEvidenceIds.some((id) => !evidenceById.has(id))) {
+  if (
+    input.current?.acceptedEvidenceIds.some((id) => !evidenceById.has(id) && !withdrawn.has(id))
+  ) {
     return rejected({
       operation: OPERATION,
       reasonCode: 'CONCEPT_REPLAY_LOG_INCOMPLETE',
@@ -72,8 +87,11 @@ export function reduceConceptState(
     const state = supportingState(evidence)
     return state !== undefined && STATE_RANK[state] > STATE_RANK[highest] ? state : highest
   }, 'OBSERVED')
+  const lostWithdrawnEvidence =
+    input.current?.acceptedEvidenceIds.some((id) => withdrawn.has(id)) ?? false
   if (
     input.current !== undefined &&
+    !lostWithdrawnEvidence &&
     STATE_RANK[calculatedState] < STATE_RANK[input.current.state]
   ) {
     return rejected({

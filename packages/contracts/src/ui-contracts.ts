@@ -204,6 +204,8 @@ export const uiRecordBuilderChatTurnCommandSchema = z.strictObject({
   taskId: taskIdSchema.optional(),
   conversationId: conversationIdSchema,
   reply: nonEmptyTextSchema,
+  /** The learner stopped this turn; it is recorded when they write again (K17). */
+  interrupted: z.literal(true).optional(),
 })
 
 export const uiRetryAnalysisCommandSchema = z.strictObject({

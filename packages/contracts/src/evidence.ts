@@ -5,6 +5,7 @@ import {
   conceptIdSchema,
   conceptLedgerIdSchema,
   correlationIdSchema,
+  decisionDisputeIdSchema,
   entityRevisionSchema,
   episodeIdSchema,
   evidenceDecisionIdSchema,
@@ -333,6 +334,21 @@ export const acceptedEvidenceSchema = z.discriminatedUnion('kind', [
   }),
 ])
 
+/**
+ * Accepted Evidence Core no longer counts: it cited a choice the learner later said was not
+ * theirs (K17). The Evidence record stays; reads and Concept State leave it out.
+ */
+export const evidenceWithdrawalSchema = z.strictObject({
+  schemaVersion: schemaVersionSchema,
+  evidenceId: evidenceIdSchema,
+  conceptId: conceptIdSchema,
+  projectId: projectIdSchema,
+  decisionDisputeId: decisionDisputeIdSchema,
+  reasonCode: z.literal('DECISION_NOT_CHOSEN_BY_LEARNER'),
+  withdrawnAt: utcTimestampSchema,
+  source: z.strictObject({ kind: z.literal('CORE') }),
+})
+
 export const misconceptionIssueSchema = z
   .strictObject({
     schemaVersion: schemaVersionSchema,
@@ -436,6 +452,7 @@ export type AnalystSemanticResult = z.infer<typeof analystSemanticResultSchema>
 export type EvidenceProposalBatch = z.infer<typeof evidenceProposalBatchSchema>
 export type EvidenceDecision = z.infer<typeof evidenceDecisionSchema>
 export type AcceptedEvidence = z.infer<typeof acceptedEvidenceSchema>
+export type EvidenceWithdrawal = z.infer<typeof evidenceWithdrawalSchema>
 export type MisconceptionIssue = z.infer<typeof misconceptionIssueSchema>
 export type ConceptStateSnapshot = z.infer<typeof conceptStateSnapshotSchema>
 export type ConceptLedgerEntry = z.infer<typeof conceptLedgerEntrySchema>

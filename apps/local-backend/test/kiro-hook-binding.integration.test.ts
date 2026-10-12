@@ -105,7 +105,7 @@ const setup = async (
         ?.events.filter((event) => event.payload.type === 'BUILDER_CHAT_TURN') ?? []
     )
   }
-  return { binding, post, userMessages, builderTurns }
+  return { binding, post, userMessages, builderTurns, storage }
 }
 
 describe('Kiro hook binding', () => {
@@ -335,6 +335,101 @@ describe('Kiro hook binding', () => {
     const restarted = await setup({ workspace, homeDirectory })
     expect(await restarted.binding.builderActivity()).toContain('메모 API 만들어줘')
     restarted.binding.revoke()
+  })
+
+  it('records a cancelled turn when the learner writes again, before the new message (K17)', async () => {
+    const base = await realpath(await mkdtemp(join(tmpdir(), 'vibe-kiro-cancel-')))
+    const workspace = join(base, 'grading')
+    const homeDirectory = join(base, 'home')
+    await mkdir(workspace)
+    const session = 'sess_00000000-0000-4000-8000-0000000000cc'
+    const sessions = kiroSessionsDirectory(homeDirectory, workspace)
+    await mkdir(join(sessions, session), { recursive: true })
+    await writeFile(join(sessions, session, 'session.json'), JSON.stringify({ agentMode: 'vibe' }))
+    const record = async (payloads: unknown[]) =>
+      writeFile(
+        join(sessions, session, 'messages.jsonl'),
+        `${payloads.map((payload) => JSON.stringify({ payload })).join('\n')}\n`,
+      )
+    const cancelled = 'aaaaaaaa-0000-4000-8000-000000000001'
+    const turn = (executionId: string, said: string, stopReason: string, captured = false) => [
+      { type: 'turn_start', executionId },
+      { type: 'assistant', operationType: 'Say', executionId, content: said },
+      ...(captured
+        ? [{ type: 'ContextualHookInvoked', name: 'vibe-helper-turn-end', executionId }]
+        : []),
+      { type: 'turn_end', stopReason, executionId },
+    ]
+    const history = [
+      { type: 'user', content: '재시도는 ack 같은 느낌인건가?' },
+      ...turn(cancelled, '닮은 점은 실패하면 다시 보낸다는 거예요.', 'cancelled'),
+      { type: 'user', content: '아니 왜 맘대로 선택함?' },
+    ]
+    const { binding, post, storage } = await setup({ workspace, homeDirectory })
+    const prompt = (text: string) =>
+      post({
+        hook_event_name: 'UserPromptSubmit',
+        session_id: session,
+        cwd: workspace,
+        prompt: text,
+      })
+    await record(history.slice(0, 1))
+    await prompt('재시도는 ack 같은 느낌인건가?')
+    await record(history)
+    expect(await (await prompt('아니 왜 맘대로 선택함?')).json()).toMatchObject({ recorded: true })
+    const events = () => {
+      const episode = storage.repository.readOpenEpisode(ids.project, 'BUILD_TASK', {
+        taskId: ids.task,
+      })
+      return episode === null
+        ? []
+        : (storage.repository.readEpisodeHistory(ids.project, episode.id)?.events ?? [])
+    }
+    expect(events().map((event) => event.payload)).toMatchObject([
+      { type: 'USER_MESSAGE', redactedExcerpt: '재시도는 ack 같은 느낌인건가?' },
+      {
+        type: 'BUILDER_CHAT_TURN',
+        summary: '닮은 점은 실패하면 다시 보낸다는 거예요.',
+        interrupted: true,
+      },
+      { type: 'USER_MESSAGE', redactedExcerpt: '아니 왜 맘대로 선택함?' },
+    ])
+    // Read back again, the same turn is not recorded twice.
+    await prompt('반려 이유가 뭐임?')
+    expect(events().filter((event) => event.payload.type === 'BUILDER_CHAT_TURN')).toHaveLength(1)
+
+    // A turn the Stop hook captured is left to it.
+    const finished = 'aaaaaaaa-0000-4000-8000-000000000002'
+    await record([...history, ...turn(finished, '설명했어요.', 'end_turn', true)])
+    await prompt('다시 설명해봐')
+    expect(events().filter((event) => event.payload.type === 'BUILDER_CHAT_TURN')).toHaveLength(1)
+
+    // A cancelled `/vibe-helper` question keeps what the Helper said and is never paired with
+    // the next Builder turn's reply.
+    expect(await (await prompt('/vibe-helper ACK가 뭐야?')).json()).toEqual({
+      pending: 'HELPER_QUESTION',
+    })
+    const helperTurn = 'aaaaaaaa-0000-4000-8000-000000000003'
+    await record([...history, ...turn(helperTurn, 'ACK는 잘 받았다는 신호예요.', 'cancelled')])
+    await prompt('그럼 3+2로 하자')
+    const helper = storage.repository.readRecentHelperConversationHistoryForProject(ids.project, 5)
+    expect(helper.flatMap(({ events }) => events.map((event) => event.payload))).toMatchObject([
+      { type: 'USER_MESSAGE', redactedExcerpt: 'ACK가 뭐야?' },
+      { type: 'HELPER_RESPONSE', summary: 'ACK는 잘 받았다는 신호예요.' },
+    ])
+    const stop = await post({
+      hook_event_name: 'Stop',
+      session_id: session,
+      cwd: workspace,
+      vibe_helper_reply: '3+2로 만들게요.',
+    })
+    expect(await stop.json()).toMatchObject({ recorded: true })
+    expect(
+      events()
+        .filter((event) => event.payload.type === 'BUILDER_CHAT_TURN')
+        .map((event) => event.payload),
+    ).toMatchObject([{ interrupted: true }, { summary: '3+2로 만들게요.' }])
+    binding.revoke()
   })
 
   it('records prompts queued while Core was away once and in order, then removes the queue', async () => {

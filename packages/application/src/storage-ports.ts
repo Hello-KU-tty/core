@@ -13,6 +13,7 @@ import type {
   ConceptLedgerEntry,
   ContextRefreshRequest,
   DecisionApplication,
+  DecisionDispute,
   DecisionRequest,
   DecisionResolution,
   DiscoveryFeedback,
@@ -21,6 +22,7 @@ import type {
   EvaluationRun,
   EvidenceDecision,
   EvidenceProposal,
+  EvidenceWithdrawal,
   LearningSpecRevision,
   LiveProjectContext,
   MisconceptionIssue,
@@ -163,6 +165,10 @@ export interface PersistenceRepository {
   appendEvidenceProposal(record: EvidenceProposal): PersistenceWriteResult
   appendEvidenceDecision(record: EvidenceDecision): PersistenceWriteResult
   appendAcceptedEvidence(record: AcceptedEvidence): PersistenceWriteResult
+  /** The learner said a recorded choice was not theirs (K17). */
+  appendDecisionDispute(record: DecisionDispute): PersistenceWriteResult
+  /** Stops counting accepted Evidence whose source choice was disputed (K17). */
+  appendEvidenceWithdrawal(record: EvidenceWithdrawal): PersistenceWriteResult
   appendMisconceptionIssue(record: MisconceptionIssue): PersistenceWriteResult
   appendConceptLedger(record: ConceptLedgerEntry): PersistenceWriteResult
   appendPersonalizationTrace(record: PersonalizationTrace): PersistenceWriteResult
@@ -235,11 +241,18 @@ export interface PersistenceRepository {
   readIdempotencyReceipt(key: string): IdempotencyReceipt | null
   readEvaluationRun(evaluationRunId: string): EvaluationRun | null
   readBaselineResult(baselineResultId: string): BaselineResult | null
+  /** `acceptedEvidence` leaves out withdrawn Evidence (K17). */
   readEvidenceTrace(conceptId: string): EvidenceTrace | null
   /** Direct project membership, optionally restricted to one validated Concept ID. */
   readEvidenceTracesForProject(projectId: string, conceptId?: string): readonly EvidenceTrace[]
   /** Recent validated Ledger heads, without reconstructing their full Evidence audit history. */
   readRecentConceptLedgers(limit: number): readonly ConceptLedgerEntry[]
+  readDecisionDisputes(projectId: string): readonly DecisionDispute[]
+  /** Accepted Evidence still counted that cites the learner's choice in this Decision. */
+  readCountedEvidenceCitingDecision(
+    projectId: string,
+    decisionId: string,
+  ): readonly AcceptedEvidence[]
   readRecentEvidenceTraces(limit: number): readonly EvidenceTrace[]
   readRecentUserEvidenceTracesForTasks(
     projectId: string,

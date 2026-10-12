@@ -617,3 +617,240 @@ describe('Kiro chat Builder surface (K10)', () => {
     expect(harness.storage.repository.readLatestTaskForProject(ids.project)?.id).toBe(followUp.id)
   })
 })
+
+/** Runs the Decision's analysis job with one hand-written Analyst result, as kiro-cli would. */
+const analyzeDecision = async (
+  harness: Harness,
+  decisionId: string,
+  proposals: (episodeId: string, revision: number) => readonly Record<string, unknown>[],
+) => {
+  const actor = { kind: 'KIRO_ADAPTER' } as const
+  const pending = await harness.service.executeAnalysis({
+    schemaVersion: 1,
+    kind: 'ANALYSIS_LIST_PENDING',
+    correlationId: ids.correlation,
+    actor,
+    limit: 20,
+  })
+  if (!pending.success) throw new Error(JSON.stringify(pending.error))
+  const job = (pending.data as readonly { id: string; episodeId: string; revision: number }[]).find(
+    (candidate) =>
+      harness.storage.repository.readEpisodeHistory(ids.project, candidate.episodeId)?.episode
+        .decisionId === decisionId,
+  )
+  if (job === undefined) throw new Error('no Decision analysis job')
+  const claimed = await harness.service.executeAnalysis({
+    schemaVersion: 1,
+    kind: 'ANALYSIS_CLAIM_JOB',
+    correlationId: ids.correlation,
+    actor,
+    projectId: ids.project,
+    analysisJobId: job.id,
+    expectedJobRevision: job.revision,
+    runtimeHandle: 'k17-undo-test',
+  })
+  if (!claimed.success) throw new Error(JSON.stringify(claimed.error))
+  const running = claimed.data as {
+    id: string
+    revision: number
+    attempt: number
+    episodeId: string
+    episodeRevision: number
+  }
+  const submitted = await harness.service.executeAnalysis({
+    schemaVersion: 1,
+    kind: 'ANALYSIS_SUBMIT_RESULT',
+    correlationId: ids.correlation,
+    actor,
+    idempotencyKey: `idem_00000000-0000-4000-8000-${String(800_000 + running.revision).padStart(12, '0')}`,
+    projectId: ids.project,
+    analysisJobId: running.id,
+    expectedJobRevision: running.revision,
+    attempt: running.attempt,
+    result: {
+      schemaVersion: 1,
+      episodeId: running.episodeId,
+      episodeRevision: running.episodeRevision,
+      correlationId: ids.correlation,
+      proposals: proposals(running.episodeId, running.episodeRevision),
+    },
+  })
+  if (!submitted.success) throw new Error(JSON.stringify(submitted.error))
+  return (submitted.data as { outcomes: readonly Record<string, unknown>[] }).outcomes
+}
+
+/** The learner message Core recorded with this text, as an Evidence source. */
+const messageSource = (harness: Harness, text: string) => {
+  const event = harness.storage.repository
+    .readTaskChatEvents(ids.project, ids.task, '2026-01-01T00:00:00.000Z')
+    .map(({ event }) => event)
+    .find(
+      (event) => event.payload.type === 'USER_MESSAGE' && event.payload.redactedExcerpt === text,
+    )
+  if (event?.payload.type !== 'USER_MESSAGE') throw new Error(`no message: ${text}`)
+  return {
+    kind: 'USER_MESSAGE',
+    conversationId: event.payload.conversationId,
+    messageId: event.payload.messageId,
+  }
+}
+
+const justified = (
+  concept: string,
+  excerpt: string,
+  sources: readonly Record<string, unknown>[],
+) => ({
+  concept: { originalExpression: concept, proposedCanonicalName: concept },
+  signal: 'JUSTIFIED_DECISION',
+  strength: 'MEDIUM',
+  promptDependence: 'INDEPENDENT',
+  userEvidenceSources: sources,
+  contextSources: [],
+  redactedEvidenceExcerpt: excerpt,
+  rationale: 'The learner tied the choice to who uses the memos.',
+  maximumSupportedState: 'EXPLAINED',
+  misconception: { action: 'NONE' },
+})
+
+const conceptState = (harness: Harness, name: string) => {
+  const concept = harness.storage.repository.readCanonicalConceptByName(name)
+  if (concept === null) return null
+  return harness.storage.repository.readEvidenceTrace(concept.id)
+}
+
+describe('Undoing a choice the learner did not make (K17)', () => {
+  it('asks the question again and stops counting Evidence that cited the choice', async () => {
+    const harness = await createHarness()
+    await harness.say('JWT 토큰은 이미 쓰고 있어')
+    const decisionId = await askedId(harness)
+    // A side question after the options; the Builder then recorded a choice nobody made.
+    await harness.say('혼자 쓸 거라 access control은 본인만이면 되는 거야?')
+    expect(await harness.save({ choice: 1 })).toMatchObject({
+      success: true,
+      data: { outcome: 'SAVED' },
+    })
+    const outcomes = await analyzeDecision(harness, decisionId, () => [
+      justified('access control', '혼자 쓸 거라 access control은 본인만이면', [
+        { kind: 'USER_DECISION', decisionId },
+        messageSource(harness, '혼자 쓸 거라 access control은 본인만이면 되는 거야?'),
+      ]),
+      {
+        ...justified('JWT', 'JWT 토큰은 이미 쓰고 있어', [
+          messageSource(harness, 'JWT 토큰은 이미 쓰고 있어'),
+        ]),
+        signal: 'REPHRASE',
+      },
+    ])
+    expect(outcomes.map((outcome) => (outcome.decision as { outcome: string }).outcome)).toEqual([
+      'ACCEPTED',
+      'ACCEPTED',
+    ])
+    expect(conceptState(harness, 'access control')?.ledger?.state.state).toBe('EXPLAINED')
+    expect(conceptState(harness, 'JWT')?.ledger?.state.state).toBe('EXPLAINED')
+
+    // Nothing the learner said since the record: nothing to undo yet.
+    expect(await harness.save({ choice: 'not_mine', decisionId })).toMatchObject({
+      success: false,
+      error: { code: 'CHAT_DECISION_NO_LEARNER_REPLY' },
+    })
+    await harness.say('나 1번 고른 적 없는데?')
+    const undone = await harness.save({ choice: 'not_mine', decisionId })
+    expect(undone).toMatchObject({
+      success: true,
+      data: { outcome: 'UNDONE', reopened: true, withdrawnEvidenceCount: 1 },
+    })
+    const reopenedId = (undone.data as { decisionId: string }).decisionId
+    expect(reopenedId).not.toBe(decisionId)
+    expect(
+      harness.aggregate().decisionRequests.find((item) => item.id === reopenedId),
+    ).toMatchObject({ replacesDecisionId: decisionId, question: 'Who can read a memo?' })
+    const [dispute] = harness.storage.repository.readDecisionDisputes(ids.project)
+    expect(dispute).toMatchObject({
+      decisionId,
+      reopenedDecisionId: reopenedId,
+      source: { kind: 'USER', mappedBy: 'BUILDER' },
+    })
+    expect(dispute?.learnerMessageIds).toHaveLength(1)
+
+    // The concept that rested on the choice goes back to "came up", with a Core source.
+    const access = conceptState(harness, 'access control')
+    expect(access?.ledger?.state.state).toBe('OBSERVED')
+    expect(access?.acceptedEvidence.map((evidence) => evidence.kind)).toEqual([
+      'CONCEPT_OBSERVATION',
+    ])
+    expect(access?.acceptedEvidence[0]).toMatchObject({
+      contextSources: [{ kind: 'EVENT' }],
+      source: { kind: 'CORE' },
+    })
+    // Evidence from the learner's own words alone stays.
+    expect(conceptState(harness, 'JWT')?.ledger?.state.state).toBe('EXPLAINED')
+
+    // The question waits for the learner again; saying it twice changes nothing more.
+    expect(await harness.check()).toMatchObject({
+      success: true,
+      data: { openChoices: [{ decisionId: reopenedId, state: 'WAITING_FOR_LEARNER' }] },
+    })
+    expect(await harness.save({ choice: 'not_mine', decisionId })).toMatchObject({
+      success: true,
+      data: { outcome: 'UNDONE', decisionId: reopenedId, withdrawnEvidenceCount: 0 },
+    })
+    // The dispute message itself is not an answer to the reopened question.
+    expect(await harness.save({ choice: 2 })).toMatchObject({
+      success: false,
+      error: { code: 'CHAT_DECISION_NO_LEARNER_REPLY' },
+    })
+    await harness.say('2번으로 할게, 나중에 공유할 수도 있어서')
+    expect(await harness.save({ choice: 2 })).toMatchObject({
+      success: true,
+      data: { outcome: 'SAVED', decisionId: reopenedId, chosen: { number: 2 } },
+    })
+  })
+
+  it('rejects late analysis that cites the undone choice', async () => {
+    const harness = await createHarness()
+    const decisionId = await askedId(harness)
+    await harness.say('access control이 뭐야?')
+    await harness.save({ choice: 1 })
+    await harness.say('그거 내가 고른 거 아니야')
+    expect(await harness.save({ choice: 'not_mine' })).toMatchObject({
+      success: true,
+      data: { outcome: 'UNDONE', reopened: true, withdrawnEvidenceCount: 0 },
+    })
+    const outcomes = await analyzeDecision(harness, decisionId, () => [
+      justified('access control', 'access control이 뭐야?', [
+        { kind: 'USER_DECISION', decisionId },
+        messageSource(harness, 'access control이 뭐야?'),
+      ]),
+    ])
+    expect(outcomes[0]?.decision).toMatchObject({
+      outcome: 'REJECTED',
+      reasonCode: 'INVALID_REFERENCE',
+    })
+    expect(conceptState(harness, 'access control')?.ledger ?? null).toBeNull()
+  })
+
+  it('does not reopen a choice that was already built, and needs a recorded choice', async () => {
+    const harness = await createHarness()
+    const waiting = await askedId(harness)
+    await harness.say('음')
+    expect(await harness.save({ choice: 'not_mine', decisionId: waiting })).toMatchObject({
+      success: false,
+      error: { code: 'CHAT_DECISION_NOT_CHOSEN' },
+    })
+    await harness.save({ choice: 1 })
+    expect(
+      await harness.finish({
+        ...completeReport,
+        decisionsApplied: [{ decisionId: waiting, how: 'Filtered memos by author.' }],
+      }),
+    ).toMatchObject({ success: true, data: { outcome: 'COMPLETED' } })
+    await harness.say('근데 그 1번은 내가 고른 게 아니었어')
+    expect(await harness.save({ choice: 'not_mine', decisionId: waiting })).toMatchObject({
+      success: true,
+      data: { outcome: 'UNDONE', decisionId: waiting, reopened: false },
+    })
+    // The finished Task stays as it was; a change would be a new request.
+    expect(harness.aggregate().task.status).toBe('COMPLETED')
+    expect(harness.aggregate().decisionRequests).toHaveLength(1)
+  })
+})

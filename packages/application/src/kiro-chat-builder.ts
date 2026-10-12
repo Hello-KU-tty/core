@@ -115,7 +115,7 @@ export interface ChatSelection {
 /** Maps the Agent's choice onto the Decision's options; undefined when the number is out of range. */
 export function chatSelection(
   decision: DecisionRequest,
-  choice: KiroChatSaveChoice['choice'],
+  choice: Exclude<KiroChatSaveChoice['choice'], 'not_mine'>,
 ): ChatSelection | undefined {
   if (choice === 'custom') return { selectionKind: 'CUSTOM' }
   if (choice === 'recommended') {

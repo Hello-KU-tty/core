@@ -35,6 +35,8 @@ export interface EvaluateEvidenceProposalInput {
   readonly decisionResolutions: readonly DecisionResolution[]
   /** The Task's Decision requests; a chat-resolved choice may name the Concept (K10). */
   readonly decisionRequests?: readonly DecisionRequest[]
+  /** Decisions whose recorded choice the learner said was not theirs (K17). */
+  readonly disputedDecisionIds?: readonly string[]
   readonly concept: CanonicalConcept
   readonly existingProposalIds: readonly string[]
   readonly priorAcceptedEvidence: readonly AcceptedEvidence[]
@@ -269,6 +271,18 @@ export function evaluateEvidenceProposal(
   }
   if (input.existingProposalIds.includes(proposal.id)) {
     return rejectEvidence(input, 'DUPLICATE_PROPOSAL', 'Evidence Proposal was already processed.')
+  }
+  const disputed = new Set(input.disputedDecisionIds ?? [])
+  if (
+    proposal.userEvidenceSources.some(
+      (source) => source.kind === 'USER_DECISION' && disputed.has(source.decisionId),
+    )
+  ) {
+    return rejectEvidence(
+      input,
+      'INVALID_REFERENCE',
+      'A cited Decision choice was later marked as not chosen by the learner.',
+    )
   }
   if (input.episode.revision !== input.episodeRevision) {
     return rejectEvidence(
