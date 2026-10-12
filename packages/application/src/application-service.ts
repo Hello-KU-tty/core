@@ -4703,10 +4703,19 @@ export class ApplicationService {
               ? [{ event, payload: event.payload, helperTab }]
               : [],
           )
-          const replies = learnerMessages.filter(
-            ({ event, helperTab }) =>
-              !helperTab && Date.parse(event.occurredAt) > Date.parse(repliesAfter),
-          )
+          // Whether the learner answered counts every Builder-tab message after the question or
+          // the last choice, also one Core placed with another open choice (K17 live check):
+          // which choice it answers is the Builder's reading. Linking stays per Decision.
+          const replies = repository
+            .readTaskChatEvents(request.projectId, request.taskId, windowStart)
+            .flatMap(({ event, helperTab }) =>
+              event.payload.type === 'USER_MESSAGE' &&
+              event.actor.kind === 'USER' &&
+              !helperTab &&
+              Date.parse(event.occurredAt) > Date.parse(repliesAfter)
+                ? [{ event, payload: event.payload }]
+                : [],
+            )
           const lastReply = replies.at(-1)
           if (lastReply === undefined) {
             throw this.#validationError(
@@ -5213,9 +5222,13 @@ export class ApplicationService {
       replacesDecisionId: decision.id,
       requestedAt: reopenedAt,
     })
-    const { blockingReason: _blockingReason, ...unblocked } = liveContext
+    // The replacement never blocks; a reason another waiting choice still blocks for stays.
+    const { blockingReason, ...unblocked } = liveContext
     const context = liveProjectContextSchema.parse({
       ...unblocked,
+      ...(aggregate.task.status === 'BLOCKED' && blockingReason !== undefined
+        ? { blockingReason }
+        : {}),
       contextVersion,
       expectedPreviousVersion: liveContext.contextVersion,
       checkpoint: 'DECISION_REQUIRED',

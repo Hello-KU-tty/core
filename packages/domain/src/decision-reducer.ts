@@ -50,8 +50,14 @@ export function openDecision(input: OpenDecisionInput): DomainResult<DecisionAgg
     }
     return rejected({ operation, reasonCode: 'DECISION_ID_CONFLICT', entityIds })
   }
+  // A choice asked again (changed or undone, K17) never blocks, so it may open while another
+  // waiting choice keeps the Task BLOCKED.
+  const reopensWhileBlocked =
+    input.task.status === 'BLOCKED' &&
+    request.replacesDecisionId !== undefined &&
+    request.independentWorkCanContinue
   if (
-    input.task.status !== 'ACTIVE' ||
+    (input.task.status !== 'ACTIVE' && !reopensWhileBlocked) ||
     request.projectId !== input.task.projectId ||
     request.taskId !== input.task.id ||
     request.correlationId !== input.task.correlationId ||

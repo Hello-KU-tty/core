@@ -806,6 +806,42 @@ describe('Undoing a choice the learner did not make (K17)', () => {
     })
   })
 
+  it('reopens a choice while another blocking choice waits (live K17 check)', async () => {
+    // Live 0.2.9 check: the Builder asked a second, blocking choice; undoing the first then
+    // failed with DECISION_REQUEST_CONTEXT_MISMATCH because the Task was BLOCKED.
+    const harness = await createHarness()
+    const first = await askedId(harness)
+    await harness.say('1번으로 할게')
+    expect(await harness.save({ choice: 1 })).toMatchObject({ success: true })
+    const blocking = await harness.ask({
+      question: 'Which seats are suggested when a reservation fails?',
+      blocksWork: true,
+      blockingReason: 'The failure response needs the suggestion rule.',
+    })
+    expect(blocking).toMatchObject({ success: true, data: { outcome: 'ASKED' } })
+    expect(harness.aggregate().task.status).toBe('BLOCKED')
+    await harness.say('잠깐, 저장 방식 1번은 내가 고른 게 아니야')
+    const undone = await harness.save({ choice: 'not_mine', decisionId: first })
+    expect(undone).toMatchObject({ success: true, data: { outcome: 'UNDONE', reopened: true } })
+    const reopened = (undone.data as { decisionId: string }).decisionId
+    // The other choice still blocks the Task, with its reason kept.
+    expect(harness.aggregate().task.status).toBe('BLOCKED')
+    expect(harness.aggregate().liveContext?.blockingReason).toBe(
+      'The failure response needs the suggestion rule.',
+    )
+    await harness.say('저장 방식은 2번으로 할게')
+    expect(await harness.save({ choice: 2, decisionId: reopened })).toMatchObject({
+      success: true,
+      data: { outcome: 'SAVED', decisionId: reopened },
+    })
+    // Changing a choice while blocked works the same way.
+    await harness.say('역시 1번으로 바꿀래')
+    expect(await harness.save({ choice: 1, decisionId: reopened })).toMatchObject({
+      success: true,
+      data: { outcome: 'CHANGED' },
+    })
+  })
+
   it('rejects late analysis that cites the undone choice', async () => {
     const harness = await createHarness()
     const decisionId = await askedId(harness)
