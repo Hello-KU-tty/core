@@ -72,7 +72,7 @@ irm https://cli.kiro.dev/install.ps1 | iex
 ### Hello Vibe 확장
 
 1. Kiro에서 확장 화면을 엽니다. Mac은 `Cmd+Shift+X`, Windows는 `Ctrl+Shift+X`입니다.
-2. 확장 화면 위쪽의 `…` 메뉴에서 **Install from VSIX…**를 고르고 내려받은 `.vsix` 파일을 선택합니다.
+2. 확장 화면 위쪽의 `…` 메뉴에서 **Install from VSIX…** 항목을 고르고 내려받은 `.vsix` 파일을 선택합니다.
 3. 다시 로드하라는 안내가 나오면 따릅니다.
 4. 왼쪽 막대의 **Agent Panel** 아이콘을 누릅니다. 패널이 로컬 Core에 자동으로 연결됩니다.
 
@@ -88,7 +88,7 @@ Windows에서 Node.js 24가 없으면 첫 실행 때 Hello Vibe가 Node.js 24.19
    - **개발 명령 미리 승인:** 설치·빌드·테스트 같은 자주 쓰는 명령은 묻지 않습니다. 파일 삭제, 배포, git push 같은 명령은 계속 묻습니다.
    - **수동으로 승인:** 명령마다 Kiro가 확인을 받습니다.
    - 나중에 명령 팔레트의 **Vibe Helper: Change Command Approval**로 바꿀 수 있습니다.
-6. Hello Vibe가 이 프로젝트를 Kiro 채팅에 연결합니다. 신뢰나 다시 로드 안내가 나오면 따릅니다. 그다음 Kiro 채팅에서 **새 세션(+)**을 열고 "시작하자"처럼 말하면 Kiro가 계획대로 만들기 시작합니다.
+6. Hello Vibe가 이 프로젝트를 Kiro 채팅에 연결합니다. 신뢰나 다시 로드 안내가 나오면 따릅니다. 그다음 Kiro 채팅의 **+** 버튼으로 새 세션을 열고 "시작하자"처럼 말하면 Kiro가 계획대로 만들기 시작합니다.
 7. 만들다가 정해야 할 것이 생기면 Kiro가 번호가 붙은 선택지로 묻습니다. 번호와 함께 **고른 이유를 한 문장** 적어 주세요. 그 이유가 학습 기록의 근거가 됩니다. "응"이나 버튼 클릭만으로는 이해했다고 기록하지 않습니다.
 8. 작업 하나가 끝나면 Agent Panel **빌더** 탭에 "다음 한 걸음" 카드가 10초 안팎에 뜹니다(0.2.8부터). 이 프로젝트를 키울 방향 3개가 나옵니다. 하고 싶은 것이 있으면 Kiro 채팅에 번호를 말하면 이어서 만듭니다. 그냥 두거나, 원하는 기능을 직접 말해도 됩니다.
 
@@ -110,15 +110,15 @@ Windows에서 Node.js 24가 없으면 첫 실행 때 Hello Vibe가 Node.js 24.19
 
 명령 팔레트는 Mac `Cmd+Shift+P`, Windows `Ctrl+Shift+P`입니다.
 
-| 화면에 보이는 것 | 해결 방법 |
-| --- | --- |
-| Kiro CLI를 찾지 못했어요 | 3단계의 Kiro CLI를 설치하고, Kiro를 완전히 종료했다가 연 뒤 **Vibe Helper: Retry Core Connection** |
-| Kiro CLI 로그인이 필요해요 | 터미널에서 `kiro-cli login` 뒤 **Retry Core Connection**. 이전 기록은 계속 볼 수 있습니다 |
-| Core 준비 실패 | **재시도** 또는 **Retry Core Connection**. 코드가 `KIRO_NATIVE_HOST_PLATFORM_UNSUPPORTED`면 지원하지 않는 컴퓨터입니다 |
-| Kiro 사용량 한도에 도달했어요 | Kiro 계정의 크레딧을 확인합니다 |
-| 계획을 확정하고 작업이 준비된 뒤에 열 수 있어요 | 4단계 4번의 **이걸로 시작**을 먼저 누릅니다 |
-| Kiro 채팅이 계획을 모르거나 Vibe Helper 도구를 쓰지 못함 | 폴더를 신뢰했는지 확인하고, 창을 다시 로드(**Developer: Reload Window**)한 뒤 새 세션(+)에서 시작. Kiro의 MCP 서버 목록에 `vibe-helper`가 Connected인지 확인 |
-| VSIX가 설치되지 않음 | Mac은 `darwin-arm64`, Windows는 `win32-x64` 파일인지 확인합니다 |
+화면에 보이는 문구별로 정리했습니다.
+
+- **"Kiro CLI를 찾지 못했어요"**: 3단계의 Kiro CLI를 설치하고, Kiro를 완전히 종료했다가 연 뒤 **Vibe Helper: Retry Core Connection**을 실행합니다.
+- **"Kiro CLI 로그인이 필요해요"**: 터미널에서 `kiro-cli login`을 실행한 뒤 **Retry Core Connection**을 실행합니다. 이전 기록은 계속 볼 수 있습니다.
+- **"Core 준비 실패"**: **재시도** 또는 **Retry Core Connection**을 누릅니다. 코드가 `KIRO_NATIVE_HOST_PLATFORM_UNSUPPORTED`이면 지원하지 않는 컴퓨터입니다.
+- **"Kiro 사용량 한도에 도달했어요"**: Kiro 계정의 크레딧을 확인합니다.
+- **"계획을 확정하고 작업이 준비된 뒤에 … 열 수 있어요"**: 4단계 4번의 **이걸로 시작**을 먼저 누릅니다.
+- **Kiro 채팅이 계획을 모르거나 Vibe Helper 도구를 쓰지 못할 때**: 폴더를 신뢰했는지 확인하고, 명령 팔레트의 **Developer: Reload Window**로 창을 다시 로드한 뒤 새 세션에서 시작합니다. Kiro의 MCP 서버 목록에서 `vibe-helper`가 Connected인지도 봅니다.
+- **VSIX가 설치되지 않을 때**: Mac은 `darwin-arm64`, Windows는 `win32-x64` 파일인지 확인합니다.
 
 해결되지 않으면 [GitHub 이슈](https://github.com/Hello-KU-tty/core/issues)에 운영체제, Kiro 버전(Help → About), `kiro-cli --version` 결과, 확장 버전, 화면의 오류 문구를 적어 주세요. 로그인 정보, 토큰, 대화 원문은 붙이지 마세요. 문제를 풀려고 프로젝트 폴더나 기록을 지울 필요는 없습니다.
 
