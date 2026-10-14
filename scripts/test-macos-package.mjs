@@ -28,6 +28,8 @@ const selected = await api.selectCoreRuntime({
 })
 assert.ok(selected.runtime.executable.startsWith(join(root, 'core-tools/runtime-cache') + '/'))
 assert.equal(selected.runtime.source, 'MANAGED_NODE')
+// K18: Core runs under its own name, not `node`.
+assert.ok(selected.runtime.executable.endsWith('/vibe-helper-core'))
 const managers = []
 const create = () => {
   const manager = createCoreLifecycle({

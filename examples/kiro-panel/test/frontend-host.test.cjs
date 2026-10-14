@@ -10,10 +10,12 @@ const workspace = `${generatedRoot}/projects/campus-drop`
 const ok = data => ({ status: 200, body: { success: true, data: { projectId, taskId: 'task_1', registered: false, permissions: 'NOT_REQUESTED', ...data } } })
 const refuse = error => ({ status: 409, body: { success: false, error } })
 
-function harness({ trusted = true, installed = true, loggedIn = true, fail = false, platform = 'darwin',
+function harness({ trusted = true, installed = true, loggedIn = true, fail: failing = false, platform = 'darwin',
   binds = [ok({ workspace })], openFolders = [], answers = {}, bound = false, consent, env = process.env,
   installedAt = () => true } = {}) {
   let listener, trustListener, stopped = 0, starts = 0, mutations = 0, terminals = 0
+  // `fail: true` fails every start, a number fails that many starts first.
+  let failures = failing === true ? Infinity : Number(failing)
   const commands = new Map(), executed = [], messages = [], fetches = [], whoami = [], dialogs = []
   const globalState = new Map(consent ? [['vibeHelper.commandApproval', consent]] : [])
   const settings = new Map([['kiroAgent.agentAutonomy', 'Supervised']])
@@ -26,7 +28,10 @@ function harness({ trusted = true, installed = true, loggedIn = true, fail = fal
     execute: async value => { mutations++; return value }, startRun: async () => { mutations++ },
     startDiscovery: async () => { mutations++ } }
   const lifecycle = { subscribe(fn) { listener = fn; return () => {} },
-    async start() { starts++; if (fail) throw new Error('CORE_START_TIMEOUT');
+    async start() { starts++
+      if (failures > 0) {
+        failures--; listener({ phase: 'FAILED', errorCode: 'CORE_START_TIMEOUT' }); throw new Error('CORE_START_TIMEOUT')
+      }
       listener({ phase: 'CORE_CONNECTED' }); return { connectionFile: '/private/core-data/connection.json',
         resources: { promptDirectory: '/portable/prompts' }, runtime: {} } },
     retry() { return this.start() }, async dispose() { stopped++ } }
@@ -90,8 +95,9 @@ function harness({ trusted = true, installed = true, loggedIn = true, fail = fal
     globalState: { get: key => globalState.get(key), update: async (key, value) => { globalState.set(key, value) } } }
   return { create: () => module.exports.createFrontendHost(context),
     grantTrust() { modules.vscode.workspace.isTrusted = true; trustListener?.() },
-    lifecycleOptions: () => lifecycleOptions, runtimeCalls, commands, executed, messages, fetches, whoami, dialogs, globalState, settings,
+    lifecycleOptions: () => lifecycleOptions, lifecycleStatus: value => listener(value), runtimeCalls, commands, executed, messages, fetches, whoami, dialogs, globalState, settings,
     opened: () => executed.filter(item => item.name === 'vscode.openFolder'),
+    recover() { failures = 0 },
     counters: () => ({ stopped, starts, mutations, terminals }) }
 }
 const settle = () => new Promise(resolve => setImmediate(resolve))
@@ -126,6 +132,8 @@ test('Windows host finds kiro-cli in Program Files and runs Core on a real Node,
   await h.lifecycleOptions().selectRuntime(undefined)
   assert.equal(h.runtimeCalls.length, 1)
   assert.equal('kiroExecutable' in h.runtimeCalls[0], false)
+  // K18: never a `node` on PATH; Core runs the managed Node under its own name.
+  assert.equal(JSON.stringify(h.runtimeCalls[0].nodeExecutables), '[]')
   await host.dispose()
 })
 
@@ -380,4 +388,68 @@ test('a bound folder asks for trust, then offers a reload once trust is granted'
   await settle(); await settle()
   assert.equal(plain.dialogs.length, 0)
   await other.dispose()
+})
+
+test('a trusted Project folder window starts Core without the panel, for Kiro chat tools (K18)', async () => {
+  const h = harness({ bound: true, openFolders: [workspace] })
+  const host = await h.create()
+  await settle(); await settle()
+  assert.equal(h.counters().starts, 1)
+  assert.equal(host.getStatus().phase, 'CORE_CONNECTED')
+  assert.equal(host.getStatus().native, 'WORKER_READY')
+  await host.dispose()
+  // Another window without a Project folder still waits for the panel.
+  const plain = harness({ openFolders: ['/Users/synthetic/other'] })
+  const other = await plain.create()
+  await settle(); await settle()
+  assert.equal(plain.counters().starts, 0)
+  await other.dispose()
+})
+
+test('in a Project folder a Core failure is shown once until Core is back (K18)', async () => {
+  const h = harness({ bound: true, openFolders: [workspace], fail: true })
+  const host = await h.create()
+  await settle(); await settle()
+  assert.equal(host.getStatus().phase, 'FAILED')
+  const notices = () => h.dialogs.filter(item => /Vibe Helper Core에 연결하지 못했어요/.test(item.text))
+  assert.equal(notices().length, 1)
+  assert.match(notices()[0].text, /CORE_START_TIMEOUT/)
+  assert.doesNotMatch(notices()[0].text, /private|synthetic-secret/)
+  assert.deepEqual(notices()[0].items, ['다시 연결'])
+  // The periodic retries keep failing without repeating the notice.
+  h.lifecycleStatus({ phase: 'CONNECTING_CORE' })
+  h.lifecycleStatus({ phase: 'FAILED', errorCode: 'CORE_START_TIMEOUT' })
+  await settle()
+  assert.equal(notices().length, 1)
+  // A periodic retry reconnects on its own: preparation finishes for the panel without a click.
+  h.recover()
+  h.lifecycleStatus({ phase: 'CORE_CONNECTED' })
+  await settle(); await settle()
+  assert.equal(host.getStatus().phase, 'CORE_CONNECTED')
+  assert.equal(host.getStatus().native, 'WORKER_READY')
+  h.lifecycleStatus({ phase: 'FAILED', errorCode: 'CORE_START_TIMEOUT' })
+  await settle()
+  assert.equal(notices().length, 2, 'a new failure after reconnecting is shown again')
+  await host.dispose()
+})
+
+test('the reconnect button retries Core and the panel side gets ready', async () => {
+  const h = harness({ bound: true, openFolders: [workspace], fail: 1, answers: { '다시 연결': true } })
+  const host = await h.create()
+  await settle(); await settle(); await settle()
+  assert.equal(h.counters().starts >= 2, true)
+  assert.equal(host.getStatus().phase, 'CORE_CONNECTED')
+  assert.equal(host.getStatus().native, 'WORKER_READY')
+  assert.equal(h.dialogs.filter(item => /Vibe Helper Core에 연결하지 못했어요/.test(item.text)).length, 1)
+  await host.dispose()
+})
+
+test('a Core failure outside a Project folder is left to the panel', async () => {
+  const h = harness({ fail: true })
+  const host = await h.create()
+  await assert.rejects(host.prepare(), /CORE_START_TIMEOUT/)
+  h.lifecycleStatus({ phase: 'FAILED', errorCode: 'CORE_START_TIMEOUT' })
+  await settle()
+  assert.equal(h.dialogs.length, 0)
+  await host.dispose()
 })

@@ -100,6 +100,7 @@ function harness(options = {}) {
       return () => release()
     },
     rotateDescriptor: () => { descriptorRotated = true },
+    advance: ms => { clock += ms },
     counters: () => ({ clock, connects, ownerReads, preparations, directoryChecks }) }
 }
 
@@ -275,4 +276,37 @@ test('a periodic health read finishing after stop cannot send a new renewal', as
     assert.deepEqual(h.leases.map(value => value.action), ['RENEW', 'RELEASE'])
     assert.equal(h.manager.getStatus().phase, 'STOPPED')
   } finally { release(); await disposing; await h.manager.dispose() }
+})
+
+test('a failed start is retried by the periodic check, later each time, until Core connects (K18)', async () => {
+  // The previous installation's Core keeps running until 100 s; a reload must not wait for a click.
+  const h = harness({ owner: { runtimeIdentity: otherIdentity }, expireAt: 100000 })
+  try {
+    await assert.rejects(h.manager.start(), /CORE_UPDATE_WAITING_FOR_OWNER_EXIT/)
+    assert.equal(h.manager.getStatus().phase, 'FAILED')
+    const tick = [...h.intervals][0]
+    const reads = h.counters().ownerReads
+    tick()
+    await new Promise(setImmediate)
+    assert.equal(h.counters().ownerReads, reads, 'the first retry waits five seconds')
+    h.advance(5000)
+    tick()
+    await new Promise(setImmediate)
+    assert.equal(h.counters().clock, 95000)
+    assert.equal(h.manager.getStatus().phase, 'FAILED')
+    assert.equal(h.launches.length, 0)
+    h.advance(5000)
+    tick()
+    await new Promise(setImmediate)
+    assert.equal(h.manager.getStatus().phase, 'FAILED', 'the second retry waits ten seconds')
+    assert.equal(h.counters().clock, 100000)
+    h.advance(5000)
+    tick()
+    await new Promise(setImmediate)
+    assert.equal(h.manager.getStatus().phase, 'CORE_CONNECTED')
+    assert.equal(h.manager.getStatus().backendInstanceId, replacementInstance)
+    assert.equal(h.launches.length, 1)
+    assert.deepEqual(h.leases.map(value => [value.action, value.instance]), [['RENEW', replacementInstance]])
+  } finally { await h.manager.dispose() }
+  assert.equal(h.intervals.size, 0)
 })

@@ -256,6 +256,25 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
     - frontend의 `feat/k17-panel` 합치기와 Windows 0.2.9 빌드. 요청은 [0.2.9 프론트 인계](FRONTEND_HANDOFF_0.2.9.md).
   - **push와 체험 환경(2026-10-13):** backend `main`과 frontend `feat/k17-panel`(`4906b36`)을 push했다. 체험 환경을 0.2.9로 올렸다. 올리기 전 Core DB·`.kiro`·권한 파일은 `backup-before-0.2.9/`에 두었다. 다시 열 때 migration 0009, Steering 0.9.0, 도우미 에이전트 파일 삭제, 미리 승인 규칙 갱신이 일어났고 기록(이벤트 47개, 완료 Task 1개)은 그대로다. 이미 미리 승인을 고른 설치라 Autopilot은 저절로 켜지지 않는다(인계 "알려진 제한").
 
+### [~] K18. Windows 0.2.9 확인 후속: 이름으로 node 종료, Core 재시작, Workflow 위임
+
+- **출처:** frontend Windows 0.2.9 확인(2026-10-14, Kiro 1.2.56, 미리 승인). 확인 1~8 통과 뒤 9~17에서 세 건으로 막혔다.
+  - Builder가 앱 서버를 다시 띄우려고 `Get-Process -Name "node" | Stop-Process -Force`를 실행했다. Core(`core.mjs`)와 MCP bridge(`bridge.mjs`)가 둘 다 관리 Node `node.exe` 위에서 돌아 함께 죽었다. Core는 host가 3초 만에 다시 띄웠지만, Kiro는 죽은 stdio MCP 서버를 다시 띄우지 않았다. Builder는 1시간 동안 "Core 재연결 중"이라고만 했다.
+  - 창을 다시 로드한 뒤 Core(18404)가 13:06까지 살아 있다가 정상 종료(`backend.stopped`)했다. 그 뒤 아무도 Core를 다시 띄우지 않았고, bridge는 `VIBE_HELPER_NOT_CONNECTED`만 돌려줬다.
+  - Builder가 첫 Task와 후속 Task를 Kiro Workflow(`run_workflow`)로 통째로 구현했다. Project 전체에서 `DECISION_REQUESTED`가 0건이었다. 그 PC는 `kiroAgent.workflows.enabled: true`(기본 꺼짐)였다.
+- **원인(코드 확인):**
+  - 미리 승인 목록에는 `Get-Process`·`Stop-Process`·`Start-Process -FilePath node`가 없다. 따라서 우리 규칙상 두 명령 모두 물어야 한다. 묻지 않았다면 사용자·작업 공간 권한 파일에 남은 "항상 허용"을 의심한다(frontend 확인 요청). Steering 0.9.0에는 서버를 끄는 방법에 대한 규칙이 없다.
+  - managed Core는 host lease가 30초 갱신되지 않으면 스스로 닫는다. host의 2초 점검 타이머는 첫 `prepare()`(패널 webview가 열릴 때 등) 뒤에만 돈다. 한 번 `FAILED`가 되면(45초 시간 초과, 60초 안 두 번 재시작) 타이머가 영구히 멈춘다. Core의 lease 점검은 벽시계 기준이라 절전에서 깨어나면 host가 갱신하기 전에 모든 lease를 만료시킨다.
+  - Workflow는 별도 creator가 계획을 만들고 각 단계를 따로 실행한다. 단계는 이 대화를 보지 못하고 학습자에게 묻지 못한다. Mac 확인 프로필은 이 설정이 꺼져 있어(키 없음) K14 확인이 이 경로를 다루지 않았다.
+- **결정:** [DECISIONS](DECISIONS.md) "Windows 0.2.9 확인 후속(K18)". 실행 파일 이름 변경은 사용자 결정(2026-10-14, 이번 0.2.10에 함께).
+- **범위:**
+  1. Steering 0.9.1: 이름으로 일괄 종료 금지(자기가 띄운 PID·포트로만), 도구 자체가 사라지면 창 다시 로드 안내, 구현을 workflow·하위 에이전트에 넘기지 않기.
+  2. Core·bridge·hook의 실행 파일 이름을 `node`가 아닌 `vibe-helper-core`로 바꾼다. 해시를 검증한 관리 Node 사본을 쓰고, Kiro-native host는 PATH의 Node 대신 늘 관리 Node를 쓴다.
+  3. Core lease: 타이머 공백(절전·멈춤) 뒤에는 바로 닫지 않고 갱신 유예를 다시 준다. 살아 있는 host의 갱신 만료를 늘린다.
+  4. host: 연결된 Project 폴더에서는 패널 없이도 Core를 띄운다. `FAILED` 뒤에도 간격을 늘려 다시 시도하고, 연결된 폴더에서는 "다시 연결" 알림을 보인다.
+  5. 인계 문서의 확인 13 문구("적용값이 Autopilot")를 고친다. Mac 0.2.10을 만들고 Windows 0.2.10을 frontend에 요청한다.
+- **완료 조건:** runtime unit(관리 Node 사본 이름·해시·경쟁), host lease unit(공백, 만료), lifecycle CJS(실패 뒤 다시 시도, 연결된 폴더에서 시작, 알림), 기존 unit·integration·eval·패널 CJS·포장 검사 회귀 없음, Steering 0.9.1 실제 Kiro 확인(Workflow를 켠 Mac 프로필에서 첫 Builder 턴이 채팅에서 직접 만들고 선택을 묻는지, `killall node`·`pkill node` 뒤에도 Core·bridge가 살아 있는지), Mac VSIX 0.2.10.
+
 ## 3. 예선 작업 요약
 
 상세 기록은 [예선 작업 기록](archive/preliminary/TASKS_PRELIMINARY.md)에 있다.

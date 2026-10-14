@@ -1,6 +1,15 @@
 import { execFile } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
-import { lstat, open, readdir, readFile, realpath, rename, writeFile } from 'node:fs/promises'
+import {
+  lstat,
+  open,
+  readdir,
+  readFile,
+  realpath,
+  rename,
+  unlink,
+  writeFile,
+} from 'node:fs/promises'
 import { delimiter, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
 import { isPrivateDirectory, privateDirectory } from './private-directory.js'
@@ -495,6 +504,50 @@ export async function acquireCoreNode(
   }
 }
 
+/**
+ * Core runs the managed Node under its own name, so a command that stops every `node` by name
+ * (`Get-Process -Name node | Stop-Process`, `taskkill /IM node.exe`, `killall node`) leaves Core
+ * and the Kiro MCP bridge and hooks it starts alone (K18). Project tools keep the `node` name.
+ */
+export const CORE_EXECUTABLE_NAME = 'vibe-helper-core'
+
+/** A verified copy of the managed Node next to it. A copy is never replaced while it may run. */
+export async function namedCoreExecutable(node: string, resources: CoreResources): Promise<string> {
+  const mac = resources.manifest.target === 'darwin-arm64'
+  const asset = mac
+    ? resources.manifest.files['bin/node']
+    : { sha256: MANAGED_NODE.sha256, bytes: MANAGED_NODE.maxBytes }
+  if (!asset) fail('RUNTIME_CACHE_CORRUPT')
+  const target = join(node, '..', mac ? CORE_EXECUTABLE_NAME : `${CORE_EXECUTABLE_NAME}.exe`)
+  const verified = async (path: string) =>
+    sha256(await plainFile(path, asset.bytes)) === asset.sha256
+  const existing = await lstat(target).catch((error) => {
+    if (error.code === 'ENOENT') return null
+    throw error
+  })
+  if (existing) {
+    if (await verified(target).catch(() => false)) return target
+    // A changed copy is moved aside; Windows refuses that while it runs, which fails closed.
+    await rename(target, `${target}.invalid-${randomUUID()}`).catch(() =>
+      fail('RUNTIME_CACHE_CORRUPT'),
+    )
+  }
+  const bytes = await plainFile(node, asset.bytes)
+  if (sha256(bytes) !== asset.sha256) fail('RUNTIME_CACHE_CORRUPT')
+  const partial = `${target}.${randomUUID()}.partial`
+  await writeFile(partial, bytes, { flag: 'wx', mode: 0o700 })
+  try {
+    await rename(partial, target)
+  } catch {
+    // Another host committed the same copy first (Windows cannot replace a running one).
+    if (!(await verified(target).catch(() => false))) fail('RUNTIME_CACHE_CORRUPT')
+  } finally {
+    await unlink(partial).catch(() => undefined)
+  }
+  if (!(await verified(target))) fail('RUNTIME_CACHE_CORRUPT')
+  return target
+}
+
 export async function selectCoreRuntime(options: {
   resourceRoot: string
   privateRoot: string
@@ -537,7 +590,8 @@ export async function selectCoreRuntime(options: {
       rejected.push({ source: candidate.source, code })
     }
   }
-  const executable = await acquireCoreNode(join(root, 'runtime-cache'), resources, options)
+  const node = await acquireCoreNode(join(root, 'runtime-cache'), resources, options)
+  const executable = await namedCoreExecutable(node, resources)
   return {
     runtime: await probeCoreRuntime(
       { executable, source: 'MANAGED_NODE' },

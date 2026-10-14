@@ -4,6 +4,9 @@ const { createHash, randomUUID } = require('node:crypto')
 const { join } = require('node:path')
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
+// After a failure the periodic check tries again, waiting longer each time (K18).
+const RETRY_FIRST_MS = 5000
+const RETRY_LONGEST_MS = 60000
 const safeCode = error => /^[A-Z][A-Z0-9_]{0,99}$/.test(error?.message ?? '')
   ? error.message : 'CORE_LIFECYCLE_FAILED'
 const alive = pid => {
@@ -24,6 +27,7 @@ function createCoreLifecycle(options) {
   let selected, packageHash, runtimeIdentity, owned, attempt, timer, stopped = false
   let lastInstance, recoveries = []
   let leasedInstance, maintenance
+  let retryDelay = RETRY_FIRST_MS, retryAt = 0
   const controller = new AbortController()
   const leaseId = randomUUID()
   async function lease(action, expectedInstance) {
@@ -172,11 +176,20 @@ function createCoreLifecycle(options) {
   }
   function start() {
     if (attempt) return attempt
-    attempt = ensure().catch(error => {
+    attempt = ensure().then(ready => { retryDelay = RETRY_FIRST_MS; return ready }, error => {
+      retryAt = Date.now() + retryDelay
+      retryDelay = Math.min(retryDelay * 2, RETRY_LONGEST_MS)
       publish({ phase: 'FAILED', errorCode: safeCode(error) }); throw error
     }).finally(() => { attempt = null })
     if (!timer) timer = setInterval(() => {
-      if (stopped || attempt || maintenance || ['FAILED', 'IDLE'].includes(state.phase)) return
+      if (stopped || attempt || maintenance || state.phase === 'IDLE') return
+      // A failure is not final: Kiro chat's MCP bridge needs Core even when no one is looking at
+      // the panel. The crash guard (CORE_CRASH_RETRY_REQUIRED) still holds within its window.
+      if (state.phase === 'FAILED') {
+        if (Date.now() < retryAt) return
+        maintenance = start().catch(() => {}).finally(() => { maintenance = null })
+        return
+      }
       maintenance = (async () => {
         try {
           const client = await connect(connectionFile)

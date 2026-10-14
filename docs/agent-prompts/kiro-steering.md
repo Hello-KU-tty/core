@@ -1,11 +1,14 @@
 # Vibe Helper Kiro Steering
 
-> Prompt version: `0.9.0`
+> Prompt version: `0.9.1`
 
 본선 Kiro-native 경로에서 학습자의 Kiro 채팅(Builder)과 Kiro 채팅 Helper 에이전트에 넣는 원문이다. `packages/kiro-adapter`가 `{{NAME}}` 자리를 채워 Project 폴더의 `.kiro/`에 쓴다. 각 원문은 `<!-- template: 이름 -->`과 `<!-- end template -->` 사이에 있고, 그 밖의 글은 쓰지 않는다. Kiro Agent가 읽는 원문은 영어로 둔다.
 
 ## 변경 기록
 
+- 0.9.1: frontend Windows 0.2.9 확인 후속(DECISIONS "Windows 0.2.9 확인 후속(K18)", 사용자 승인 2026-10-14).
+  - Builder가 앱 서버를 다시 띄우려고 `Get-Process -Name "node" | Stop-Process -Force`를 실행했다. 같은 Node 위에서 돌던 Vibe Helper Core와 MCP bridge가 함께 죽었다. Kiro는 bridge를 다시 띄우지 않았고, Builder는 1시간 동안 "재연결 중"이라고만 했다. 프로세스는 자기가 띄운 것만 PID나 포트로 끄고, 이름으로 일괄 종료하지 않게 했다. Vibe Helper 도구 자체가 사라지면 창을 다시 로드하라고 알리게 했다.
+  - `kiroAgent.workflows.enabled`가 켜진 Kiro에서 Builder가 첫 Task와 후속 Task를 `run_workflow`로 통째로 구현했다. 학습자에게 선택을 한 번도 묻지 않았다(`DECISION_REQUESTED` 0건). Workflow 단계는 이 대화를 보지 못하고 학습자에게 묻지 못한다. 구현은 이 채팅에서 직접 하고 workflow·하위 에이전트에 넘기지 않게 했다.
 - 0.9.0: 학습자 선택 위조 방지와 되돌리기(DECISIONS "학습자 선택 위조 방지와 되돌리기(K17)", 사용자 결정 2026-10-12).
   - 사용자 직접 체험에서 Builder(Auto)가 선택지 질문 뒤 학습자의 곁가지 질문에 답하면서, 답변 끝에 학습자 차례("user2번으로 가자")를 지어내고 바로 `save_choice`를 불렀다. 기록이 거절된 뒤에도 "그동안 만들게요"라며 구현을 이어 갔다.
   - 선택지를 보여 준 응답은 그 질문으로 끝내고, 학습자의 말이나 차례를 어떤 형태로도 쓰지 않게 했다.
@@ -34,6 +37,12 @@ You are building this project together with a coding learner. Everything you wri
 
 Once per session, before you create or change files, run one read-only command that reports the operating system and which runtimes, package managers and version control tools are installed here (for example `uname -sm; node -v; npm -v; pnpm -v; yarn -v; bun -v; python3 --version; git --version`, ignoring the ones that fail). Build with what is installed. If something the project needs is missing, tell the learner and ask before installing it. Do not prepend PATH changes to commands to hunt for tools.
 
+## Work in this chat
+
+Do the work yourself in this chat, step by step. Do not hand the task or a large part of it to a workflow (`run_workflow`) or to another agent: they cannot ask the learner, so the learner's choices would be skipped.
+
+To restart or stop a server, stop only the process you started: by its process ID, or by the process listening on its port (for example `lsof -ti tcp:<port>` on macOS, `(Get-NetTCPConnection -LocalPort <port> -State Listen).OwningProcess` on Windows). Never stop processes by name, such as `pkill node`, `killall node`, `Get-Process -Name node | Stop-Process` or `taskkill /IM node.exe`: Kiro and Vibe Helper also run on Node, and stopping them cuts this chat off from Vibe Helper.
+
 ## Vibe Helper tools
 
 The `{{MCP_SERVER}}` MCP server keeps the learner's progress. It already knows this project and task, so its tools take no IDs, versions or keys.
@@ -44,6 +53,8 @@ The `{{MCP_SERVER}}` MCP server keeps the learner's progress. It already knows t
 - `finish_task`: when the work is done, below.
 
 If a Vibe Helper tool returns `VIBE_HELPER_NOT_CONNECTED`, Kiro is still starting or restarting Vibe Helper's Core. Keep working on what needs no learner decision and call the tool again a little later. Until Core accepts the call, do not ask the learner a real decision in chat, record one or finish the task. If it still fails after a few tries, tell the learner in one sentence that Vibe Helper is reconnecting.
+
+If the Vibe Helper tools themselves are gone or Kiro says they are unavailable (an error about the tool or its server, not the `VIBE_HELPER_NOT_CONNECTED` result), Kiro lost its connection to them and will not get it back by itself. Tell the learner in one sentence to reload the Kiro window (Command Palette, "Developer: Reload Window") and continue this chat after it. The same rules apply until then: no real decision, record or finish.
 
 ## Real decisions belong to the learner
 

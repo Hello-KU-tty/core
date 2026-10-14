@@ -2,6 +2,7 @@ import {
   lstat,
   mkdir,
   mkdtemp,
+  readdir,
   readFile,
   realpath,
   rename,
@@ -9,9 +10,14 @@ import {
   writeFile,
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { acquireCoreNode, type CoreResources, sha256 } from '../src/portable-core.js'
+import {
+  acquireCoreNode,
+  type CoreResources,
+  namedCoreExecutable,
+  sha256,
+} from '../src/portable-core.js'
 
 describe.skipIf(process.platform !== 'darwin' || process.arch !== 'arm64')(
   'persistent Mac Node cache',
@@ -58,6 +64,40 @@ describe.skipIf(process.platform !== 'darwin' || process.arch !== 'arm64')(
         expect(await readFile(path, 'utf8')).toBe('tampered')
       },
     )
+    it('runs Core from a verified copy that is not named node (K18)', async () => {
+      const { resources, cache } = await fixture()
+      const node = await acquireCoreNode(cache, resources, { offline: true })
+      const [copy, again] = await Promise.all([
+        namedCoreExecutable(node, resources),
+        namedCoreExecutable(node, resources),
+      ])
+      expect(again).toBe(copy)
+      expect(copy).toBe(join(dirname(node), 'vibe-helper-core'))
+      expect(basename(copy)).not.toMatch(/node/)
+      expect((await lstat(copy)).mode & 0o777).toBe(0o700)
+      expect(await readFile(copy, 'utf8')).toBe('synthetic bin/node')
+      // The cache itself keeps its node, which project tools and older installs still use.
+      expect(await acquireCoreNode(cache, resources, { offline: true })).toBe(node)
+      expect((await readdir(dirname(node))).filter((name) => name.includes('partial'))).toEqual([])
+    })
+    it('moves a changed Core copy aside and copies verified bytes again', async () => {
+      const { resources, cache } = await fixture()
+      const node = await acquireCoreNode(cache, resources, { offline: true })
+      const copy = await namedCoreExecutable(node, resources)
+      await writeFile(copy, 'tampered')
+      expect(await namedCoreExecutable(node, resources)).toBe(copy)
+      expect(await readFile(copy, 'utf8')).toBe('synthetic bin/node')
+      const aside = (await readdir(dirname(node))).filter((name) => name.includes('.invalid-'))
+      expect(aside).toHaveLength(1)
+      expect(await readFile(join(dirname(node), aside.at(0) ?? ''), 'utf8')).toBe('tampered')
+    })
+    it('never copies a changed managed Node under the Core name', async () => {
+      const { resources, cache } = await fixture()
+      const node = await acquireCoreNode(cache, resources, { offline: true })
+      await writeFile(node, 'tampered')
+      await expect(namedCoreExecutable(node, resources)).rejects.toThrow('RUNTIME_CACHE_CORRUPT')
+      await expect(lstat(join(dirname(node), 'vibe-helper-core'))).rejects.toThrow()
+    })
     it('rejects a linked cache destination', async () => {
       const { resources, cache } = await fixture()
       const directory = dirname(await acquireCoreNode(cache, resources))

@@ -1,5 +1,36 @@
 # 결정 기록
 
+## 본선: Windows 0.2.9 확인 후속 — 이름으로 node 종료, Core 재시작, Workflow 위임(K18)
+
+- **맥락(frontend Windows 0.2.9 확인, 2026-10-14, Kiro 1.2.56):**
+  - Builder가 `Get-Process -Name "node" | Stop-Process -Force`로 앱 서버를 끄면서 같은 `node.exe` 위에서 돌던 Core와 MCP bridge도 함께 죽였다. Core는 host가 다시 띄웠지만 Kiro는 죽은 stdio MCP 서버를 다시 띄우지 않았다.
+  - 창을 다시 로드한 뒤 Core가 lease 만료로 정상 종료했다. 그 뒤 아무도 Core를 다시 띄우지 않았다.
+  - `kiroAgent.workflows.enabled`가 켜진 Kiro에서 Builder가 구현을 `run_workflow`에 통째로 맡겼다. 학습자에게 선택을 한 번도 묻지 않았다.
+- **결정(사용자 승인, 2026-10-14):**
+  1. **Steering 0.9.1:**
+     - 서버는 자기가 띄운 프로세스의 PID나 그 포트를 쓰는 프로세스로만 끈다. `node` 같은 이름으로 일괄 종료하지 않는다(`Get-Process -Name node`, `taskkill /IM node.exe`, `pkill node`, `killall node`). Kiro와 Vibe Helper도 Node 위에서 돈다.
+     - Vibe Helper 도구 자체가 사라졌거나 쓸 수 없다고 나오면(`VIBE_HELPER_NOT_CONNECTED` 결과와 다름) 학습자에게 Kiro 창을 다시 로드하라고 한 문장으로 알린다.
+     - 구현은 이 채팅에서 직접 한다. workflow(`run_workflow`)나 하위 에이전트에 넘기지 않는다. 그쪽은 학습자에게 묻지 못해 학습자의 선택이 빠진다.
+  2. **실행 파일 이름(사용자 결정, 이번 0.2.10에 함께):**
+     - Core와 Core가 쓰는 bridge·hook 명령은 `node`가 아닌 `vibe-helper-core`(Windows `vibe-helper-core.exe`)라는 이름의 관리 Node 사본으로 돈다. 이름으로 일괄 종료하는 명령에 휘말리지 않는다. 내용은 같은 Node 24.19.0이고 사본도 같은 해시로 검증한다.
+     - Kiro-native host는 PATH에 있는 Node를 Core 런타임으로 쓰지 않는다. 그 Node는 `node`라는 이름이기 때문이다. 늘 관리 Node(Windows는 처음 한 번 내려받기, Mac은 설치물 안의 Node)를 쓴다.
+     - 막지 못하는 것: 경로 전체를 보는 `pkill -f node`, 모든 프로세스 종료, 프로세스 트리 종료.
+  3. **Core lease:**
+     - Core의 점검 타이머가 몇 초 넘게 멈췄다 깨어나면(절전·멈춤) 바로 닫지 않는다. 그때 살아 있는 host에게 갱신 유예를 다시 준다.
+     - 살아 있는 host의 갱신 만료를 30초에서 2분으로 늘린다. 같은 확장 호스트의 다른 확장이 잠시 멈춰도 Core가 닫히지 않게 한다. 죽은 host는 지금처럼 바로 지우고, 마지막 host가 떠난 뒤 30초 유예도 그대로다.
+  4. **host:**
+     - Vibe Helper가 연결한 Project 폴더를 신뢰한 창에서는 패널을 열지 않아도 Core를 띄운다. Kiro 채팅의 Vibe Helper 도구가 패널 없이도 동작해야 하기 때문이다.
+     - `FAILED`는 끝이 아니다. 점검 타이머가 5초에서 시작해 60초까지 간격을 늘려 다시 시도한다. 연결되면 간격을 처음으로 되돌린다. 연속 재시작 방지(`CORE_CRASH_RETRY_REQUIRED`)는 이 간격으로 대신한다.
+     - 연결된 Project 폴더에서 `FAILED`가 되면 "다시 연결" 버튼이 있는 알림을 한 번 보인다. 다시 연결되기 전에는 같은 알림을 반복하지 않는다.
+- **하지 않는 것:**
+  - 학습자의 Kiro 전역 설정 `kiroAgent.workflows.enabled`는 바꾸지 않는다. Kiro 전체에 걸린 학습자 선택이라서다.
+  - bridge가 죽은 것을 패널에서 감지하는 것은 이번에 하지 않는다. Kiro가 띄운 MCP 프로세스를 host가 볼 공개 경로가 없다. 이름 변경으로 주된 원인을 막고, Builder가 도구 오류를 보면 다시 로드를 안내한다.
+  - 미리 승인 목록은 바꾸지 않는다. 이름 기반 종료는 처음부터 목록에 없어 Kiro가 묻는다. Kiro의 "항상 허용"이 우리 규칙보다 넓게 남아 있으면 그쪽이 이긴다.
+- **위험:**
+  - 업그레이드한 Windows 설치는 관리 Node 사본(약 80MB)을 한 번 더 만든다. PATH에 Node 24.18·24.19가 있던 설치는 관리 Node를 처음 한 번 내려받는다.
+  - 실행 파일 이름이 바뀌어 설치 identity가 달라진다. 업그레이드 직후에는 지금처럼 예전 Core가 끝나기를 기다린다(`CORE_UPDATE_WAITING_FOR_OWNER_EXIT`).
+  - Steering 규칙은 Builder가 지킬 때만 효과가 있다.
+
 ## 본선: 학습자 선택 위조 방지와 "내가 고른 게 아니야" 되돌리기(K17)
 
 - **맥락(사용자 직접 체험, 2026-10-12, Kiro 1.2.56, 채팅 모델 Auto):**

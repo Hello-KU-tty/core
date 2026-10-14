@@ -83,9 +83,11 @@ async function createFrontendHost(context) {
       return ['--kiro-cli', kiroCli]
     },
     // Core writes its own Node into Kiro hook and MCP commands, so it must run on a real Node, not
-    // on Kiro's executable with ELECTRON_RUN_AS_NODE (that command would open Kiro instead).
+    // on Kiro's executable with ELECTRON_RUN_AS_NODE (that command would open Kiro instead). It is
+    // always the managed Node under Core's own name, never a `node` on PATH, so a Builder command
+    // that stops `node` by name does not stop Core or the Kiro MCP bridge (K18).
     selectRuntime: signal => api.selectCoreRuntime({ resourceRoot,
-      privateRoot: join(storagePath, 'core-tools'), signal }),
+      privateRoot: join(storagePath, 'core-tools'), nodeExecutables: [], signal }),
   })
   const connectionFile = join(storagePath, 'core-data/connection.json')
   const workspacesRoot = join(storagePath, 'core-data/workspaces')
@@ -93,6 +95,9 @@ async function createFrontendHost(context) {
   // Kiro-native mode has no IDE-internal worker; the handle reports no status and no questions.
   const worker = createNativeWorkerHandle()
   let preparation, disposal, terminalPrepared = false, stopped = false
+  // K18: a window on a Vibe Helper Project folder keeps Core up for Kiro chat's MCP bridge, panel
+  // or not, and says so once when Core cannot be reached.
+  let boundWindow = false, prepareFailed = false, failureNoticed = false
   // Kiro reads hooks and workspace MCP when a window opens. In a window opened untrusted they stay
   // off after trust is granted, until the window reloads.
   const openedUntrusted = !vscode.workspace.isTrusted
@@ -121,7 +126,25 @@ async function createFrontendHost(context) {
     emit(value)
     if (value.phase === 'CORE_CONNECTED' && value.restoreRequired)
       void client.health().catch(() => {})
+    if (value.phase === 'CORE_CONNECTED') {
+      failureNoticed = false
+      // The periodic check reconnected after a failed preparation; finish it for the panel.
+      if (prepareFailed && !preparation && !stopped) void prepare().catch(() => {})
+    }
+    if (value.phase === 'FAILED' && boundWindow && !failureNoticed && !stopped) {
+      failureNoticed = true
+      void noticeCoreFailure(value.errorCode).catch(() => {})
+    }
   })
+  async function noticeCoreFailure(code) {
+    const reconnect = '다시 연결'
+    const choice = await vscode.window.showWarningMessage(
+      `Vibe Helper Core에 연결하지 못했어요 (${code ?? 'CORE_NOT_CONNECTED'}). 그동안 Kiro 채팅의 Vibe Helper 도구가 동작하지 않아요. 잠시 뒤 저절로 다시 시도해요.`,
+      reconnect)
+    if (choice !== reconnect || stopped) return
+    failureNoticed = false
+    await retry()
+  }
   async function prepareOnce() {
     try {
       kiroCli = await findKiroCli()
@@ -140,8 +163,10 @@ async function createFrontendHost(context) {
       } catch (error) {
         emit({ native: 'UNAVAILABLE', nativeErrorCode: safeCode(error) })
       }
+      prepareFailed = false
       return { client, connection, connectionFile: ready.connectionFile, worker }
     } catch (error) {
+      prepareFailed = true
       emit({ phase: stopped ? 'STOPPED' : 'FAILED', errorCode: safeCode(error) })
       throw error
     }
@@ -338,7 +363,10 @@ async function createFrontendHost(context) {
   }
   void boundFolder().then(async bound => {
     if (!bound || stopped) return
+    boundWindow = true
     if (!vscode.workspace.isTrusted) return askForTrust()
+    // Kiro chat's Vibe Helper tools reach Core through the MCP bridge; start it without the panel.
+    void prepare().catch(() => {})
     // A folder just connected (new window) or just trusted (after the reload) starts a new session.
     const folder = await currentFolder()
     const timer = setTimeout(() => { if (!stopped) void startFreshSession(folder).catch(() => {}) }, FRESH_SESSION_DELAY_MS)
@@ -348,10 +376,15 @@ async function createFrontendHost(context) {
     void prepare().catch(() => {})
     void boundFolder().then(async bound => {
       if (!bound || stopped) return
+      boundWindow = true
       await markFreshSession(await currentFolder())
       await offerReload('신뢰가 Kiro 채팅에 적용되도록 창을 다시 로드할까요? 다시 로드하면 새 채팅 세션이 열려요.')
     }).catch(() => {})
   })
+  async function retry() {
+    if (stopped) throw new Error('FRONTEND_HOST_STOPPED')
+    kiroCli = await findKiroCli(); await lifecycle.retry(); return prepare()
+  }
   async function dispose() {
     if (disposal) return disposal
     stopped = true; trust.dispose(); openCommand.dispose(); approvalCommand.dispose()
@@ -366,10 +399,7 @@ async function createFrontendHost(context) {
   return Object.freeze({ client, worker, prepare, assertAgentReady, openProjectInKiro, getStatus: () => status,
     subscribeStatus(listener) { listeners.add(listener); listener(status); return () => listeners.delete(listener) },
     onDidRotate: connection.onDidRotate,
-    async retry() {
-      if (stopped) throw new Error('FRONTEND_HOST_STOPPED')
-      kiroCli = await findKiroCli(); await lifecycle.retry(); return prepare()
-    },
+    retry,
     dispose,
   })
 }

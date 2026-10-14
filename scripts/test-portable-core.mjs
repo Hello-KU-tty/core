@@ -17,7 +17,7 @@ import {
 } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { Client } from '../apps/mcp-server/node_modules/@modelcontextprotocol/client/dist/index.mjs'
 import { StdioClientTransport } from '../apps/mcp-server/node_modules/@modelcontextprotocol/client/dist/stdio.mjs'
 import { privateDirectory } from '../packages/runtime/dist/private-directory.js'
@@ -186,7 +186,11 @@ const acquired = await api.selectCoreRuntime({
   download: fetch,
 })
 assert.equal(acquired.runtime.source, 'MANAGED_NODE')
+// K18: Core runs from a verified copy that commands stopping `node.exe` by name do not match.
+assert.equal(basename(acquired.runtime.executable), 'vibe-helper-core.exe')
+const managedNode = join(dirname(acquired.runtime.executable), 'node.exe')
 const binary = await readFile(acquired.runtime.executable)
+assert.ok(binary.equals(await readFile(managedNode)))
 report.runtimes.managed = {
   source: acquired.runtime.source,
   node: acquired.runtime.nodeVersion,
@@ -205,7 +209,7 @@ const cached = await api.selectCoreRuntime({
 })
 assert.equal(cached.runtime.source, 'MANAGED_NODE')
 record('officialAcquisitionAndOfflineCache')
-await writeFile(acquired.runtime.executable, 'corrupted cache')
+await writeFile(managedNode, 'corrupted cache')
 await assert.rejects(
   api.acquireCoreNode(cache, resources, { offline: true }),
   /OFFLINE_UNAVAILABLE/,
