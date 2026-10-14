@@ -1,5 +1,7 @@
 # 0.2.9 프론트 인계 (2026-10-13)
 
+> **0.2.10으로 대체(2026-10-14):** 1(브랜치 합치기)은 끝났다. Windows 0.2.9 확인이 세 건으로 막혀 2·3은 [0.2.10 프론트 인계](FRONTEND_HANDOFF_0.2.10.md)로 넘어갔다. 아래 리뷰 내용과 Windows에서 볼 곳은 0.2.10에도 그대로 맞다.
+
 backend가 사용자 직접 체험의 후속(TASKS K17)을 마치고 Mac 0.2.9를 만들어 실제 Kiro에서 확인했다. frontend에 부탁할 일은 아래 세 가지다. 이 문서에는 이번에 할 일만 모았다. 빌드 절차와 지난 기록은 [Kiro-native 인계](FRONTEND_KIRO_NATIVE_HANDOFF.md)에 있다.
 
 | 할 일 | 어디서 | 끝난 기준 |
@@ -8,7 +10,7 @@ backend가 사용자 직접 체험의 후속(TASKS K17)을 마치고 Mac 0.2.9�
 | 2. Windows 0.2.9 빌드와 확인 | Windows 11 x64, Kiro 최신판 | 확인 1~17 |
 | 3. 올리기와 링크 바꾸기 | `Hello-KU-tty/core`의 `main` | VSIX·receipt·files, 설치 가이드, README를 한 커밋에 |
 
-- **Mac 0.2.9:** [`builder-helper-agent-panel-0.2.9-darwin-arm64.vsix`](../releases/macos/kiro-native/builder-helper-agent-panel-0.2.9-darwin-arm64.vsix) · 41,607,751 bytes · SHA-256 `922d73b7afcfb39f144c257c41ae5d95ad7fd63cbfc8fd45e55771c7e3603239`
+- **Mac 0.2.9:** `builder-helper-agent-panel-0.2.9-darwin-arm64.vsix`(0.2.10으로 교체, Git 이력 `bc29a8c`) · 41,607,751 bytes · SHA-256 `922d73b7afcfb39f144c257c41ae5d95ad7fd63cbfc8fd45e55771c7e3603239`
 - **빌드 출처:** backend `main` `3721a76`, frontend `feat/k17-panel` `4906b36`. 그 뒤 backend `main` 커밋은 문서만 바꿨으므로 최신 `main`으로 빌드해도 된다.
 - **0.2.9에서 바뀐 동작 전체:** [0.2.9에서 바뀐 점](FRONTEND_KIRO_NATIVE_HANDOFF.md#029에서-바뀐-점). Mac 실측 결과: [0.2.9 확인](FRONTEND_KIRO_NATIVE_HANDOFF.md#029-확인-2026-10-12-mac).
 

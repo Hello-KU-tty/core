@@ -274,6 +274,24 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
   4. host: 연결된 Project 폴더에서는 패널 없이도 Core를 띄운다. `FAILED` 뒤에도 간격을 늘려 다시 시도하고, 연결된 폴더에서는 "다시 연결" 알림을 보인다.
   5. 인계 문서의 확인 13 문구("적용값이 Autopilot")를 고친다. Mac 0.2.10을 만들고 Windows 0.2.10을 frontend에 요청한다.
 - **완료 조건:** runtime unit(관리 Node 사본 이름·해시·경쟁), host lease unit(공백, 만료), lifecycle CJS(실패 뒤 다시 시도, 연결된 폴더에서 시작, 알림), 기존 unit·integration·eval·패널 CJS·포장 검사 회귀 없음, Steering 0.9.1 실제 Kiro 확인(Workflow를 켠 Mac 프로필에서 첫 Builder 턴이 채팅에서 직접 만들고 선택을 묻는지, `killall node`·`pkill node` 뒤에도 Core·bridge가 살아 있는지), Mac VSIX 0.2.10.
+- **진행(2026-10-14):**
+  - **구현과 자동 검사 완료(Node 24.19.0):**
+    - runtime `namedCoreExecutable`(해시를 검증한 `vibe-helper-core` 사본, 바뀐 사본은 옆으로 옮기고 다시 복사)와 host의 `nodeExecutables: []`.
+    - `HostLeases`(갱신 만료 2분, 5초 넘는 타이머 공백 뒤 유예).
+    - `core-lifecycle.cjs`(`FAILED` 뒤 5~60초 다시 시도), `frontend-host.cjs`(연결된 폴더에서 시작, 다시 연결되면 준비 마저 하기, "다시 연결" 알림 한 번).
+    - Steering 0.9.1, 결정 기록.
+    - 검사: `pnpm typecheck` 통과, unit 177 통과·3 skip, integration 558 통과·9 skip(새 6개), eval 47 통과·1 skip, 패널 CJS 192 통과·2 skip(새 5개), 바꾼 파일 Biome 오류 없음.
+    - commit `1923f07`, 버전 `dc5859e`.
+  - **Mac 0.2.10:** 깨끗한 worktree(backend `dc5859e`, program `main` `324214e`)로 빌드했다. 41,609,475 bytes, SHA-256 `a7dc53d4…f510`, 포장 검사 9 PASS.
+  - **실제 Kiro 확인([기록](../tests/eval/results/kiro-steering-0.9.1-k18.md), 약 7.9크레딧, 계정 누적 약 165.4):**
+    - 0.2.9에서 올린 프로필의 Core는 PATH의 Node로 돌고 있었다. 0.2.10에서는 Core·bridge가 `vibe-helper-core`로 돌고 `pgrep -x node`·`pgrep node`에 잡히지 않았다. MCP·hook 명령과 Steering은 Core 시작 때 다시 쓰였다.
+    - Core를 PID로 종료하면 2~3초 만에 다시 떴고 bridge는 유지됐다(다시 로드 전후). Kiro를 닫으면 23초 뒤 Core가 스스로 끝났다.
+    - Workflow를 켠 세션에서 0.9.1 Builder가 채팅에서 후속 기능을 만들고 선택을 묻고 완료했다. workflow 문단을 뺀 대조도 위임하지 않아 Mac에서는 재현되지 않았다.
+    - Kiro는 Workflow 세션 지침에 "항상 `run_workflow`"를 넣고, 그 지침은 서버 A/B 설정으로 바뀐다.
+  - **남은 것:**
+    - frontend의 0.2.9 사건 답(승인 창, 권한 파일, 절전)과 Windows 0.2.10 확인 9~21. 요청은 [0.2.10 프론트 인계](FRONTEND_HANDOFF_0.2.10.md).
+    - 패널 없는 창의 Core 시작, 절전 뒤 유예, `FAILED` 뒤 다시 시도는 실제 화면으로 만들 수 없어 단위 테스트로만 확인했다(frontend 확장이 활성화 때 패널을 연다).
+    - Workflow 위임 방지의 효과는 Windows 확인 9·14가 판정한다.
 
 ## 3. 예선 작업 요약
 

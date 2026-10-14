@@ -1,6 +1,6 @@
 # Hello Vibe 설치 가이드
 
-Hello Vibe는 Kiro IDE 확장입니다. Agent Panel에서 배우고 싶은 것을 바탕으로 만들 프로젝트를 고르고, 실제 만들기는 Kiro 채팅에서 합니다. 이 문서는 본선 설치물 **0.2.9**(Mac) 기준입니다.
+Hello Vibe는 Kiro IDE 확장입니다. Agent Panel에서 배우고 싶은 것을 바탕으로 만들 프로젝트를 고르고, 실제 만들기는 Kiro 채팅에서 합니다. 이 문서는 본선 설치물 **0.2.10**(Mac) 기준입니다.
 
 ## 1. 준비물
 
@@ -16,23 +16,23 @@ Hello Vibe 계정이나 API 키는 없습니다. Node.js, pnpm 같은 개발 도
 
 | 운영체제 | 설치 파일 |
 | --- | --- |
-| Mac (Apple Silicon) | **[0.2.9 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/kiro-native/builder-helper-agent-panel-0.2.9-darwin-arm64.vsix)** (약 40MB) |
+| Mac (Apple Silicon) | **[0.2.10 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/kiro-native/builder-helper-agent-panel-0.2.10-darwin-arm64.vsix)** (약 40MB) |
 | Windows (x64) | **[0.2.7 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/windows/kiro-native/builder-helper-agent-panel-0.2.7-win32-x64.vsix)** (약 2.5MB) |
 
-링크를 누르면 `.vsix` 파일이 바로 내려받아집니다. Windows용 0.2.9는 준비 중입니다. 0.2.7에는 아래 4단계 8번의 "다음 한 걸음" 카드, 새 채팅 세션 자동 열기, "내가 고른 게 아니야" 되돌리기가 없고, 나머지 흐름은 같습니다. 새 파일이 올라오면 [Windows 설치 파일 폴더](../releases/windows/kiro-native/)에서도 받을 수 있습니다.
+링크를 누르면 `.vsix` 파일이 바로 내려받아집니다. Windows용 0.2.10은 준비 중입니다. 0.2.7에는 아래 4단계 8번의 "다음 한 걸음" 카드, 새 채팅 세션 자동 열기, "내가 고른 게 아니야" 되돌리기가 없고, 나머지 흐름은 같습니다. 새 파일이 올라오면 [Windows 설치 파일 폴더](../releases/windows/kiro-native/)에서도 받을 수 있습니다.
 
 <details>
 <summary>파일이 온전한지 확인하기 (선택)</summary>
 
 | 파일 | SHA-256 |
 | --- | --- |
-| Mac 0.2.9 | `922d73b7afcfb39f144c257c41ae5d95ad7fd63cbfc8fd45e55771c7e3603239` |
+| Mac 0.2.10 | `a7dc53d4acd27df203f62c774c1a8acd0b747ef85630c15c99735a636bdff510` |
 | Windows 0.2.7 | `66bb080ee62e58bf1cdfc58d7a36a7088ed7831d4ed5b4943aef93a6c7393c04` |
 
 Mac 터미널:
 
 ```sh
-shasum -a 256 ~/Downloads/builder-helper-agent-panel-0.2.9-darwin-arm64.vsix
+shasum -a 256 ~/Downloads/builder-helper-agent-panel-0.2.10-darwin-arm64.vsix
 ```
 
 Windows PowerShell:
@@ -107,7 +107,7 @@ Windows에서 Node.js 24가 없으면 첫 실행 때 Hello Vibe가 Node.js 24.19
 
 0.2.9를 한 번 실행하면 저장소 형식이 바뀌어 0.2.8 이하로 되돌릴 수 없습니다.
 
-이전 버전이 터미널과 출력 창을 Kiro 채팅 자리로 옮겼을 수 있습니다. 0.2.9를 처음 열 때 "원래 배치로 되돌리기"를 물으면 누르세요(Kiro 화면 배치가 처음 상태로 돌아갑니다).
+이전 버전이 터미널과 출력 창을 Kiro 채팅 자리로 옮겼을 수 있습니다. 0.2.9 이상을 처음 열 때 "원래 배치로 되돌리기"를 물으면 누르세요(Kiro 화면 배치가 처음 상태로 돌아갑니다).
 
 ## 6. 문제가 생기면
 
@@ -118,9 +118,11 @@ Windows에서 Node.js 24가 없으면 첫 실행 때 Hello Vibe가 Node.js 24.19
 - **"Kiro CLI를 찾지 못했어요"**: 3단계의 Kiro CLI를 설치하고, Kiro를 완전히 종료했다가 연 뒤 **Vibe Helper: Retry Core Connection**을 실행합니다.
 - **"Kiro CLI 로그인이 필요해요"**: 터미널에서 `kiro-cli login`을 실행한 뒤 **Retry Core Connection**을 실행합니다. 이전 기록은 계속 볼 수 있습니다.
 - **"Core 준비 실패"**: **재시도** 또는 **Retry Core Connection**을 누릅니다. 코드가 `KIRO_NATIVE_HOST_PLATFORM_UNSUPPORTED`이면 지원하지 않는 컴퓨터입니다.
+- **"Vibe Helper Core에 연결하지 못했어요"**(0.2.10부터, 프로젝트 폴더 창): Hello Vibe가 잠시 뒤 저절로 다시 시도합니다. 바로 다시 시도하려면 알림의 **다시 연결**을 누릅니다.
 - **"Kiro 사용량 한도에 도달했어요"**: Kiro 계정의 크레딧을 확인합니다.
 - **"계획을 확정하고 작업이 준비된 뒤에 … 열 수 있어요"**: 4단계 4번의 **이걸로 시작**을 먼저 누릅니다.
-- **Kiro 채팅이 계획을 모르거나 Vibe Helper 도구를 쓰지 못할 때**: 폴더를 신뢰했는지 확인하고, 명령 팔레트의 **Developer: Reload Window**로 창을 다시 로드한 뒤 새 세션에서 시작합니다. Kiro의 MCP 서버 목록에서 `vibe-helper`가 Connected인지도 봅니다.
+- **Kiro 채팅이 계획을 모르거나 Vibe Helper 도구를 쓰지 못할 때**: 폴더를 신뢰했는지 확인하고, 명령 팔레트의 **Developer: Reload Window**로 창을 다시 로드한 뒤 새 세션에서 시작합니다. Kiro의 MCP 서버 목록에서 `vibe-helper`가 Connected인지도 봅니다. Kiro는 한 번 끊긴 MCP 서버를 스스로 다시 띄우지 않아서, Kiro 채팅이 "Vibe Helper 도구를 쓸 수 없다"고 하면 창을 다시 로드해야 합니다.
+- **Kiro 채팅이 선택을 묻지 않고 "워크플로우로 구현"할 때**: Kiro 설정의 Workflows(`kiroAgent.workflows.enabled`)가 켜져 있으면 Kiro가 구현을 별도 작업으로 넘길 수 있고, 그 작업은 선택을 묻지 못합니다. Hello Vibe는 채팅에서 직접 만들게 안내하지만, 계속 그러면 명령 팔레트의 **Disable Workflows**로 끄고 새 세션에서 시작합니다.
 - **VSIX가 설치되지 않을 때**: Mac은 `darwin-arm64`, Windows는 `win32-x64` 파일인지 확인합니다.
 
 해결되지 않으면 [GitHub 이슈](https://github.com/Hello-KU-tty/core/issues)에 운영체제, Kiro 버전(Help → About), `kiro-cli --version` 결과, 확장 버전, 화면의 오류 문구를 적어 주세요. 로그인 정보, 토큰, 대화 원문은 붙이지 마세요. 문제를 풀려고 프로젝트 폴더나 기록을 지울 필요는 없습니다.
