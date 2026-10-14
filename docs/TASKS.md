@@ -293,6 +293,26 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
     - 패널 없는 창의 Core 시작, 절전 뒤 유예, `FAILED` 뒤 다시 시도는 실제 화면으로 만들 수 없어 단위 테스트로만 확인했다(frontend 확장이 활성화 때 패널을 연다).
     - Workflow 위임 방지의 효과는 Windows 확인 9·14가 판정한다.
 
+### [ ] K19. Mac·Windows의 Node 포함 방식 맞추기 (본선 뒤 판단)
+
+- **출처:** 사용자 질문(2026-10-14): Mac VSIX는 Node를 넣고 Windows는 내려받는 이유. 사용자 결정: 어느 쪽으로 맞출지는 본선 뒤에 정한다.
+- **배경:**
+  - Windows는 Kiro 런타임(`ELECTRON_RUN_AS_NODE`)을 빌려 쓰는 전제로 Node를 넣지 않았다([DECISIONS](DECISIONS.md) 2026-09-23 "Windows 우선 확장 설치와 런타임 재사용"). VSIX는 2.6MB다.
+  - Mac은 공식 Node 24.19.0을 넣었다(2026-09-29 "Mac 배포용 VSIX", VSIX 41MB).
+  - 본선 Kiro-native에서 Kiro 런타임 후보가 빠졌다(Core가 자기 실행 파일을 hook·MCP 명령에 씀). K18에서 PATH의 Node도 뺐다.
+  - 그래서 지금은 모든 Windows 설치가 첫 실행 때 nodejs.org에서 `node.exe`(약 90MB)를 내려받는다. nodejs.org가 막힌 망에서는 Core가 시작하지 않는다(`RUNTIME_DOWNLOAD_UNAVAILABLE`).
+- **고를 안(본선 뒤 판단):**
+  1. **Windows에도 넣기:** Windows 포장(`build-portable-core.mjs win32-x64`)에 해시를 고정한 공식 `node.exe`와 라이선스를 넣는다. `acquireCoreNode`의 Windows 경로를 Mac처럼 설치물에서 검증·복사하게 바꾼다. 오프라인 첫 실행이 되고 외부 의존이 줄지만, VSIX가 30~40MB로 커진다.
+  2. **Mac에서도 빼기:** Mac 포장에서 `bin/node`를 빼고, Mac 관리 Node를 Windows처럼 공식 배포본에서 해시를 고정해 내려받게 한다. VSIX가 작아지지만, Mac도 첫 실행에 인터넷이 필요하다.
+  - 어느 쪽이든 0.2.10 이하가 만든 캐시(`runtime-cache`)와의 관계를 정하고, 시작 전에 DECISIONS를 고친다.
+- **완료 조건(고른 안 기준):**
+  - 첫 실행(1번은 오프라인, 2번은 내려받기)
+  - 기존 캐시가 있는 설치의 업그레이드
+  - 변조 거절(runtime unit, `test-portable-core.mjs`·`test-macos-package.mjs`)
+  - 두 플랫폼 VSIX 크기 측정
+  - 바뀐 플랫폼의 빌드와 확인 1~8
+- **그때까지:** 부스·시연용 Windows PC는 행사 전에 한 번 실행해 관리 Node 캐시를 만들어 둔다.
+
 ## 3. 예선 작업 요약
 
 상세 기록은 [예선 작업 기록](archive/preliminary/TASKS_PRELIMINARY.md)에 있다.
