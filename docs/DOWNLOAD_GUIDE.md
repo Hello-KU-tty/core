@@ -17,9 +17,9 @@ Hello Vibe 계정이나 API 키는 없습니다. Node.js, pnpm 같은 개발 도
 | 운영체제 | 설치 파일 |
 | --- | --- |
 | Mac (Apple Silicon) | **[0.2.10 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/kiro-native/builder-helper-agent-panel-0.2.10-darwin-arm64.vsix)** (약 40MB) |
-| Windows (x64) | **[0.2.7 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/windows/kiro-native/builder-helper-agent-panel-0.2.7-win32-x64.vsix)** (약 2.5MB) |
+| Windows (x64) | **[0.2.10 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/windows/kiro-native/builder-helper-agent-panel-0.2.10-win32-x64.vsix)** (약 2.5MB) |
 
-링크를 누르면 `.vsix` 파일이 바로 내려받아집니다. Windows용 0.2.10은 준비 중입니다. 0.2.7에는 아래 4단계 8번의 "다음 한 걸음" 카드, 새 채팅 세션 자동 열기, "내가 고른 게 아니야" 되돌리기가 없고, 나머지 흐름은 같습니다. 새 파일이 올라오면 [Windows 설치 파일 폴더](../releases/windows/kiro-native/)에서도 받을 수 있습니다.
+링크를 누르면 `.vsix` 파일이 바로 내려받아집니다. [Windows 설치 파일 폴더](../releases/windows/kiro-native/)에서도 받을 수 있습니다.
 
 <details>
 <summary>파일이 온전한지 확인하기 (선택)</summary>
@@ -27,7 +27,7 @@ Hello Vibe 계정이나 API 키는 없습니다. Node.js, pnpm 같은 개발 도
 | 파일 | SHA-256 |
 | --- | --- |
 | Mac 0.2.10 | `a7dc53d4acd27df203f62c774c1a8acd0b747ef85630c15c99735a636bdff510` |
-| Windows 0.2.7 | `66bb080ee62e58bf1cdfc58d7a36a7088ed7831d4ed5b4943aef93a6c7393c04` |
+| Windows 0.2.10 | `6682973aad3c5cc3119d135f6786c28792ad5518fdc27c9d597afb7bf15126b9` |
 
 Mac 터미널:
 
@@ -38,7 +38,7 @@ shasum -a 256 ~/Downloads/builder-helper-agent-panel-0.2.10-darwin-arm64.vsix
 Windows PowerShell:
 
 ```powershell
-Get-FileHash "$env:USERPROFILE\Downloads\builder-helper-agent-panel-0.2.7-win32-x64.vsix"
+Get-FileHash "$env:USERPROFILE\Downloads\builder-helper-agent-panel-0.2.10-win32-x64.vsix"
 ```
 
 빌드 출처와 파일별 해시는 [Mac receipt](../releases/macos/kiro-native/macos-vsix-receipt.json), [Windows receipt](../releases/windows/kiro-native/windows-vsix-receipt.json)에 있습니다.
@@ -76,7 +76,7 @@ irm https://cli.kiro.dev/install.ps1 | iex
 3. 다시 로드하라는 안내가 나오면 따릅니다.
 4. 왼쪽 막대의 **Agent Panel** 아이콘을 누릅니다. 패널이 로컬 Core에 자동으로 연결됩니다.
 
-Windows에서 Node.js 24가 없으면 첫 실행 때 Hello Vibe가 Node.js 24.19.0을 내려받아 무결성을 확인한 뒤 씁니다.
+Windows에서는 첫 실행 때 Hello Vibe가 Node.js 24.19.0을 내려받아 무결성을 확인한 뒤 씁니다. PC에 설치된 Node.js는 쓰지 않습니다.
 
 ## 4. 첫 프로젝트 만들기
 
@@ -149,7 +149,7 @@ pnpm panel:pack:macos <program 폴더>          # Mac
 pnpm panel:pack:kiro-windows <program 폴더>   # Windows
 ```
 
-결과는 core 폴더의 `dist/`에 생깁니다. 0.2.9의 패널(다음 한 걸음 카드, 빌더 탭 정리, 남은 시간 표시)은 program의 `feat/k17-panel` 브랜치에 있고, `main`에 합쳐지기 전까지는 그 브랜치로 빌드합니다. Windows 빌드와 확인 절차는 [본선 인계 문서](FRONTEND_KIRO_NATIVE_HANDOFF.md#windows에서), 저장소 검증은 [README](../README.md#개발-환경과-검증)에 있습니다.
+결과는 core 폴더의 `dist/`에 생깁니다. program은 `main`으로 빌드합니다. Windows 빌드와 확인 절차는 [본선 인계 문서](FRONTEND_KIRO_NATIVE_HANDOFF.md#windows에서), 저장소 검증은 [README](../README.md#개발-환경과-검증)에 있습니다.
 
 ## 예선 설치물
 

@@ -17,6 +17,8 @@
 
 ## Windows 0.2.10 빌드 요청 (frontend)
 
+**완료(2026-10-15):** 확인 1~20 중 16을 뺀 모두 통과, 21은 해당 없음. [0.2.10 Windows 확인](#0210-windows-확인-2026-10-15)
+
 backend가 Windows 0.2.9 확인의 세 건을 고쳐 Mac 0.2.10을 만들고 실제 Kiro에서 확인했다([0.2.10 확인](#0210-확인-2026-10-14-mac)). Windows 0.2.9는 올리지 않고 0.2.10으로 건너뛴다. 할 일과 추가 확인 18~21은 [0.2.10 프론트 인계](FRONTEND_HANDOFF_0.2.10.md)에 있다. 확인 1~17은 아래 0.2.9 요청의 목록을 그대로 쓴다. program은 `main`(`324214e`) 그대로 빌드한다. 버전은 `0.2.10`으로 나온다.
 
 ## Windows 0.2.9 빌드 요청 (frontend)
@@ -260,6 +262,47 @@ host API 형식은 [`examples/kiro-panel/src/frontend-host.d.cts`](../examples/k
 - Helper 답 수집은 Kiro 세션 기록 파일(비공개 형식)에 기대며, 못 읽으면 안내 문구로 기록한다.
 - 지원 플랫폼은 Apple Silicon Mac과 Windows x64다. 그 밖의 플랫폼에서는 host가 `KIRO_NATIVE_HOST_PLATFORM_UNSUPPORTED`로 시작하지 않는다. Windows는 0.2.7에서 실기기 확인 1~10을 했다.
 - Kiro는 최소 버전(VS Code 엔진 `^1.131.0`, 확인한 가장 오래된 Kiro 1.2.37)만 두고 최신판을 따라간다. 자동 업데이트되면 확인 루틴을 다시 돌린다. 데모 기기는 확인한 버전에서 자동 업데이트를 끈다. 1.2.4 → 1.2.37 → 1.2.56(2026-10-09)으로 바뀌었다. Builder 채팅 단계는 1.2.37에서, Helper 탭·hook 기록·도구 허용은 1.2.56에서 확인했다.
+
+## 0.2.10 Windows 확인 (2026-10-15)
+
+frontend가 Windows 11 x64(10.0.26200, Node 24.19.0, pnpm 11.13.1)에서 backend `main` `320c6aa`과 program `main` `324214e`로 빌드했다. 두 checkout 모두 깨끗했다. 결과는 2,604,187 bytes, SHA-256 `6682973aad3c5cc3119d135f6786c28792ad5518fdc27c9d597afb7bf15126b9`, 75 entries다.
+
+- **자동 검사(Windows):** program typecheck 통과, `npm test` 838 통과. backend unit 179 통과·1 skip, integration 552 통과·15 skip, 패널 CJS 193 통과·1 skip.
+- **실제 Kiro 환경:** Kiro 1.2.56, kiro-cli 2.29.0, 0.2.9에서 업그레이드, `kiroAgent.workflows.enabled: true` 그대로, 미리 승인, 모델 Auto. 새 폴더 `win-0.2.10`, 처음 보는 목표(롤 챔피언 백과사전).
+- **계정 한도:** 첫 계정이 첫 Builder 턴 끝에 월 사용량 한도(`UsageLimitReachedError`)에 걸렸다. 그래서 그 턴은 `finish_task` 없이 끝났다. 다른 계정으로 로그인한 뒤 "작업 마무리해 줘"로 이어 갔다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 1~8 | 통과. 0.2.10 설치 뒤 `vibe-helper Connected (5 tools)`, hook 2개 |
+| 9 | 통과. 후속 Task에서 `ask_choice`(22:16:51) → "1번, 통일성 있잖아" → 학습자 선택으로 확정, 발언 1개 연결 → `APPLIED`. 첫 Task(Workflow 켬)는 `run_workflow` 없이 채팅에서 만들었지만 선택을 묻지 않았다(`ask_choice` 0회) |
+| 10 | 통과. 첫 Task 뒤 후속 Task 2개가 `COMPLETED`(22:22:23, 22:27:59). 확인 14에 쓴 네 번째 Task는 기록 시점에 `ACTIVE` |
+| 11 | 통과. `TASK_COMPLETED` 22:09:43 → Next Move `SUCCEEDED` 22:09:54(11초), 후보 3개 |
+| 12 | 통과. 채팅에 같은 후보를 번호로 전함 → "2번 해 보자"로 후속 Task, 카드 사라짐 |
+| 13 | 통과. 신뢰 → 다시 로드 뒤 새 세션이 저절로 열림, 적용값 Autopilot |
+| 14 | 통과. 답(22:51:04 확정) → "그건 내가 고른 게 아니야"(22:51:08, 턴 `interrupted`) → 이의 기록, 같은 질문이 새 Decision으로 다시 열림(22:51:15) → 곁가지 질문은 기록 없이 다시 물음 → 답으로 확정(22:51:57) |
+| 15 | 통과. Cancel로 멈춘 턴이 `BUILDER_CHAT_TURN`(`interrupted: true`, 22:24:23.884)으로 다음 발언(22:24:23.890)보다 먼저 기록됨 |
+| 16 | **실패.** 서버는 유지된다. 하지만 Builder가 `Start-Process "http://localhost:5173"`처럼 주소를 따옴표로 감싸 미리 승인 패턴 `Start-Process http://localhost:*`과 맞지 않았다. `(Invoke-WebRequest -Uri "http://localhost:5173" -UseBasicParsing).StatusCode`도 같은 이유로 승인 창이 떴다. 첫 승인 창은 14:54에 떠 15:20에 허용될 때까지 27분 동안 턴을 멈췄다. 세 번째 Task 뒤에는 브라우저를 열지 않았다 |
+| 17 | 통과. `/` 메뉴에 `/vibe-helper` 하나(나머지는 Kiro 기본 하위 에이전트). 빌더 탭 순서가 맞음. 터미널이 채팅 자리로 바뀐 것은 0.2.7이 옮긴 배치가 남아 있었기 때문이다. 0.2.9 설치 때 "원래 배치로 되돌리기" 안내가 한 번 떴지만 적용되지 않았다(`vibeHelper.layoutRepairOffered: true`). View: Reset View Locations 뒤에는 정상 |
+| 18 | 통과. Core와 bridge가 `vibe-helper-core.exe`, Project의 `mcp.json` `command`와 hook 명령도 같은 파일 |
+| 19 | 통과. `Get-Process -Name node \| Stop-Process -Force`와 `taskkill /IM node.exe /F`로 node 27개 종료. Core(29716)와 bridge(28420)는 PID 그대로. 이어서 채팅의 `check_progress` 성공(22:36:40) |
+| 20 | 통과. Core를 PID로 끄면 새 Core가 7초 만에 떴다. 다시 로드 뒤에는 8.2초였고, 두 경우 모두 bridge는 그대로였다. 절전 5분 5초(22:39:00~22:44:05) 뒤에도 Core와 bridge가 같은 PID로 살아 있었다 |
+| 21 | 해당 없음. 서버를 끄는 명령이 나오지 않았다 |
+
+**0.2.9 사건 질문에 대한 답**
+
+1. **승인 창:** 11:51:43 `Start-Process -NoNewWindow -FilePath "node" …`와 11:52:02 `Get-Process -Name "node" … \| Stop-Process -Force` 모두 `pending_interaction`(`tool_approval`)이 떴다. 각각 11:51:46·11:52:05에 "Allow"(한 번)로 풀렸다. 사용자·작업 공간 `permissions.yaml`에 `Stop-Process`·`Get-Process` match는 없다. 즉 승인 규칙은 의도대로 동작했고, 사람이 허용했다.
+2. **절전:** Windows 이벤트 로그(Kernel-Power 506/507) 기준이다. 13:08:33 Modern Standby 진입 → 13:23:27 잠깐 깨었다 다시 진입 → 14:40:36 깨어남. Core는 13:23:28에 종료했다. 14:47 패널 문구는 기억하지 못한다.
+3. **확인 15:** 0.2.9 때 Cancel을 눌렀는지는 기억하지 못한다. 0.2.10에서는 눌렀고 위 15처럼 기록됐다.
+
+**새로 발견한 것**
+
+- **한글 인자 이중 이스케이프(backend 확인 요청):** Builder가 MCP 도구 인자의 한글을 `능력…`처럼 이스케이프된 글자 그대로 보낸다.
+  - `ask_choice`: 두 번 모두 `question`·`reasonRequiredNow`·`recommendationRationale`이 그렇게 저장됐다. 그래서 패널 "Kiro 채팅이 답을 기다려요"와 결정 상자에 그대로 보인다. 같은 호출의 선택지 이름·설명은 정상 한글이었다.
+  - `save_progress`(22:46:20): 인자 전체가 이스케이프된 채 `summary` 하나에 들어가 `kind` 검증 오류가 났다.
+  - Core가 이런 문자열을 다시 쓰라는 오류로 돌려주거나 풀어서 저장하는 방안을 검토해 주세요.
+- **말로 바꾼 선택:** 완료된 Task 뒤 "버튼 방식으로 바꿔볼래. 버튼이 한 번 클릭으로 볼 수 있어서"는 Decision 변경이 아니라 새 후속 Task로 처리됐다. 의도한 동작인지 확인이 필요하다.
+- **배치 되돌리기(frontend):** "원래 배치로 되돌리기" 안내는 한 번만 뜬다. 놓친 학습자를 위해 명령 팔레트 명령으로 다시 열 수 있게 하는 것을 검토한다.
+- **크레딧:** 첫 계정 약 4.5(한도 도달), 두 번째 계정 약 14.8.
 
 ## 0.2.10 확인 (2026-10-14, Mac)
 
