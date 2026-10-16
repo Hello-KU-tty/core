@@ -465,11 +465,11 @@ Builder Agent:
 
 Kiro 채팅 Builder(본선, K10). 학습자의 Kiro Agent가 쓰는 도구로, 연결이 Project·Task·correlation을 정하고 Core가 버전을 채우므로 Agent는 식별자·멱등키·버전을 보내지 않는다. Core 명령은 `BUILDER_CHAT_*`다.
 
-- `check_progress`: Task, 수락 기준, 열린 선택(번호 선택지)
+- `check_progress`: Task, 수락 기준, 확정 Spec의 개념 이름(`conceptNames`, K22), 열린 선택(번호 선택지)
 - `save_progress`: 계획·방향 변경·오류 뒤 계획·검증 시작 메모. 첫 쓰기에서 Core가 Task를 시작하고 `TASK_STARTED`를 기록한다
 - `ask_choice`: 실제 Decision 기록(2~4개 선택지, 추천 번호)
 - `save_choice`: 학습자가 고른 안만 기록. Core가 직전 확정(첫 Decision이면 Task 시작) 이후 같은 Task의 Builder·Helper 탭 학습자 발언 최근 20개를 연결하고, 질문 뒤 Builder 탭 발언이 있는지와 분명한 번호 답과의 모순만 검증한다. 바뀐 선택은 같은 질문을 새 Decision으로 다시 열어 확정한다
-- `finish_task`: 보고를 먼저 검증한 뒤 Decision 적용, `TASK_COMPLETED` 맥락, 완료를 한 번에 처리
+- `finish_task`: 보고를 먼저 검증한 뒤 Decision 적용, `TASK_COMPLETED` 맥락, 완료를 한 번에 처리. 보고의 개념은 확정 Spec(제외 영역 빼고)에 있는 이름만 개념 사용으로 기록하고, 나머지는 `ignoredConcepts`로 돌려준다
 
 입력은 MCP 경계(`apps/mcp-server`)에서 엄격한 schema 앞에 한 번 다듬는다(K20). 모델이 입력을 JSON 한 단계 더 깊게 쓴 경우만 고친다.
 - 모든 비 ASCII 글자가 `\uXXXX`로 적힌 ASCII 문자열은 풀어서 저장한다.

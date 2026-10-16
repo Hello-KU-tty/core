@@ -1,5 +1,33 @@
 # 결정 기록
 
+## 본선: 사용자 Windows 0.2.11 실사용 후속 — npm 설정, 승인 창, 개념 이름, Spec 예상 Decision(K22)
+
+- **맥락(사용자 Windows 0.2.11 실사용 2회, 2026-10-16, 본선 계정):**
+  - 실시간 채팅 앱과 뽀모도로 타이머(후속 Task 1개 포함)를 만들었다. Windows의 Codex가 세션 기록, Core DB와 로그를 묶어 넘겼다([분석](../tests/eval/results/kiro-windows-trial-k22.md)).
+  - 사용자가 함께 말한 것:
+    1. 예상 Decision이 나올 만한데도 Spec이 정하지 않는다.
+    2. 새 창을 연 뒤 Core 연결까지 약 30초가 걸린다.
+    3. 빌더·도우미·학습 기록 탭 정리가 필요하다(frontend 몫).
+    4. 처음 쓰는 사람은 맨 처음 무엇을 입력할지 모른다. "ㄱㄱ" 한 번이면 되는데, 진행 방식 안내를 왼쪽 패널에 두면 좋겠다(frontend 몫).
+    5. Next Move 주제마다 버튼을 누르면 프롬프트가 들어가거나, 적어도 "~라고 입력해 보세요"가 있으면 좋겠다. Task로 바로 추가하고 "ㄱㄱ"만 치게 할지는 더 고민하자.
+- **로그에서 찾은 것:**
+  - 두 첫 Task 모두 코드 전에 실제 선택을 물었다(본선 계정·Windows). 하나도 묻지 않은 앞선 Windows 세 번은 frontend 계정이었다.
+  - 승인 창 8개. 버전 확인 식 1개(K21이 이미 고침), `| Out-String` 3개, 괄호·`try` 서버 확인 2개, npm 오류 우회용 `$env:` 대입 2개.
+  - npm이 Project 터미널에서 실행되지 않았다. Vibe Helper가 터미널 환경에 user·global npm 설정을 같은 빈 파일로 넣었고, npm 11은 같은 파일을 두 번 읽으면 시작하지 않는다(이 Mac의 npm 11.17.0으로 재현).
+  - 완료 보고의 개념 이름이 Spec 개념 이름과 글자가 달라 기록되지 않았다. 타이머 Project는 개념 기록이 0개였고, 이 Mac의 10/9 이후 완료 16건 중 9건도 0개였다. 학습 기록 탭이 비는 원인이다.
+  - Builder가 종료 코드 1인 설치를 "설치가 됐어요"라고 말했다.
+- **결정(사용자 지시 "자체적으로 계획 세워서 작업하고 0.2.12 빌드까지", 2026-10-17):**
+  1. **npm 설정 파일 분리:** global 설정은 새 빈 파일 `empty-global.npmrc`를 쓴다. user 설정은 그대로 `empty.npmrc`다.
+  2. **미리 승인 추가:** `Out-String`(인자 없이)과 따옴표로 시작하는 `Invoke-WebRequest`·`Invoke-RestMethod` 주소(이 컴퓨터만)를 더한다. 0.2.11 규칙은 인식 목록에 넣어 업그레이드 때 바뀐다. 괄호·`try`·변수 대입은 계속 묻는다. `Out-String *`은 괄호 안 명령을 받을 수 있어 넣지 않는다.
+  3. **개념 이름:** `check_progress`가 확정 Spec의 개념 이름(`conceptNames`, 학습 목표·에이전트 지원)을 돌려준다. `finish_task` 도구 설명과 Steering 0.9.4가 그 이름을 그대로 쓰게 한다. 다른 이름은 지금처럼 거절하지 않고 기록하지 않는다(`ignoredConcepts`).
+  4. **Steering 0.9.4:** 위 3번, Windows 서버 확인은 승인 없이 도는 한 줄(`Invoke-WebRequest http://localhost:<port> -UseBasicParsing | Select-Object -ExpandProperty StatusCode`), 종료 코드가 0이 아니면 실패로 말하기.
+  5. **Spec 예상 Decision(Discovery 1.5.0 후보)은 채택하지 않는다.** 처음 보는 목표 10개로 시험했다. 실제 갈림길 예고가 1개에서 14개로 늘었지만, 문구를 두 번 다듬어도 약한 질문(자료구조 고르기, 화면 모양, 응답 코드)이 Spec 10개에 4개 남았다. 예상 Decision은 Builder가 반드시 묻기 때문에, "교육용 퀴즈를 만들지 않는다"를 우선해 1.4.0을 유지한다. 결과와 문구는 [시험 기록](../tests/eval/results/discovery-spec-decisions-1.5.0-candidate.md)에 있다. 예고가 없어도 Builder는 첫 Task에서 실제 선택을 물었다(Windows 2/2, Mac 16/16).
+  6. **새 창 연결 지연:** backend 변경은 없다. 원인은 Kiro 확장 호스트 시작(우리 확장 활성화까지 19초, 그사이 호스트가 응답 없음)과 신뢰 → 다시 로드다. 첫 창은 약 10초였다. 우리 확장은 `extensionDependencies: ["kiro.kiroAgent"]` 때문에 Kiro 에이전트 전용 호스트에 함께 놓인다. 의존을 빼는 것은 활성화 순서를 바꾸므로 본선 뒤 frontend와 확인한다.
+  7. **frontend 몫(인계):** 탭 정리, 첫 화면 진행 안내, Next Move 카드의 입력 예시와 복사 버튼. Kiro 채팅 입력칸을 채우는 공개 명령은 없다(실측 probe가 쓰는 `kiroAgent.sessions.sendPrompt`는 비공개 개발용 명령이다). 학습자가 쓰지 않은 발언이 학습자 발언으로 기록되면 안 되므로 자동 입력·전송은 하지 않는다.
+  8. **Next Move를 Task로 바로 추가하기:** 사용자가 더 고민하기로 했다. 결정을 미룬다.
+- **검증:** Node 24.19.0 `pnpm typecheck` 통과, unit 177 통과·3 skip, integration 563 통과·9 skip(새 테스트 2개), eval 47 통과·1 skip, 패널 CJS 192 통과·2 skip. kiro-cli 판정기: 사용 기록의 승인 창 명령과 위험 형태 25개, 예전 목록 113개(판정 변화 없음).
+- **위험:** Builder가 Steering과 달리 괄호·`try` 서버 확인을 또 쓰면 승인 창이 남는다. 개념 이름을 다르게 쓰면 그 개념은 여전히 기록되지 않는다.
+
 ## 본선: Windows 0.2.11 확인 후속 — 다음 설치물 0.2.12, 첫 턴 버전 확인 명령(K21)
 
 - **맥락(frontend Windows 0.2.11 확인, 2026-10-16, core `1ac4b8d`):**

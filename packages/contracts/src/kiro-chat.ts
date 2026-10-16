@@ -221,6 +221,11 @@ export const builderChatProgressSchema = z.strictObject({
     )
     .max(10),
   omittedOpenChoiceCount: z.int().nonnegative(),
+  /**
+   * The confirmed plan's concept names (learner focus and agent support). `finish_task` records
+   * a concept only under one of these names (K22: other wording was dropped as ignoredConcepts).
+   */
+  conceptNames: z.array(labelSchema).max(60),
   lastNote: nonEmptyTextSchema.optional(),
   /** Present once the Task is finished: suggestions to grow the project, or their state. */
   nextMove: nextMoveViewSchema.optional(),

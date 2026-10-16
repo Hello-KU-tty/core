@@ -4423,6 +4423,13 @@ export class ApplicationService {
         }
       }),
       omittedOpenChoiceCount: Math.max(0, open.length - 10),
+      conceptNames: [
+        ...new Set(
+          aggregate.learningSpec.scope
+            .filter((item) => item.category !== 'EXCLUDED')
+            .flatMap((item) => item.conceptNames),
+        ),
+      ].slice(0, 60),
       ...(aggregate.liveContext === null ? {} : { lastNote: aggregate.liveContext.currentGoal }),
       ...(aggregate.task.status === 'COMPLETED'
         ? {

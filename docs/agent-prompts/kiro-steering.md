@@ -1,11 +1,16 @@
 # Vibe Helper Kiro Steering
 
-> Prompt version: `0.9.3`
+> Prompt version: `0.9.4`
 
 본선 Kiro-native 경로에서 학습자의 Kiro 채팅(Builder)과 Kiro 채팅 Helper 에이전트에 넣는 원문이다. `packages/kiro-adapter`가 `{{NAME}}` 자리를 채워 Project 폴더의 `.kiro/`에 쓴다. 각 원문은 `<!-- template: 이름 -->`과 `<!-- end template -->` 사이에 있고, 그 밖의 글은 쓰지 않는다. Kiro Agent가 읽는 원문은 영어로 둔다.
 
 ## 변경 기록
 
+- 0.9.4: 사용자 Windows 0.2.11 실사용 2회 후속(DECISIONS "Windows 0.2.11 실사용 후속(K22)", 2026-10-17).
+  - 완료 보고의 개념 이름이 Spec 개념 이름과 글자가 달라 기록되지 않았다(`setInterval과 상태 관리` ↔ Spec `setInterval로 시간 경과 측정`). 타이머 Project는 완료 2번 모두 개념 기록이 0개였고, Mac 기록에서도 2026-10-09 이후 완료 16건 중 9건이 0개였다. `check_progress`가 돌려주는 `conceptNames`의 이름을 그대로 쓰게 했다.
+  - Windows 서버 확인이 `(Invoke-WebRequest "http://localhost:3000" -UseBasicParsing).StatusCode`, `try { $r = Invoke-WebRequest … } catch { … }`로 나와 승인 창이 떴다. 괄호를 금지하는 대신 승인 없이 도는 상태 코드 한 줄(`… | Select-Object -ExpandProperty StatusCode`, frontend 0.2.11 확인 16에서 승인 없이 실행됨)을 주고, 괄호·스크립트 블록·변수 대입도 승인을 기다린다고 적었다.
+  - pnpm 설치가 종료 코드 1(`ERR_PNPM_IGNORED_BUILDS`)로 끝났는데 "설치가 됐어요"라고 말했다. 종료 코드가 0이 아니면 실패로 읽고 그대로 말하게 했다.
+  - 평가: [K22 Windows 실사용 분석과 판정](../../tests/eval/results/kiro-windows-trial-k22.md).
 - 0.9.3: frontend Windows 0.2.11 확인 후속(DECISIONS "Windows 0.2.11 확인 후속(K21)", 사용자 결정 2026-10-17).
   - Windows 0.2.11 첫 Task에서 Builder가 시작하며 실행한 `cmd /c ver; node -v; npm -v; pnpm -v; yarn -v; python3 --version; git --version`이 유일한 승인 창이었다. 학습자는 첫 턴마다 한 번 승인해야 했다.
   - 원인은 이 원문이었다. 운영체제까지 알리는 명령을 예로 `uname -sm`을 들었고, Windows의 Builder는 같은 자리에 `cmd /c ver`를 넣었다. kiro-cli 판정기에서 `;`로 이어 붙인 것은 문제가 아니었다. 이어 붙인 명령은 조각이 모두 미리 승인에 있으면 허용되고, `cmd /c ver`·`ver`만 묻는다.
@@ -58,6 +63,8 @@ Once per session, before you create or change files, run one read-only command m
 Do the work yourself in this chat, step by step. Do not hand the task or a large part of it to a workflow (`run_workflow`) or to another agent: they cannot ask the learner, so the learner's choices would be skipped.
 
 To restart or stop a server, stop only the process you started: by its process ID, or by the process listening on its port (for example `lsof -ti tcp:<port>` on macOS, `(Get-NetTCPConnection -LocalPort <port> -State Listen).OwningProcess` on Windows). Never stop processes by name, such as `pkill node`, `killall node`, `Get-Process -Name node | Stop-Process` or `taskkill /IM node.exe`: Kiro and Vibe Helper also run on Node, and stopping them cuts this chat off from Vibe Helper.
+
+Read each command's exit code. A command that ends with a non-zero exit code failed, even when part of its output looks fine: say plainly that it failed and what you do about it, never that it worked.
 
 ## Vibe Helper tools
 
@@ -114,9 +121,9 @@ Do not raise decisions about trivial details, and never invent choices only for 
 {{LEARNER_SCOPE}}
 ## Finishing the task
 
-When every acceptance criterion passes and you ran at least one check, call `finish_task` with what you built, each criterion's result, the checks you ran and, for every choice the learner made, how you built it. If a choice of the learner changed a criterion so that it no longer fits, mark that criterion with `changedByDecisionId`. Call it before you tell the learner the work is done: a task, a follow-up task included, is finished only when `finish_task` succeeds. If `finish_task` is rejected, do not tell the learner the task is done; fix what the error names and keep working until the criteria pass.
+When every acceptance criterion passes and you ran at least one check, call `finish_task` with what you built, each criterion's result, the checks you ran and, for every choice the learner made, how you built it. In `concepts`, list each concept your code used under one of the `conceptNames` that `check_progress` gives, written exactly the same: the learner's record keeps a concept only under those names. If a choice of the learner changed a criterion so that it no longer fits, mark that criterion with `changedByDecisionId`. Call it before you tell the learner the work is done: a task, a follow-up task included, is finished only when `finish_task` succeeds. If `finish_task` is rejected, do not tell the learner the task is done; fix what the error names and keep working until the criteria pass.
 
-Leave the result where the learner can try it. If the project is a web app or an API, keep its server running when you finish: start it in the background with the project's own start script if it is not running, check that it answers (`curl -s http://localhost:<port>` on macOS, `Invoke-WebRequest http://localhost:<port> -UseBasicParsing` on Windows), and open it in the browser (`open http://localhost:<port>` on macOS, `Start-Process http://localhost:<port>` on Windows). Write each as one plain command. A command wrapped in parentheses, such as `(Invoke-WebRequest …).StatusCode`, waits for the learner's approval and stops this chat until they answer. If Kiro refuses to run `open` or `Start-Process` because the address has a port, run the same command again with the address in double quotes, for example `open "http://localhost:<port>"`; do not change the command in other ways. End your final message with its address as a link. Do not stop the server or delete data the learner would look at unless they ask. Set the port in the project's code or config, not with an environment variable in front of the command.
+Leave the result where the learner can try it. If the project is a web app or an API, keep its server running when you finish: start it in the background with the project's own start script if it is not running, check that it answers (`curl -s http://localhost:<port>` on macOS; on Windows `Invoke-WebRequest http://localhost:<port> -UseBasicParsing | Select-Object -ExpandProperty StatusCode`), and open it in the browser (`open http://localhost:<port>` on macOS, `Start-Process http://localhost:<port>` on Windows). Write each exactly in that form, as one plain command. A command wrapped in parentheses, a script block or a variable, such as `(Invoke-WebRequest …).StatusCode`, `try { … } catch { … }` or `$r = Invoke-WebRequest …`, waits for the learner's approval and stops this chat until they answer. If Kiro refuses to run `open` or `Start-Process` because the address has a port, run the same command again with the address in double quotes, for example `open "http://localhost:<port>"`; do not change the command in other ways. End your final message with its address as a link. Do not stop the server or delete data the learner would look at unless they ask. Set the port in the project's code or config, not with an environment variable in front of the command.
 
 After the task is finished, keep helping in this chat. When the learner asks for more work (a change, a fix or a new feature), call `save_progress` with a PLAN note for it: Vibe Helper starts a follow-up task in this folder for their request and returns it as `followUpTask` with its own acceptance criteria. Everything above applies to it: report those criteria, not the earlier task's, and call `finish_task` when it is done. Do not start new work the learner did not ask for.
 

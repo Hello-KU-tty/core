@@ -242,7 +242,7 @@ describe('Kiro-native workspace adapter', () => {
   })
 
   it('steers decisions to the moment they arise, recorded before they are asked (since 0.5.0)', () => {
-    expect(templates.version).toBe('0.9.3')
+    expect(templates.version).toBe('0.9.4')
     const scoped = renderLearnerSteering(templates, binding, {
       learnerFocus: [],
       agentSupport: [],
@@ -309,7 +309,7 @@ describe('Kiro-native workspace adapter', () => {
     expect(learner).toContain('`followUpTask`')
   })
 
-  it('keeps the work, its commands and its tool input in the shape Kiro accepts (0.9.1–0.9.3)', () => {
+  it('keeps the work, its commands and its tool input in the shape Kiro accepts (0.9.1–0.9.4)', () => {
     const learner = renderLearnerSteering(templates, binding)
     // 0.9.1: no workflow hand-off and no stopping processes by name.
     expect(learner).toContain('Do not hand the task or a large part of it to a workflow')
@@ -320,17 +320,24 @@ describe('Kiro-native workspace adapter', () => {
     expect(learner).toContain('Do not write a temporary version of that code first')
     expect(learner).toContain('refer to them in the third person in any language')
     // 0.9.2: plain commands that the pre-approval matches, and tool input one JSON level deep.
-    expect(learner).toContain('Write each as one plain command.')
-    expect(learner).toContain('`(Invoke-WebRequest …).StatusCode`, waits for the learner')
+    expect(learner).toContain('Write each exactly in that form, as one plain command.')
+    expect(learner).toContain('such as `(Invoke-WebRequest …).StatusCode`, `try { … } catch')
     expect(learner).toContain('Do not say that it is yours to decide')
     expect(learner).toContain('run the same command again with the address in double quotes')
-    expect(learner).toContain('`Invoke-WebRequest http://localhost:<port> -UseBasicParsing`')
+    // 0.9.4 (Windows 0.2.11 trial): the Windows status check is the pipeline the pre-approval
+    // allows, not a parenthesized command, a script block or a variable.
+    expect(learner).toContain(
+      '`Invoke-WebRequest http://localhost:<port> -UseBasicParsing | Select-Object -ExpandProperty StatusCode`',
+    )
     expect(learner).toContain('never as `\\u` escapes and never as JSON text inside a string')
     // 0.9.3 (Windows 0.2.11): the first environment check is only version flags, which the
     // pre-approval allows even chained; `cmd /c ver` was the one approval prompt of the first turn.
     expect(learner).toContain('run one read-only command made only of version checks')
     expect(learner).toContain('such as `cmd /c ver`, `ver` or `systeminfo`')
     expect(learner).not.toContain('uname -sm')
+    // 0.9.4: concepts under the plan's own names, and a non-zero exit code is a failure.
+    expect(learner).toContain('under one of the `conceptNames` that `check_progress` gives')
+    expect(learner).toContain('A command that ends with a non-zero exit code failed')
   })
 
   it('fails closed on a missing, duplicated or unfilled steering template', () => {
@@ -658,9 +665,9 @@ describe('Kiro-native workspace adapter', () => {
     expect(fresh.text).toContain('      - open *@*\n')
     expect(fresh.text).toContain('      - curl -s -X POST http://localhost:*\n')
     expect(fresh.text).toContain('      - lsof *\n')
-    // 0.2.7–0.2.8 wrote the same rule without the browser commands (nor the K20 quoted forms).
+    // 0.2.7–0.2.8 wrote the same rule without the browser commands (nor the K20 and K22 forms).
     const browser =
-      /^ {6}- (open|Start-Process|start|lsof|curl(\.exe)? (-s )?(-X |["'])|Invoke-(WebRequest|RestMethod) -Uri )/
+      /^ {6}- (open|Start-Process|start|lsof|curl(\.exe)? (-s )?(-X |["'])|Invoke-(WebRequest|RestMethod) (-Uri |["'])|Out-String$)/
     const earlier = fresh.text
       .split('\n')
       .filter((line) => !browser.test(line))
@@ -707,9 +714,9 @@ describe('Kiro-native workspace adapter', () => {
     // Other hosts stay excluded in every form.
     for (const entry of ['open *@*', 'Start-Process *@*', 'curl *@*', 'Invoke-WebRequest *@*'])
       expect(fresh.text).toContain(`      - ${entry}\n`)
-    // 0.2.9–0.2.10 wrote the rule without the quoted forms.
+    // 0.2.9–0.2.10 wrote the rule without the quoted forms (nor the K22 entries).
     const quoted =
-      /^ {6}- ((open|Start-Process|start|curl(\.exe)?( -s)?) ["']|Invoke-(WebRequest|RestMethod) -Uri )/
+      /^ {6}- ((open|Start-Process|start|curl(\.exe)?( -s)?) ["']|Invoke-(WebRequest|RestMethod) (-Uri |["'])|Out-String$)/
     const earlier = fresh.text
       .split('\n')
       .filter((line) => !quoted.test(line))
@@ -732,6 +739,46 @@ describe('Kiro-native workspace adapter', () => {
     expect(upgraded.text).toContain('      - rm -rf dist\n')
     expect(upgraded.text.match(/- lsof \*\n/g)).toHaveLength(1)
     expect(upgraded.text.match(/- Start-Process http:\/\/localhost:\*\n/g)).toHaveLength(1)
+  })
+
+  it('allows Out-String and the quoted Invoke-WebRequest address, and upgrades 0.2.11 (K22)', () => {
+    const fresh = applyKiroCommandApproval(null, 'PREAPPROVED')
+    if (fresh.status !== 'WRITE') throw new Error(fresh.status)
+    for (const entry of [
+      'Out-String',
+      'Invoke-WebRequest "http://localhost:*',
+      "Invoke-WebRequest 'http://127.0.0.1:*",
+      'Invoke-RestMethod "http://localhost:*',
+    ])
+      expect(fresh.text).toContain(`      - ${entry}\n`)
+    // Out-String with arguments could read a parenthesized command, so only the bare name is ours.
+    expect(fresh.text).not.toContain('      - Out-String *\n')
+    // 0.2.11 wrote the rule without the K22 entries.
+    const added = /^ {6}- (Out-String|Invoke-(WebRequest|RestMethod) ["']http)/
+    const earlier = fresh.text
+      .split('\n')
+      .filter((line) => !added.test(line))
+      .join('\n')
+    expect(earlier).toContain('      - Invoke-WebRequest -Uri "http://localhost:*\n')
+    expect(earlier).not.toBe(fresh.text)
+    for (const choice of ['PREAPPROVED', 'UPGRADE'] as const)
+      expect(applyKiroCommandApproval(earlier, choice)).toEqual({
+        status: 'WRITE',
+        text: fresh.text,
+      })
+    expect(applyKiroCommandApproval(earlier, 'MANUAL')).toEqual({
+      status: 'WRITE',
+      text: 'rules: []\n',
+    })
+    // The learner's "always allow" from the Windows trial outlives the upgrade.
+    const merged = earlier.replace(
+      '      - lsof *\n',
+      '      - lsof *\n      - pnpm build 2>&1 | Out-String\n',
+    )
+    const upgraded = applyKiroCommandApproval(merged, 'UPGRADE')
+    if (upgraded.status !== 'WRITE') throw new Error(upgraded.status)
+    expect(upgraded.text).toContain('      - pnpm build 2>&1 | Out-String\n')
+    expect(upgraded.text.match(/- Out-String\n/g)).toHaveLength(1)
   })
 
   it("manual approval removes only the Vibe Helper entries and keeps the learner's own", () => {

@@ -354,7 +354,7 @@ export const KIRO_CHAT_BUILDER_TOOLS: readonly KiroChatToolDefinition[] = [
     name: 'check_progress',
     title: 'Check progress',
     description:
-      'Read the task, its acceptance criteria and the choices still open with numbered options. Call it when you start and whenever you need the decisionId of an open choice. After the task is finished it has nextMove: numbered suggestions to grow the project, or that they are still being generated.',
+      "Read the task, its acceptance criteria, the plan's concept names (conceptNames, the names finish_task records concepts under) and the choices still open with numbered options. Call it when you start and whenever you need the decisionId of an open choice. After the task is finished it has nextMove: numbered suggestions to grow the project, or that they are still being generated.",
     inputSchema: kiroChatTransportSchema(kiroChatCheckProgressToolInputSchema),
     readOnly: true,
     command: () => ({ kind: 'BUILDER_CHAT_CHECK_PROGRESS' }),
@@ -390,7 +390,7 @@ export const KIRO_CHAT_BUILDER_TOOLS: readonly KiroChatToolDefinition[] = [
     name: 'finish_task',
     title: 'Finish the task',
     description:
-      'Finish the task when every acceptance criterion passes and you ran at least one check. Say how each chosen option was built. If it is rejected, keep working until the criteria pass.',
+      'Finish the task when every acceptance criterion passes and you ran at least one check. Say how each chosen option was built. In concepts, name each concept your code used with one of the conceptNames from check_progress, exactly as written; other names are not recorded. If it is rejected, keep working until the criteria pass.',
     inputSchema: kiroChatTransportSchema(kiroChatFinishTaskToolInputSchema),
     readOnly: false,
     command: (input) => ({ kind: 'BUILDER_CHAT_FINISH_TASK', report: withoutToolPurpose(input) }),

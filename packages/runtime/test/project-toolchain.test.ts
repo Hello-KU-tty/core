@@ -49,6 +49,17 @@ describe('generated project tool boundary', () => {
     expect(env.npm_config_userconfig).not.toContain('user.npmrc')
     expect(env.USERPROFILE).not.toBe('C:\\user')
   })
+  it('gives npm separate user and global config files (K22)', () => {
+    // npm 11 stops with "double-loading config … as global, previously loaded as user" when both
+    // name the same file, so every npm command in a Project terminal failed on Windows 0.2.11.
+    const env = projectEnvironment({
+      node: { executable: 'C:\\tools\\node.exe' },
+      privateRoot: 'C:\\tools',
+    } as ProjectToolchain)
+    expect(env.npm_config_userconfig).toMatch(/empty\.npmrc$/)
+    expect(env.npm_config_globalconfig).toMatch(/empty-global\.npmrc$/)
+    expect(env.npm_config_globalconfig).not.toBe(env.npm_config_userconfig)
+  })
   it('rejects unverified archives before decompression or extraction', () => {
     expect(() => unpackPnpm(Buffer.from('not a trusted package'))).toThrow(
       'PNPM_DOWNLOAD_HASH_MISMATCH',

@@ -513,6 +513,33 @@ const K17_SHELL_RULE: KiroAllowRule = {
   exclude: [...K11_SHELL_RULE.exclude, 'open *@*', 'Start-Process *@*', 'start *@*'],
 }
 
+/** The shell rule 0.2.11 wrote (K20). */
+const K20_SHELL_RULE: KiroAllowRule = {
+  capability: 'shell',
+  // K20 (Windows 0.2.10 check 16): Kiro compares the command text as written, and Builders put
+  // the address in quotes (`Start-Process "http://localhost:5173"`) or after `-Uri`. The same
+  // commands with a quoted address of this computer are allowed; other hosts stay excluded. The
+  // parenthesized `(Invoke-WebRequest …).StatusCode` is not one command for Kiro, so Steering
+  // asks for the plain form instead.
+  match: [
+    ...K17_SHELL_RULE.match,
+    ...['localhost', '127.0.0.1'].flatMap((host) => [
+      ...['"', "'"].flatMap((quote) => [
+        ...['open', 'Start-Process', 'start'].map(
+          (command) => `${command} ${quote}http://${host}:*${quote}`,
+        ),
+        ...['curl', 'curl -s', 'curl.exe', 'curl.exe -s'].map(
+          (command) => `${command} ${quote}http://${host}:*`,
+        ),
+      ]),
+      ...['Invoke-WebRequest', 'Invoke-RestMethod'].flatMap((command) =>
+        ['', '"', "'"].map((quote) => `${command} -Uri ${quote}http://${host}:*`),
+      ),
+    ]),
+  ],
+  exclude: K17_SHELL_RULE.exclude,
+}
+
 export const KIRO_PREAPPROVED_RULES: readonly KiroAllowRule[] = [
   {
     capability: 'mcp',
@@ -521,38 +548,33 @@ export const KIRO_PREAPPROVED_RULES: readonly KiroAllowRule[] = [
   },
   {
     capability: 'shell',
-    // K20 (Windows 0.2.10 check 16): Kiro compares the command text as written, and Builders put
-    // the address in quotes (`Start-Process "http://localhost:5173"`) or after `-Uri`. The same
-    // commands with a quoted address of this computer are allowed; other hosts stay excluded. The
-    // parenthesized `(Invoke-WebRequest …).StatusCode` is not one command for Kiro, so Steering
-    // asks for the plain form instead.
+    // K22 (Windows 0.2.11 trial): Windows Builders end a command with `2>&1 | Out-String` to read
+    // all its output, and check the app with `Invoke-WebRequest "http://localhost:3000"` (quoted,
+    // no `-Uri`). `Out-String` alone only turns the piped output into text; with arguments it
+    // could take a value from a parenthesized command, so it is not listed with `*`.
     match: [
-      ...K17_SHELL_RULE.match,
-      ...['localhost', '127.0.0.1'].flatMap((host) => [
-        ...['"', "'"].flatMap((quote) => [
-          ...['open', 'Start-Process', 'start'].map(
-            (command) => `${command} ${quote}http://${host}:*${quote}`,
-          ),
-          ...['curl', 'curl -s', 'curl.exe', 'curl.exe -s'].map(
+      ...K20_SHELL_RULE.match,
+      'Out-String',
+      ...['localhost', '127.0.0.1'].flatMap((host) =>
+        ['"', "'"].flatMap((quote) =>
+          ['Invoke-WebRequest', 'Invoke-RestMethod'].map(
             (command) => `${command} ${quote}http://${host}:*`,
           ),
-        ]),
-        ...['Invoke-WebRequest', 'Invoke-RestMethod'].flatMap((command) =>
-          ['', '"', "'"].map((quote) => `${command} -Uri ${quote}http://${host}:*`),
         ),
-      ]),
+      ),
     ],
-    exclude: K17_SHELL_RULE.exclude,
+    exclude: K20_SHELL_RULE.exclude,
   },
 ]
 
 /**
  * Our rules in the order they are recognized: the current ones first, then what earlier
- * installers wrote (0.2.9–0.2.10, K17; 0.2.7–0.2.8, K11), so an upgrade replaces an earlier rule
- * and manual approval still removes it.
+ * installers wrote (0.2.11, K20; 0.2.9–0.2.10, K17; 0.2.7–0.2.8, K11), so an upgrade replaces an
+ * earlier rule and manual approval still removes it.
  */
 const RECOGNIZED_PREAPPROVED_RULES: readonly KiroAllowRule[] = [
   ...KIRO_PREAPPROVED_RULES,
+  K20_SHELL_RULE,
   K17_SHELL_RULE,
   K11_SHELL_RULE,
 ]

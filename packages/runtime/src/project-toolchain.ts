@@ -282,8 +282,10 @@ export function projectEnvironment(
   env.XDG_DATA_HOME = join(toolchain.privateRoot, 'data')
   env.XDG_STATE_HOME = join(toolchain.privateRoot, 'state')
   env.PNPM_HOME = join(toolchain.privateRoot, 'bin')
+  // Two files: npm 11 refuses to start when the user and global config are the same file
+  // ("double-loading config"), which broke every npm command in Windows Project terminals (K22).
   env.npm_config_userconfig = join(toolchain.privateRoot, 'empty.npmrc')
-  env.npm_config_globalconfig = join(toolchain.privateRoot, 'empty.npmrc')
+  env.npm_config_globalconfig = join(toolchain.privateRoot, 'empty-global.npmrc')
   env.COREPACK_ENABLE_NETWORK = '0'
   env.COREPACK_ENABLE_PROJECT_SPEC = '0'
   env.npm_config_verify_deps_before_run = 'error'
@@ -356,13 +358,11 @@ export async function selectProjectToolchain(options: {
     'bin',
   ])
     await ownedPrivateDirectory(join(root, name))
-  await writeFile(join(root, 'empty.npmrc'), '', { flag: 'wx', mode: 0o600 }).catch(
-    async (error) => {
+  for (const name of ['empty.npmrc', 'empty-global.npmrc'])
+    await writeFile(join(root, name), '', { flag: 'wx', mode: 0o600 }).catch(async (error) => {
       if (error.code !== 'EEXIST') throw error
-      if ((await plainFile(join(root, 'empty.npmrc'), 1)).length !== 0)
-        fail('PROJECT_CONFIG_UNSAFE')
-    },
-  )
+      if ((await plainFile(join(root, name), 1)).length !== 0) fail('PROJECT_CONFIG_UNSAFE')
+    })
   const paths = (process.env.PATH ?? process.env.Path ?? '').split(delimiter).filter(isAbsolute)
   const recorded = await recordedProjectToolchain(root, options.resources)
   let node: CoreRuntimeDescriptor | undefined

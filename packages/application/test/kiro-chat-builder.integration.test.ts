@@ -239,6 +239,8 @@ describe('Kiro chat Builder surface (K10)', () => {
         task: { title: 'Implement event variant viewer', status: 'ACTIVE' },
         acceptanceCriteria: [{ key: 'valid_event' }],
         openChoices: [{ state: 'WAITING_FOR_LEARNER', recommendedNumber: 1 }],
+        // K22: the names finish_task records concepts under, from the confirmed Spec.
+        conceptNames: ['discriminated union'],
       },
     })
   })
