@@ -151,7 +151,7 @@ describe('Kiro binding manager', () => {
     expect(steering).toContain('steering 0.9.2.')
     // 0.7.0: the Spec's agent-support areas reach the Builder, which decides there itself.
     expect(steering).toContain(
-      'Agent support (decide here and state what you chose):\n- Local application shell',
+      'Agent support (choose these yourself; in chat, say only what you chose):\n- Local application shell',
     )
     // K17: `/vibe-helper` is the steering turn only; no Helper agent beside it in Kiro's menu.
     const agentFile = join(first.workspace, '.kiro/agents/vibe-helper.json')

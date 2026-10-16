@@ -227,7 +227,9 @@ describe('Kiro-native workspace adapter', () => {
     expect(scoped).toContain(
       'Learner focus (ask real choices here):\n- 만료되는 공유 링크와 접근 토큰 (link expiry)',
     )
-    expect(scoped).toContain('Agent support (decide here and state what you chose):\n- 화면 꾸미기')
+    expect(scoped).toContain(
+      'Agent support (choose these yourself; in chat, say only what you chose):\n- 화면 꾸미기',
+    )
     expect(scoped).toContain(
       'Expected decisions (ask each when the work reaches it):\n- 공유 링크를 얼마 동안 열 수 있게 할지 정한다.',
     )
@@ -321,6 +323,7 @@ describe('Kiro-native workspace adapter', () => {
     expect(learner).toContain('Write each as one plain command.')
     expect(learner).toContain('`(Invoke-WebRequest …).StatusCode`, waits for the learner')
     expect(learner).toContain('Do not say that it is yours to decide')
+    expect(learner).toContain('run the same command again with the address in double quotes')
     expect(learner).toContain('`Invoke-WebRequest http://localhost:<port> -UseBasicParsing`')
     expect(learner).toContain('never as `\\u` escapes and never as JSON text inside a string')
   })

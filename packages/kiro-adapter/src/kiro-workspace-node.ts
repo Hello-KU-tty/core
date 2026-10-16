@@ -869,7 +869,9 @@ function renderScope(
   const blocks = [
     ...(focus.length > 0 ? [`Learner focus (ask real choices here):\n${focus.join('\n')}`] : []),
     ...(support.length > 0
-      ? [`Agent support (decide here and state what you chose):\n${support.join('\n')}`]
+      ? [
+          `Agent support (choose these yourself; in chat, say only what you chose):\n${support.join('\n')}`,
+        ]
       : []),
     ...(decisions.length > 0
       ? [`Expected decisions (ask each when the work reaches it):\n${decisions.join('\n')}`]
