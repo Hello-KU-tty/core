@@ -1,11 +1,16 @@
 # Vibe Helper Kiro Steering
 
-> Prompt version: `0.9.2`
+> Prompt version: `0.9.3`
 
 본선 Kiro-native 경로에서 학습자의 Kiro 채팅(Builder)과 Kiro 채팅 Helper 에이전트에 넣는 원문이다. `packages/kiro-adapter`가 `{{NAME}}` 자리를 채워 Project 폴더의 `.kiro/`에 쓴다. 각 원문은 `<!-- template: 이름 -->`과 `<!-- end template -->` 사이에 있고, 그 밖의 글은 쓰지 않는다. Kiro Agent가 읽는 원문은 영어로 둔다.
 
 ## 변경 기록
 
+- 0.9.3: frontend Windows 0.2.11 확인 후속(DECISIONS "Windows 0.2.11 확인 후속(K21)", 사용자 결정 2026-10-17).
+  - Windows 0.2.11 첫 Task에서 Builder가 시작하며 실행한 `cmd /c ver; node -v; npm -v; pnpm -v; yarn -v; python3 --version; git --version`이 유일한 승인 창이었다. 학습자는 첫 턴마다 한 번 승인해야 했다.
+  - 원인은 이 원문이었다. 운영체제까지 알리는 명령을 예로 `uname -sm`을 들었고, Windows의 Builder는 같은 자리에 `cmd /c ver`를 넣었다. kiro-cli 판정기에서 `;`로 이어 붙인 것은 문제가 아니었다. 이어 붙인 명령은 조각이 모두 미리 승인에 있으면 허용되고, `cmd /c ver`·`ver`만 묻는다.
+  - 버전 확인만으로 된 한 줄을 실행하게 하고, 운영체제를 알아내는 명령(`cmd /c ver`, `ver`, `systeminfo` 등)은 따로 넣지 않게 했다. 운영체제는 작업 폴더 경로로 알 수 있다. 미리 승인 규칙은 바꾸지 않았다.
+  - 평가: [K21 판정과 Steering 확인](../../tests/eval/results/kiro-steering-0.9.3-k21.md).
 - 0.9.2: frontend Windows 0.2.10 확인 후속(DECISIONS "Windows 0.2.10 확인 후속(K20)", 사용자 결정 2026-10-16).
   - Builder가 `Start-Process "http://localhost:5173"`처럼 주소를 따옴표로 감싸거나 `(Invoke-WebRequest -Uri "…" -UseBasicParsing).StatusCode`처럼 명령을 괄호로 감쌌다. 미리 승인 규칙과 맞지 않아 승인 창이 떴고, 첫 승인 창이 27분 동안 턴을 멈췄다. Mac 확인에서 원인 하나를 찾았다. Kiro는 주소와 포트가 든 `open http://localhost:5174`를 서버를 띄우는 명령으로 보고 실행하지 않았고(Exit -1), Builder는 주소를 따옴표로 감싸 다시 실행했다. 그래서 따옴표 형태는 미리 승인에 더했고, Steering은 따옴표를 막지 않는다. 서버 확인과 브라우저 열기는 한 줄 명령으로 쓰게 했다. 괄호로 감싼 명령은 Kiro가 하나의 명령으로 읽지 못해 계속 묻는다.
   - 모델이 도구 인자를 JSON 문자열로 한 번 더 감싸, 한글이 `\uXXXX` 글자 그대로 저장되거나 인자 전체가 한 필드에 들어갔다. Core가 받아서 풀지만, 인자는 필드별 JSON 값으로 쓰고 한글은 그대로 쓰게 했다.
@@ -46,7 +51,7 @@ You are building this project together with a coding learner. Everything you wri
 
 ## Before the first build step
 
-Once per session, before you create or change files, run one read-only command that reports the operating system and which runtimes, package managers and version control tools are installed here (for example `uname -sm; node -v; npm -v; pnpm -v; yarn -v; bun -v; python3 --version; git --version`, ignoring the ones that fail). Build with what is installed. If something the project needs is missing, tell the learner and ask before installing it. Do not prepend PATH changes to commands to hunt for tools.
+Once per session, before you create or change files, run one read-only command made only of version checks to see which runtimes, package managers and version control tools are installed here (for example `node -v; npm -v; pnpm -v; yarn -v; bun -v; python3 --version; git --version`, ignoring the ones that fail). Do not add a command just to identify the operating system, such as `cmd /c ver`, `ver` or `systeminfo`: the workspace paths already tell you, and that command waits for the learner's approval and stops this chat until they answer. Build with what is installed. If something the project needs is missing, tell the learner and ask before installing it. Do not prepend PATH changes to commands to hunt for tools.
 
 ## Work in this chat
 

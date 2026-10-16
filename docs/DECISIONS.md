@@ -1,5 +1,19 @@
 # 결정 기록
 
+## 본선: Windows 0.2.11 확인 후속 — 다음 설치물 0.2.12, 첫 턴 버전 확인 명령(K21)
+
+- **맥락(frontend Windows 0.2.11 확인, 2026-10-16, core `1ac4b8d`):**
+  - Mac 0.2.11은 program `324214e`, Windows 0.2.11은 `1eefe3f`로 빌드됐다. `1eefe3f`에는 program#11(명령 팔레트 "Vibe Helper: Restore Kiro Layout")과 #12(Core 재연결 뒤 flow 포트 다시 만들기)가 더 있다. frontend는 Mac 재빌드의 버전 번호를 물었다.
+  - 첫 Task의 승인 창은 Builder가 시작하며 실행한 `cmd /c ver; node -v; npm -v; pnpm -v; yarn -v; python3 --version; git --version` 하나였다. 학습자는 첫 턴마다 한 번 승인해야 한다.
+- **확인(2026-10-17, kiro-cli 판정기):** 이어 붙인 것은 원인이 아니다. 조각이 모두 미리 승인에 있으면 이어 붙인 한 줄도 허용된다. `cmd /c ver`·`ver`만 묻는다. Steering 0.9.2가 운영체제까지 알리는 명령을 시키며 `uname -sm`을 예로 들었고, Windows Builder가 같은 자리에 `cmd /c ver`를 넣었다.
+- **결정(사용자 결정, 2026-10-17):**
+  1. **다음 설치물은 0.2.12다.** Mac·Windows 모두 0.2.12로 맞춘다. 같은 0.2.11 번호로 다른 파일을 내지 않는다. program은 `1eefe3f` 이상을 쓴다.
+  2. **빌드는 다른 세션의 작업이 끝난 뒤 한 번에 한다.** 그때 `scripts/package-program.mjs` 버전, Mac VSIX, README·설치 가이드의 링크·SHA-256, 가이드의 "(Windows 0.2.11부터)" 문구를 같이 바꾸고 Windows 0.2.12를 요청한다.
+  3. **Steering 0.9.3:** 첫 환경 확인은 버전 확인만으로 된 한 줄로 한다. 운영체제를 알아내는 명령(`cmd /c ver`, `ver`, `systeminfo` 등)은 따로 넣지 않는다. 작업 폴더 경로로 알 수 있다.
+  4. **미리 승인 규칙은 그대로 둔다.** `cmd /c *`는 넓어 넣지 않는다. `cmd /c ver`·`ver`만 넣으면 0.2.11 규칙을 인식 목록에 더하는 업그레이드가 따라오는데, Steering만으로 같은 효과를 낸다.
+- **검증:** adapter 단위 테스트(0.9.3 문장, `uname -sm` 예시 없음), kiro-cli 판정기([K21 기록](../tests/eval/results/kiro-steering-0.9.3-k21.md)). 실제 Kiro 첫 Task 확인은 0.2.12 빌드 때 Mac 실측과 frontend Windows 확인에서 한다.
+- **위험:** Builder가 Steering과 달리 운영체제 명령을 또 넣으면 승인 창이 그대로 남는다. 학습자가 한 번 승인하면 이어 간다.
+
 ## 본선: Windows 0.2.10 확인 후속 — 한글 이스케이프, 따옴표 주소, 첫 Task 선택, 완료 뒤 바꾼 선택(K20)
 
 - **맥락(frontend Windows 0.2.10 확인, 2026-10-15, Kiro 1.2.56, Workflow 켬):**

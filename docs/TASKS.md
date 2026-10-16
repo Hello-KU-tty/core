@@ -316,7 +316,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
   - 바뀐 플랫폼의 빌드와 확인 1~8
 - **그때까지:** 부스·시연용 Windows PC는 행사 전에 한 번 실행해 관리 Node 캐시를 만들어 둔다.
 
-### [~] K20. Windows 0.2.10 확인 후속: 한글 이스케이프, 따옴표 주소, 첫 Task 선택, 완료 뒤 바꾼 선택
+### [x] K20. Windows 0.2.10 확인 후속: 한글 이스케이프, 따옴표 주소, 첫 Task 선택, 완료 뒤 바꾼 선택
 
 - **출처:** frontend Windows 0.2.10 확인(2026-10-15, [0.2.10 Windows 확인](FRONTEND_KIRO_NATIVE_HANDOFF.md#0210-windows-확인-2026-10-15))의 backend 요청 네 건.
   1. `ask_choice`의 최상위 문자열(`question` 등)이 `\uXXXX` 글자 그대로 저장돼 패널에 보였다. `save_progress`는 인자 전체가 `summary` 하나에 들어가 `kind` 검증 오류가 났다.
@@ -356,6 +356,24 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
     - frontend의 두 PR이 program `main`에 들어오면 Mac을 같은 커밋으로 다시 빌드한다.
     - 담당을 말하는 약한 표현("제가 알아서 정할게요")과 예고한 선택의 코드를 먼저 써 두는 일이 한 번씩 남았다.
     - 완료 뒤 바꾼 선택을 Decision으로 남기는 방안은 본선 뒤 판단한다.
+  - **마감(2026-10-17):** frontend Windows 0.2.11 확인이 통과했다(core `1ac4b8d`, 확인 1~9·13·14·16·22·23·25 통과, 24는 생기지 않음). Mac 재빌드와 남은 요청은 K21이 맡는다.
+
+### [~] K21. Windows 0.2.11 확인 후속: 0.2.12로 두 플랫폼 맞추기, 첫 턴 버전 확인 명령
+
+- **출처:** frontend Windows 0.2.11 확인(2026-10-16, [0.2.11 Windows 확인](FRONTEND_KIRO_NATIVE_HANDOFF.md#0211-windows-확인-2026-10-16))의 backend 할 일 다섯 건.
+  1. Mac을 program `1eefe3f`(program#11 Restore Kiro Layout, #12 재연결 뒤 flow 포트)로 다시 빌드하고 버전 번호를 정한다.
+  2. Mac에서 #11·#12를 실제로 확인한다.
+  3. 설치 가이드 "6. 문제가 생기면"의 "(Windows 0.2.11부터)"를 두 플랫폼에 맞게 고친다.
+  4. (선택) 첫 Task의 유일한 승인 창인 `cmd /c ver; node -v; …`를 줄인다.
+  5. (선택) 본선 뒤로 미룬 것(완료 뒤 바꾼 선택, 0.2.10 이스케이프 기록, Kiro `expected object, received string` 거절, 선택 전 설정 파일)을 기록한다.
+- **결정:** 사용자 결정(2026-10-17, DECISIONS "Windows 0.2.11 확인 후속(K21)"): 다음 설치물은 Mac·Windows 모두 0.2.12, 4번 포함. 빌드는 다른 세션의 작업이 끝난 뒤 한 번에 한다.
+- **완료 조건:** Steering 0.9.3 테스트, 0.2.12 Mac VSIX(program `1eefe3f` 이상)와 포장 검사, Mac에서 #11·#12와 첫 Task 승인 창 확인, README·가이드 링크·SHA-256과 3번 문구, Windows 0.2.12 요청.
+- **진행(2026-10-17):**
+  - **4번 완료:**
+    - kiro-cli 판정기: 이어 붙인 것은 원인이 아니다. 조각이 모두 미리 승인에 있으면 허용되고, `cmd /c ver`·`ver`만 묻는다([K21 기록](../tests/eval/results/kiro-steering-0.9.3-k21.md)).
+    - Steering 0.9.3: 버전 확인만으로 된 한 줄, 운영체제 명령은 따로 넣지 않기. 미리 승인 규칙은 그대로다.
+    - Node 24.19.0: `pnpm typecheck` 통과, unit 177 통과·3 skip, integration 561 통과·9 skip, eval 47 통과·1 skip.
+  - **남은 것(0.2.12 빌드 때):** `scripts/package-program.mjs` 버전 0.2.12, program `1eefe3f` 깨끗한 worktree로 Mac VSIX, 2번 실제 확인, 3번 문구, 실제 첫 Task에서 버전 확인 명령 형태, 5번 기록, frontend 인계와 Windows 0.2.12 요청.
 
 ## 3. 예선 작업 요약
 

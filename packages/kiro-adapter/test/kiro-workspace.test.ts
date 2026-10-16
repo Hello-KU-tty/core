@@ -242,7 +242,7 @@ describe('Kiro-native workspace adapter', () => {
   })
 
   it('steers decisions to the moment they arise, recorded before they are asked (since 0.5.0)', () => {
-    expect(templates.version).toBe('0.9.2')
+    expect(templates.version).toBe('0.9.3')
     const scoped = renderLearnerSteering(templates, binding, {
       learnerFocus: [],
       agentSupport: [],
@@ -309,7 +309,7 @@ describe('Kiro-native workspace adapter', () => {
     expect(learner).toContain('`followUpTask`')
   })
 
-  it('keeps the work, its commands and its tool input in the shape Kiro accepts (0.9.1, 0.9.2)', () => {
+  it('keeps the work, its commands and its tool input in the shape Kiro accepts (0.9.1–0.9.3)', () => {
     const learner = renderLearnerSteering(templates, binding)
     // 0.9.1: no workflow hand-off and no stopping processes by name.
     expect(learner).toContain('Do not hand the task or a large part of it to a workflow')
@@ -326,6 +326,11 @@ describe('Kiro-native workspace adapter', () => {
     expect(learner).toContain('run the same command again with the address in double quotes')
     expect(learner).toContain('`Invoke-WebRequest http://localhost:<port> -UseBasicParsing`')
     expect(learner).toContain('never as `\\u` escapes and never as JSON text inside a string')
+    // 0.9.3 (Windows 0.2.11): the first environment check is only version flags, which the
+    // pre-approval allows even chained; `cmd /c ver` was the one approval prompt of the first turn.
+    expect(learner).toContain('run one read-only command made only of version checks')
+    expect(learner).toContain('such as `cmd /c ver`, `ver` or `systeminfo`')
+    expect(learner).not.toContain('uname -sm')
   })
 
   it('fails closed on a missing, duplicated or unfilled steering template', () => {
