@@ -17,6 +17,8 @@
 
 ## Windows 0.2.11 빌드 요청 (frontend)
 
+**완료(2026-10-16):** program `main` `1eefe3f`(program#11·#12 합침)로 빌드했다. 확인 1~8, 9, 13, 14, 16과 22·23·25를 통과했고, 24는 나오지 않았다. [0.2.11 Windows 확인](#0211-windows-확인-2026-10-16)
+
 backend가 Windows 0.2.10 확인의 요청 네 건을 처리해 Mac 0.2.11을 만들고 실제 Kiro에서 확인했다([0.2.11 확인](#0211-확인-2026-10-16-mac)). 할 일, 답, 추가 확인 22~25는 [0.2.11 프론트 인계](FRONTEND_HANDOFF_0.2.11.md)에 있다. program은 `main`으로 빌드한다. frontend의 두 PR을 먼저 합쳤다면 그 커밋을 알려 주세요. Mac도 같은 커밋으로 다시 빌드한다. 버전은 `0.2.11`로 나온다.
 
 ## Windows 0.2.10 빌드 요청 (frontend)
@@ -309,6 +311,35 @@ host API 형식은 [`examples/kiro-panel/src/frontend-host.d.cts`](../examples/k
   - 0.2.10에서 연결한 폴더는 0.2.11 Core 시작 때 새 승인 규칙과 Steering 0.9.2를 받았다.
   - 남은 것: "화면 레이아웃·스타일은 제가 알아서 정할게요"처럼 담당을 말하는 표현이 약하게 남았다. 한 번은 예고한 선택의 코드를 먼저 써 두고 그 안을 추천했다.
   - 채팅 약 25.7크레딧.
+
+## 0.2.11 Windows 확인 (2026-10-16)
+
+frontend가 Windows 11 x64(10.0.26200, Node 24.19.0, pnpm 11.13.1)에서 빌드했다.
+- 빌드 출처: backend `main` `9314edb`, program `main` `1eefe3f`(program#11 배치 되돌리기 명령, #12 재연결 뒤 flow 포트). 두 checkout 모두 깨끗했다.
+- 결과물: 2,606,726 bytes, SHA-256 `f00156f364b99c9bf6df4c406796582da3ef8e204b6bdf6d56361ea961f3fba2`, 75 entries.
+- **Mac 0.2.11은 program `324214e`로 빌드됐으니 `1eefe3f`로 다시 빌드해 주세요.**
+
+**자동 검사(Windows):** program typecheck 통과, `npm test` 843 통과. backend unit 179 통과·1 skip, integration 555 통과·15 skip, 패널 CJS 193 통과·1 skip.
+
+**실제 Kiro 환경:**
+- Kiro 1.2.56, kiro-cli 2.29.0, 0.2.10에서 업그레이드
+- Workflows 켬(세션 `workflowsEnabled: true`), 미리 승인, 모델 Auto
+- 새 폴더 `win-0.2.11`, 처음 보는 목표(주식 시뮬레이터)
+
+| 확인 | 결과 |
+| --- | --- |
+| 1~8, 13 | 통과. 0.2.11 Core·bridge로 연결, 신뢰·다시 로드 뒤 새 세션에서 Vibe Helper 도구 사용 |
+| 9 | 통과. **첫 Task에서** 코드 전에 선택을 물었다: `check_progress` → 환경 확인 → `save_progress` → 설정 파일 4개(`package.json`·`tsconfig.json`·`vite.config.ts`·`index.html`) → `ask_choice`(22:51:40, 종목·가격 데이터 구조). `run_workflow` 없음 |
+| 14 | 통과. 답(22:53:29 확정) → "그건 내가 고른게 아니야"(22:53:32, 턴 `interrupted`) → 이의 기록·같은 질문 다시 열림(22:53:35) → 곁가지 질문은 기록 없이 다시 물음 → 답으로 확정(22:55:10), Task 완료 때 `APPLIED` |
+| 16 | 통과. `Invoke-WebRequest http://localhost:5180 -UseBasicParsing \| Select-Object -ExpandProperty StatusCode`와 `Start-Process "http://localhost:5180"`이 승인 없이 실행됐다. 서버를 켠 채 완료 |
+| 22 | 통과. 이 Project의 `decision_requests` 2건, `live_context_versions` 6건에 이스케이프 0건(이전 0.2.10 기록 3·7건만 남음). Kiro가 `ask_choice` 한 번을 `expected object, received string`으로 거절했고 Builder가 11초 뒤 다시 보내 성공 |
+| 23 | 통과. 새 폴더와 `win-0.2.10` 폴더의 `permissions.yaml`에 `Start-Process "http://localhost:*"`(95행), `Invoke-WebRequest -Uri "http://localhost:*`(109행) |
+| 24 | 나오지 않음 |
+| 25 | 통과. Builder 글 4,107자에 "학습자", "영역", "정할 몫", "규칙" 0회 |
+
+**참고:**
+- 이번 Task의 승인 창은 한 번뿐이었다. 개발 환경 확인 `cmd /c ver; node -v; npm -v; pnpm -v; yarn -v; python3 --version; git --version`(22:49:50)이다. 여러 명령을 이어 붙인 형태라 묻는 것이 맞다.
+- 0.2.10 요청 1-4(완료 뒤 이유와 함께 바꾼 선택이 후속 Task가 되는 것)는 의도한 동작으로 기록한다.
 
 ## 0.2.10 Windows 확인 (2026-10-15)
 

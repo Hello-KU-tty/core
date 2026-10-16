@@ -74,9 +74,9 @@ Kiro IDE
 
 ## 다운로드·설치
 
-본선 설치물은 Kiro-native **0.2.11**(Apple Silicon Mac)과 **0.2.10**(Windows x64)이다. 준비물, 내려받기, 첫 프로젝트, 업데이트와 문제 해결은 [**설치 가이드**](docs/DOWNLOAD_GUIDE.md)에 있다.
+본선 설치물은 Kiro-native **0.2.11**(Apple Silicon Mac, Windows x64)이다. 준비물, 내려받기, 첫 프로젝트, 업데이트와 문제 해결은 [**설치 가이드**](docs/DOWNLOAD_GUIDE.md)에 있다.
 
-**[Mac용 0.2.11 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/kiro-native/builder-helper-agent-panel-0.2.11-darwin-arm64.vsix)** · **[Windows용 0.2.10 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/windows/kiro-native/builder-helper-agent-panel-0.2.10-win32-x64.vsix)**
+**[Mac용 0.2.11 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/kiro-native/builder-helper-agent-panel-0.2.11-darwin-arm64.vsix)** · **[Windows용 0.2.11 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/windows/kiro-native/builder-helper-agent-panel-0.2.11-win32-x64.vsix)**
 
 1. [Kiro IDE](https://kiro.dev/downloads/) 최신판과 Kiro CLI(2.21.1 이상)를 설치하고 둘 다 로그인한다.
 2. Kiro Extensions → `…` → `Install from VSIX…`로 설치한 뒤 다시 로드한다.
