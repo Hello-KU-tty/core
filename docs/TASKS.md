@@ -72,6 +72,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 ### [-] K07. 포스터 핵심 장면 확보
 
 - **보류(2026-10-09):** 포스터는 팀원과 함께 완성하므로 이 작업 목록에서 뺀다. 포스터 기간에는 K09 마무리와 K10~K12, K08을 진행한다.
+- **포스터 QR(2026-10-12):** 포스터 2(Figma `posters-hurdoo2`)의 "설치 가이드" QR을 `https://github.com/Hello-KU-tty/core/blob/main/docs/DOWNLOAD_GUIDE.md`로 교체했다(디코딩 확인). 문서는 본선 Kiro-native 0.2.8 기준으로 다시 써서 main에 push했다(904c57b, ab0d1e5). 완료. "소스 저장소" QR(github.com/Hello-KU-tty/core)은 정상이다.
 
 - **기한:** 10/11 포스터 사전 제출.
 - **범위:** Kiro 채팅의 사용자 발언 → hook → Evidence → 학습자 요약 갱신 → 다음 대화 변화 중 실측된 범위를 한 장면으로 캡처한다. 실측되지 않은 부분은 목표 구조로 구분해 표시한다.
@@ -140,6 +141,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 
 - **출처:** 사용자 직접 체험(2026-10-12, 체험 빌드 backend `57ef752`·frontend `88275f6`). 처음 받은 후보 10개 화면에서 바구니를 비운 채 방향을 적고 "보완하기"를 누르자 "요청을 처리하지 못했습니다. 다시 시도해 주세요."가 떴다. 사용자 판단: 마음에 드는 후보가 없을 때 방향만 적어 요청하는 것도 정상 사용이다.
 - **원인:** 첫 화면의 후보는 미리보기뿐이고 Core에는 후보 라운드가 아직 없다. Core는 피드백이 가리키는 후보를 채워 첫 라운드를 만들 수 있을 때만 받는다(`#recordDiscoveryFeedback`의 `canMaterializeReferencedPreviews`, 대상 1개 이상 필요). 패널은 글만 있는 보완을 대상 없는 `REGENERATE`로 보내고 그 전에 라운드를 준비하지 않아 `DISCOVERY_ROUND_NOT_CURRENT`로 거절된다. 패널은 이 코드를 몰라 일반 문구를 보인다. 모델 호출 전 거절이라 크레딧은 쓰지 않는다. 입력 없이 누르는 `MORE`는 먼저 `ENRICH_ALL`로 라운드 1을 만들므로 통과하고, 라운드가 생긴 뒤에는 글만 적어도 통과한다. 0.2.7 배포본에도 같은 문제가 있다(frontend `c2c873c`부터 보완 버튼이 하나). frontend 테스트는 라운드가 이미 있는 상태만 다뤘다.
+- **재발(2026-10-13):** 0.2.9 체험 프로필(`kiro-user-trial-20261012`, 새 목표 "그래픽을 만져보고 싶어")에서 같은 조작으로 다시 실패했다. 0.2.9에는 K16 수정이 들어가지 않았다. Core에는 미리보기 라운드(11:31:25 KST)만 있고 후보 라운드·피드백 기록은 없다.
 - **재현:** 모델 호출 없는 Core 테스트에서 미리보기만 있는 상태의 대상 없는 `REGENERATE`는 `DISCOVERY_ROUND_NOT_CURRENT`, 후보 1개를 채운 뒤 `REVISE`는 통과, 라운드 1이 생긴 뒤 대상 없는 `REGENERATE`는 통과.
 - **범위(초안):** 미리보기만 있는 상태에서 바구니 없이 글만 적은 보완이 새 후보 라운드로 이어지게 한다(패널이 먼저 라운드를 준비할지, Core가 미리보기 상태의 대상 없는 피드백을 받을지는 구현 전에 정한다). 크레딧이 덜 드는 쪽을 우선한다. 알 수 없는 오류 코드도 쓸 수 있는 안내로 보인다.
 - **완료 조건:** 미리보기 상태의 대상 없는 보완을 다루는 Core integration·frontend 테스트, 기존 Discovery 회귀 없음, 실제 Kiro 패널에서 첫 화면 → 방향만 적어 보완하기 → 새 후보 1회, Mac VSIX 재생성.
@@ -254,6 +256,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
     - 채팅 Decision 평가 재실행: 새 fixture(곁가지 질문, 거절 뒤 멈춤, 되돌리기). 실제 Kiro 흐름에서는 각 한 번씩 확인했다.
     - 새 미리 승인 항목(`lsof`, 메서드 `curl`)의 Kiro 판정.
     - frontend의 `feat/k17-panel` 합치기와 Windows 0.2.9 빌드. 요청은 [0.2.9 프론트 인계](FRONTEND_HANDOFF_0.2.9.md).
+    - 배치 되돌리기 안내를 놓치면 다시 묻지 않는다(체험 프로필, 2026-10-13). `offerLayoutRepair`가 답을 받기 전에 `vibeHelper.layoutRepairOffered`를 저장한다. 업그레이드 뒤 아무도 보지 않던 00:11 창에서 안내가 지나갔고, 0.2.7이 옮긴 `terminal` 등의 위치(`views.customizations` 2=보조 사이드바)가 남아 터미널이 채팅을 덮었다. 답(또는 닫기)을 받은 뒤에만 저장하도록 고친다. 새로 설치한 프로필은 해당 없음.
   - **push와 체험 환경(2026-10-13):** backend `main`과 frontend `feat/k17-panel`(`4906b36`)을 push했다. 체험 환경을 0.2.9로 올렸다. 올리기 전 Core DB·`.kiro`·권한 파일은 `backup-before-0.2.9/`에 두었다. 다시 열 때 migration 0009, Steering 0.9.0, 도우미 에이전트 파일 삭제, 미리 승인 규칙 갱신이 일어났고 기록(이벤트 47개, 완료 Task 1개)은 그대로다. 이미 미리 승인을 고른 설치라 Autopilot은 저절로 켜지지 않는다(인계 "알려진 제한").
 
 ### [~] K18. Windows 0.2.9 확인 후속: 이름으로 node 종료, Core 재시작, Workflow 위임
