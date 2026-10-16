@@ -334,6 +334,28 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
   3. Steering 0.9.2: 주소는 따옴표 없이, 서버 확인은 괄호 없이 쓴다. 도구 인자는 JSON 객체로, 한글은 그대로 쓴다. 첫 Task 규칙은 실측 결과에 맞춘다.
   4. 완료 뒤 바꾼 선택은 DECISIONS와 인계 문서에 적는다.
 - **완료 조건:** contracts·MCP·adapter 단위 테스트, 기존 unit·integration·eval·패널 CJS·포장 검사 회귀 없음, kiro-cli 판정기, Workflow를 켠 Mac 프로필에서 처음 보는 목표의 첫 Task 실측(0.9.1 재현, 0.9.2 확인), Mac VSIX 0.2.11, Windows 0.2.11 요청.
+- **진행(2026-10-16):**
+  - **구현:**
+    - MCP 경계 `kiroChatTransportSchema`(풀기, 배열 문자열, 몰린 인자 거절)
+    - adapter `K17_SHELL_RULE`과 따옴표·`-Uri` 형태, Spec 영역 머리글
+    - Steering 0.9.2, DECISIONS "Windows 0.2.10 확인 후속(K20)", ARCHITECTURE 한 단락
+    - commit `f5b5182`·`af6942f`, 버전 `b44472c`
+  - **자동 검사(Node 24.19.0):**
+    - `pnpm typecheck` 통과
+    - unit 177 통과·3 skip, integration 561 통과·9 skip(새 3개), eval 47 통과·1 skip, 패널 CJS 192 통과·2 skip
+    - 바꾼 파일 Biome 오류 없음(원래 있던 경고 제외)
+    - 새 연결 테스트는 풀기를 끈 빌드에서 Windows 증상으로 실패함을 확인
+  - **kiro-cli 판정기:** 따옴표·`-Uri` 형태는 허용, 위험 이어 붙임·다른 호스트·명령 치환·괄호 `.StatusCode`는 계속 묻기, 예전 목록 3개 판정 그대로.
+  - **실제 Kiro([기록](../tests/eval/results/kiro-steering-0.9.2-k20.md), Workflow 켬, 처음 보는 목표 4개, 채팅 약 25.7크레딧, 계정 누적 약 197):**
+    - 0.9.1은 Windows 증상(하나도 묻지 않음)을 재현하지 못했다. 데이터 구조를 스스로 정함, 임시 구현 뒤 질문, "학습자" 말하기를 찾았다.
+    - 0.9.2 세 번은 첫 Task에서 코드 전에 선택을 물었다(예상 Decision이 있는 Spec과 Personal Need 하나씩 포함). 마지막 빌드는 승인 창 0번이었다.
+    - Kiro `execute_bash`가 포트 든 `open`을 거절하면 Builder가 따옴표·절대 경로로 피해 간다는 원인을 찾아, 따옴표 형태 승인과 Steering 재시도 문장을 넣었다.
+  - **Mac 0.2.11:** 깨끗한 worktree(backend `af6942f`, program `4906b36` = `main` `324214e` 트리). 41,611,702 bytes, SHA-256 `58d3a262…6d97`, 포장 검사 9 PASS.
+  - **남은 것:**
+    - frontend Windows 0.2.11 확인 1~16과 22~25([0.2.11 프론트 인계](FRONTEND_HANDOFF_0.2.11.md)). 첫 Task 묻기의 효과는 Windows 확인 9가 판정한다.
+    - frontend의 두 PR이 program `main`에 들어오면 Mac을 같은 커밋으로 다시 빌드한다.
+    - 담당을 말하는 약한 표현("제가 알아서 정할게요")과 예고한 선택의 코드를 먼저 써 두는 일이 한 번씩 남았다.
+    - 완료 뒤 바꾼 선택을 Decision으로 남기는 방안은 본선 뒤 판단한다.
 
 ## 3. 예선 작업 요약
 

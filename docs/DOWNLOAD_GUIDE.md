@@ -1,6 +1,6 @@
 # Hello Vibe 설치 가이드
 
-Hello Vibe는 Kiro IDE 확장입니다. Agent Panel에서 배우고 싶은 것을 바탕으로 만들 프로젝트를 고르고, 실제 만들기는 Kiro 채팅에서 합니다. 이 문서는 본선 설치물 **0.2.10**(Mac) 기준입니다.
+Hello Vibe는 Kiro IDE 확장입니다. Agent Panel에서 배우고 싶은 것을 바탕으로 만들 프로젝트를 고르고, 실제 만들기는 Kiro 채팅에서 합니다. 이 문서는 본선 설치물 **0.2.11**(Mac) 기준입니다.
 
 ## 1. 준비물
 
@@ -16,23 +16,23 @@ Hello Vibe 계정이나 API 키는 없습니다. Node.js, pnpm 같은 개발 도
 
 | 운영체제 | 설치 파일 |
 | --- | --- |
-| Mac (Apple Silicon) | **[0.2.10 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/kiro-native/builder-helper-agent-panel-0.2.10-darwin-arm64.vsix)** (약 40MB) |
+| Mac (Apple Silicon) | **[0.2.11 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/kiro-native/builder-helper-agent-panel-0.2.11-darwin-arm64.vsix)** (약 40MB) |
 | Windows (x64) | **[0.2.10 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/windows/kiro-native/builder-helper-agent-panel-0.2.10-win32-x64.vsix)** (약 2.5MB) |
 
-링크를 누르면 `.vsix` 파일이 바로 내려받아집니다. [Windows 설치 파일 폴더](../releases/windows/kiro-native/)에서도 받을 수 있습니다.
+링크를 누르면 `.vsix` 파일이 바로 내려받아집니다. Windows용 0.2.11은 준비 중입니다. [Windows 설치 파일 폴더](../releases/windows/kiro-native/)에서도 받을 수 있습니다.
 
 <details>
 <summary>파일이 온전한지 확인하기 (선택)</summary>
 
 | 파일 | SHA-256 |
 | --- | --- |
-| Mac 0.2.10 | `a7dc53d4acd27df203f62c774c1a8acd0b747ef85630c15c99735a636bdff510` |
+| Mac 0.2.11 | `58d3a262c07ecddd309fe0b886842a8dca56503e47a7cd1f3d6f108b58ad6d97` |
 | Windows 0.2.10 | `6682973aad3c5cc3119d135f6786c28792ad5518fdc27c9d597afb7bf15126b9` |
 
 Mac 터미널:
 
 ```sh
-shasum -a 256 ~/Downloads/builder-helper-agent-panel-0.2.10-darwin-arm64.vsix
+shasum -a 256 ~/Downloads/builder-helper-agent-panel-0.2.11-darwin-arm64.vsix
 ```
 
 Windows PowerShell:
