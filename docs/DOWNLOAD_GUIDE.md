@@ -1,6 +1,6 @@
 # Hello Vibe 설치 가이드
 
-Hello Vibe는 Kiro IDE 확장입니다. Agent Panel에서 배우고 싶은 것을 바탕으로 만들 프로젝트를 고르고, 실제 만들기는 Kiro 채팅에서 합니다. 이 문서는 본선 설치물 **0.2.11**(Mac, Windows) 기준입니다.
+Hello Vibe는 Kiro IDE 확장입니다. Agent Panel에서 배우고 싶은 것을 바탕으로 만들 프로젝트를 고르고, 실제 만들기는 Kiro 채팅에서 합니다. 이 문서는 본선 설치물 **0.2.12**(Mac)와 **0.2.11**(Windows) 기준입니다. Windows용 0.2.12는 준비 중입니다.
 
 ## 1. 준비물
 
@@ -16,7 +16,7 @@ Hello Vibe 계정이나 API 키는 없습니다. Node.js, pnpm 같은 개발 도
 
 | 운영체제 | 설치 파일 |
 | --- | --- |
-| Mac (Apple Silicon) | **[0.2.11 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/kiro-native/builder-helper-agent-panel-0.2.11-darwin-arm64.vsix)** (약 40MB) |
+| Mac (Apple Silicon) | **[0.2.12 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/kiro-native/builder-helper-agent-panel-0.2.12-darwin-arm64.vsix)** (약 40MB) |
 | Windows (x64) | **[0.2.11 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/windows/kiro-native/builder-helper-agent-panel-0.2.11-win32-x64.vsix)** (약 2.5MB) |
 
 링크를 누르면 `.vsix` 파일이 바로 내려받아집니다. [Windows 설치 파일 폴더](../releases/windows/kiro-native/)에서도 받을 수 있습니다.
@@ -26,13 +26,13 @@ Hello Vibe 계정이나 API 키는 없습니다. Node.js, pnpm 같은 개발 도
 
 | 파일 | SHA-256 |
 | --- | --- |
-| Mac 0.2.11 | `58d3a262c07ecddd309fe0b886842a8dca56503e47a7cd1f3d6f108b58ad6d97` |
+| Mac 0.2.12 | `baa150b12117f1d0174c0540e162b67ebd442d4597be89732f5a7b3603e7f61c` |
 | Windows 0.2.11 | `f00156f364b99c9bf6df4c406796582da3ef8e204b6bdf6d56361ea961f3fba2` |
 
 Mac 터미널:
 
 ```sh
-shasum -a 256 ~/Downloads/builder-helper-agent-panel-0.2.11-darwin-arm64.vsix
+shasum -a 256 ~/Downloads/builder-helper-agent-panel-0.2.12-darwin-arm64.vsix
 ```
 
 Windows PowerShell:
@@ -91,7 +91,7 @@ Windows에서는 첫 실행 때 Hello Vibe가 Node.js 24.19.0을 내려받아 �
 6. Hello Vibe가 이 프로젝트를 Kiro 채팅에 연결합니다. 신뢰나 다시 로드 안내가 나오면 따릅니다. 연결이 끝나면 Hello Vibe가 Kiro 채팅에 새 세션을 열어 줍니다(0.2.9부터). 거기서 "시작하자"처럼 말하면 Kiro가 계획대로 만들기 시작합니다. 새 세션이 열리지 않았으면 Kiro 채팅의 **+** 버튼으로 엽니다.
 7. 만들다가 정해야 할 것이 생기면 Kiro가 번호가 붙은 선택지로 묻고 기다립니다. 번호와 함께 **고른 이유를 한 문장** 적어 주세요. 그 이유가 학습 기록의 근거가 됩니다. "응"이나 버튼 클릭만으로는 이해했다고 기록하지 않습니다. 묻는 중에 궁금한 걸 물어봐도 선택으로 기록되지 않습니다. 고르지 않은 선택이 기록됐다면 채팅에 "그건 내가 고른 게 아니야"라고 말하세요. 그 선택을 기록에서 빼고 다시 물어봅니다(0.2.9부터).
 8. 작업이 끝나면 Kiro가 만든 앱의 서버를 켜 둔 채 브라우저로 열어 주고 주소를 알려 줍니다.
-9. 작업 하나가 끝나면 Agent Panel **빌더** 탭에 "다음 한 걸음" 카드가 10초 안팎에 뜹니다(0.2.8부터). 빌더 탭에는 지금 Kiro 채팅이 기다리는 질문, 이번 작업에서 인정된 학습 기록, 이번 작업의 결정도 한 줄씩 보입니다. 이 프로젝트를 키울 방향 3개가 나옵니다. 하고 싶은 것이 있으면 Kiro 채팅에 번호를 말하면 이어서 만듭니다. 그냥 두거나, 원하는 기능을 직접 말해도 됩니다.
+9. 작업 하나가 끝나면 Agent Panel **빌더** 탭에 "다음 한 걸음" 카드가 10초 안팎에 뜹니다(0.2.8부터). 빌더 탭에는 지금 Kiro 채팅이 기다리는 질문, 이번 작업에서 인정된 학습 기록, 이번 작업의 결정도 한 줄씩 보입니다. 이 프로젝트를 키울 방향 3개가 나옵니다. 하고 싶은 것이 있으면 Kiro 채팅에 "2번 해 보자"처럼 번호를 말하면 이어서 만듭니다. 그냥 두거나, 원하는 기능을 직접 말해도 됩니다.
 
 **질문하기:** 만들기를 하던 채팅에 `/vibe-helper 질문`을 입력합니다. 그 질문에는 코드를 읽고 설명만 하며 수정하지 않습니다. 고칠 것은 `/vibe-helper` 없이 이어서 부탁합니다.
 
@@ -123,7 +123,7 @@ Windows에서는 첫 실행 때 Hello Vibe가 Node.js 24.19.0을 내려받아 �
 - **"계획을 확정하고 작업이 준비된 뒤에 … 열 수 있어요"**: 4단계 4번의 **이걸로 시작**을 먼저 누릅니다.
 - **Kiro 채팅이 계획을 모르거나 Vibe Helper 도구를 쓰지 못할 때**: 폴더를 신뢰했는지 확인하고, 명령 팔레트의 **Developer: Reload Window**로 창을 다시 로드한 뒤 새 세션에서 시작합니다. Kiro의 MCP 서버 목록에서 `vibe-helper`가 Connected인지도 봅니다. Kiro는 한 번 끊긴 MCP 서버를 스스로 다시 띄우지 않아서, Kiro 채팅이 "Vibe Helper 도구를 쓸 수 없다"고 하면 창을 다시 로드해야 합니다.
 - **Kiro 채팅이 선택을 묻지 않고 "워크플로우로 구현"할 때**: Kiro 설정의 Workflows(`kiroAgent.workflows.enabled`)가 켜져 있으면 Kiro가 구현을 별도 작업으로 넘길 수 있고, 그 작업은 선택을 묻지 못합니다. Hello Vibe는 채팅에서 직접 만들게 안내하지만, 계속 그러면 명령 팔레트의 **Disable Workflows**로 끄고 새 세션에서 시작합니다.
-- **명령이 도는 동안 터미널이 Kiro 채팅 자리를 가릴 때**: 이전 버전이 옮겨 둔 화면 배치가 남아 있는 경우입니다. 명령 팔레트의 **Vibe Helper: Restore Kiro Layout**(Windows 0.2.11부터) 또는 **View: Reset View Locations**로 처음 배치로 되돌립니다. 직접 옮긴 창 위치도 함께 돌아갑니다.
+- **명령이 도는 동안 터미널이 Kiro 채팅 자리를 가릴 때**: 이전 버전이 옮겨 둔 화면 배치가 남아 있는 경우입니다. 명령 팔레트의 **Vibe Helper: Restore Kiro Layout**(Mac 0.2.12, Windows 0.2.11부터) 또는 **View: Reset View Locations**로 처음 배치로 되돌립니다. 직접 옮긴 창 위치도 함께 돌아갑니다.
 - **VSIX가 설치되지 않을 때**: Mac은 `darwin-arm64`, Windows는 `win32-x64` 파일인지 확인합니다.
 
 해결되지 않으면 [GitHub 이슈](https://github.com/Hello-KU-tty/core/issues)에 운영체제, Kiro 버전(Help → About), `kiro-cli --version` 결과, 확장 버전, 화면의 오류 문구를 적어 주세요. 로그인 정보, 토큰, 대화 원문은 붙이지 마세요. 문제를 풀려고 프로젝트 폴더나 기록을 지울 필요는 없습니다.

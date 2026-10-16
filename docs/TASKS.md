@@ -373,7 +373,40 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
     - kiro-cli 판정기: 이어 붙인 것은 원인이 아니다. 조각이 모두 미리 승인에 있으면 허용되고, `cmd /c ver`·`ver`만 묻는다([K21 기록](../tests/eval/results/kiro-steering-0.9.3-k21.md)).
     - Steering 0.9.3: 버전 확인만으로 된 한 줄, 운영체제 명령은 따로 넣지 않기. 미리 승인 규칙은 그대로다.
     - Node 24.19.0: `pnpm typecheck` 통과, unit 177 통과·3 skip, integration 561 통과·9 skip, eval 47 통과·1 skip.
-  - **남은 것(0.2.12 빌드 때):** `scripts/package-program.mjs` 버전 0.2.12, program `1eefe3f` 깨끗한 worktree로 Mac VSIX, 2번 실제 확인, 3번 문구, 실제 첫 Task에서 버전 확인 명령 형태, 5번 기록, frontend 인계와 Windows 0.2.12 요청.
+  - **0.2.12 빌드(2026-10-17, K22와 함께):**
+    - 버전 0.2.12(`c781eb5`). Mac VSIX: backend `c781eb5`·program `1eefe3f` 깨끗한 worktree, 41,613,213 bytes, SHA-256 `baa150b12117f1d0174c0540e162b67ebd442d4597be89732f5a7b3603e7f61c`, 76 entries, 포장 검사 9 PASS. program `1eefe3f`은 Mac에서도 타입 검사와 테스트 843개가 통과했다.
+    - 실제 Kiro([Mac 0.2.12 확인](../tests/eval/results/kiro-0.2.12-mac-check.md)): 0.2.11 폴더가 Steering 0.9.4와 새 규칙으로 올라감. 첫 Task의 버전 확인 한 줄이 승인 없이 돌았고, 승인 창은 Project 폴더 안 `rm` 두 개(일부러 묻는 종류)뿐이었다. #11 명령은 알림 → 되돌리기까지 동작했다. #12는 Core를 준비하지 못한 채 패널이 열리는 상태를 Mac에서 만들지 못해 단위 테스트로 갈음했다.
+    - 3번: 가이드 문구를 "(Mac 0.2.12, Windows 0.2.11부터)"로 고쳤다. README·가이드는 Mac 0.2.12, Windows 0.2.11 링크다.
+    - frontend 인계: [0.2.12 프론트 인계](FRONTEND_HANDOFF_0.2.12.md)(Windows 0.2.12 빌드, 확인 26~30, 패널 UI 요청).
+  - **본선 뒤로 미룬 것(5번):**
+    - 완료 뒤 바꾼 선택을 Decision으로 남기는 방안(지금은 후속 Task가 됨, K20).
+    - 0.2.10이 저장한 `\uXXXX` 기록(Windows DB의 Decision 3건, Live Context 7건)은 풀지 않는다. 새 기록만 풀어서 저장된다.
+    - Kiro가 `tool_call`의 `arguments`를 문자열로 받으면 `expected object, received string`으로 거절한다. Core에 닿지 않고 Builder가 다시 보내 성공한다. Kiro 쪽 동작이다.
+    - Builder가 선택을 묻기 전에 설정 파일(`package.json`·`tsconfig.json` 등)을 먼저 쓰는 것. 선택과 무관한 뼈대라 허용한다.
+  - **남은 것:** push(사용자 확인), frontend Windows 0.2.12 빌드와 확인 26~30.
+
+### [~] K22. 사용자 Windows 0.2.11 실사용 후속: npm 설정, 승인 창, 개념 이름, Spec 예상 Decision
+
+- **출처:** 사용자가 본선 계정으로 Windows 0.2.11을 두 번 썼다(2026-10-16, 실시간 채팅 앱, 뽀모도로와 후속 Task). Windows Codex가 세션 기록·Core DB·로그를 묶어 넘겼고, 사용자가 다섯 가지를 말했다(예상 Decision이 비어 있음, 새 창 연결이 약 30초, 탭 정리, 첫 입력 안내, Next Move 입력 예시).
+- **결정:** DECISIONS "사용자 Windows 0.2.11 실사용 후속(K22)"(사용자 지시 "자체적으로 계획 세워서 작업하고 0.2.12 빌드까지", 2026-10-17).
+- **완료 조건:** npm 설정·미리 승인·개념 이름·Steering 0.9.4의 테스트와 kiro-cli 판정, Discovery 후보 시험과 채택 여부 기록, 0.2.12 Mac 실측(첫 Task 승인 창, 개념 기록), frontend 인계(Windows 확인 26~30, 패널 UI 요청).
+- **진행(2026-10-17):**
+  - **분석:** [K22 기록](../tests/eval/results/kiro-windows-trial-k22.md). 두 첫 Task 모두 코드 전에 실제 선택을 물었다. 승인 창 8개의 원인은 버전 확인 식(K21이 고침), `| Out-String`, 괄호·`try` 서버 확인, npm 오류 우회였다. npm은 Project 터미널 환경의 같은 설정 파일 두 번 읽기로 실행되지 않았다. 완료 보고의 개념 이름이 Spec 이름과 달라 학습 기록이 비었다(이 Mac에서도 완료 16건 중 9건).
+  - **구현(`13d9399`):** npm global 설정 파일 분리, `Out-String`·따옴표 `Invoke-WebRequest`/`Invoke-RestMethod` 미리 승인(0.2.11 규칙 인식), `check_progress` `conceptNames`, `finish_task` 도구 설명, Steering 0.9.4(개념 이름, Windows 서버 확인 한 줄, 종료 코드). 회귀 테스트: npm 설정 파일이 서로 다름, K22 규칙과 0.2.11 업그레이드("항상 허용" 유지), `check_progress` 개념 이름, Steering 문장.
+  - **검증:** Node 24.19.0 typecheck 통과, unit 177 통과·3 skip, integration 563 통과·9 skip, eval 47 통과·1 skip, 패널 CJS 192 통과·2 skip. kiro-cli 판정기: 사용 기록의 승인 창 명령과 위험 형태 25개(`k22-windows-trial-0.2.12.txt`), 예전 목록 113개 판정 변화 없음. 이 Mac의 npm 11.17.0으로 오류 재현과 해소 확인.
+  - **Discovery 1.5.0 후보(채택 안 함):** 처음 보는 목표 10개로 1.4.0과 비교했다. 실제 갈림길 예고가 1개에서 14개로 늘었지만 약한 질문 4개(자료구조 고르기, 화면 모양, 응답 코드)가 기준(2개 이하)을 넘었다([시험 기록](../tests/eval/results/discovery-spec-decisions-1.5.0-candidate.md)).
+  - **Mac 0.2.12 실측:** 개념 이름 두 개를 Spec 그대로 보내 `conceptUsage` 2개, OBSERVED Evidence 3개가 기록됐다. 실패한 설치를 실패라고 말했다. 채팅 7.07크레딧.
+  - **새 창 연결 지연:** backend 변경 없음. Kiro 확장 호스트 시작(활성화까지 19초)과 신뢰 → 다시 로드가 원인이다. 부스 PC에서 상위 폴더를 한 번 신뢰하는 방법과 확장 호스트 분리(본선 뒤)는 frontend 인계에 확인 요청으로 적었다.
+- **남은 것:**
+  - frontend Windows 0.2.12 확인 26~30(npm, 승인 창, 개념 기록, 실패 보고, 새 창 시간과 신뢰).
+  - frontend 패널 UI: 탭 정리, 첫 화면 진행 안내, Next Move 입력 예시와 복사 버튼.
+  - Next Move를 Task로 바로 추가하고 "ㄱㄱ"만 치게 하기: 사용자 결정 대기.
+  - 본선 뒤:
+    - 후보 상세화(`ENRICH_SELECTED`)가 결과를 저장하지 않고 끝나는 경우가 Discovery 시험에서 약 33번 중 4번이었다. Spec처럼 복구 turn을 더할지 판단한다.
+    - Discovery 예상 Decision 다시 시도(Builder가 약한 예고를 걸러 내는 규칙 또는 더 큰 Spec 모델).
+    - 남은 말투("실제 선택", "제가 알아서 정하는 영역") 한 번씩.
+    - 첫 Task의 `BUILD_TASK` Episode 2개가 `OPEN`으로 남는 것.
+    - 확장 호스트 분리(`extensionDependencies`).
 
 ## 3. 예선 작업 요약
 

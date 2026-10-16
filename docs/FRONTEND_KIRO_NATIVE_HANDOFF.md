@@ -1,19 +1,24 @@
-# 본선 설치물 0.2.11 (Kiro-native, Mac·Windows) 프론트 인계
+# 본선 설치물 0.2.12 (Kiro-native, Mac·Windows) 프론트 인계
 
-본선 방향([PROJECT_BRIEF §0](../PROJECT_BRIEF.md))에 맞춰 Mac 설치물의 host를 Kiro-native로 바꿨다. 0.2.1은 첫 실사용 체험 피드백(K09)을 반영했고, 0.2.2는 본선 계정 재실측에서 나온 Analyst·Evidence 정책 변경을 더했고, 0.2.3은 Kiro 채팅 Helper 에이전트가 도구를 받지 못하던 문제를 고치고 Helper를 읽기 전용으로 바꿨고, 0.2.4는 Kiro 연결이 Core 재시작을 넘어 유지되게 하고 끊긴 동안의 학습자 발언을 큐로 보존하며, 0.2.5는 같은 코드로 Windows x64 설치물을 빌드할 수 있게 했다(Mac은 backend, Windows는 frontend가 빌드). 0.2.6은 버전 강제를 완화했고, 0.2.7은 Kiro 채팅 Builder 도구를 다시 설계하고(K10) 개발 명령 미리 승인(K11), 완료 뒤 이어서 만들기, frontend가 Windows에서 찾은 문제 수정을 더했다. 0.2.8은 Builder가 묻는 기준(K14)과 Task를 마칠 때마다 확장 방향 3개를 제안하는 Next Move(K15, 패널 카드 포함)를 더했다. 0.2.9는 사용자 직접 체험의 후속(K17)이다: 학습자 선택 위조 방지와 "내가 고른 게 아니야" 되돌리기, 중단된 턴 기록, 미리 승인 때 Autopilot과 새 채팅 세션, `/vibe-helper` 하나, 완료 뒤 서버 유지, 패널 빌더 탭 정리와 남은 시간 표시. 0.2.10은 frontend Windows 0.2.9 확인의 후속(K18)이다: Core·bridge의 실행 파일 이름을 `vibe-helper-core`로 바꿔 이름으로 node를 끄는 명령에서 지키고, 다시 로드·절전·시작 실패 뒤 Core가 다시 뜨게 하고, Builder가 구현을 Kiro Workflow에 넘기지 않게 했다(Steering 0.9.1). 0.2.11은 frontend Windows 0.2.10 확인의 후속(K20)이다: 모델이 JSON 한 단계 더 깊게 쓴 도구 입력(`\uXXXX` 한글, 문자열로 온 배열)을 Core가 풀어서 받고, 따옴표로 감싼 이 컴퓨터 주소를 미리 승인에 더하고, 첫 Task에서도 학습 목표 영역의 선택을 묻게 했다(Steering 0.9.2). 2026-10-11부터 두 저장소 모두 `main` 브랜치 하나로 작업한다.
+본선 방향([PROJECT_BRIEF §0](../PROJECT_BRIEF.md))에 맞춰 Mac 설치물의 host를 Kiro-native로 바꿨다. 0.2.1은 첫 실사용 체험 피드백(K09)을 반영했고, 0.2.2는 본선 계정 재실측에서 나온 Analyst·Evidence 정책 변경을 더했고, 0.2.3은 Kiro 채팅 Helper 에이전트가 도구를 받지 못하던 문제를 고치고 Helper를 읽기 전용으로 바꿨고, 0.2.4는 Kiro 연결이 Core 재시작을 넘어 유지되게 하고 끊긴 동안의 학습자 발언을 큐로 보존하며, 0.2.5는 같은 코드로 Windows x64 설치물을 빌드할 수 있게 했다(Mac은 backend, Windows는 frontend가 빌드). 0.2.6은 버전 강제를 완화했고, 0.2.7은 Kiro 채팅 Builder 도구를 다시 설계하고(K10) 개발 명령 미리 승인(K11), 완료 뒤 이어서 만들기, frontend가 Windows에서 찾은 문제 수정을 더했다. 0.2.8은 Builder가 묻는 기준(K14)과 Task를 마칠 때마다 확장 방향 3개를 제안하는 Next Move(K15, 패널 카드 포함)를 더했다. 0.2.9는 사용자 직접 체험의 후속(K17)이다: 학습자 선택 위조 방지와 "내가 고른 게 아니야" 되돌리기, 중단된 턴 기록, 미리 승인 때 Autopilot과 새 채팅 세션, `/vibe-helper` 하나, 완료 뒤 서버 유지, 패널 빌더 탭 정리와 남은 시간 표시. 0.2.10은 frontend Windows 0.2.9 확인의 후속(K18)이다: Core·bridge의 실행 파일 이름을 `vibe-helper-core`로 바꿔 이름으로 node를 끄는 명령에서 지키고, 다시 로드·절전·시작 실패 뒤 Core가 다시 뜨게 하고, Builder가 구현을 Kiro Workflow에 넘기지 않게 했다(Steering 0.9.1). 0.2.11은 frontend Windows 0.2.10 확인의 후속(K20)이다: 모델이 JSON 한 단계 더 깊게 쓴 도구 입력(`\uXXXX` 한글, 문자열로 온 배열)을 Core가 풀어서 받고, 따옴표로 감싼 이 컴퓨터 주소를 미리 승인에 더하고, 첫 Task에서도 학습 목표 영역의 선택을 묻게 했다(Steering 0.9.2). 0.2.12는 frontend Windows 0.2.11 확인(K21)과 사용자 Windows 실사용(K22)의 후속이다: program `1eefe3f`(배치 되돌리기 명령, 재연결 뒤 flow 포트), 첫 턴 버전 확인만 하기(Steering 0.9.3), Project 터미널의 npm 설정 오류 수정, `Out-String`과 따옴표 `Invoke-WebRequest` 미리 승인, `check_progress`의 Spec 개념 이름과 그 이름으로 완료 보고하기(Steering 0.9.4). 2026-10-11부터 두 저장소 모두 `main` 브랜치 하나로 작업한다.
 
-- 설치 파일: Mac [`releases/macos/kiro-native/builder-helper-agent-panel-0.2.11-darwin-arm64.vsix`](../releases/macos/kiro-native/builder-helper-agent-panel-0.2.11-darwin-arm64.vsix) · 41,611,702 bytes · SHA-256 `58d3a262c07ecddd309fe0b886842a8dca56503e47a7cd1f3d6f108b58ad6d97` · [receipt](../releases/macos/kiro-native/macos-vsix-receipt.json) · [항목별 hash](../releases/macos/kiro-native/files.json)
-- 설치 파일: Windows는 0.2.10이다. [`releases/windows/kiro-native/builder-helper-agent-panel-0.2.10-win32-x64.vsix`](../releases/windows/kiro-native/builder-helper-agent-panel-0.2.10-win32-x64.vsix) · 2,604,187 bytes · SHA-256 `6682973aad3c5cc3119d135f6786c28792ad5518fdc27c9d597afb7bf15126b9` · [receipt](../releases/windows/kiro-native/windows-vsix-receipt.json) · [항목별 hash](../releases/windows/kiro-native/files.json). frontend가 backend `320c6aa`와 program `324214e`(두 저장소 `main`)으로 빌드하고 확인 1~21을 했다([0.2.10 Windows 확인](#0210-windows-확인-2026-10-15)). Windows 0.2.11은 아래 [Windows 0.2.11 빌드 요청](#windows-0211-빌드-요청-frontend)대로 만든다.
-- 빌드 출처(Mac 0.2.11): backend `af6942f`(`main`, 깨끗한 worktree), frontend `4906b36`(깨끗함, program `main` `324214e`과 같은 트리). 0.2.10(backend `dc5859e`, frontend `324214e`), 0.2.9(backend `3721a76`, frontend `4906b36`), 0.2.8(backend `10eaafb`, frontend `6a6a557`), 0.2.7(backend `5f1257c`, frontend `88275f6`), 0.2.6(backend `a18f718`), 0.2.5(backend `1f1eea4`), 0.2.4(backend `2b0487a`), 0.2.3(backend `7df50ec`), 0.2.2(backend `012c664`), 0.2.1(backend `4def349`)과 0.2.0(frontend `e65cd7f`)은 Git 이력에 있다.
+- 설치 파일: Mac [`releases/macos/kiro-native/builder-helper-agent-panel-0.2.12-darwin-arm64.vsix`](../releases/macos/kiro-native/builder-helper-agent-panel-0.2.12-darwin-arm64.vsix) · 41,613,213 bytes · SHA-256 `baa150b12117f1d0174c0540e162b67ebd442d4597be89732f5a7b3603e7f61c` · [receipt](../releases/macos/kiro-native/macos-vsix-receipt.json) · [항목별 hash](../releases/macos/kiro-native/files.json)
+- 설치 파일: Windows는 0.2.11이다. [`releases/windows/kiro-native/builder-helper-agent-panel-0.2.11-win32-x64.vsix`](../releases/windows/kiro-native/builder-helper-agent-panel-0.2.11-win32-x64.vsix) · 2,606,726 bytes · SHA-256 `f00156f364b99c9bf6df4c406796582da3ef8e204b6bdf6d56361ea961f3fba2` · [receipt](../releases/windows/kiro-native/windows-vsix-receipt.json) · [항목별 hash](../releases/windows/kiro-native/files.json). frontend가 backend `9314edb`와 program `1eefe3f`로 빌드하고 확인했다([0.2.11 Windows 확인](#0211-windows-확인-2026-10-16)). Windows 0.2.12는 아래 [Windows 0.2.12 빌드 요청](#windows-0212-빌드-요청-frontend)대로 만든다.
+- 빌드 출처(Mac 0.2.12): backend `c781eb5`(`main`, 깨끗한 worktree), frontend `1eefe3f`(program `main`, 깨끗한 worktree). 0.2.11(backend `af6942f`, frontend `4906b36`), 0.2.10(backend `dc5859e`, frontend `324214e`), 0.2.9(backend `3721a76`, frontend `4906b36`), 0.2.8(backend `10eaafb`, frontend `6a6a557`), 0.2.7(backend `5f1257c`, frontend `88275f6`), 0.2.6(backend `a18f718`), 0.2.5(backend `1f1eea4`), 0.2.4(backend `2b0487a`), 0.2.3(backend `7df50ec`), 0.2.2(backend `012c664`), 0.2.1(backend `4def349`)과 0.2.0(frontend `e65cd7f`)은 Git 이력에 있다.
 
 ## 프론트 담당자 빠른 시작
 
-- **이번에 할 일(0.2.11):** [0.2.11 프론트 인계](FRONTEND_HANDOFF_0.2.11.md)에 보내 준 요청 네 건의 답, Windows 0.2.11 빌드와 추가 확인 22~25를 모았다. frontend 코드 변경은 없다. 지난 할 일은 [0.2.10 프론트 인계](FRONTEND_HANDOFF_0.2.10.md)와 [0.2.9 프론트 인계](FRONTEND_HANDOFF_0.2.9.md)에 있다.
+- **이번에 할 일(0.2.12):** [0.2.12 프론트 인계](FRONTEND_HANDOFF_0.2.12.md)에 0.2.11 확인 요청 다섯 건의 답, Windows 0.2.12 빌드와 추가 확인 26~30, 사용자가 말한 패널 UI 요청(탭 정리, 첫 화면 진행 안내, Next Move 입력 예시)을 모았다. 빌드에 frontend 코드 변경은 필요 없다.
+- **지난 할 일(0.2.11):** [0.2.11 프론트 인계](FRONTEND_HANDOFF_0.2.11.md)에 보내 준 요청 네 건의 답, Windows 0.2.11 빌드와 추가 확인 22~25를 모았다. frontend 코드 변경은 없다. 지난 할 일은 [0.2.10 프론트 인계](FRONTEND_HANDOFF_0.2.10.md)와 [0.2.9 프론트 인계](FRONTEND_HANDOFF_0.2.9.md)에 있다.
 - **코드:** backend `Hello-KU-tty/core`의 `main`(이 문서와 설치 파일), frontend `Hello-KU-tty/program`의 `main`(PR #10의 "Kiro 채팅에서 열기" 패널 포함). `finals/kiro-native`·`finals/trial-feedback`은 `main`에 합쳤고 더 쓰지 않는다. 새 작업은 `main`에서 브랜치를 따서 `main`으로 PR한다.
 - **설치 파일 바로 받기:** [0.2.11 Mac VSIX](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/kiro-native/builder-helper-agent-panel-0.2.11-darwin-arm64.vsix). 받은 뒤 `shasum -a 256 <파일>`이 위 SHA-256과 같은지 확인한다. 학습자용 설치·사용 안내는 [설치 가이드](DOWNLOAD_GUIDE.md)에 따로 있고, 이 문서는 빌드·확인·패널 계약을 다룬다.
 - **Mac(Apple Silicon):** 아래 [설치 전 준비](#설치-전-준비)와 [설치와 사용 흐름](#설치와-사용-흐름)대로 쓴다.
 - **Windows:** frontend가 빌드·확인·업로드한다. 절차는 [Windows에서](#windows에서)에 있다(0.2.5부터).
 - **패널 코드에 필요한 변경(0.2.9):** backend가 frontend 저장소 브랜치 `feat/k17-panel` 하나에 Next Move 카드(`feat/next-move-card`), 다시 로드 안내(`feat/reload-required-notice`), K17 패널 정리를 모았다. Windows 0.2.9를 빌드하기 전에 이 브랜치를 `main`에 합쳐 주세요(아래 [Windows 0.2.9 빌드 요청](#windows-029-빌드-요청-frontend)). host API(`frontend-host.d.cts`)의 `openProjectInKiro` 결과에 선택 필드 `freshSession`이 생겼다. 0.2.2의 Evidence 표시 검토도 그대로다([0.2.2에서 바뀐 점](#022에서-바뀐-점-analystevidence-정책)).
+
+## Windows 0.2.12 빌드 요청 (frontend)
+
+backend가 Windows 0.2.11 확인의 다섯 건(K21)과 사용자 Windows 실사용 2회의 후속(K22)을 처리해 Mac 0.2.12를 만들고 실제 Kiro에서 확인했다([Mac 0.2.12 확인](../tests/eval/results/kiro-0.2.12-mac-check.md)). 할 일, 답, 추가 확인 26~30, 패널 UI 요청은 [0.2.12 프론트 인계](FRONTEND_HANDOFF_0.2.12.md)에 있다.
 
 ## Windows 0.2.11 빌드 요청 (frontend)
 
@@ -55,6 +60,24 @@ backend `main`과 frontend `main`으로 Windows 0.2.7을 빌드해 확인하고 
 8. **늦은 신뢰:** 빈 폴더를 신뢰하지 **않은** 상태로 열고, 신뢰 설정에서 신뢰한 뒤 "이걸로 시작"(또는 Open Project in Kiro Chat)을 누른다. "이 창은 폴더를 신뢰하기 전에 열려서…다시 로드할까요?" 알림이 떠야 하고, 다시 로드 뒤 MCP 목록에 `vibe-helper Connected`, hook 2개 등록이 보여야 한다.
 9. **채팅 Decision:** Builder가 번호 선택지로 물으면 "2번, 이유는 …"처럼 답한다. History나 Core에서 그 Decision이 학습자 선택으로 확정되고 학습자 발언이 연결됐는지 본다.
 10. **완료 뒤 이어서 만들기:** Task가 완료된 뒤 같은 채팅에서 기능을 하나 더 부탁한다. 새 Task(이전 Task를 이어받음)가 생기고 Builder가 그 Task로 작업·완료하는지 본다.
+
+## 0.2.12에서 바뀐 점
+
+frontend Windows 0.2.11 확인(2026-10-16)과 사용자의 Windows 0.2.11 실사용 2회의 후속이다(TASKS K21·K22, [DECISIONS](DECISIONS.md) "Windows 0.2.11 확인 후속(K21)", "사용자 Windows 0.2.11 실사용 후속(K22)"). DB 형식은 바뀌지 않았다.
+
+- **program `1eefe3f`:** 명령 팔레트 "Vibe Helper: Restore Kiro Layout", 패널이 Core 재연결 뒤 flow 포트를 다시 만든다.
+- **Project 터미널의 npm:** user·global npm 설정이 같은 빈 파일이어서 npm 11이 시작하지 않던 것을 고쳤다. global은 새 빈 파일 `empty-global.npmrc`를 쓴다.
+- **미리 승인:**
+  - 인자 없는 `Out-String`과, 따옴표로 시작하는 이 컴퓨터 주소의 `Invoke-WebRequest`·`Invoke-RestMethod`(`-Uri` 없이)를 더했다.
+  - 괄호·`try`·변수 대입 형태와 다른 호스트는 계속 묻는다.
+  - 0.2.11 규칙을 가진 폴더는 0.2.12 Core가 시작할 때 새 규칙으로 바뀐다.
+- **개념 이름:** `check_progress`가 확정 Spec의 개념 이름(`conceptNames`)을 돌려준다. `finish_task`는 그 이름의 개념만 기록한다(다른 이름은 `ignoredConcepts`, 거절은 하지 않음).
+- **Steering 0.9.3·0.9.4:**
+  - 첫 환경 확인은 버전 확인만 하고 운영체제 명령을 넣지 않는다.
+  - `finish_task`의 개념은 `conceptNames` 그대로 쓴다.
+  - Windows 서버 확인은 `Invoke-WebRequest http://localhost:<port> -UseBasicParsing | Select-Object -ExpandProperty StatusCode` 한 줄로 쓴다.
+  - 종료 코드가 0이 아니면 실패로 말한다.
+- **Discovery:** 1.4.0 그대로다. 예상 Decision을 늘리는 1.5.0 후보는 시험 뒤 채택하지 않았다([시험 기록](../tests/eval/results/discovery-spec-decisions-1.5.0-candidate.md)).
 
 ## 0.2.11에서 바뀐 점
 
