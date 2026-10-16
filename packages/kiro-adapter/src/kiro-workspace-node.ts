@@ -488,6 +488,31 @@ const K11_SHELL_RULE: KiroAllowRule = {
   ],
 }
 
+/** The shell rule 0.2.9–0.2.10 wrote (K17). */
+const K17_SHELL_RULE: KiroAllowRule = {
+  capability: 'shell',
+  // K17: open the finished app on this computer in the browser (macOS `open`, PowerShell
+  // `Start-Process` and its `start` alias), only for this computer's addresses; list ports; and
+  // call the app's own API with a method.
+  match: [
+    ...K11_SHELL_RULE.match,
+    ...['open http://localhost:*', 'open http://127.0.0.1:*'],
+    ...['Start-Process http://localhost:*', 'Start-Process http://127.0.0.1:*'],
+    ...['start http://localhost:*', 'start http://127.0.0.1:*'],
+    // K17 live check: the Builder checks which port is free and calls its own API with a method.
+    'lsof *',
+    ...['POST', 'PUT', 'PATCH', 'DELETE'].flatMap((method) => [
+      `curl -X ${method} http://localhost:*`,
+      `curl -s -X ${method} http://localhost:*`,
+      `curl -X ${method} http://127.0.0.1:*`,
+      `curl -s -X ${method} http://127.0.0.1:*`,
+      `curl.exe -X ${method} http://localhost:*`,
+      `curl.exe -s -X ${method} http://localhost:*`,
+    ]),
+  ],
+  exclude: [...K11_SHELL_RULE.exclude, 'open *@*', 'Start-Process *@*', 'start *@*'],
+}
+
 export const KIRO_PREAPPROVED_RULES: readonly KiroAllowRule[] = [
   {
     capability: 'mcp',
@@ -496,36 +521,39 @@ export const KIRO_PREAPPROVED_RULES: readonly KiroAllowRule[] = [
   },
   {
     capability: 'shell',
-    // K17: open the finished app on this computer in the browser (macOS `open`, PowerShell
-    // `Start-Process` and its `start` alias), only for this computer's addresses; list ports; and
-    // call the app's own API with a method.
+    // K20 (Windows 0.2.10 check 16): Kiro compares the command text as written, and Builders put
+    // the address in quotes (`Start-Process "http://localhost:5173"`) or after `-Uri`. The same
+    // commands with a quoted address of this computer are allowed; other hosts stay excluded. The
+    // parenthesized `(Invoke-WebRequest …).StatusCode` is not one command for Kiro, so Steering
+    // asks for the plain form instead.
     match: [
-      ...K11_SHELL_RULE.match,
-      ...['open http://localhost:*', 'open http://127.0.0.1:*'],
-      ...['Start-Process http://localhost:*', 'Start-Process http://127.0.0.1:*'],
-      ...['start http://localhost:*', 'start http://127.0.0.1:*'],
-      // K17 live check: the Builder checks which port is free and calls its own API with a method.
-      'lsof *',
-      ...['POST', 'PUT', 'PATCH', 'DELETE'].flatMap((method) => [
-        `curl -X ${method} http://localhost:*`,
-        `curl -s -X ${method} http://localhost:*`,
-        `curl -X ${method} http://127.0.0.1:*`,
-        `curl -s -X ${method} http://127.0.0.1:*`,
-        `curl.exe -X ${method} http://localhost:*`,
-        `curl.exe -s -X ${method} http://localhost:*`,
+      ...K17_SHELL_RULE.match,
+      ...['localhost', '127.0.0.1'].flatMap((host) => [
+        ...['"', "'"].flatMap((quote) => [
+          ...['open', 'Start-Process', 'start'].map(
+            (command) => `${command} ${quote}http://${host}:*${quote}`,
+          ),
+          ...['curl', 'curl -s', 'curl.exe', 'curl.exe -s'].map(
+            (command) => `${command} ${quote}http://${host}:*`,
+          ),
+        ]),
+        ...['Invoke-WebRequest', 'Invoke-RestMethod'].flatMap((command) =>
+          ['', '"', "'"].map((quote) => `${command} -Uri ${quote}http://${host}:*`),
+        ),
       ]),
     ],
-    exclude: [...K11_SHELL_RULE.exclude, 'open *@*', 'Start-Process *@*', 'start *@*'],
+    exclude: K17_SHELL_RULE.exclude,
   },
 ]
 
 /**
  * Our rules in the order they are recognized: the current ones first, then what earlier
- * installers wrote (0.2.7–0.2.8, K11), so an upgrade replaces an earlier rule and manual approval
- * still removes it.
+ * installers wrote (0.2.9–0.2.10, K17; 0.2.7–0.2.8, K11), so an upgrade replaces an earlier rule
+ * and manual approval still removes it.
  */
 const RECOGNIZED_PREAPPROVED_RULES: readonly KiroAllowRule[] = [
   ...KIRO_PREAPPROVED_RULES,
+  K17_SHELL_RULE,
   K11_SHELL_RULE,
 ]
 

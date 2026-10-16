@@ -316,6 +316,25 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
   - 바뀐 플랫폼의 빌드와 확인 1~8
 - **그때까지:** 부스·시연용 Windows PC는 행사 전에 한 번 실행해 관리 Node 캐시를 만들어 둔다.
 
+### [~] K20. Windows 0.2.10 확인 후속: 한글 이스케이프, 따옴표 주소, 첫 Task 선택, 완료 뒤 바꾼 선택
+
+- **출처:** frontend Windows 0.2.10 확인(2026-10-15, [0.2.10 Windows 확인](FRONTEND_KIRO_NATIVE_HANDOFF.md#0210-windows-확인-2026-10-15))의 backend 요청 네 건.
+  1. `ask_choice`의 최상위 문자열(`question` 등)이 `\uXXXX` 글자 그대로 저장돼 패널에 보였다. `save_progress`는 인자 전체가 `summary` 하나에 들어가 `kind` 검증 오류가 났다.
+  2. 확인 16 실패: Builder가 `Start-Process "http://localhost:5173"`, `(Invoke-WebRequest -Uri "…" -UseBasicParsing).StatusCode`처럼 주소를 따옴표로 감싸 미리 승인 패턴과 맞지 않았다. 첫 승인 창이 27분 동안 턴을 멈췄다.
+  3. 첫 Task("계획대로 만들기 시작해 줘")가 `ask_choice` 없이 앱 전체를 만들었다(0.2.7 Windows와 같은 증상). Workflow는 켜져 있었지만 쓰지 않았다.
+  4. 완료 뒤 학습자가 이유와 함께 이전 선택을 바꾸자 새 후속 Task가 됐고, Decision 기록에는 변경이 남지 않았다. 의도를 물었다.
+- **확인(2026-10-16, Mac):**
+  - 1은 Mac에서도 생긴다. 10/9 이후 Mac Kiro 세션의 Vibe Helper 도구 호출 118건 중 11건이 같은 원인이다. 모델이 인자를 JSON 문자열로 한 번 더 감싸 한글을 `\uXXXX`로 쓴다. 8건은 Kiro `tool_call`이 거절했다(`arguments: expected object, received string`, K10의 알려진 한계). 2건은 배열을 문자열로 보내 schema가 거절했다. 1건(10/12 K17 실측 `save_progress` 요약)은 그대로 저장됐다. Mac Core DB의 결정 요청 60건에는 없었다. bridge·Windows 경로의 문제가 아니다.
+  - 2는 Mac kiro-cli 판정기로도 재현된다(`open "http://localhost:5173"`, `curl "http://…"`도 묻기). 괄호로 감싼 `(Invoke-WebRequest …).StatusCode`는 패턴을 넣어도 하나의 명령으로 읽히지 않아 계속 묻는다.
+  - 4는 지금 설계대로다. 적용된 Decision의 `save_choice`는 `DECISION_ALREADY_APPLIED`로 거절되고, 바꾸는 요청은 후속 Task가 된다.
+- **결정:** 사용자 결정(2026-10-16): 1은 풀어서 받기, 3은 Mac 실측 뒤 Steering, 4는 의도한 동작으로 문서화, 끝나면 Mac 0.2.11·push·Windows 요청까지.
+- **범위:**
+  1. MCP 입력 단계(Kiro 채팅 도구): 문자열 전체가 이스케이프된 경우만 풀어서 받는다. 다른 인자까지 한 문자열에 들어간 경우는 다시 보내라는 오류로 돌려준다. 배열·객체를 JSON 문자열로 보낸 경우도 풀어서 받는다.
+  2. 미리 승인: 따옴표로 감싼 주소(`Start-Process`·`start`·`open`·`curl`)와 `Invoke-WebRequest -Uri` 형태를 더한다. 0.2.9~0.2.10 규칙을 가진 폴더는 업그레이드한다.
+  3. Steering 0.9.2: 주소는 따옴표 없이, 서버 확인은 괄호 없이 쓴다. 도구 인자는 JSON 객체로, 한글은 그대로 쓴다. 첫 Task 규칙은 실측 결과에 맞춘다.
+  4. 완료 뒤 바꾼 선택은 DECISIONS와 인계 문서에 적는다.
+- **완료 조건:** contracts·MCP·adapter 단위 테스트, 기존 unit·integration·eval·패널 CJS·포장 검사 회귀 없음, kiro-cli 판정기, Workflow를 켠 Mac 프로필에서 처음 보는 목표의 첫 Task 실측(0.9.1 재현, 0.9.2 확인), Mac VSIX 0.2.11, Windows 0.2.11 요청.
+
 ## 3. 예선 작업 요약
 
 상세 기록은 [예선 작업 기록](archive/preliminary/TASKS_PRELIMINARY.md)에 있다.

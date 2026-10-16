@@ -261,6 +261,89 @@ function withoutToolPurpose(input: Record<string, unknown>): Record<string, unkn
   return rest
 }
 
+// A `\uXXXX` escape of a non-ASCII character, and any non-ASCII character itself.
+const ESCAPED_NON_ASCII =
+  /\\u(?:00[89a-fA-F][0-9a-fA-F]|0[1-9a-fA-F][0-9a-fA-F]{2}|[1-9a-fA-F][0-9a-fA-F]{3})/
+const NON_ASCII = /[\u0080-\uffff]/
+const LONE_SURROGATE = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/
+
+/**
+ * Text a model wrote one JSON level too deep: plain ASCII in which every non-ASCII letter is a
+ * `\uXXXX` escape (K20, Korean in Kiro chat). Text that already holds a non-ASCII character is
+ * left as it is, so a written escape next to real Korean stays.
+ */
+function decodeEscapedText(value: string): string {
+  if (!ESCAPED_NON_ASCII.test(value) || NON_ASCII.test(value)) return value
+  const decoders = [
+    () => JSON.parse(`"${value}"`) as unknown,
+    () =>
+      value.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex: string) =>
+        String.fromCharCode(Number.parseInt(hex, 16)),
+      ),
+  ]
+  for (const decode of decoders) {
+    try {
+      const decoded = decode()
+      if (typeof decoded === 'string' && !LONE_SURROGATE.test(decoded)) return decoded
+    } catch {}
+  }
+  return value
+}
+
+function decodeEscapedStrings(value: unknown): unknown {
+  if (typeof value === 'string') return decodeEscapedText(value)
+  if (Array.isArray(value)) return value.map(decodeEscapedStrings)
+  if (typeof value === 'object' && value !== null)
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, decodeEscapedStrings(item)]),
+    )
+  return value
+}
+
+const isContainerField = (field: z.ZodType): boolean => {
+  const inner = field instanceof z.ZodOptional ? field.unwrap() : field
+  return inner instanceof z.ZodArray || inner instanceof z.ZodObject
+}
+
+/**
+ * Kiro chat tool input as models send it (K20). A model sometimes writes the input one JSON level
+ * too deep: Korean as `\uXXXX` escapes, an array as its JSON text, or every argument inside the
+ * first string. Escaped text is decoded and an array or object field sent as JSON text is parsed
+ * before the strict schema runs, so the stored text is what the learner reads. Arguments packed
+ * into one string are refused with a message that says how to send them. The JSON Schema the
+ * Agent sees stays the strict one.
+ */
+function kiroChatTransportSchema(
+  schema: z.ZodType & { readonly shape: Readonly<Record<string, z.ZodType>> },
+): z.ZodType {
+  const keys = Object.keys(schema.shape)
+  const containers = new Set(
+    Object.entries(schema.shape).flatMap(([key, field]) => (isContainerField(field) ? [key] : [])),
+  )
+  return z.preprocess((input, context) => {
+    if (typeof input !== 'object' || input === null || Array.isArray(input)) return input
+    const fields: Record<string, unknown> = { ...input }
+    for (const [key, value] of Object.entries(fields)) {
+      if (typeof value !== 'string') continue
+      if (containers.has(key)) {
+        const parsed = parseStringifiedArray(value)
+        if (typeof parsed === 'object' && parsed !== null) fields[key] = parsed
+        continue
+      }
+      const packed = keys.filter(
+        (other) => other !== key && new RegExp(`"\\s*,\\s*\\\\?"${other}\\\\?"\\s*:`).test(value),
+      )
+      if (packed.length > 0)
+        context.addIssue({
+          code: 'custom',
+          path: [key],
+          message: `${key} holds other arguments (${packed.join(', ')}). Send every argument as its own field of the JSON object, and write Korean and other non-ASCII text as it is, not as \\u escapes.`,
+        })
+    }
+    return decodeEscapedStrings(fields)
+  }, schema)
+}
+
 /**
  * The Builder tools of the learner's own Kiro chat (K10). Kiro shows each call as
  * `@vibe-helper/<name>`, so the names are plain words. The Agent sends only what it decided;
@@ -272,7 +355,7 @@ export const KIRO_CHAT_BUILDER_TOOLS: readonly KiroChatToolDefinition[] = [
     title: 'Check progress',
     description:
       'Read the task, its acceptance criteria and the choices still open with numbered options. Call it when you start and whenever you need the decisionId of an open choice. After the task is finished it has nextMove: numbered suggestions to grow the project, or that they are still being generated.',
-    inputSchema: kiroChatCheckProgressToolInputSchema,
+    inputSchema: kiroChatTransportSchema(kiroChatCheckProgressToolInputSchema),
     readOnly: true,
     command: () => ({ kind: 'BUILDER_CHAT_CHECK_PROGRESS' }),
   },
@@ -281,7 +364,7 @@ export const KIRO_CHAT_BUILDER_TOOLS: readonly KiroChatToolDefinition[] = [
     title: 'Save progress',
     description:
       "Save a short progress note that the learner's helper tab reads: your plan, a change of direction, a new plan after an error, or the start of a test run. After a finished task, a PLAN note for the learner's new request starts a follow-up task; the result then has followUpTask with the acceptance criteria to finish against. If the learner picked a nextMove suggestion, add nextMove with its number.",
-    inputSchema: kiroChatSaveProgressToolInputSchema,
+    inputSchema: kiroChatTransportSchema(kiroChatSaveProgressToolInputSchema),
     readOnly: false,
     command: (input) => ({ kind: 'BUILDER_CHAT_SAVE_PROGRESS', note: withoutToolPurpose(input) }),
   },
@@ -290,7 +373,7 @@ export const KIRO_CHAT_BUILDER_TOOLS: readonly KiroChatToolDefinition[] = [
     title: 'Ask the learner to choose',
     description:
       'Record a real product or technical choice the learner should make, before you ask it in chat. Give 2 to 4 options in the order you will show them (numbered from 1) and your recommendation. Then ask in chat and wait for the learner.',
-    inputSchema: kiroChatAskChoiceToolInputSchema,
+    inputSchema: kiroChatTransportSchema(kiroChatAskChoiceToolInputSchema),
     readOnly: false,
     command: (input) => ({ kind: 'BUILDER_CHAT_ASK_CHOICE', choice: withoutToolPurpose(input) }),
   },
@@ -299,7 +382,7 @@ export const KIRO_CHAT_BUILDER_TOOLS: readonly KiroChatToolDefinition[] = [
     title: "Save the learner's choice",
     description:
       'Record the learner\'s answer after they reply in this chat: the option number, "recommended", or "custom" with a short summary of their own idea. Vibe Helper links the learner\'s own words, so do not quote them. Call it again if the learner changes their mind. If the learner says a recorded choice was not theirs, send "not_mine" with its decisionId: it stops counting as their choice and, when it is not built yet, the question opens again (reopened).',
-    inputSchema: kiroChatSaveChoiceToolInputSchema,
+    inputSchema: kiroChatTransportSchema(kiroChatSaveChoiceToolInputSchema),
     readOnly: false,
     command: (input) => ({ kind: 'BUILDER_CHAT_SAVE_CHOICE', answer: withoutToolPurpose(input) }),
   },
@@ -308,7 +391,7 @@ export const KIRO_CHAT_BUILDER_TOOLS: readonly KiroChatToolDefinition[] = [
     title: 'Finish the task',
     description:
       'Finish the task when every acceptance criterion passes and you ran at least one check. Say how each chosen option was built. If it is rejected, keep working until the criteria pass.',
-    inputSchema: kiroChatFinishTaskToolInputSchema,
+    inputSchema: kiroChatTransportSchema(kiroChatFinishTaskToolInputSchema),
     readOnly: false,
     command: (input) => ({ kind: 'BUILDER_CHAT_FINISH_TASK', report: withoutToolPurpose(input) }),
   },

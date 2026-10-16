@@ -236,6 +236,135 @@ describe('experimental native Core binding', () => {
     }
   })
 
+  it('stores Kiro chat input sent one JSON level too deep as the text the learner reads (K20)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'vibe-native-kiro-chat-escaped-'))
+    const storage = await openInMemorySqliteStorage()
+    storage.transaction((repository) => {
+      repository.appendProject(projectSchema.parse(projectFixture))
+      repository.appendDiscoverySession(discoverySessionSchema.parse(discoverySessionFixture))
+      repository.appendCandidate(projectCandidateRevisionSchema.parse(candidateFixture))
+      repository.appendCandidateRound(candidateRoundSchema.parse(candidateRoundFixture))
+      repository.appendDiscoveryFeedback(discoveryFeedbackSchema.parse(discoveryFeedbackFixture))
+      repository.appendLearningSpec(learningSpecRevisionSchema.parse(draftLearningSpecFixture))
+      repository.appendLearningSpec(learningSpecRevisionSchema.parse(confirmedLearningSpecFixture))
+      repository.appendTask(builderTaskSchema.parse(builderTaskFixture))
+    })
+    const application = new ApplicationService({
+      storage,
+      workspacePolicy: await WorkspacePathPolicy.create(root),
+    })
+    const binding = createNativeCoreBinding({
+      application,
+      role: 'BUILDER',
+      surface: 'KIRO_CHAT',
+      projectId: ids.project,
+      correlationId: ids.correlation,
+      taskId: ids.task,
+    })
+    const runtime = new WorkflowRuntime({
+      application,
+      agents: {
+        invoke: async () => {
+          throw new Error('NATIVE_AGENT_NOT_ATTACHED')
+        },
+      },
+      instanceId: randomUUID(),
+    })
+    const server = createLocalServer({
+      application,
+      runtime,
+      token: randomBytes(32).toString('hex'),
+      instanceId: randomUUID(),
+      mcpHandlers: new Map([[binding.path, binding.handler]]),
+      runStartDisabledCode: 'NATIVE_RUNTIME_NOT_ATTACHED',
+    })
+    await new Promise<void>((done) => server.listen(0, '127.0.0.1', done))
+    const address = server.address()
+    if (!address || typeof address === 'string') throw new Error('LISTEN_FAILED')
+    const client = new Client({ name: 'kiro-chat-escaped-test', version: '0.1.0' })
+    const transport = new StreamableHTTPClientTransport(
+      new URL(`http://127.0.0.1:${address.port}${binding.path}`),
+      { requestInit: { headers: { Authorization: binding.authorization } } },
+    )
+    // What the Builder meant, and the same text as the model wrote it one JSON level too deep.
+    const asciiOnly = (json: string) =>
+      json
+        .split('')
+        .map((char) => {
+          const code = char.charCodeAt(0)
+          return code < 0x80 ? char : `\\u${code.toString(16).padStart(4, '0')}`
+        })
+        .join('')
+    const escaped = (text: string) => asciiOnly(JSON.stringify(text)).slice(1, -1)
+    const question = '능력치별 정렬 UI를 "드롭다운"으로 할까요, 버튼으로 할까요?'
+    try {
+      await client.connect(transport)
+      // Every argument packed into the first string: refused with how to send it, nothing saved.
+      const packed = await client.callTool({
+        name: 'save_progress',
+        arguments: {
+          summary: `${escaped('롤 챔피언 백과사전')}", "nextSteps": ["a"], "kind": "PLAN"}`,
+        },
+      })
+      expect(packed.isError).toBe(true)
+      expect(JSON.stringify(packed.content)).toContain('summary holds other arguments')
+      expect(JSON.stringify(packed.content)).not.toContain('expected one of')
+      expect(storage.repository.readBuilderTaskAggregate(ids.project, ids.task)?.liveContext).toBe(
+        null,
+      )
+
+      const note = await client.callTool({
+        name: 'save_progress',
+        arguments: {
+          kind: 'PLAN',
+          summary: escaped('정렬 기준을 정한 뒤 목록 화면을 만든다.'),
+          // An array sent as its JSON text, with escaped Korean inside.
+          nextSteps: asciiOnly(JSON.stringify(['정렬 UI 만들기', '테스트 실행'])),
+        },
+      })
+      expect(note.isError).not.toBe(true)
+      expect(note.structuredContent).toMatchObject({ outcome: 'SAVED' })
+      const context = storage.repository.readBuilderTaskAggregate(
+        ids.project,
+        ids.task,
+      )?.liveContext
+      expect(context?.currentGoal).toBe('정렬 기준을 정한 뒤 목록 화면을 만든다.')
+      expect(context?.nextActions).toEqual(['정렬 UI 만들기', '테스트 실행'])
+
+      const asked = await client.callTool({
+        name: 'ask_choice',
+        arguments: {
+          category: 'PRODUCT_BEHAVIOR',
+          question: escaped(question),
+          whyNow: escaped('정렬 코드를 쓰기 직전이에요.'),
+          options: [
+            { label: '드롭다운 + 방향 토글', description: '한 곳에서 고릅니다.' },
+            // A real Korean string with a written escape stays as it is.
+            { label: '버튼', description: '정규식 \\u00e9 처리처럼 글자 그대로 둡니다.' },
+          ],
+          recommended: 1,
+          recommendationReason: escaped('화면이 덜 복잡해요.'),
+          blocksWork: true,
+        },
+      })
+      expect(asked.isError).not.toBe(true)
+      const decision = storage.repository.readBuilderTaskAggregate(ids.project, ids.task)
+        ?.decisionRequests[0]
+      expect(decision?.question).toBe(question)
+      expect(decision?.reasonRequiredNow).toBe('정렬 코드를 쓰기 직전이에요.')
+      expect(decision?.recommendationRationale).toBe('화면이 덜 복잡해요.')
+      expect(decision?.options.map((option) => option.description)).toEqual([
+        '한 곳에서 고릅니다.',
+        '정규식 \\u00e9 처리처럼 글자 그대로 둡니다.',
+      ])
+    } finally {
+      await client.close().catch(() => {})
+      await new Promise<void>((done) => server.close(() => done()))
+      await runtime.close()
+      storage.close()
+    }
+  })
+
   it('uses real Core with one Builder Task scope and revokes the MCP authority', async () => {
     const root = await mkdtemp(join(tmpdir(), 'vibe-native-bound-core-'))
     const storage = await openInMemorySqliteStorage()

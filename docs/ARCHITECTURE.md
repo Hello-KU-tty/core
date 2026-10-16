@@ -471,6 +471,12 @@ Kiro 채팅 Builder(본선, K10). 학습자의 Kiro Agent가 쓰는 도구로, �
 - `save_choice`: 학습자가 고른 안만 기록. Core가 직전 확정(첫 Decision이면 Task 시작) 이후 같은 Task의 Builder·Helper 탭 학습자 발언 최근 20개를 연결하고, 질문 뒤 Builder 탭 발언이 있는지와 분명한 번호 답과의 모순만 검증한다. 바뀐 선택은 같은 질문을 새 Decision으로 다시 열어 확정한다
 - `finish_task`: 보고를 먼저 검증한 뒤 Decision 적용, `TASK_COMPLETED` 맥락, 완료를 한 번에 처리
 
+입력은 MCP 경계(`apps/mcp-server`)에서 엄격한 schema 앞에 한 번 다듬는다(K20). 모델이 입력을 JSON 한 단계 더 깊게 쓴 경우만 고친다.
+- 모든 비 ASCII 글자가 `\uXXXX`로 적힌 ASCII 문자열은 풀어서 저장한다.
+- JSON 문자열로 온 배열·객체 필드는 풀어서 받는다.
+- 다른 인자까지 한 문자열에 들어간 입력은 다시 보내는 방법을 담은 검증 오류로 거절한다.
+- Agent가 보는 JSON Schema는 바꾸지 않는다.
+
 연결된 Task를 이어받은 뒤 Task(후속 Task)가 있으면 도구는 그 Task에서 일한다. 완료한 Task에서 `save_progress`·`ask_choice`가 오면, 완료 뒤 Builder 탭 학습자 발언이 있을 때만 Core가 그 원문을 목표로 같은 workspace의 후속 Task를 만든다(FR-BLD-008, `UI_PREPARE_FOLLOW_UP_TASK`와 같은 계획 규칙). 없으면 `CHAT_TASK_FINISHED`다. local backend는 Builder 도구 호출 뒤 Project의 현재 Task가 연결된 Task를 이어받았으면 다시 연결해 descriptor·hook·Steering·Spec을 새 Task로 옮긴다.
 
 Helper Agent:

@@ -1,5 +1,57 @@
 # 결정 기록
 
+## 본선: Windows 0.2.10 확인 후속 — 한글 이스케이프, 따옴표 주소, 첫 Task 선택, 완료 뒤 바꾼 선택(K20)
+
+- **맥락(frontend Windows 0.2.10 확인, 2026-10-15, Kiro 1.2.56, Workflow 켬):**
+  - `ask_choice`의 최상위 문자열(`question`·`reasonRequiredNow`·`recommendationRationale`)이 `\uXXXX` 글자 그대로 저장돼 패널에 보였다. 선택지 안의 문자열은 정상이었다.
+  - `save_progress`는 인자 전체가 `summary` 하나에 들어가 `kind` 검증 오류가 났다.
+  - Builder가 `Start-Process "http://localhost:5173"`, `(Invoke-WebRequest -Uri "…" -UseBasicParsing).StatusCode`처럼 써서 미리 승인과 맞지 않았다. 첫 승인 창이 27분 동안 턴을 멈췄다(확인 16).
+  - 첫 Task("계획대로 만들기 시작해 줘")가 `ask_choice` 없이 앱 전체를 만들었다(0.2.7 Windows와 같은 증상).
+  - 완료 뒤 학습자가 이유와 함께 이전 선택을 바꾸자 새 후속 Task가 됐다. Decision 기록에는 변경이 남지 않았다.
+- **확인(2026-10-16, Mac):**
+  - **이스케이프:** Mac에서도 생긴다. 10/9 이후 Mac Kiro 세션의 Vibe Helper 도구 호출 118건 중 11건이 같은 원인이다. 모델이 입력을 JSON 한 단계 더 깊게 써서 비 ASCII 글자를 `\uXXXX`로 적는다.
+    - 8건: Kiro `tool_call`의 `arguments`가 문자열로 와서 Kiro가 거절했다(K10의 알려진 한계).
+    - 2건: 배열 필드가 JSON 문자열로 와서 schema가 거절했다.
+    - 1건: 10/12 K17 실측의 `save_progress` 요약이 그대로 저장됐다.
+    - Mac Core DB의 결정 요청 60건에는 없었다. bridge·Windows 경로의 문제가 아니다.
+  - **따옴표 주소:** Mac kiro-cli 판정기로도 재현된다(`open "http://localhost:5173"`, `curl "http://…"`도 묻기). 원인 하나도 찾았다. Kiro `execute_bash`는 주소와 포트가 든 `open http://localhost:5174`를 서버를 띄우는 명령으로 보고 실행하지 않는다(Exit -1). 그러면 Builder가 주소를 따옴표로 감싸 다시 실행한다.
+  - **첫 Task:** Workflow를 켠 Mac(Steering 0.9.1)에서 처음 보는 목표로 "계획대로 만들기 시작해 줘"를 보냈다. Windows처럼 하나도 묻지 않는 증상은 재현되지 않았다(선택 1개를 물음). 하지만 다음 문제가 있었다.
+    - 학습 목표 영역인 데이터 구조를 Builder가 스스로 정했다.
+    - 정렬 코드를 임시로 먼저 짠 뒤 물었다.
+    - "학습자가 결정할 만한 실제 선택"처럼 규칙을 학습자에게 말했다.
+  - **완료 뒤 바꾼 선택:** 지금 설계대로다. 적용된 Decision의 `save_choice`는 `DECISION_ALREADY_APPLIED`로 거절되고, 바꾸는 요청은 `save_progress` PLAN으로 후속 Task가 된다.
+- **결정(사용자 결정, 2026-10-16):**
+  1. **Kiro 채팅 도구 입력(MCP 경계):** 엄격한 schema 앞에서 한 번 다듬는다. Agent가 보는 JSON Schema는 그대로다.
+     - **이스케이프된 글:** ASCII 문자열 안의 비 ASCII 글자가 모두 `\uXXXX`로 적혀 있을 때만 JSON 문자열 규칙으로 풀어서 저장한다. 원래 비 ASCII 글자가 든 문자열은 그대로 둔다(글 속의 `\u` 표기 보존). 풀었을 때 짝 없는 surrogate가 생기면 풀지 않는다.
+     - **JSON 문자열로 온 배열·객체:** 배열·객체 필드가 JSON 문자열로 오면 풀어서 받는다(Discovery 도구와 같은 방식).
+     - **한 문자열에 몰린 인자:** 문자열 필드 안에 `", "<다른 인자 이름>":`가 있으면 인자가 한 문자열에 들어간 것으로 본다. "각 인자를 따로, 한글은 그대로"라는 검증 오류로 거절하고 아무것도 저장하지 않는다.
+     - Agent 출력의 글자 표기만 고치므로 provenance·Evidence 규칙은 그대로다. Kiro가 `arguments` 자체를 거절하는 경우는 Core에 닿지 않아 그대로 남는다.
+  2. **미리 승인:** 0.2.9~0.2.10 목록(K17)에 이 컴퓨터 주소(localhost·127.0.0.1)의 따옴표 형태를 더한다.
+     - `open`·`Start-Process`·`start`: 큰따옴표나 작은따옴표로 닫힌 주소.
+     - `curl`·`curl.exe`(`-s` 포함): 따옴표로 시작하는 주소.
+     - `Invoke-WebRequest -Uri`·`Invoke-RestMethod -Uri`: 따옴표 없이, 큰따옴표, 작은따옴표.
+     - 다른 호스트(`*@*`)는 그대로 제외한다. 이어 붙인 명령·줄바꿈·`$( )`는 부분마다 판정해 계속 묻는다.
+     - 괄호로 감싼 `(Invoke-WebRequest …).StatusCode`는 Kiro가 하나의 명령으로 읽지 못해 패턴으로 풀 수 없다. 그래서 Steering이 한 줄 명령을 쓰게 한다.
+     - 0.2.9~0.2.10 규칙을 인식 목록에 넣는다. 다시 연결할 때 그 규칙이 새 규칙으로 바뀌고, 수동 승인으로 바꾸면 그 항목도 지워진다.
+  3. **Steering 0.9.2:**
+     - 도구 입력은 JSON 객체 하나로 쓰고 인자마다 필드를 둔다. 한글은 그대로 쓴다.
+     - 시작 요청은 어떤 선택도 정하지 않는다. 학습 목표 영역의 코드를 쓰기 전마다 실제 선택이 있는지 보고, 있으면 그때 묻는다. 임시 구현을 먼저 쓰고 나중에 묻지 않는다.
+     - 학습자를 어떤 언어로도 3인칭으로 부르지 않고, 이 규칙의 용어도 쓰지 않는다. 직접 정한 것은 무엇으로 정했는지만 말하고, 자기가 정할 몫이라고 말하지 않는다.
+     - 서버 확인(`curl -s`·`Invoke-WebRequest … -UseBasicParsing`)과 브라우저 열기는 한 줄 명령으로 쓴다. 따옴표는 막지 않는다(Kiro 경고를 피하는 방법이고 미리 승인에 있다).
+  4. **완료 뒤 바꾼 선택(의도한 동작):**
+     - 적용된 Decision은 바꾸지 않는다. 완료 뒤 학습자가 이전 선택을 바꾸자고 하면 후속 Task가 된다. 학습자 말은 발언 기록으로 남는다.
+     - Decision 기록에 "바뀜"이 남지 않는 것은 알려진 한계다. 후속 Task의 Decision으로 남기는 방안(이전 Decision 참조, 학습자 이유 연결)은 Core 계약이 바뀌므로 본선 뒤 다시 판단한다.
+- **검증:**
+  - MCP 연결 통합 테스트: 이스케이프된 `ask_choice`·`save_progress`가 풀린 글로 저장된다. 원래 한글이 든 문자열의 `\u` 표기는 그대로다. 한 문자열에 몰린 인자는 안내 오류로 거절되고 아무것도 저장되지 않는다. 풀기를 끈 빌드에서는 같은 테스트가 Windows와 같은 증상으로 실패했다.
+  - adapter 단위 테스트: 따옴표 형태 포함, 0.2.9~0.2.10 → 새 규칙 업그레이드, 수동 승인의 제거, Kiro가 더한 "항상 허용" 보존. Steering 0.9.1·0.9.2 문장.
+  - kiro-cli 판정기: 예전 명령 목록 3개는 판정이 그대로다. 따옴표 형태는 허용되고, 이어 붙인 위험 명령·다른 호스트·명령 치환은 계속 묻는다.
+  - 실제 Kiro(Mac, Workflow 켬): [K20 기록](../tests/eval/results/kiro-steering-0.9.2-k20.md).
+- **위험:**
+  - 한글 없이 `\u00e9`처럼 이스케이프 표기를 일부러 쓴 ASCII 문자열은 풀린다. 학습자에게 보이는 Builder 글에서는 드물다고 본다.
+  - 글 속에 `", "files":` 같은 JSON 조각을 그대로 인용하면 인자가 몰린 것으로 보고 거절한다. Builder는 오류 문장을 보고 다시 보낸다.
+  - `Invoke-WebRequest -Uri "http://localhost:…" -OutFile <경로>`도 허용된다. 기존 `Invoke-WebRequest http://localhost:*`와 같은 성질이다. 목록은 실수 방지용이고 sandbox가 아니다(K11).
+  - 첫 Task에서 묻는 일은 여전히 Steering에 기댄다. Windows에서 묻지 않은 원인은 Mac에서 재현하지 못했다. Windows 0.2.11 확인 9가 판정한다.
+
 ## 본선: Windows 0.2.9 확인 후속 — 이름으로 node 종료, Core 재시작, Workflow 위임(K18)
 
 - **맥락(frontend Windows 0.2.9 확인, 2026-10-14, Kiro 1.2.56):**

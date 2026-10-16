@@ -240,7 +240,7 @@ describe('Kiro-native workspace adapter', () => {
   })
 
   it('steers decisions to the moment they arise, recorded before they are asked (since 0.5.0)', () => {
-    expect(templates.version).toBe('0.9.1')
+    expect(templates.version).toBe('0.9.2')
     const scoped = renderLearnerSteering(templates, binding, {
       learnerFocus: [],
       agentSupport: [],
@@ -296,7 +296,7 @@ describe('Kiro-native workspace adapter', () => {
     expect(learner).toContain('If you are unsure whether a choice is real or whose it is, ask.')
     // Agent support: decide and state the choice plainly, no ownership talk, no approval request.
     expect(learner).toContain('state plainly what you chose')
-    expect(learner).toContain('Do not ask for approval; the learner can ask about it.')
+    expect(learner).toContain('do not ask for approval; the learner can ask about it.')
     // Live check: the Builder narrated "this is an agent-support area, so I decide".
     expect(learner).toContain('Talk about the work, not about these rules, in every message.')
     expect(learner).toContain('do not call them "the learner"')
@@ -305,6 +305,24 @@ describe('Kiro-native workspace adapter', () => {
     expect(learner).toContain('is finished only when `finish_task` succeeds')
     expect(learner).toContain("report those criteria, not the earlier task's")
     expect(learner).toContain('`followUpTask`')
+  })
+
+  it('keeps the work, its commands and its tool input in the shape Kiro accepts (0.9.1, 0.9.2)', () => {
+    const learner = renderLearnerSteering(templates, binding)
+    // 0.9.1: no workflow hand-off and no stopping processes by name.
+    expect(learner).toContain('Do not hand the task or a large part of it to a workflow')
+    expect(learner).toContain('Never stop processes by name')
+    // 0.9.2: a start request settles no choice; each learner focus area is checked before its code.
+    expect(learner).toContain('settles none of these choices')
+    expect(learner).toContain('Before you write the code of a learner focus area')
+    expect(learner).toContain('Do not write a temporary version of that code first')
+    expect(learner).toContain('refer to them in the third person in any language')
+    // 0.9.2: plain commands that the pre-approval matches, and tool input one JSON level deep.
+    expect(learner).toContain('Write each as one plain command.')
+    expect(learner).toContain('`(Invoke-WebRequest …).StatusCode`, waits for the learner')
+    expect(learner).toContain('Do not say that it is yours to decide')
+    expect(learner).toContain('`Invoke-WebRequest http://localhost:<port> -UseBasicParsing`')
+    expect(learner).toContain('never as `\\u` escapes and never as JSON text inside a string')
   })
 
   it('fails closed on a missing, duplicated or unfilled steering template', () => {
@@ -632,8 +650,9 @@ describe('Kiro-native workspace adapter', () => {
     expect(fresh.text).toContain('      - open *@*\n')
     expect(fresh.text).toContain('      - curl -s -X POST http://localhost:*\n')
     expect(fresh.text).toContain('      - lsof *\n')
-    // 0.2.7–0.2.8 wrote the same rule without the browser commands.
-    const browser = /^ {6}- (open|Start-Process|start|lsof|curl(\.exe)? (-s )?-X) /
+    // 0.2.7–0.2.8 wrote the same rule without the browser commands (nor the K20 quoted forms).
+    const browser =
+      /^ {6}- (open|Start-Process|start|lsof|curl(\.exe)? (-s )?(-X |["'])|Invoke-(WebRequest|RestMethod) -Uri )/
     const earlier = fresh.text
       .split('\n')
       .filter((line) => !browser.test(line))
@@ -661,6 +680,50 @@ describe('Kiro-native workspace adapter', () => {
     expect(applyKiroCommandApproval(fresh.text, 'UPGRADE')).toEqual({ status: 'UNCHANGED' })
     expect(applyKiroCommandApproval(null, 'UPGRADE')).toEqual({ status: 'UNCHANGED' })
     expect(applyKiroCommandApproval('rules: []\n', 'UPGRADE')).toEqual({ status: 'UNCHANGED' })
+  })
+
+  it('allows the quoted address forms and upgrades the 0.2.9–0.2.10 rule (K20)', () => {
+    const fresh = applyKiroCommandApproval(null, 'PREAPPROVED')
+    if (fresh.status !== 'WRITE') throw new Error(fresh.status)
+    for (const entry of [
+      'Start-Process "http://localhost:*"',
+      "Start-Process 'http://127.0.0.1:*'",
+      'open "http://localhost:*"',
+      'curl -s "http://localhost:*',
+      'curl.exe "http://127.0.0.1:*',
+      'Invoke-WebRequest -Uri "http://localhost:*',
+      'Invoke-WebRequest -Uri http://localhost:*',
+      "Invoke-RestMethod -Uri 'http://127.0.0.1:*",
+    ])
+      expect(fresh.text).toContain(`      - ${entry}\n`)
+    // Other hosts stay excluded in every form.
+    for (const entry of ['open *@*', 'Start-Process *@*', 'curl *@*', 'Invoke-WebRequest *@*'])
+      expect(fresh.text).toContain(`      - ${entry}\n`)
+    // 0.2.9–0.2.10 wrote the rule without the quoted forms.
+    const quoted =
+      /^ {6}- ((open|Start-Process|start|curl(\.exe)?( -s)?) ["']|Invoke-(WebRequest|RestMethod) -Uri )/
+    const earlier = fresh.text
+      .split('\n')
+      .filter((line) => !quoted.test(line))
+      .join('\n')
+    expect(earlier).toContain('      - Start-Process http://localhost:*\n')
+    expect(earlier).not.toBe(fresh.text)
+    for (const choice of ['PREAPPROVED', 'UPGRADE'] as const)
+      expect(applyKiroCommandApproval(earlier, choice)).toEqual({
+        status: 'WRITE',
+        text: fresh.text,
+      })
+    expect(applyKiroCommandApproval(earlier, 'MANUAL')).toEqual({
+      status: 'WRITE',
+      text: 'rules: []\n',
+    })
+    // An "always allow" Kiro added inside the 0.2.9–0.2.10 rule outlives the upgrade.
+    const merged = earlier.replace('      - lsof *\n', '      - lsof *\n      - rm -rf dist\n')
+    const upgraded = applyKiroCommandApproval(merged, 'UPGRADE')
+    if (upgraded.status !== 'WRITE') throw new Error(upgraded.status)
+    expect(upgraded.text).toContain('      - rm -rf dist\n')
+    expect(upgraded.text.match(/- lsof \*\n/g)).toHaveLength(1)
+    expect(upgraded.text.match(/- Start-Process http:\/\/localhost:\*\n/g)).toHaveLength(1)
   })
 
   it("manual approval removes only the Vibe Helper entries and keeps the learner's own", () => {
