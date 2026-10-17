@@ -412,7 +412,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
     - 첫 Task의 `BUILD_TASK` Episode 2개가 `OPEN`으로 남는 것.
     - 확장 호스트 분리(`extensionDependencies`). frontend PC에서는 활성화가 4.5초였다. 사용자 PC는 19초였으므로 부스 PC 리허설에서 다시 보고 판단한다.
 
-### [>] K23. 0.2.13 패널 화면 정리 (backend가 frontend까지 맡음)
+### [~] K23. 0.2.13 패널 화면 정리 (backend가 frontend까지 맡음)
 
 - **출처:** backend 패널 구성안(2026-10-17, 사용자에게만 공유한 비공개 페이지)과 사용자 Windows 0.2.11 체험(K22 "이어지는 것"). frontend 담당자가 "사용자가 알아서 작업까지" 하라고 넘겼다.
 - **결정(사용자, 2026-10-18 01:40):**
@@ -444,6 +444,16 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
   - program typecheck·test와 backend 패널 CJS test 통과.
   - 상태별 화면 ①~⑤를 실제 Kiro(테스트 프로필)에서 밝은·어두운 테마로 찍어 사용자에게 보여 주고 승인받는다.
   - 승인 뒤 Mac 0.2.13 release를 커밋하고 Windows 빌드를 인계한다. `releases/`와 다운로드 링크는 사용자 확인 전에 바꾸지 않는다.
+- **진행(2026-10-18 새벽):**
+  - **결정:** DECISIONS "Kiro-native 패널 정리(K23)". PROJECT_BRIEF §0 Helper 문장을 고쳤다.
+  - **구현:**
+    - program `feat/k23-panel-cleanup`: `157cfe2`~`972aef2`.
+    - backend `be9151b`(창 상태 `kiroWindow`, 새 창 대기 안내, 0.2.13 버전), `3b16e19`(다른 Project 폴더 구분, 쉬운 거절 이유).
+  - **검증:**
+    - program 테스트 862 통과·타입 검사 통과, 패널 CJS 195 중 193 통과·2 skip.
+    - 미리보기(실제 Kiro 밝은·어두운 테마 변수, 300px)에서 14개 상태 모두 가로 넘침이 없다.
+    - 테스트 Kiro 실측은 [K23 기록](../tests/eval/results/kiro-0.2.13-k23-panel.md)에 있다. 크레딧 253.55 → 264.81.
+  - **남은 것:** 사용자 아침 확인과 수정, Mac 0.2.13 release 커밋, Windows 빌드(사용자 또는 frontend), 두 플랫폼 다운로드 가이드.
 
 ## 3. 예선 작업 요약
 
