@@ -358,7 +358,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
     - 완료 뒤 바꾼 선택을 Decision으로 남기는 방안은 본선 뒤 판단한다.
   - **마감(2026-10-17):** frontend Windows 0.2.11 확인이 통과했다(core `1ac4b8d`, 확인 1~9·13·14·16·22·23·25 통과, 24는 생기지 않음). Mac 재빌드와 남은 요청은 K21이 맡는다.
 
-### [~] K21. Windows 0.2.11 확인 후속: 0.2.12로 두 플랫폼 맞추기, 첫 턴 버전 확인 명령
+### [x] K21. Windows 0.2.11 확인 후속: 0.2.12로 두 플랫폼 맞추기, 첫 턴 버전 확인 명령
 
 - **출처:** frontend Windows 0.2.11 확인(2026-10-16, [0.2.11 Windows 확인](FRONTEND_KIRO_NATIVE_HANDOFF.md#0211-windows-확인-2026-10-16))의 backend 할 일 다섯 건.
   1. Mac을 program `1eefe3f`(program#11 Restore Kiro Layout, #12 재연결 뒤 flow 포트)로 다시 빌드하고 버전 번호를 정한다.
@@ -383,9 +383,9 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
     - 0.2.10이 저장한 `\uXXXX` 기록(Windows DB의 Decision 3건, Live Context 7건)은 풀지 않는다. 새 기록만 풀어서 저장된다.
     - Kiro가 `tool_call`의 `arguments`를 문자열로 받으면 `expected object, received string`으로 거절한다. Core에 닿지 않고 Builder가 다시 보내 성공한다. Kiro 쪽 동작이다.
     - Builder가 선택을 묻기 전에 설정 파일(`package.json`·`tsconfig.json` 등)을 먼저 쓰는 것. 선택과 무관한 뼈대라 허용한다.
-  - **남은 것:** frontend Windows 0.2.12 빌드와 확인 26~30. backend 커밋과 인계는 2026-10-17 core `main`에 올렸다(사용자 요청).
+  - **마감(2026-10-17):** backend 커밋과 인계를 core `main`(`e020bbc`)에 올렸다(사용자 요청). frontend가 Windows 0.2.12를 backend `e020bbc`·program `1eefe3f`로 빌드해 확인했다(core `86a64b7`, 2,608,078 bytes, SHA-256 `bd65be96…4b9a4b`). 확인 1~8·9·14·16 통과([0.2.12 Windows 확인](FRONTEND_KIRO_NATIVE_HANDOFF.md#0212-windows-확인-2026-10-17)). 두 플랫폼 설치 가이드와 README가 0.2.12를 가리킨다.
 
-### [~] K22. 사용자 Windows 0.2.11 실사용 후속: npm 설정, 승인 창, 개념 이름, Spec 예상 Decision
+### [x] K22. 사용자 Windows 0.2.11 실사용 후속: npm 설정, 승인 창, 개념 이름, Spec 예상 Decision
 
 - **출처:** 사용자가 본선 계정으로 Windows 0.2.11을 두 번 썼다(2026-10-16, 실시간 채팅 앱, 뽀모도로와 후속 Task). Windows Codex가 세션 기록·Core DB·로그를 묶어 넘겼고, 사용자가 다섯 가지를 말했다(예상 Decision이 비어 있음, 새 창 연결이 약 30초, 탭 정리, 첫 입력 안내, Next Move 입력 예시).
 - **결정:** DECISIONS "사용자 Windows 0.2.11 실사용 후속(K22)"(사용자 지시 "자체적으로 계획 세워서 작업하고 0.2.12 빌드까지", 2026-10-17).
@@ -397,16 +397,20 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
   - **Discovery 1.5.0 후보(채택 안 함):** 처음 보는 목표 10개로 1.4.0과 비교했다. 실제 갈림길 예고가 1개에서 14개로 늘었지만 약한 질문 4개(자료구조 고르기, 화면 모양, 응답 코드)가 기준(2개 이하)을 넘었다([시험 기록](../tests/eval/results/discovery-spec-decisions-1.5.0-candidate.md)).
   - **Mac 0.2.12 실측:** 개념 이름 두 개를 Spec 그대로 보내 `conceptUsage` 2개, OBSERVED Evidence 3개가 기록됐다. 실패한 설치를 실패라고 말했다. 채팅 7.07크레딧.
   - **새 창 연결 지연:** backend 변경 없음. Kiro 확장 호스트 시작(활성화까지 19초)과 신뢰 → 다시 로드가 원인이다. 부스 PC에서 상위 폴더를 한 번 신뢰하는 방법과 확장 호스트 분리(본선 뒤)는 frontend 인계에 확인 요청으로 적었다.
-- **남은 것:**
-  - frontend Windows 0.2.12 확인 26~30(npm, 승인 창, 개념 기록, 실패 보고, 새 창 시간과 신뢰).
-  - frontend 패널 UI: 탭 정리, 첫 화면 진행 안내, Next Move 입력 예시와 복사 버튼. 범위와 빌드 순서(Windows 0.2.12 먼저, UI는 0.2.13 권장)는 사용자와 frontend가 [0.2.12 프론트 인계](FRONTEND_HANDOFF_0.2.12.md) 2절로 정한다.
+- **마감(2026-10-17):** frontend Windows 0.2.12 확인 26~28 통과, 29는 생기지 않음([0.2.12 Windows 확인](FRONTEND_KIRO_NATIVE_HANDOFF.md#0212-windows-확인-2026-10-17)).
+  - 26: `npm install`·`test`·`build`에 `double-loading config`도 우회 명령도 없었다.
+  - 27: 명령 승인 창 0개(Kiro `web_search` 도구 승인 1번). 새 규칙이 새 폴더와 0.2.11 폴더에 생겼다.
+  - 28: `conceptUsage`에 계획의 두 개념, `ignoredConcepts` `[]`.
+  - 30: 새 창의 확장 활성화가 확장 호스트 시작 뒤 4.5초였다(0.2.11 사용자 기록 19초). 그 PC는 상위 폴더가 이미 신뢰돼 있어 신뢰 창이 뜨지 않았다. 상위 폴더 신뢰로 신뢰 창이 없어진다는 뜻이지만 "상위 폴더도 신뢰" 선택지 자체는 보지 못했다. 부스 PC 준비 절차(상위 폴더 신뢰, 자동 업데이트 끄기)는 frontend가 정리했다(core 이슈 #4).
+- **이어지는 것:**
+  - 패널 화면 정리(탭, 첫 화면 진행 안내, Next Move 입력 예시와 복사, 학습 기록 문구): 사용자·frontend 회의로 범위를 정한다. 들어가면 두 플랫폼 0.2.13이고, program은 `b0541b5`(program#13, 근거 0건 분석의 Analyst 메모 대신 쉬운 문장) 이후로 빌드한다.
   - Next Move를 Task로 바로 추가하고 "ㄱㄱ"만 치게 하기: 사용자 결정 대기. 하려면 SPEC FR-NXT-007·009(후보에 시작·선택 버튼 없음, 채팅 발언으로만 시작) 변경 승인과 backend 작업(패널에서 후속 Task를 만드는 Core 명령, Steering, 실측)이 필요하다.
   - 본선 뒤:
     - 후보 상세화(`ENRICH_SELECTED`)가 결과를 저장하지 않고 끝나는 경우가 Discovery 시험에서 약 33번 중 4번이었다. Spec처럼 복구 turn을 더할지 판단한다.
     - Discovery 예상 Decision 다시 시도(Builder가 약한 예고를 걸러 내는 규칙 또는 더 큰 Spec 모델).
     - 남은 말투("실제 선택", "제가 알아서 정하는 영역") 한 번씩.
     - 첫 Task의 `BUILD_TASK` Episode 2개가 `OPEN`으로 남는 것.
-    - 확장 호스트 분리(`extensionDependencies`).
+    - 확장 호스트 분리(`extensionDependencies`). frontend PC에서는 활성화가 4.5초였다. 사용자 PC는 19초였으므로 부스 PC 리허설에서 다시 보고 판단한다.
 
 ## 3. 예선 작업 요약
 
