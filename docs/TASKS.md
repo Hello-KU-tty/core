@@ -412,6 +412,39 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
     - 첫 Task의 `BUILD_TASK` Episode 2개가 `OPEN`으로 남는 것.
     - 확장 호스트 분리(`extensionDependencies`). frontend PC에서는 활성화가 4.5초였다. 사용자 PC는 19초였으므로 부스 PC 리허설에서 다시 보고 판단한다.
 
+### [>] K23. 0.2.13 패널 화면 정리 (backend가 frontend까지 맡음)
+
+- **출처:** backend 패널 구성안(2026-10-17, 사용자에게만 공유한 비공개 페이지)과 사용자 Windows 0.2.11 체험(K22 "이어지는 것"). frontend 담당자가 "사용자가 알아서 작업까지" 하라고 넘겼다.
+- **결정(사용자, 2026-10-18 01:40):**
+  - backend가 program 작업을 맡는다. 작업 브랜치를 backend가 program `main`에 직접 합친다.
+  - 완성도를 우선한다. 밤새 작업하고, 오전에 사용자가 확인·수정을 요청하고, 오후에 마친다.
+  - 탭은 두 개(진행 · 학습 기록)다. 패널 도우미 탭은 대체 경로 없이 없앤다. Kiro 채팅의 `/vibe-helper`와 Core Helper는 그대로 둔다.
+  - 나머지는 구성안 추천대로 한다.
+  - Windows 빌드는 사용자나 frontend가 언제든 한다.
+- **범위(program `b0541b5` 이후):**
+  - 탭 두 개, 도우미 탭과 그 webview 코드 제거(`agent-render.ts` `makeTab`, `agent-panel-view-provider.ts` 탭별 CSS).
+  - 맨 위 "지금 할 일" 카드. 상태마다 문장 하나와 행동 하나를 둔다. 채팅에 보낼 말이 있으면 예시와 복사 버튼을 둔다. 지금의 상태 줄과 `builderNextHint`를 이 카드로 바꾼다.
+  - "이렇게 진행돼요" 4단계(연결 → 시작 말 보내기 → 번호 선택에 답하기 → 결과 보고 다음 한 걸음). 지금 단계를 굵게 하고, 첫 Task를 마치면 접는다. 접힘 상태는 webview 상태에 둔다.
+  - Next Move 후보마다 보낼 말("N번 해 보자")과 복사 버튼을 둔다(`renderNextMove`, host 메시지 → `vscode.env.clipboard.writeText`). 시작·선택 버튼은 두지 않는다.
+  - 학습 기록 탭:
+    - "근거 불러오기" 없이 탭을 열면 바로 불러온다(기존 `UI_READ_EVIDENCE_TRACE`).
+    - 개념마다 학습자 원문을 인용한다.
+    - "관찰만 되었어요" 대신 "코드에 쓰였어요"라고 쓴다.
+    - program#13의 "자세한 분석 메모"는 숨긴다.
+  - backend `examples/kiro-panel/src/frontend-host.cjs`: 새 창을 열기 전 확인 창과 폴더 없이 열 때의 알림에 "신뢰를 누르면 패널이 다시 뜨기까지 보통 10~30초"를 알린다.
+  - 0.2.13 버전(`scripts/package-program.mjs`, program `package.json`)으로 Mac VSIX를 만든다.
+- **바꾸지 않는 원칙:**
+  - 학습 기록에는 학습자가 직접 한 말만 넣는다.
+  - 점수·퍼센트·진도율·배지를 쓰지 않는다.
+  - 고른 이유에는 예시 복사를 두지 않는다.
+  - 채팅 입력칸을 대신 채우거나 보내지 않는다.
+  - 폭 300px에서 가로 스크롤이 없어야 한다. Kiro 밝은·어두운 테마 토큰을 쓴다.
+- **뒤로 미룸:** Next Move를 패널에서 Task로 추가하기(SPEC FR-NXT-007·009 변경과 Core 명령이 필요해 본선 뒤).
+- **완료 조건:**
+  - program typecheck·test와 backend 패널 CJS test 통과.
+  - 상태별 화면 ①~⑤를 실제 Kiro(테스트 프로필)에서 밝은·어두운 테마로 찍어 사용자에게 보여 주고 승인받는다.
+  - 승인 뒤 Mac 0.2.13 release를 커밋하고 Windows 빌드를 인계한다. `releases/`와 다운로드 링크는 사용자 확인 전에 바꾸지 않는다.
+
 ## 3. 예선 작업 요약
 
 상세 기록은 [예선 작업 기록](archive/preliminary/TASKS_PRELIMINARY.md)에 있다.
