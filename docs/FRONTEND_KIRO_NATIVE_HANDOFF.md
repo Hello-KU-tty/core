@@ -18,6 +18,8 @@
 
 ## Windows 0.2.12 빌드 요청 (frontend)
 
+**완료(2026-10-17):** 확인 1~8, 9, 14, 16과 26~28을 통과했고, 29는 나오지 않았다. 30은 이 PC에서 신뢰 창이 뜨지 않아 상위 폴더 신뢰 선택지를 보지 못했다. 이 PC는 부스 PC가 아니다. [0.2.12 Windows 확인](#0212-windows-확인-2026-10-17)
+
 backend가 Windows 0.2.11 확인의 다섯 건(K21)과 사용자 Windows 실사용 2회의 후속(K22)을 처리해 Mac 0.2.12를 만들고 실제 Kiro에서 확인했다([Mac 0.2.12 확인](../tests/eval/results/kiro-0.2.12-mac-check.md)). 할 일, 답, 추가 확인 26~30, 패널 UI 요청은 [0.2.12 프론트 인계](FRONTEND_HANDOFF_0.2.12.md)에 있다.
 
 ## Windows 0.2.11 빌드 요청 (frontend)
@@ -334,6 +336,36 @@ host API 형식은 [`examples/kiro-panel/src/frontend-host.d.cts`](../examples/k
   - 0.2.10에서 연결한 폴더는 0.2.11 Core 시작 때 새 승인 규칙과 Steering 0.9.2를 받았다.
   - 남은 것: "화면 레이아웃·스타일은 제가 알아서 정할게요"처럼 담당을 말하는 표현이 약하게 남았다. 한 번은 예고한 선택의 코드를 먼저 써 두고 그 안을 추천했다.
   - 채팅 약 25.7크레딧.
+
+## 0.2.12 Windows 확인 (2026-10-17)
+
+frontend가 Windows 11 x64(10.0.26200, Node 24.19.0, pnpm 11.13.1)에서 backend `main` `e020bbc`과 program `main` `1eefe3f`로 빌드했다. 두 checkout 모두 깨끗했다. 결과는 2,608,078 bytes, SHA-256 `bd65be96e6ddb9beb9e92ed32d8faac2a471d5a0c542b1d861beb56aa34b9a4b`, 75 entries다.
+
+**자동 검사(Windows):** program typecheck 통과, `npm test` 843 통과. backend unit 179 통과·1 skip, integration 557 통과·15 skip, 패널 CJS 193 통과·1 skip.
+
+**실제 Kiro 환경:**
+- Kiro 1.2.56(이 PC는 `update.mode: none`으로 자동 업데이트를 껐다), kiro-cli 2.29.0, 0.2.11에서 업그레이드
+- Workflows 켬, 미리 승인, 모델 Auto
+- 빈 창의 패널에서 처음 보는 목표(테슬라 로드스터 시뮬레이터)로 새 Project를 만들고, 생성 폴더를 새 창으로 열었다
+
+| 확인 | 결과 |
+| --- | --- |
+| 1~8 | 통과 |
+| 9 | 통과. 첫 Task에서 `check_progress` → 버전 확인(`node -v; npm -v; …`, 승인 없음) → `save_progress` → `ask_choice`(14:56:36). `run_workflow` 없음 |
+| 14 | 통과. 답(14:57:17 확정) → "그건 내가 고른게 아니야"(턴 `interrupted`) → 이의 기록·같은 질문 다시 열림(14:57:30) → 곁가지 질문은 기록 없이 다시 물음 → 답으로 확정(14:58:11), 완료 때 `APPLIED` |
+| 16 | 통과. `Invoke-WebRequest http://localhost:5173 -UseBasicParsing \| Select-Object -ExpandProperty StatusCode`와 `Start-Process "http://localhost:5173"`이 승인 없이 실행됐다 |
+| 26 | 통과. `npm install`·`npm test`·`npm run build`가 `double-loading config` 없이 돌았다. 우회 명령 없음 |
+| 27 | 통과. 명령 승인 창 0개(Kiro `remote/web_search` 도구 승인 1번뿐). `permissions.yaml`에 `Out-String`(134행)과 `Invoke-WebRequest "http://localhost:*`(135행). 0.2.11 폴더에도 생겼다 |
+| 28 | 통과. `conceptUsage`에 계획의 두 개념("JSON 데이터 구조", "클라이언트 상태 업데이트 및 재렌더링"), `finish_task` 결과의 `ignoredConcepts`는 `[]`. 패널 학습 기록 탭에 두 개념이 "관찰만 되었어요"로 보인다 |
+| 29 | 나오지 않음(종료 코드가 0이 아닌 명령 없음) |
+| 30 | 새 창의 확장 호스트 시작(14:52:15.9) → Vibe Helper 활성화(14:52:20.4) 4.5초. 신뢰 창은 뜨지 않았다(사용자: 상위 폴더가 이미 신뢰돼 있었음). 그래서 "상위 폴더도 신뢰" 선택지는 보지 못했다. 이 PC는 부스 PC가 아니다 |
+
+**참고:**
+- **이해 근거 0건(의도한 동작):** 이번 Task의 학습자 이해 근거는 0건이다.
+  - 첫 답의 근거는 인정됐다가 이의 제기로 철회됐다(`DECISION_NOT_CHOSEN_BY_LEARNER`).
+  - 두 번째 답 "1번, … 코드가 단순한 게 좋다"는 곁가지 질문에 Builder가 "1번이 더 간단하다"고 답한 직후라 `DIRECTLY_LED`·`INSUFFICIENT_EVIDENCE`로 거절됐다.
+  - 확인 14 절차 때문에 생긴 결과이고, 보수적 Evidence 원칙대로 동작했다.
+- **패널 문제(frontend가 고친다):** 학습 기록 탭에 Evidence Analyst의 판정 메모가 그대로 보인다("인정된 근거 없음: Episode에서 … USER_DECISION reference … BUILDER_CHAT_TURN …"). 학습자가 읽을 문장이 아니다.
 
 ## 0.2.11 Windows 확인 (2026-10-16)
 
