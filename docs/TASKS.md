@@ -383,7 +383,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
     - 0.2.10이 저장한 `\uXXXX` 기록(Windows DB의 Decision 3건, Live Context 7건)은 풀지 않는다. 새 기록만 풀어서 저장된다.
     - Kiro가 `tool_call`의 `arguments`를 문자열로 받으면 `expected object, received string`으로 거절한다. Core에 닿지 않고 Builder가 다시 보내 성공한다. Kiro 쪽 동작이다.
     - Builder가 선택을 묻기 전에 설정 파일(`package.json`·`tsconfig.json` 등)을 먼저 쓰는 것. 선택과 무관한 뼈대라 허용한다.
-  - **남은 것:** push(사용자 확인), frontend Windows 0.2.12 빌드와 확인 26~30.
+  - **남은 것:** frontend Windows 0.2.12 빌드와 확인 26~30. backend 커밋과 인계는 2026-10-17 core `main`에 올렸다(사용자 요청).
 
 ### [~] K22. 사용자 Windows 0.2.11 실사용 후속: npm 설정, 승인 창, 개념 이름, Spec 예상 Decision
 
@@ -399,8 +399,8 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
   - **새 창 연결 지연:** backend 변경 없음. Kiro 확장 호스트 시작(활성화까지 19초)과 신뢰 → 다시 로드가 원인이다. 부스 PC에서 상위 폴더를 한 번 신뢰하는 방법과 확장 호스트 분리(본선 뒤)는 frontend 인계에 확인 요청으로 적었다.
 - **남은 것:**
   - frontend Windows 0.2.12 확인 26~30(npm, 승인 창, 개념 기록, 실패 보고, 새 창 시간과 신뢰).
-  - frontend 패널 UI: 탭 정리, 첫 화면 진행 안내, Next Move 입력 예시와 복사 버튼.
-  - Next Move를 Task로 바로 추가하고 "ㄱㄱ"만 치게 하기: 사용자 결정 대기.
+  - frontend 패널 UI: 탭 정리, 첫 화면 진행 안내, Next Move 입력 예시와 복사 버튼. 범위와 빌드 순서(Windows 0.2.12 먼저, UI는 0.2.13 권장)는 사용자와 frontend가 [0.2.12 프론트 인계](FRONTEND_HANDOFF_0.2.12.md) 2절로 정한다.
+  - Next Move를 Task로 바로 추가하고 "ㄱㄱ"만 치게 하기: 사용자 결정 대기. 하려면 SPEC FR-NXT-007·009(후보에 시작·선택 버튼 없음, 채팅 발언으로만 시작) 변경 승인과 backend 작업(패널에서 후속 Task를 만드는 Core 명령, Steering, 실측)이 필요하다.
   - 본선 뒤:
     - 후보 상세화(`ENRICH_SELECTED`)가 결과를 저장하지 않고 끝나는 경우가 Discovery 시험에서 약 33번 중 4번이었다. Spec처럼 복구 turn을 더할지 판단한다.
     - Discovery 예상 Decision 다시 시도(Builder가 약한 예고를 걸러 내는 규칙 또는 더 큰 Spec 모델).

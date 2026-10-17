@@ -8,10 +8,10 @@
 
 ## 프론트 담당자 빠른 시작
 
-- **이번에 할 일(0.2.12):** [0.2.12 프론트 인계](FRONTEND_HANDOFF_0.2.12.md)에 0.2.11 확인 요청 다섯 건의 답, Windows 0.2.12 빌드와 추가 확인 26~30, 사용자가 말한 패널 UI 요청(탭 정리, 첫 화면 진행 안내, Next Move 입력 예시)을 모았다. 빌드에 frontend 코드 변경은 필요 없다.
+- **이번에 할 일(0.2.12):** [0.2.12 프론트 인계](FRONTEND_HANDOFF_0.2.12.md)에 할 일 순서, 사용자와 같이 정할 것(빌드 순서, 탭 정리, 첫 화면 안내, Next Move 바로 시작), Windows 0.2.12 빌드와 추가 확인 26~30, 사용자가 말한 패널 UI 요청(탭 정리, 첫 화면 진행 안내, Next Move 입력 예시), 0.2.11 확인 요청 다섯 건의 답을 모았다. 빌드에 frontend 코드 변경은 필요 없다.
 - **지난 할 일(0.2.11):** [0.2.11 프론트 인계](FRONTEND_HANDOFF_0.2.11.md)에 보내 준 요청 네 건의 답, Windows 0.2.11 빌드와 추가 확인 22~25를 모았다. frontend 코드 변경은 없다. 지난 할 일은 [0.2.10 프론트 인계](FRONTEND_HANDOFF_0.2.10.md)와 [0.2.9 프론트 인계](FRONTEND_HANDOFF_0.2.9.md)에 있다.
 - **코드:** backend `Hello-KU-tty/core`의 `main`(이 문서와 설치 파일), frontend `Hello-KU-tty/program`의 `main`(PR #10의 "Kiro 채팅에서 열기" 패널 포함). `finals/kiro-native`·`finals/trial-feedback`은 `main`에 합쳤고 더 쓰지 않는다. 새 작업은 `main`에서 브랜치를 따서 `main`으로 PR한다.
-- **설치 파일 바로 받기:** [0.2.11 Mac VSIX](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/kiro-native/builder-helper-agent-panel-0.2.11-darwin-arm64.vsix). 받은 뒤 `shasum -a 256 <파일>`이 위 SHA-256과 같은지 확인한다. 학습자용 설치·사용 안내는 [설치 가이드](DOWNLOAD_GUIDE.md)에 따로 있고, 이 문서는 빌드·확인·패널 계약을 다룬다.
+- **설치 파일 바로 받기:** [0.2.12 Mac VSIX](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/kiro-native/builder-helper-agent-panel-0.2.12-darwin-arm64.vsix). 받은 뒤 `shasum -a 256 <파일>`이 위 SHA-256과 같은지 확인한다. 학습자용 설치·사용 안내는 [설치 가이드](DOWNLOAD_GUIDE.md)에 따로 있고, 이 문서는 빌드·확인·패널 계약을 다룬다.
 - **Mac(Apple Silicon):** 아래 [설치 전 준비](#설치-전-준비)와 [설치와 사용 흐름](#설치와-사용-흐름)대로 쓴다.
 - **Windows:** frontend가 빌드·확인·업로드한다. 절차는 [Windows에서](#windows에서)에 있다(0.2.5부터).
 - **패널 코드에 필요한 변경(0.2.9):** backend가 frontend 저장소 브랜치 `feat/k17-panel` 하나에 Next Move 카드(`feat/next-move-card`), 다시 로드 안내(`feat/reload-required-notice`), K17 패널 정리를 모았다. Windows 0.2.9를 빌드하기 전에 이 브랜치를 `main`에 합쳐 주세요(아래 [Windows 0.2.9 빌드 요청](#windows-029-빌드-요청-frontend)). host API(`frontend-host.d.cts`)의 `openProjectInKiro` 결과에 선택 필드 `freshSession`이 생겼다. 0.2.2의 Evidence 표시 검토도 그대로다([0.2.2에서 바뀐 점](#022에서-바뀐-점-analystevidence-정책)).
