@@ -11,7 +11,7 @@ const ok = data => ({ status: 200, body: { success: true, data: { projectId, tas
 const refuse = error => ({ status: 409, body: { success: false, error } })
 
 function harness({ trusted = true, installed = true, loggedIn = true, fail: failing = false, platform = 'darwin',
-  binds = [ok({ workspace })], openFolders = [], answers = {}, bound = false, boundTo = projectId, consent, env = process.env,
+  binds = [ok({ workspace })], openFolders = [], answers = {}, bound = false, boundTo = projectId, hookSep = '/', consent, env = process.env,
   installedAt = () => true } = {}) {
   let listener, trustListener, stopped = 0, starts = 0, mutations = 0, terminals = 0
   // `fail: true` fails every start, a number fails that many starts first.
@@ -70,7 +70,8 @@ function harness({ trusted = true, installed = true, loggedIn = true, fail: fail
       // The hook Core writes into a connected folder names that Project's binding (K23).
       readFile: async path => {
         if (!path.endsWith('.kiro/hooks/vibe-helper.json') || !bound) throw new Error('ENOENT')
-        return JSON.stringify({ hooks: [{ action: { command: `"/core" "/hook.mjs" "/data/kiro-bindings/${boundTo}/hook.json"` } }] })
+        const binding = ['', 'data', 'kiro-bindings', boundTo, 'hook.json'].join(hookSep)
+        return JSON.stringify({ hooks: [{ action: { command: `"/core" "/hook.mjs" "${binding}"` } }] })
       },
       access: async path => {
         if (path.endsWith('.kiro/hooks/vibe-helper.json')) { if (!bound) throw new Error('ENOENT'); return }
@@ -422,6 +423,13 @@ test('the panel can tell whether Kiro chat in this window reaches the Project (K
   assert.equal(await otherHost.kiroWindow(projectId), 'NOT_BOUND')
   assert.equal(await otherHost.kiroWindow(), 'READY')
   await otherHost.dispose()
+  // Windows writes the binding path with backslashes (escaped in the hook JSON).
+  for (const [boundTo, expected] of [[projectId, 'READY'], ['project_00000000-0000-4000-8000-000000000000', 'NOT_BOUND']]) {
+    const windows = harness({ bound: true, boundTo, hookSep: '\\', openFolders: [workspace] })
+    const windowsHost = await windows.create()
+    assert.equal(await windowsHost.kiroWindow(projectId), expected)
+    await windowsHost.dispose()
+  }
   // Trusted after the window opened: Kiro reads hooks and MCP again only after a reload.
   const late = harness({ bound: true, trusted: false, openFolders: [workspace] })
   const host = await late.create()
