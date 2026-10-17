@@ -52,6 +52,8 @@ const FRESH_SESSION_KEY = 'vibeHelper.freshChatSessionFolders'
 // Kiro opens its chat view a few seconds after the window; the + command needs that view.
 const FRESH_SESSION_DELAY_MS = 4000
 const BOUND_MARKER = '.kiro/hooks/vibe-helper.json'
+// Kiro starts the new window's extension host before this panel loads, so the wait is said first (K23).
+const NEW_WINDOW_WAIT = '새 창에서 ‘신뢰’를 누르면 패널이 다시 뜨기까지 보통 10~30초 걸려요.'
 const RELOAD_AFTER_LATE_TRUST = '이 폴더를 Vibe Helper Project로 연결했어요. 이 창은 폴더를 신뢰하기 전에 열려서 Kiro가 아직 Vibe Helper hook과 도구를 읽지 않았어요. 창을 다시 로드할까요? 다시 로드하면 새 채팅 세션이 열려요.'
 const inside = (parent, child) => {
   const part = relative(parent, child)
@@ -266,14 +268,14 @@ async function createFrontendHost(context) {
       } catch (error) {
         const code = safeCode(error)
         if (PROJECT_FOLDER_ELSEWHERE.has(code)) {
-          void vscode.window.showInformationMessage('이 Project는 이미 다른 폴더에서 만들고 있어요. 그 폴더를 새 창으로 열게요.')
+          void vscode.window.showInformationMessage(`이 Project는 이미 다른 폴더에서 만들고 있어요. 그 폴더를 새 창으로 열게요. ${NEW_WINDOW_WAIT}`)
         } else if (CURRENT_FOLDER_REFUSALS.has(code)) {
           const open = '새 창에서 열기'
           const choice = await vscode.window.showWarningMessage(
             code === 'WORKSPACE_FOLDER_NOT_EMPTY'
               ? '지금 연 폴더에는 이미 다른 파일이 있어요. Vibe Helper가 새 폴더를 만들어 새 창으로 열까요?'
               : `지금 연 폴더는 Project 폴더로 쓸 수 없어요 (${code}). Vibe Helper가 새 폴더를 만들어 새 창으로 열까요?`,
-            { modal: true }, open)
+            { modal: true, detail: NEW_WINDOW_WAIT }, open)
           if (choice !== open) return { projectId, taskId: null, folder: 'CANCELLED', openedNewWindow: false }
         } else throw error
         data = await bind({ projectId, ...choice })
@@ -381,6 +383,15 @@ async function createFrontendHost(context) {
       await offerReload('신뢰가 Kiro 채팅에 적용되도록 창을 다시 로드할까요? 다시 로드하면 새 채팅 세션이 열려요.')
     }).catch(() => {})
   })
+  /**
+   * K23: what Kiro chat in this window reaches, for the panel's "지금 할 일". A window that opened
+   * before its folder was trusted keeps hooks and MCP off until one reload. Never rejects.
+   */
+  async function kiroWindow() {
+    if (!(await boundFolder().catch(() => false))) return 'NOT_BOUND'
+    if (!vscode.workspace.isTrusted) return 'UNTRUSTED'
+    return openedUntrusted ? 'RELOAD' : 'READY'
+  }
   async function retry() {
     if (stopped) throw new Error('FRONTEND_HOST_STOPPED')
     kiroCli = await findKiroCli(); await lifecycle.retry(); return prepare()
@@ -396,7 +407,7 @@ async function createFrontendHost(context) {
     })()
     return disposal
   }
-  return Object.freeze({ client, worker, prepare, assertAgentReady, openProjectInKiro, getStatus: () => status,
+  return Object.freeze({ client, worker, prepare, assertAgentReady, openProjectInKiro, kiroWindow, getStatus: () => status,
     subscribeStatus(listener) { listeners.add(listener); listener(status); return () => listeners.delete(listener) },
     onDidRotate: connection.onDidRotate,
     retry,

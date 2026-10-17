@@ -38,7 +38,7 @@ function harness({ trusted = true, installed = true, loggedIn = true, fail: fail
   // Dialogs answer by their buttons; unanswered ones resolve to undefined (dismissed).
   const dialog = kind => async (text, ...rest) => {
     const items = rest.filter(item => typeof item === 'string')
-    dialogs.push({ kind, text, items, modal: rest.some(item => item?.modal === true) })
+    dialogs.push({ kind, text, items, modal: rest.some(item => item?.modal === true), detail: rest.find(item => item?.detail)?.detail })
     for (const item of items) if (answers[item]) return item
     if (!items.length) messages.push([kind, text])
     return undefined
@@ -330,6 +330,8 @@ test('a folder with other files leads to a generated folder in a new window only
   assert.equal(agreed.fetches[1].body.workspace, undefined)
   assert.equal(agreed.opened()[0].path, workspace)
   assert.ok(agreed.dialogs.some(item => item.modal && /이미 다른 파일이 있어요/.test(item.text)))
+  // K23: the wait in the new window is said before it opens; this window's panel cannot follow it.
+  assert.ok(agreed.dialogs.some(item => item.modal && /10~30초/.test(item.detail ?? '')))
   await host.dispose()
   const declined = harness({ openFolders: [folder], consent: 'PREAPPROVED',
     binds: [refuse('WORKSPACE_FOLDER_NOT_EMPTY'), ok({ workspace })] })
@@ -388,6 +390,27 @@ test('a bound folder asks for trust, then offers a reload once trust is granted'
   await settle(); await settle()
   assert.equal(plain.dialogs.length, 0)
   await other.dispose()
+})
+
+test('the panel can tell whether Kiro chat in this window reaches the Project (K23)', async () => {
+  const cases = [
+    [{ bound: false, openFolders: ['/Users/synthetic/other'] }, 'NOT_BOUND'],
+    [{ bound: true, openFolders: [] }, 'NOT_BOUND'],
+    [{ bound: true, trusted: false, openFolders: [workspace] }, 'UNTRUSTED'],
+    [{ bound: true, openFolders: [workspace] }, 'READY'],
+  ]
+  for (const [options, expected] of cases) {
+    const h = harness(options)
+    const host = await h.create()
+    assert.equal(await host.kiroWindow(), expected)
+    await host.dispose()
+  }
+  // Trusted after the window opened: Kiro reads hooks and MCP again only after a reload.
+  const late = harness({ bound: true, trusted: false, openFolders: [workspace] })
+  const host = await late.create()
+  late.grantTrust()
+  assert.equal(await host.kiroWindow(), 'RELOAD')
+  await host.dispose()
 })
 
 test('a trusted Project folder window starts Core without the panel, for Kiro chat tools (K18)', async () => {
