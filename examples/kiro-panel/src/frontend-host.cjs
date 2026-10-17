@@ -6,7 +6,7 @@
 // hooks, MCP, the Helper agent and the Spec into that folder.
 const vscode = require('vscode')
 const { execFile } = require('node:child_process')
-const { access, constants, mkdir, realpath } = require('node:fs/promises')
+const { access, constants, mkdir, readFile, realpath } = require('node:fs/promises')
 const { homedir } = require('node:os')
 const { delimiter, join, relative, isAbsolute, sep } = require('node:path')
 const { connectLocalCore, readLocalConnection } = require('@vibe-helper/frontend-client/node')
@@ -43,6 +43,11 @@ const BIND_MESSAGES = {
 const CURRENT_FOLDER_REFUSALS = new Set(['WORKSPACE_FOLDER_NOT_EMPTY', 'WORKSPACE_FOLDER_IN_USE',
   'WORKSPACE_FOLDER_NOT_CANONICAL', 'WORKSPACE_FOLDER_NOT_OWNED', 'WORKSPACE_FOLDER_TOO_BROAD',
   'WORKSPACE_FOLDER_OVERLAPS_CORE', 'WORKSPACE_FOLDER_INVALID'])
+// Why the open folder cannot hold the Project, in the learner's words; others keep their code (K23).
+const CURRENT_FOLDER_REASONS = {
+  WORKSPACE_FOLDER_NOT_EMPTY: '지금 연 폴더에는 이미 다른 파일이 있어요.',
+  WORKSPACE_FOLDER_IN_USE: '지금 연 폴더는 다른 Project가 쓰고 있어요.',
+}
 // The Project already has its folder elsewhere; open that one instead of splitting the work.
 const PROJECT_FOLDER_ELSEWHERE = new Set(['PROJECT_REGISTERED_ELSEWHERE', 'PROJECT_HAS_GENERATED_FOLDER'])
 // Replaces 0.2.x `vibeHelper.coreToolsConsent` (Core tools only); the wider choice is asked anew.
@@ -272,9 +277,7 @@ async function createFrontendHost(context) {
         } else if (CURRENT_FOLDER_REFUSALS.has(code)) {
           const open = '새 창에서 열기'
           const choice = await vscode.window.showWarningMessage(
-            code === 'WORKSPACE_FOLDER_NOT_EMPTY'
-              ? '지금 연 폴더에는 이미 다른 파일이 있어요. Vibe Helper가 새 폴더를 만들어 새 창으로 열까요?'
-              : `지금 연 폴더는 Project 폴더로 쓸 수 없어요 (${code}). Vibe Helper가 새 폴더를 만들어 새 창으로 열까요?`,
+            `${CURRENT_FOLDER_REASONS[code] ?? `지금 연 폴더는 Project 폴더로 쓸 수 없어요 (${code}).`} Vibe Helper가 새 폴더를 만들어 새 창으로 열까요?`,
             { modal: true, detail: NEW_WINDOW_WAIT }, open)
           if (choice !== open) return { projectId, taskId: null, folder: 'CANCELLED', openedNewWindow: false }
         } else throw error
@@ -383,12 +386,24 @@ async function createFrontendHost(context) {
       await offerReload('신뢰가 Kiro 채팅에 적용되도록 창을 다시 로드할까요? 다시 로드하면 새 채팅 세션이 열려요.')
     }).catch(() => {})
   })
+  // The Project this window's folder is connected to, read from the hook Core wrote there
+  // (`…/kiro-bindings/<projectId>/hook.json`); 'UNKNOWN' when the hook names none (K23).
+  const boundProject = async () => {
+    const folders = vscode.workspace.workspaceFolders ?? []
+    if (folders.length !== 1) return null
+    const text = await readFile(join(folders[0].uri.fsPath, BOUND_MARKER), 'utf8').catch(() => null)
+    if (text === null) return null
+    return text.match(/kiro-bindings[\\/]+(project_[0-9a-f-]{36})[\\/]+hook\.json/)?.[1] ?? 'UNKNOWN'
+  }
   /**
-   * K23: what Kiro chat in this window reaches, for the panel's "지금 할 일". A window that opened
-   * before its folder was trusted keeps hooks and MCP off until one reload. Never rejects.
+   * K23: what Kiro chat in this window reaches for `projectId`, for the panel's "지금 할 일". A
+   * folder connected to another Project is `NOT_BOUND` for this one. A window that opened before
+   * its folder was trusted keeps hooks and MCP off until one reload. Never rejects.
    */
-  async function kiroWindow() {
-    if (!(await boundFolder().catch(() => false))) return 'NOT_BOUND'
+  async function kiroWindow(projectId) {
+    const bound = await boundProject().catch(() => null)
+    if (bound === null) return 'NOT_BOUND'
+    if (typeof projectId === 'string' && bound !== 'UNKNOWN' && bound !== projectId) return 'NOT_BOUND'
     if (!vscode.workspace.isTrusted) return 'UNTRUSTED'
     return openedUntrusted ? 'RELOAD' : 'READY'
   }

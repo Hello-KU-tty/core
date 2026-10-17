@@ -84,9 +84,9 @@ export interface FrontendHost {
    * K23: what Kiro chat in this window can reach. `READY`: the single open folder is a connected
    * Project folder and trusted since the window opened; `UNTRUSTED`: connected, not trusted;
    * `RELOAD`: trusted after the window opened, so hooks and MCP wait for one reload;
-   * `NOT_BOUND`: no single open folder, or it is not a Project folder. Never rejects.
+   * `NOT_BOUND`: no single open folder, or it is not `projectId`'s folder. Never rejects.
    */
-  kiroWindow?(): Promise<'READY' | 'UNTRUSTED' | 'RELOAD' | 'NOT_BOUND'>
+  kiroWindow?(projectId?: string): Promise<'READY' | 'UNTRUSTED' | 'RELOAD' | 'NOT_BOUND'>
   dispose(): Promise<void>
 }
 export function createFrontendHost(context: {

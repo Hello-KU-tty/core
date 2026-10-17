@@ -11,7 +11,7 @@ const ok = data => ({ status: 200, body: { success: true, data: { projectId, tas
 const refuse = error => ({ status: 409, body: { success: false, error } })
 
 function harness({ trusted = true, installed = true, loggedIn = true, fail: failing = false, platform = 'darwin',
-  binds = [ok({ workspace })], openFolders = [], answers = {}, bound = false, consent, env = process.env,
+  binds = [ok({ workspace })], openFolders = [], answers = {}, bound = false, boundTo = projectId, consent, env = process.env,
   installedAt = () => true } = {}) {
   let listener, trustListener, stopped = 0, starts = 0, mutations = 0, terminals = 0
   // `fail: true` fails every start, a number fails that many starts first.
@@ -67,6 +67,11 @@ function harness({ trusted = true, installed = true, loggedIn = true, fail: fail
     },
     'node:child_process': { execFile(file, args, options, done) { whoami.push([file, ...args]); done(loggedIn ? null : new Error('1')) } },
     'node:fs/promises': { mkdir: async () => {}, realpath: async value => value,
+      // The hook Core writes into a connected folder names that Project's binding (K23).
+      readFile: async path => {
+        if (!path.endsWith('.kiro/hooks/vibe-helper.json') || !bound) throw new Error('ENOENT')
+        return JSON.stringify({ hooks: [{ action: { command: `"/core" "/hook.mjs" "/data/kiro-bindings/${boundTo}/hook.json"` } }] })
+      },
       access: async path => {
         if (path.endsWith('.kiro/hooks/vibe-helper.json')) { if (!bound) throw new Error('ENOENT'); return }
         if (!installed || !installedAt(path)) throw new Error('ENOENT')
@@ -338,6 +343,12 @@ test('a folder with other files leads to a generated folder in a new window only
   host = await declined.create(); await host.prepare()
   assert.equal((await host.openProjectInKiro(projectId)).folder, 'CANCELLED')
   assert.equal(declined.fetches.length, 1)
+  // K23: a folder another Project uses is said so, without the raw code.
+  const inUse = harness({ openFolders: [folder], consent: 'PREAPPROVED', binds: [refuse('WORKSPACE_FOLDER_IN_USE')] })
+  const inUseHost = await inUse.create(); await inUseHost.prepare()
+  assert.equal((await inUseHost.openProjectInKiro(projectId)).folder, 'CANCELLED')
+  assert.ok(inUse.dialogs.some(item => item.modal && /다른 Project가 쓰고 있어요/.test(item.text) && !/WORKSPACE_FOLDER/.test(item.text)))
+  await inUseHost.dispose()
   assert.equal(declined.opened().length, 0)
   await host.dispose()
 })
@@ -402,14 +413,20 @@ test('the panel can tell whether Kiro chat in this window reaches the Project (K
   for (const [options, expected] of cases) {
     const h = harness(options)
     const host = await h.create()
-    assert.equal(await host.kiroWindow(), expected)
+    assert.equal(await host.kiroWindow(projectId), expected)
     await host.dispose()
   }
+  // A folder connected to another Project is not this one's, whatever its trust.
+  const other = harness({ bound: true, boundTo: 'project_00000000-0000-4000-8000-000000000000', openFolders: [workspace] })
+  const otherHost = await other.create()
+  assert.equal(await otherHost.kiroWindow(projectId), 'NOT_BOUND')
+  assert.equal(await otherHost.kiroWindow(), 'READY')
+  await otherHost.dispose()
   // Trusted after the window opened: Kiro reads hooks and MCP again only after a reload.
   const late = harness({ bound: true, trusted: false, openFolders: [workspace] })
   const host = await late.create()
   late.grantTrust()
-  assert.equal(await host.kiroWindow(), 'RELOAD')
+  assert.equal(await host.kiroWindow(projectId), 'RELOAD')
   await host.dispose()
 })
 
