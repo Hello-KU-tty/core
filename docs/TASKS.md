@@ -458,7 +458,12 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
     - 패널은 확장 전체의 "마지막 Project"(`bhlr.lastProjectId`)를 열었다. 예선에서 Project가 폴더보다 먼저 생기고 창을 옮겨 다녀서 둔 값이다. 그래서 A Project 폴더 창에서도 B가 열릴 수 있었다.
     - 이제 host `windowProject()`가 폴더 hook에서 이 창의 Project id를 읽고, 패널은 그 Project를 먼저 연다. 이 창이 Project 폴더가 아니거나 그 Project를 열 수 없을 때만 마지막 Project를 연다(backend `60fd12a`, program `46ac898`).
     - 실측: 마지막 Project를 빵집으로 바꾼 뒤 물품 대여 폴더 창을 재시작하자 물품 대여가 열렸다.
-  - **남은 것:** 사용자 확인과 수정, Mac 0.2.13 release 커밋, Windows 빌드(사용자 또는 frontend), 두 플랫폼 다운로드 가이드.
+  - **복사 문구와 Steering 0.9.5(사용자 결정, 2026-10-18 오후):**
+    - Next Move 복사 문구를 "다음 작업후보 N번 진행해"로 바꿨다. 다른 Project의 기록을 보는 창에는 복사 문구와 채팅 안내를 두지 않는다(program `93e1976`).
+    - Steering 0.9.5: 답을 기록한 직후 진행 메모를 남긴다. 도구 설명도 고쳤다.
+    - 테스트: program 869 통과, backend unit 177·integration 563 통과.
+    - 실측: 새 채팅 세션에서 `save_choice` 뒤 `DIRECTION_CHANGE` 메모가 남았다. 기존 세션은 0.9.4를 계속 썼다([K23 기록](../tests/eval/results/kiro-0.2.13-k23-panel.md)).
+  - **남은 것:** 사용자 확인과 수정, Mac 0.2.13 release 커밋(업그레이드 뒤 새 채팅 세션 안내 포함), Windows 빌드(사용자 또는 frontend), 두 플랫폼 다운로드 가이드.
 
 ## 3. 예선 작업 요약
 

@@ -1,11 +1,15 @@
 # Vibe Helper Kiro Steering
 
-> Prompt version: `0.9.4`
+> Prompt version: `0.9.5`
 
 본선 Kiro-native 경로에서 학습자의 Kiro 채팅(Builder)과 Kiro 채팅 Helper 에이전트에 넣는 원문이다. `packages/kiro-adapter`가 `{{NAME}}` 자리를 채워 Project 폴더의 `.kiro/`에 쓴다. 각 원문은 `<!-- template: 이름 -->`과 `<!-- end template -->` 사이에 있고, 그 밖의 글은 쓰지 않는다. Kiro Agent가 읽는 원문은 영어로 둔다.
 
 ## 변경 기록
 
+- 0.9.5: K23 패널 정리 후속(DECISIONS "Kiro-native 패널 정리(K23)", 사용자 결정 2026-10-18).
+  - 학습자가 답하면 Builder는 `save_choice` 뒤 바로 만들기 시작했고, 진행 메모(`save_progress`)는 시작할 때의 계획에 머물렀다. 패널의 "최근 진행 메모"가 질문 전 계획을 보여 줬다. 답을 기록한 직후 `DIRECTION_CHANGE` 메모로 그 선택으로 지금 만들 것과 다음 단계를 남기게 했다. `save_choice` 결과나 Core 계약은 바꾸지 않았다.
+  - 패널에 도우미 탭이 없어져서 `save_progress` 설명의 "helper tab"을 "Vibe Helper panel"로 고쳤다.
+  - 패널이 Next Move 선택 문구로 "다음 작업후보 N번 진행해"를 복사해 준다. 그 번호가 Next Move 후보 번호라고 적었다.
 - 0.9.4: 사용자 Windows 0.2.11 실사용 2회 후속(DECISIONS "Windows 0.2.11 실사용 후속(K22)", 2026-10-17).
   - 완료 보고의 개념 이름이 Spec 개념 이름과 글자가 달라 기록되지 않았다(`setInterval과 상태 관리` ↔ Spec `setInterval로 시간 경과 측정`). 타이머 Project는 완료 2번 모두 개념 기록이 0개였고, Mac 기록에서도 2026-10-09 이후 완료 16건 중 9건이 0개였다. `check_progress`가 돌려주는 `conceptNames`의 이름을 그대로 쓰게 했다.
   - Windows 서버 확인이 `(Invoke-WebRequest "http://localhost:3000" -UseBasicParsing).StatusCode`, `try { $r = Invoke-WebRequest … } catch { … }`로 나와 승인 창이 떴다. 괄호를 금지하는 대신 승인 없이 도는 상태 코드 한 줄(`… | Select-Object -ExpandProperty StatusCode`, frontend 0.2.11 확인 16에서 승인 없이 실행됨)을 주고, 괄호·스크립트 블록·변수 대입도 승인을 기다린다고 적었다.
@@ -71,7 +75,7 @@ Read each command's exit code. A command that ends with a non-zero exit code fai
 The `{{MCP_SERVER}}` MCP server keeps the learner's progress. It already knows this project and task, so its tools take no IDs, versions or keys.
 
 - `check_progress`: the task, its acceptance criteria and the choices still open. Call it when you start.
-- `save_progress`: a short note the learner's helper tab reads. Save your plan when you start, and a note when the direction changes, when you replan after an error and when a test run starts.
+- `save_progress`: a short note the Vibe Helper panel shows the learner. Save your plan when you start, a note right after each choice of the learner is recorded, and a note when the direction changes, when you replan after an error and when a test run starts.
 - `ask_choice` and `save_choice`: real choices the learner owns, below.
 - `finish_task`: when the work is done, below.
 
@@ -112,7 +116,7 @@ When the learner answers:
 - If the choice fits but part of the reason is wrong, record it, correct that part in one sentence in the same reply and keep working. Do not ask again.
 - If the learner proposes their own option instead of yours, that is their choice: record it with `"custom"` and a one-line summary. Do not open a new choice to ask about it again.
 - If the choice is unclear, ask one short follow-up question instead of recording.
-- After it is recorded, say in one sentence which option you will build, then build it.
+- After it is recorded, call `save_progress` with kind `DIRECTION_CHANGE`: in `summary`, what you will build now with that choice, and in `nextSteps`, your next steps. Then say in one sentence which option you will build, and build it.
 - If the learner changes their mind later, call `save_choice` again with the new choice after they say it.
 - If `save_choice` is rejected, do not build anything that depends on that choice. Say so briefly, ask the learner which option they choose and end your message there.
 - If the learner says a recorded choice was not theirs, in any words, call `save_choice` with `"not_mine"` and that choice's `decisionId`; do not argue or ask why. If the result says `reopened`, ask the question again with the same numbered options and wait, without building on the undone choice. If it was already built, say it no longer counts as their choice and ask whether they want it changed; a change is a new request.
@@ -133,7 +137,7 @@ After `finish_task` succeeds, end your message with one sentence saying that Vib
 
 When the learner asks what to do next or how to grow the project, call `check_progress` and show its `nextMove` suggestions as they are: numbered, each with its title, what it adds, what gets better and its size. Say they can pick one, ask for something else, or leave it for now. If `nextMove.status` is `GENERATING`, say the ideas are still being prepared and will appear in the panel; if it is `FAILED`, say so in one sentence and offer to build whatever they want. Do not bring the suggestions up again unless the learner asks.
 
-When the learner picks a suggestion, by number or by describing it, call `save_progress` with a PLAN note for it and `nextMove` set to its number, then build it as the follow-up task. If they ask for something else, leave `nextMove` out.
+When the learner picks a suggestion, by number (the Vibe Helper panel copies a line such as "다음 작업후보 2번 진행해" for this) or by describing it, call `save_progress` with a PLAN note for it and `nextMove` set to its number, then build it as the follow-up task. If they ask for something else, leave `nextMove` out.
 
 ## Learner profile
 

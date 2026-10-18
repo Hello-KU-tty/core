@@ -242,7 +242,7 @@ describe('Kiro-native workspace adapter', () => {
   })
 
   it('steers decisions to the moment they arise, recorded before they are asked (since 0.5.0)', () => {
-    expect(templates.version).toBe('0.9.4')
+    expect(templates.version).toBe('0.9.5')
     const scoped = renderLearnerSteering(templates, binding, {
       learnerFocus: [],
       agentSupport: [],
@@ -309,7 +309,7 @@ describe('Kiro-native workspace adapter', () => {
     expect(learner).toContain('`followUpTask`')
   })
 
-  it('keeps the work, its commands and its tool input in the shape Kiro accepts (0.9.1–0.9.4)', () => {
+  it('keeps the work, its commands and its tool input in the shape Kiro accepts (0.9.1–0.9.5)', () => {
     const learner = renderLearnerSteering(templates, binding)
     // 0.9.1: no workflow hand-off and no stopping processes by name.
     expect(learner).toContain('Do not hand the task or a large part of it to a workflow')
@@ -338,6 +338,15 @@ describe('Kiro-native workspace adapter', () => {
     // 0.9.4: concepts under the plan's own names, and a non-zero exit code is a failure.
     expect(learner).toContain('under one of the `conceptNames` that `check_progress` gives')
     expect(learner).toContain('A command that ends with a non-zero exit code failed')
+    // 0.9.5 (K23): a progress note right after each recorded choice, so the panel's latest note
+    // is not the plan from before the question; the panel's Next Move line names a suggestion.
+    expect(learner).toContain(
+      'After it is recorded, call `save_progress` with kind `DIRECTION_CHANGE`',
+    )
+    expect(learner).toContain('a note right after each choice of the learner is recorded')
+    expect(learner).toContain('the Vibe Helper panel shows the learner')
+    expect(learner).not.toContain('helper tab')
+    expect(learner).toContain('"다음 작업후보 2번 진행해"')
   })
 
   it('fails closed on a missing, duplicated or unfilled steering template', () => {

@@ -363,7 +363,7 @@ export const KIRO_CHAT_BUILDER_TOOLS: readonly KiroChatToolDefinition[] = [
     name: 'save_progress',
     title: 'Save progress',
     description:
-      "Save a short progress note that the learner's helper tab reads: your plan, a change of direction, a new plan after an error, or the start of a test run. After a finished task, a PLAN note for the learner's new request starts a follow-up task; the result then has followUpTask with the acceptance criteria to finish against. If the learner picked a nextMove suggestion, add nextMove with its number.",
+      "Save a short progress note that the Vibe Helper panel shows the learner: your plan, what you build right after a choice of the learner is recorded, a change of direction, a new plan after an error, or the start of a test run. After a finished task, a PLAN note for the learner's new request starts a follow-up task; the result then has followUpTask with the acceptance criteria to finish against. If the learner picked a nextMove suggestion, add nextMove with its number.",
     inputSchema: kiroChatTransportSchema(kiroChatSaveProgressToolInputSchema),
     readOnly: false,
     command: (input) => ({ kind: 'BUILDER_CHAT_SAVE_PROGRESS', note: withoutToolPurpose(input) }),
@@ -381,7 +381,7 @@ export const KIRO_CHAT_BUILDER_TOOLS: readonly KiroChatToolDefinition[] = [
     name: 'save_choice',
     title: "Save the learner's choice",
     description:
-      'Record the learner\'s answer after they reply in this chat: the option number, "recommended", or "custom" with a short summary of their own idea. Vibe Helper links the learner\'s own words, so do not quote them. Call it again if the learner changes their mind. If the learner says a recorded choice was not theirs, send "not_mine" with its decisionId: it stops counting as their choice and, when it is not built yet, the question opens again (reopened).',
+      'Record the learner\'s answer after they reply in this chat: the option number, "recommended", or "custom" with a short summary of their own idea. Vibe Helper links the learner\'s own words, so do not quote them. After a choice is recorded, save a progress note of what you build now with it. Call it again if the learner changes their mind. If the learner says a recorded choice was not theirs, send "not_mine" with its decisionId: it stops counting as their choice and, when it is not built yet, the question opens again (reopened).',
     inputSchema: kiroChatTransportSchema(kiroChatSaveChoiceToolInputSchema),
     readOnly: false,
     command: (input) => ({ kind: 'BUILDER_CHAT_SAVE_CHOICE', answer: withoutToolPurpose(input) }),
