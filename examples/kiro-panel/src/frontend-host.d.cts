@@ -87,6 +87,11 @@ export interface FrontendHost {
    * `NOT_BOUND`: no single open folder, or it is not `projectId`'s folder. Never rejects.
    */
   kiroWindow?(projectId?: string): Promise<'READY' | 'UNTRUSTED' | 'RELOAD' | 'NOT_BOUND'>
+  /**
+   * K23: the Project this window's single open folder is connected to (from the hook Core wrote
+   * there), or `null`. The panel opens it before the last Project seen in any window. Never rejects.
+   */
+  windowProject?(): Promise<string | null>
   dispose(): Promise<void>
 }
 export function createFrontendHost(context: {

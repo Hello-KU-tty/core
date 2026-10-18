@@ -407,6 +407,15 @@ async function createFrontendHost(context) {
     if (!vscode.workspace.isTrusted) return 'UNTRUSTED'
     return openedUntrusted ? 'RELOAD' : 'READY'
   }
+  /**
+   * K23: the Project this window's folder is connected to, so the panel opens that Project here
+   * instead of the last one seen in any window. `null` when the folder is not a Project folder.
+   * Never rejects.
+   */
+  async function windowProject() {
+    const bound = await boundProject().catch(() => null)
+    return bound === null || bound === 'UNKNOWN' ? null : bound
+  }
   async function retry() {
     if (stopped) throw new Error('FRONTEND_HOST_STOPPED')
     kiroCli = await findKiroCli(); await lifecycle.retry(); return prepare()
@@ -422,7 +431,7 @@ async function createFrontendHost(context) {
     })()
     return disposal
   }
-  return Object.freeze({ client, worker, prepare, assertAgentReady, openProjectInKiro, kiroWindow, getStatus: () => status,
+  return Object.freeze({ client, worker, prepare, assertAgentReady, openProjectInKiro, kiroWindow, windowProject, getStatus: () => status,
     subscribeStatus(listener) { listeners.add(listener); listener(status); return () => listeners.delete(listener) },
     onDidRotate: connection.onDidRotate,
     retry,

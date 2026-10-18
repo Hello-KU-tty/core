@@ -438,6 +438,22 @@ test('the panel can tell whether Kiro chat in this window reaches the Project (K
   await host.dispose()
 })
 
+test('the panel learns which Project this window belongs to, if any (K23)', async () => {
+  for (const [options, expected] of [
+    [{ bound: true, openFolders: [workspace] }, projectId],
+    [{ bound: true, trusted: false, openFolders: [workspace] }, projectId],
+    [{ bound: true, hookSep: '\\', openFolders: [workspace] }, projectId],
+    [{ bound: false, openFolders: [workspace] }, null],
+    [{ bound: true, openFolders: [] }, null],
+    [{ bound: true, boundTo: 'not-a-project', openFolders: [workspace] }, null],
+  ]) {
+    const h = harness(options)
+    const host = await h.create()
+    assert.equal(await host.windowProject(), expected)
+    await host.dispose()
+  }
+})
+
 test('a trusted Project folder window starts Core without the panel, for Kiro chat tools (K18)', async () => {
   const h = harness({ bound: true, openFolders: [workspace] })
   const host = await h.create()
