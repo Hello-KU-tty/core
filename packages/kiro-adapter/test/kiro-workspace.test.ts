@@ -242,7 +242,7 @@ describe('Kiro-native workspace adapter', () => {
   })
 
   it('steers decisions to the moment they arise, recorded before they are asked (since 0.5.0)', () => {
-    expect(templates.version).toBe('0.9.5')
+    expect(templates.version).toBe('0.9.6')
     const scoped = renderLearnerSteering(templates, binding, {
       learnerFocus: [],
       agentSupport: [],
@@ -347,6 +347,36 @@ describe('Kiro-native workspace adapter', () => {
     expect(learner).toContain('the Vibe Helper panel shows the learner')
     expect(learner).not.toContain('helper tab')
     expect(learner).toContain('"다음 작업후보 2번 진행해"')
+  })
+
+  it('invites a question before every choice and keeps /vibe-helper turns read-only (0.9.6)', () => {
+    const learner = renderLearnerSteering(templates, binding)
+    // K24: a first-time learner may answer a number because not knowing feels wrong, so every
+    // choice says asking first is fine, with an example that is only an example.
+    expect(learner).toContain(
+      'they do not need to know the answer already and can ask before choosing',
+    )
+    expect(learner).toContain(
+      'give one example question about these options that starts with `/vibe-helper`',
+    )
+    expect(learner).toContain('say it is only an example: asking in their own words')
+    expect(learner).toContain('Do this for every choice, not only the first')
+    // The invitation comes before the closing question, which still ends the message.
+    expect(learner.indexOf('they do not need to know the answer already')).toBeLessThan(
+      learner.indexOf('Last, ask the learner to choose and say why in their own words.'),
+    )
+    expect(learner).toContain('End your message with that question and wait.')
+    // A pasted `/vibe-helper` may arrive without the Helper steering: still a read-only question.
+    expect(learner).toContain('even when no Helper guidance came with it')
+    expect(learner).toContain(
+      'do not edit files, run commands or call `save_progress`, `ask_choice`, `save_choice` or `finish_task`',
+    )
+    expect(learner).toContain(
+      'never their answer to a waiting choice and never a request to change the project',
+    )
+    const helper = renderHelperSteering(templates)
+    expect(helper).toContain('If a choice is waiting, end with one short line')
+    expect(helper).toContain('Do not choose a pending decision for the learner.')
   })
 
   it('fails closed on a missing, duplicated or unfilled steering template', () => {
