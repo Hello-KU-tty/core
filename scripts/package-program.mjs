@@ -39,7 +39,7 @@ const hostCommands = [
 ]
 const pkg = {
   ...product,
-  version: '0.2.13',
+  version: '0.2.14',
   displayName: 'Hello Vibe',
   description: `Kiro-native Vibe Helper for ${mac ? 'Apple Silicon Mac' : 'Windows x64'}: local Core, kiro-cli Agents and Kiro chat hooks.`,
   engines: { vscode: '^1.131.0' },
