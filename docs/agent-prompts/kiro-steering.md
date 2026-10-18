@@ -1,11 +1,14 @@
 # Vibe Helper Kiro Steering
 
-> Prompt version: `0.9.6`
+> Prompt version: `0.9.7`
 
 본선 Kiro-native 경로에서 학습자의 Kiro 채팅(Builder)과 Kiro 채팅 Helper 에이전트에 넣는 원문이다. `packages/kiro-adapter`가 `{{NAME}}` 자리를 채워 Project 폴더의 `.kiro/`에 쓴다. 각 원문은 `<!-- template: 이름 -->`과 `<!-- end template -->` 사이에 있고, 그 밖의 글은 쓰지 않는다. Kiro Agent가 읽는 원문은 영어로 둔다.
 
 ## 변경 기록
 
+- 0.9.7: 다시 로드 뒤에는 새 채팅 세션(Windows 0.2.13 확인, 2026-10-18).
+  - 확인 35 때문에 창을 다시 로드한 뒤 같은 채팅 세션에 "다음 작업후보 2번 진행해"를 보냈다. Builder가 인자 없는 `tool_call`을 8번 보내 `Tool "tool_call" is not available`을 받았고, Kiro 반복 감지 창 뒤에야 `mcp_vibe_helper_check_progress`를 직접 불렀다. 0.9.6은 도구가 사라지면 다시 로드한 뒤 "이 채팅에서 이어 가라"고 했다.
+  - 도구 호출이 not available로 거절되면 같은 호출을 되풀이하지 않고 Vibe Helper 도구를 이름으로 한 번 직접 부르게 했다. 그래도 안 되면 창을 다시 로드한 뒤 Kiro 채팅의 새 세션(+)에서 이어 가라고 알리게 했다.
 - 0.9.6: 결정 순간 Helper 안내(DECISIONS "결정 순간 Helper 안내(K24)", 사용자 결정 2026-10-18).
   - 처음 쓰는 학습자는 선택을 받으면 모르면 안 된다고 생각해 바로 번호를 말할 수 있다. Builder 질문은 "고르고 이유를 말해 달라"로 끝났고, 10/12~13 체험의 결정 6건 중 Helper 질문은 1건이었다.
   - 결정을 물을 때마다(첫 결정만이 아니라) 고르기 전에 물어봐도 된다는 말, `/vibe-helper`로 시작하는 예시 질문 하나, 그것은 예시일 뿐이고 자기가 이해한 대로·헷갈리는 부분을 자기 말로 묻는 것이 가장 좋다는 말을 넣게 했다. 문장은 매번 학습자 언어로 새로 쓴다.
@@ -88,7 +91,7 @@ Send each tool's input as one JSON object: every argument as its own field and e
 
 If a Vibe Helper tool returns `VIBE_HELPER_NOT_CONNECTED`, Kiro is still starting or restarting Vibe Helper's Core. Keep working on what needs no learner decision and call the tool again a little later. Until Core accepts the call, do not ask the learner a real decision in chat, record one or finish the task. If it still fails after a few tries, tell the learner in one sentence that Vibe Helper is reconnecting.
 
-If the Vibe Helper tools themselves are gone or Kiro says they are unavailable (an error about the tool or its server, not the `VIBE_HELPER_NOT_CONNECTED` result), Kiro lost its connection to them and will not get it back by itself. Tell the learner in one sentence to reload the Kiro window (Command Palette, "Developer: Reload Window") and continue this chat after it. The same rules apply until then: no real decision, record or finish.
+If the Vibe Helper tools themselves are gone or Kiro says they are unavailable (an error about the tool or its server, not the `VIBE_HELPER_NOT_CONNECTED` result), Kiro lost its connection to them and will not get it back by itself. Never repeat a call that Kiro refused as not available. If a call through a generic wrapper such as `tool_call` is refused, call the Vibe Helper tool directly by its own name once (for example `mcp_vibe_helper_check_progress`). If that is refused too, tell the learner in one sentence to reload the Kiro window (Command Palette, "Developer: Reload Window") and then continue in a new Kiro chat session (the + button), not in this one: after a reload this session cannot reach the tools. The same rules apply until then: no real decision, record or finish.
 
 ## Real decisions belong to the learner
 
