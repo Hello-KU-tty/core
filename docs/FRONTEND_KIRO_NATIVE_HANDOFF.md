@@ -359,6 +359,24 @@ host API 형식은 [`examples/kiro-panel/src/frontend-host.d.cts`](../examples/k
   - 남은 것: "화면 레이아웃·스타일은 제가 알아서 정할게요"처럼 담당을 말하는 표현이 약하게 남았다. 한 번은 예고한 선택의 코드를 먼저 써 두고 그 안을 추천했다.
   - 채팅 약 25.7크레딧.
 
+## 0.2.14 Windows 확인 (2026-10-19, frontend가 먼저)
+
+Windows 0.2.13 확인([이슈 #5](https://github.com/Hello-KU-tty/core/issues/5))에서 나온 문제를 frontend가 고쳐(K25: core [#6](https://github.com/Hello-KU-tty/core/pull/6), program [#14](https://github.com/Hello-KU-tty/program/pull/14)) Windows 0.2.14를 먼저 냈다. **Mac은 0.2.13 그대로이며, 같은 커밋으로 다시 빌드해야 한다.**
+
+- **빌드:** backend `main` `748ea92`(버전 0.2.14), program `main` `fc1ff89`. 두 checkout 모두 깨끗했다.
+- **결과물:** 2,620,956 bytes, SHA-256 `9501810e74d229c62a4b99b49ec35c3aec3ac266e1fed27601bfacc1295ed927`, 75 entries.
+- **바뀐 점(0.2.13 대비):**
+  - **frontend-host:** Project 터미널 준비 실패는 `status.terminalErrorCode`와 경고 한 번으로 알리고, `native`를 `UNAVAILABLE`로 만들지 않는다.
+  - **core-connection:** `UI_READ_NEXT_MOVE`·`UI_READ_LEARNER_PROFILE`을 읽기 전용으로 넣었다.
+  - **runtime `ownedPrivateDirectory`:** Windows에서 본인 전용 부모 안의 상속 ACL 폴더는 새 폴더처럼 좁힌 뒤 다시 검사한다.
+  - **Steering 0.9.7:** 거절된 도구 호출을 되풀이하지 않고, 다시 로드 뒤에는 새 채팅 세션에서 이어 가라고 안내한다.
+  - **패널:** 시작 화면이 모르는 Core 코드를 "Core에 연결할 수 없어요 (CODE)"로 보여 준다. 시작 중 단계는 "준비하고 있어요"로 보인다.
+- **자동 검사(Windows):** program 875, backend unit 179, integration 562, 패널 CJS 197 통과. 새 실제 ACL 테스트 `packages/runtime/test/owned-private-repair.test.ts`는 수정을 빼면 실패한다.
+- **실제 Kiro**(Kiro 1.2.56, 0.2.13에서 업그레이드):
+  - **ACL 복구:** 재시작 전에 `project-tools\home\AppData` 세 폴더를 일부러 상속 ACL로 되돌려 두었다. 0.2.14가 뜨며 세 폴더 모두 본인 전용으로 바로잡았다. 같은 상태에서 0.2.13 Project 창은 "Core에 연결할 수 없어요"였지만, 0.2.14는 진행 탭이 정상이었다.
+  - **Steering:** Project의 Steering이 0.9.7로 다시 써졌고 새 문장이 들어 있다.
+  - **이어 만들기:** 새 채팅 세션에서 "작업마무리해줘"로 열려 있던 Task가 완료됐다(00:11:33). Next Move는 11초 뒤 `SUCCEEDED`였다. 복사한 "다음 작업후보 1번 진행해"로 다음 Task가 시작됐다. 거절된 도구 호출과 승인 창은 없었다.
+
 ## 0.2.13 Windows 확인 (2026-10-18)
 
 frontend가 Windows 11 x64(10.0.26200, Node 24.19.0, pnpm 11.13.1)에서 backend `main` `e33bc79`과 program `main` `d314006`으로 빌드했다. 두 checkout 모두 깨끗했다. 결과는 2,620,125 bytes, SHA-256 `97acf8cdfaf4963d865cf79637b68a9ac2753111162bc8022461da7d79066249`, 75 entries다.
