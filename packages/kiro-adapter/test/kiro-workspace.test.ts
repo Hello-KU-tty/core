@@ -638,6 +638,10 @@ describe('Kiro-native workspace adapter', () => {
     expect(summarizeKiroSessionActivity('')).toBeNull()
   })
 
+  // The entries 0.2.13 added (K23); every earlier installer wrote its rule without them.
+  const K23_ENTRY =
+    /^ {6}- (set -e\*|set -o pipefail|curl(\.exe)? \* .*|curl(\.exe)? ["']?(localhost|127\.0\.0\.1):\*|curl\.exe http:\/\/127\.0\.0\.1:\*)$/
+
   it("pre-approves the Core tools and dev commands in a permission file shaped like Kiro's own", () => {
     const mcp = `  - capability: mcp\n    effect: allow\n    match:\n      - ${KIRO_MCP_SERVER_NAME}/*\n      - ${KIRO_HELPER_MCP_SERVER_NAME}/*\n`
     const written = (existing: string | null) => {
@@ -679,7 +683,7 @@ describe('Kiro-native workspace adapter', () => {
       /^ {6}- (open|Start-Process|start|lsof|curl(\.exe)? (-s )?(-X |["'])|Invoke-(WebRequest|RestMethod) (-Uri |["'])|Out-String$)/
     const earlier = fresh.text
       .split('\n')
-      .filter((line) => !browser.test(line))
+      .filter((line) => !browser.test(line) && !K23_ENTRY.test(line))
       .join('\n')
     expect(earlier).not.toBe(fresh.text)
     expect(applyKiroCommandApproval(earlier, 'PREAPPROVED')).toEqual({
@@ -728,7 +732,7 @@ describe('Kiro-native workspace adapter', () => {
       /^ {6}- ((open|Start-Process|start|curl(\.exe)?( -s)?) ["']|Invoke-(WebRequest|RestMethod) (-Uri |["'])|Out-String$)/
     const earlier = fresh.text
       .split('\n')
-      .filter((line) => !quoted.test(line))
+      .filter((line) => !quoted.test(line) && !K23_ENTRY.test(line))
       .join('\n')
     expect(earlier).toContain('      - Start-Process http://localhost:*\n')
     expect(earlier).not.toBe(fresh.text)
@@ -766,7 +770,7 @@ describe('Kiro-native workspace adapter', () => {
     const added = /^ {6}- (Out-String|Invoke-(WebRequest|RestMethod) ["']http)/
     const earlier = fresh.text
       .split('\n')
-      .filter((line) => !added.test(line))
+      .filter((line) => !added.test(line) && !K23_ENTRY.test(line))
       .join('\n')
     expect(earlier).toContain('      - Invoke-WebRequest -Uri "http://localhost:*\n')
     expect(earlier).not.toBe(fresh.text)
@@ -788,6 +792,49 @@ describe('Kiro-native workspace adapter', () => {
     if (upgraded.status !== 'WRITE') throw new Error(upgraded.status)
     expect(upgraded.text).toContain('      - pnpm build 2>&1 | Out-String\n')
     expect(upgraded.text.match(/- Out-String\n/g)).toHaveLength(1)
+  })
+
+  it('allows curl to this computer in any form and set -e, and upgrades 0.2.12 (K23)', () => {
+    const fresh = applyKiroCommandApproval(null, 'PREAPPROVED')
+    if (fresh.status !== 'WRITE') throw new Error(fresh.status)
+    for (const entry of [
+      'set -e*',
+      'set -o pipefail',
+      'curl localhost:*',
+      'curl * localhost:*',
+      'curl * "localhost:*',
+      'curl * http://localhost:*',
+      "curl * '127.0.0.1:*",
+      'curl.exe * http://127.0.0.1:*',
+    ])
+      expect(fresh.text).toContain(`      - ${entry}\n`)
+    expect(applyKiroCommandApproval(fresh.text, 'PREAPPROVED')).toEqual({ status: 'UNCHANGED' })
+    // Each entry is written once, though K11 already had `curl http://localhost:*`.
+    expect(fresh.text.match(/- curl http:\/\/localhost:\*\n/g)).toHaveLength(1)
+    // `@` (an upload or another host) stays excluded.
+    expect(fresh.text).toContain('      - curl *@*\n')
+    // 0.2.12 wrote the rule without the K23 entries.
+    const earlier = fresh.text
+      .split('\n')
+      .filter((line) => !K23_ENTRY.test(line))
+      .join('\n')
+    expect(earlier).toContain('      - Out-String\n')
+    expect(earlier).not.toContain('set -e')
+    for (const choice of ['PREAPPROVED', 'UPGRADE'] as const)
+      expect(applyKiroCommandApproval(earlier, choice)).toEqual({
+        status: 'WRITE',
+        text: fresh.text,
+      })
+    expect(applyKiroCommandApproval(earlier, 'MANUAL')).toEqual({
+      status: 'WRITE',
+      text: 'rules: []\n',
+    })
+    // The learner's "always allow" outlives the upgrade.
+    const merged = earlier.replace('      - lsof *\n', '      - lsof *\n      - rm -f data.db\n')
+    const upgraded = applyKiroCommandApproval(merged, 'UPGRADE')
+    if (upgraded.status !== 'WRITE') throw new Error(upgraded.status)
+    expect(upgraded.text).toContain('      - rm -f data.db\n')
+    expect(upgraded.text.match(/- set -e\*\n/g)).toHaveLength(1)
   })
 
   it("manual approval removes only the Vibe Helper entries and keeps the learner's own", () => {

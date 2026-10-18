@@ -463,6 +463,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
     - Steering 0.9.5: 답을 기록한 직후 진행 메모를 남긴다. 도구 설명도 고쳤다.
     - 테스트: program 869 통과, backend unit 177·integration 563 통과.
     - 실측: 새 채팅 세션에서 `save_choice` 뒤 `DIRECTION_CHANGE` 메모가 남았다. 기존 세션은 0.9.4를 계속 썼다([K23 기록](../tests/eval/results/kiro-0.2.13-k23-panel.md)).
+  - **"이렇게 진행돼요" 3단계와 미리 승인(사용자 결정, 2026-10-18 오후):** 3단계를 "만드는 동안 묻는 선택에 답하기"로 바꿨다(program `dff0099`). 이 컴퓨터 주소로 가는 curl의 여러 형태와 `set -e`를 미리 승인한다. kiro-cli 판정기로 오늘 승인 창 명령을 다시 판정했다([K23 기록](../tests/eval/results/kiro-0.2.13-k23-panel.md)).
   - **남은 것:** 사용자 확인과 수정, Mac 0.2.13 release 커밋(업그레이드 뒤 새 채팅 세션 안내 포함), Windows 빌드(사용자 또는 frontend), 두 플랫폼 다운로드 가이드.
 
 ## 3. 예선 작업 요약

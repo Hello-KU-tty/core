@@ -89,6 +89,15 @@
   - `save_progress` 한 번이 인자 전체를 `\u` 이스케이프 문자열로 보내 Kiro `tool_call` 단계에서 거절됐다(`expected object, received string`).
 - **크레딧:** 끝난 채팅 네 턴에 16.84(7.00 + 1.81 + 6.61 + 1.42)가 들었다. 다섯 번째 턴(새 세션에서 답한 뒤)은 기록 시점에 승인을 기다리고 있어 아직 집계되지 않았다. IDE 기록은 시작 때 305.61이었다.
 
+## 미리 승인 규칙 판정(2026-10-18 오후, 모델 크레딧 없음)
+
+- **방법:** `experiments/kiro-shell-permissions/judge.sh`(kiro-cli 2.32.0 `_kiro/permissions/explain`). 오늘 테스트 Kiro에서 승인 창이 뜬 명령 9개와 그 조각 20개를 0.2.12 규칙과 0.2.13 규칙으로 판정했다. 결과는 같은 폴더의 `k23-observed-0.2.12.txt`, `k23-observed-0.2.13.txt`, `k23-segments-0.2.13.txt`에 있다.
+- **결과:** 29건 중 허용이 9건에서 17건으로 늘었다.
+  - 이제 허용: `set -e`, `set -euo pipefail`, `curl -s -X POST localhost:3000/items …`, `curl -s "localhost:3000/movements?…"`, `curl -s -o /dev/null -w "%{http_code}\n" localhost:3000/…`. 오늘 스크립트 중 `sleep`·`echo`·curl로만 된 첫 확인 스크립트가 통째로 허용됐다.
+  - 원래 허용: `X=$(curl … http://localhost…)`, 함수 정의, `for` 반복, `TODAY=$(date …)`, `| python3 -m json.tool`.
+  - 그대로 묻는 것: `rm`, `BASE=http://localhost:3000`, `curl … $BASE/items`, `sed -E`, `# 주석`, 정의한 함수를 부르는 줄(`br 2`). 이 때문에 오늘 스크립트 중 다섯 개는 여전히 묻는다.
+  - 안전 확인: `https://example.com`, `http://example.com` POST, `-d @secret.txt`, `localhost.evil.com:80`, `localhost:3000@evil.com`, `set -e; rm -rf dist`는 모두 묻는다.
+
 ## 관찰만 한 것
 
 - **Analyst 판정:** 합성 이유 두 개는 Builder의 추천 이유를 거의 따라 말해서 `DIRECTLY_LED`로 거절됐다. 정직성 규칙대로 동작한 것이며 패널 문제는 아니다.

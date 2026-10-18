@@ -540,6 +540,27 @@ const K20_SHELL_RULE: KiroAllowRule = {
   exclude: K17_SHELL_RULE.exclude,
 }
 
+/** The shell rule 0.2.12 wrote (K22). */
+const K22_SHELL_RULE: KiroAllowRule = {
+  capability: 'shell',
+  // K22 (Windows 0.2.11 trial): Windows Builders end a command with `2>&1 | Out-String` to read
+  // all its output, and check the app with `Invoke-WebRequest "http://localhost:3000"` (quoted,
+  // no `-Uri`). `Out-String` alone only turns the piped output into text; with arguments it
+  // could take a value from a parenthesized command, so it is not listed with `*`.
+  match: [
+    ...K20_SHELL_RULE.match,
+    'Out-String',
+    ...['localhost', '127.0.0.1'].flatMap((host) =>
+      ['"', "'"].flatMap((quote) =>
+        ['Invoke-WebRequest', 'Invoke-RestMethod'].map(
+          (command) => `${command} ${quote}http://${host}:*`,
+        ),
+      ),
+    ),
+  ],
+  exclude: K20_SHELL_RULE.exclude,
+}
+
 export const KIRO_PREAPPROVED_RULES: readonly KiroAllowRule[] = [
   {
     capability: 'mcp',
@@ -548,32 +569,40 @@ export const KIRO_PREAPPROVED_RULES: readonly KiroAllowRule[] = [
   },
   {
     capability: 'shell',
-    // K22 (Windows 0.2.11 trial): Windows Builders end a command with `2>&1 | Out-String` to read
-    // all its output, and check the app with `Invoke-WebRequest "http://localhost:3000"` (quoted,
-    // no `-Uri`). `Out-String` alone only turns the piped output into text; with arguments it
-    // could take a value from a parenthesized command, so it is not listed with `*`.
+    // K23 (0.2.13 live check): the Builder checks its own API with a script of curl calls. Kiro
+    // asked for every one: the address without `http://` (`curl -s localhost:3000/items`),
+    // options before it (`-o /dev/null -w "%{http_code}"`) and a `set -e` line. Any curl to this
+    // computer's address is allowed, with or without the scheme or quotes and with options in
+    // front; `@` stays excluded, and an address in a shell variable still asks. `#` comment lines
+    // still ask: `# *` is not a plain YAML string.
     match: [
-      ...K20_SHELL_RULE.match,
-      'Out-String',
-      ...['localhost', '127.0.0.1'].flatMap((host) =>
-        ['"', "'"].flatMap((quote) =>
-          ['Invoke-WebRequest', 'Invoke-RestMethod'].map(
-            (command) => `${command} ${quote}http://${host}:*`,
+      ...new Set([
+        ...K22_SHELL_RULE.match,
+        ...['set -e*', 'set -o pipefail'],
+        ...['curl', 'curl.exe'].flatMap((command) =>
+          ['localhost', '127.0.0.1'].flatMap((host) =>
+            ['http://', ''].flatMap((scheme) =>
+              ['', '"', "'"].flatMap((quote) => [
+                `${command} ${quote}${scheme}${host}:*`,
+                `${command} * ${quote}${scheme}${host}:*`,
+              ]),
+            ),
           ),
         ),
-      ),
+      ]),
     ],
-    exclude: K20_SHELL_RULE.exclude,
+    exclude: K22_SHELL_RULE.exclude,
   },
 ]
 
 /**
  * Our rules in the order they are recognized: the current ones first, then what earlier
- * installers wrote (0.2.11, K20; 0.2.9–0.2.10, K17; 0.2.7–0.2.8, K11), so an upgrade replaces an
+ * installers wrote (0.2.12, K22; 0.2.11, K20; 0.2.9–0.2.10, K17; 0.2.7–0.2.8, K11), so an upgrade replaces an
  * earlier rule and manual approval still removes it.
  */
 const RECOGNIZED_PREAPPROVED_RULES: readonly KiroAllowRule[] = [
   ...KIRO_PREAPPROVED_RULES,
+  K22_SHELL_RULE,
   K20_SHELL_RULE,
   K17_SHELL_RULE,
   K11_SHELL_RULE,
