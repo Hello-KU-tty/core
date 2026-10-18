@@ -1,6 +1,6 @@
 # Hello Vibe 설치 가이드
 
-Hello Vibe는 Kiro IDE 확장입니다. Vibe Helper 패널에서 배우고 싶은 것을 바탕으로 만들 프로젝트를 고르고, 실제 만들기는 Kiro 채팅에서 합니다. 이 문서는 본선 설치물 **0.2.13** 기준입니다. Windows는 0.2.13이 올라오기 전까지 0.2.12이며, 화면이 다른 곳은 따로 적었습니다.
+Hello Vibe는 Kiro IDE 확장입니다. Vibe Helper 패널에서 배우고 싶은 것을 바탕으로 만들 프로젝트를 고르고, 실제 만들기는 Kiro 채팅에서 합니다. 이 문서는 본선 설치물 **0.2.13**(Mac, Windows) 기준입니다.
 
 ## 1. 준비물
 
@@ -17,7 +17,7 @@ Hello Vibe 계정이나 API 키는 없습니다. Node.js, pnpm 같은 개발 도
 | 운영체제 | 설치 파일 |
 | --- | --- |
 | Mac (Apple Silicon) | **[0.2.13 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/kiro-native/builder-helper-agent-panel-0.2.13-darwin-arm64.vsix)** (약 40MB) |
-| Windows (x64) | **[0.2.12 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/windows/kiro-native/builder-helper-agent-panel-0.2.12-win32-x64.vsix)** (약 2.5MB, 0.2.13 준비 중) |
+| Windows (x64) | **[0.2.13 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/windows/kiro-native/builder-helper-agent-panel-0.2.13-win32-x64.vsix)** (약 2.5MB) |
 
 링크를 누르면 `.vsix` 파일이 바로 내려받아집니다. [Windows 설치 파일 폴더](../releases/windows/kiro-native/)에서도 받을 수 있습니다.
 
@@ -27,7 +27,7 @@ Hello Vibe 계정이나 API 키는 없습니다. Node.js, pnpm 같은 개발 도
 | 파일 | SHA-256 |
 | --- | --- |
 | Mac 0.2.13 | `7a1218213f93aa13c5cdd9df157bf1a7ceac57272776ef1db9e2be89a9b39b92` |
-| Windows 0.2.12 | `bd65be96e6ddb9beb9e92ed32d8faac2a471d5a0c542b1d861beb56aa34b9a4b` |
+| Windows 0.2.13 | `97acf8cdfaf4963d865cf79637b68a9ac2753111162bc8022461da7d79066249` |
 
 Mac 터미널:
 
@@ -38,7 +38,7 @@ shasum -a 256 ~/Downloads/builder-helper-agent-panel-0.2.13-darwin-arm64.vsix
 Windows PowerShell:
 
 ```powershell
-Get-FileHash "$env:USERPROFILE\Downloads\builder-helper-agent-panel-0.2.12-win32-x64.vsix"
+Get-FileHash "$env:USERPROFILE\Downloads\builder-helper-agent-panel-0.2.13-win32-x64.vsix"
 ```
 
 빌드 출처와 파일별 해시는 [Mac receipt](../releases/macos/kiro-native/macos-vsix-receipt.json), [Windows receipt](../releases/windows/kiro-native/windows-vsix-receipt.json)에 있습니다.
@@ -74,7 +74,7 @@ irm https://cli.kiro.dev/install.ps1 | iex
 1. Kiro에서 확장 화면을 엽니다. Mac은 `Cmd+Shift+X`, Windows는 `Ctrl+Shift+X`입니다.
 2. 확장 화면 위쪽의 `…` 메뉴에서 **Install from VSIX…** 항목을 고르고 내려받은 `.vsix` 파일을 선택합니다.
 3. 다시 로드하라는 안내가 나오면 따릅니다.
-4. 왼쪽 막대의 **Vibe Helper** 아이콘(Windows 0.2.12는 **Agent Panel**)을 누릅니다. 패널이 로컬 Core에 자동으로 연결됩니다.
+4. 왼쪽 막대의 **Vibe Helper** 아이콘을 누릅니다. 패널이 로컬 Core에 자동으로 연결됩니다.
 
 Windows에서는 첫 실행 때 Hello Vibe가 Node.js 24.19.0을 내려받아 무결성을 확인한 뒤 씁니다. PC에 설치된 Node.js는 쓰지 않습니다.
 
@@ -91,7 +91,7 @@ Windows에서는 첫 실행 때 Hello Vibe가 Node.js 24.19.0을 내려받아 �
 6. Hello Vibe가 이 프로젝트를 Kiro 채팅에 연결합니다. 패널 맨 위 **지금 할 일**이 신뢰, 다시 로드처럼 지금 할 일을 하나씩 알려 줍니다. 새 창으로 열렸다면 새 창에서 '신뢰'를 누른 뒤 패널이 다시 뜨기까지 보통 10~30초 걸립니다. 연결이 끝나면 Hello Vibe가 Kiro 채팅에 새 세션을 열어 주고, 패널이 보낼 첫 말 `시작해 줘`와 복사 버튼을 보여 줍니다. 그대로 보내거나 "시작하자"처럼 말하면 Kiro가 계획대로 만들기 시작합니다. 새 세션이 열리지 않았으면 Kiro 채팅의 **+** 버튼으로 엽니다.
 7. 만들다가 정해야 할 것이 생기면 Kiro가 번호가 붙은 선택지로 묻고 기다립니다. **잘 몰라도 괜찮습니다.** 고르기 전에 `/vibe-helper 1번이랑 2번이 뭐가 다른지 알려줘`처럼 먼저 물어보세요. Kiro와 패널이 예시 질문을 보여 주고 패널에서는 복사도 됩니다(0.2.13부터). 예시는 예시일 뿐이고, 내가 이해한 대로·헷갈리는 부분을 내 말로 묻는 게 더 좋습니다. 정했으면 번호와 함께 **고른 이유를 한 문장** 적어 주세요. 그 이유가 학습 기록의 근거가 됩니다. "응"이나 버튼 클릭만으로는 이해했다고 기록하지 않습니다. 묻는 중에 궁금한 걸 물어봐도 선택으로 기록되지 않습니다. 고르지 않은 선택이 기록됐다면 채팅에 "그건 내가 고른 게 아니야"라고 말하세요. 그 선택을 기록에서 빼고 다시 물어봅니다(0.2.9부터).
 8. 작업이 끝나면 Kiro가 만든 앱의 서버를 켜 둔 채 브라우저로 열어 주고 주소를 알려 줍니다.
-9. 작업 하나가 끝나면 패널 **진행** 탭(Windows 0.2.12는 **빌더** 탭)에 "다음 한 걸음" 카드가 10초 안팎에 뜹니다. 이 프로젝트를 키울 방향 3개가 나옵니다. 하고 싶은 것이 있으면 그 카드의 문구("다음 작업후보 2번 진행해")를 복사해 Kiro 채팅에 보내면 이어서 만듭니다. 그냥 두거나, 원하는 기능을 직접 말해도 됩니다. 진행 탭에는 지금 Kiro 채팅이 기다리는 질문, 이번 작업에서 고른 것과 인정된 학습 기록도 보입니다.
+9. 작업 하나가 끝나면 패널 **진행** 탭에 "다음 한 걸음" 카드가 10초 안팎에 뜹니다. 이 프로젝트를 키울 방향 3개가 나옵니다. 하고 싶은 것이 있으면 그 카드의 문구("다음 작업후보 2번 진행해")를 복사해 Kiro 채팅에 보내면 이어서 만듭니다. 그냥 두거나, 원하는 기능을 직접 말해도 됩니다. 진행 탭에는 지금 Kiro 채팅이 기다리는 질문, 이번 작업에서 고른 것과 인정된 학습 기록도 보입니다.
 
 **질문하기:** 만들기를 하던 채팅에 `/vibe-helper 질문`을 입력합니다. 붙여 넣어도 됩니다. 그 질문에는 코드를 읽고 설명만 하며 수정하지 않고, 선택으로 기록하지도 않습니다. 고칠 것은 `/vibe-helper` 없이 이어서 부탁합니다. 0.2.13 패널에는 도우미 탭이 없고 질문은 Kiro 채팅에서 합니다.
 

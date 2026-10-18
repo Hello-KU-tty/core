@@ -19,6 +19,8 @@
 
 ## Windows 0.2.13 빌드 요청 (frontend)
 
+**완료(2026-10-18):** 확인 1~8, 9, 14, 16, 26~28, 31~35를 통과했고, 36은 나오지 않았다. 34는 다시 로드 뒤 같은 채팅 세션에서 빈 `tool_call`이 반복된 일을 함께 적었다. [0.2.13 Windows 확인](#0213-windows-확인-2026-10-18)
+
 backend가 패널 정리(K23)와 결정 순간 Helper 안내(K24)를 program `main` `d314006`에 합치고 Mac 0.2.13을 만들어 실제 Kiro에서 확인했다. 할 일, 추가 확인 31~36, 올리기는 [0.2.13 프론트 인계](FRONTEND_HANDOFF_0.2.13.md)에 있다. 빌드는 사용자나 frontend가 한다.
 
 ## 0.2.13에서 바뀐 점
@@ -356,6 +358,44 @@ host API 형식은 [`examples/kiro-panel/src/frontend-host.d.cts`](../examples/k
   - 0.2.10에서 연결한 폴더는 0.2.11 Core 시작 때 새 승인 규칙과 Steering 0.9.2를 받았다.
   - 남은 것: "화면 레이아웃·스타일은 제가 알아서 정할게요"처럼 담당을 말하는 표현이 약하게 남았다. 한 번은 예고한 선택의 코드를 먼저 써 두고 그 안을 추천했다.
   - 채팅 약 25.7크레딧.
+
+## 0.2.13 Windows 확인 (2026-10-18)
+
+frontend가 Windows 11 x64(10.0.26200, Node 24.19.0, pnpm 11.13.1)에서 backend `main` `e33bc79`과 program `main` `d314006`으로 빌드했다. 두 checkout 모두 깨끗했다. 결과는 2,620,125 bytes, SHA-256 `97acf8cdfaf4963d865cf79637b68a9ac2753111162bc8022461da7d79066249`, 75 entries다.
+
+**자동 검사(Windows):** program typecheck 통과, `npm test` 871 통과. backend unit 179 통과·1 skip, integration 559 통과·15 skip, 패널 CJS 195 통과·1 skip.
+
+**실제 Kiro 환경:**
+- Kiro 1.2.56(자동 업데이트 끔), kiro-cli 2.29.0, 0.2.12에서 업그레이드
+- Workflows 켬, 미리 승인, 모델 Auto
+- 빈 창의 패널에서 처음 보는 목표(지붕 위 도망 게임)로 새 Project를 만들고 새 창에서 열었다
+
+| 확인 | 결과 |
+| --- | --- |
+| 1~8 | 통과 |
+| 9 | 통과. 카드 문구 "시작해 줘" → `check_progress` → `save_progress` → `ask_choice`(23:11:14). 첫 Task에서 선택 질문 2개(이의 뒤 다시 연 것 포함 3번). `run_workflow` 없음 |
+| 14 | 통과. 답(23:12:27 확정) → "그건 내가 고른게 아니야"(턴 `interrupted`) → 이의 기록·같은 질문 다시 열림(23:12:36) → 답으로 확정(23:12:55), 완료 때 `APPLIED` |
+| 16 | 통과. 브라우저를 열고 서버를 켠 채 완료했다 |
+| 26 | 통과. `npm install`·`npm test`·`npm run build`에 `double-loading` 없음. Builder가 쓴 `npm install-scripts … run`은 npm 사용법 오류(EUSAGE)였고, `npm rebuild esbuild`로 이어 갔다 |
+| 27 | 명령 승인 창 1개: `(Invoke-WebRequest http://localhost:5173/ -UseBasicParsing).StatusCode; (Invoke-WebRequest …/src/main.ts …)`(23:18:42). 인계에 적힌 괄호 형태다 |
+| 28 | 통과. `conceptUsage` 6개, `ignoredConcepts` `[]` |
+| 29 | 통과. `npm run build`가 TS 오류로 실패(23:17:48)한 뒤 Builder가 고쳐 다시 빌드했고, 성공한 결과만 성공이라고 했다 |
+| 31 | 통과. 패널 이름 Vibe Helper, 탭은 진행 · 학습 기록 |
+| 32 | 통과(사용자 확인). 새 창 확장 호스트 배치(23:08:05) → 첫 발언 "시작해 줘"(23:08:25). 이 PC는 상위 폴더가 신뢰돼 있어 신뢰 창이 뜨지 않았다 |
+| 33 | 통과. Builder가 선택 질문 앞에 "정답을 미리 알 필요는 전혀 없어요… `/vibe-helper 1번이랑 2번은 이 게임에서 뭐가 달라져?`… 예시일 뿐이고 본인 말로" 안내. 복사한 `/vibe-helper 이 선택지들이 뭐가 다른지 쉽게 알려줘`에 `HELPER_RESPONSE`만 남고 선택으로 기록되지 않음 |
+| 34 | 통과(주의). 카드에서 복사한 "다음 작업후보 2번 진행해"(23:39:14)로 후속 Task가 시작됐다(23:40:23, "난이도 조절 시스템"). 다만 이 채팅 세션은 창을 다시 로드한 뒤 이어 쓴 것이었고, Builder가 먼저 인자 없는 `tool_call`을 8번 보내 `Tool "tool_call" is not available`을 받았다. Kiro의 반복 감지 창("Keep Iterating") 뒤에야 `mcp_vibe_helper_check_progress`를 직접 불렀다(약 1분 지연) |
+| 35 | 통과(사용자 확인). 다른 Project를 열면 안내 줄과 새 창 버튼, 다시 로드하면 이 창의 Project |
+| 36 | 나오지 않음(curl 없음) |
+
+**이 PC에서만 생긴 문제(제품 결함 포함):**
+- 처음에 프로젝트 창 패널에 "다음 한 걸음"이 보이지 않았다. Core의 Next Move는 23:20:33에 `SUCCEEDED`(후보 3개)였다.
+- 시작 화면 배너는 "Core에 연결할 수 없어요"였다. host `prepareProjectTerminal` → `selectProjectToolchain`이 `PRIVATE_DIRECTORY_UNSAFE`로 실패해 `native: UNAVAILABLE`이 되었기 때문이다.
+- 그러면 `READ_ONLY_UI_KINDS`에 없는 `UI_READ_NEXT_MOVE`가 `assertAgentReady`에 막힌다.
+- 실패한 폴더는 `core-data\project-tools\home\AppData`, `…\Local`, `…\Roaming`이다. 10-11 02:23~02:25(`dca359b` 02:43 이전) 디버깅 중에 상속 ACL로 생겼다. `icacls /inheritance:r /grant:r *<SID>:(OI)(CI)F`로 본인 전용으로 바꾸자 통과했고, 다시 로드한 뒤 카드가 보였다.
+- 새 설치에는 생기지 않는다. 하지만 다음 세 가지는 제품 쪽에서 고칠 만하다.
+  1. 터미널 준비 같은 부가 단계 하나가 실패하면 패널 전체가 준비 안 됨이 된다.
+  2. 읽기 명령인 `UI_READ_NEXT_MOVE`까지 막힌다.
+  3. 패널에 원인 코드 없이 "Core에 연결할 수 없어요"만 보인다.
 
 ## 0.2.12 Windows 확인 (2026-10-17)
 

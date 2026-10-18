@@ -7,17 +7,17 @@
   {
     "name": "extension.vsixmanifest",
     "bytes": 844,
-    "sha256": "0ac9a50ea22b360b399145a3fdc5af85ab14621251254116d491902216643ba1"
+    "sha256": "c3d5a39e62bd10b845cfbffdcb1b0e5b88b00f6d831951ac7fccfc0fedb00981"
   },
   {
     "name": "extension/dist/extension.js",
-    "bytes": 1421192,
-    "sha256": "81421e034098710fafa9efb483452bff5c3d755da667728278ee6c214b92bdc0"
+    "bytes": 1446779,
+    "sha256": "3aa45447a61431e6edcba4f08caacdf3546ada53f85490306d7842b7677950be"
   },
   {
     "name": "extension/dist/webview/main.js",
-    "bytes": 188086,
-    "sha256": "ad329c55d8b2cc822da0de74ec6ddf394d30293875368f8d640136abb6b4a781"
+    "bytes": 213404,
+    "sha256": "6221d079dc76c4378a0504265c2cd7dcc3610da0496b80a5dd9c56f1571ae976"
   },
   {
     "name": "extension/media/agent-panel.svg",
@@ -26,8 +26,8 @@
   },
   {
     "name": "extension/package.json",
-    "bytes": 1819,
-    "sha256": "9583710c75c2a1277955816c0c047d0f1b3177bf81e7580425a73102f8493b28"
+    "bytes": 1814,
+    "sha256": "7d2d3e02b4ce277da988df28e4535e4e59372f2bfb49cf6bc84b2346a14787f3"
   },
   {
     "name": "extension/portable/agent-prompts/builder.md",
@@ -51,8 +51,8 @@
   },
   {
     "name": "extension/portable/agent-prompts/kiro-steering.md",
-    "bytes": 30786,
-    "sha256": "5091442b42642b2b1be73aaf323683c8478efe4aa40f9b1b042a8b469a2e6492"
+    "bytes": 34392,
+    "sha256": "c066e69ab59a977ad76c0003fbc0db7bf72854c7565281978f7971e60e89fa6d"
   },
   {
     "name": "extension/portable/bin/bridge.mjs",
@@ -66,18 +66,18 @@
   },
   {
     "name": "extension/portable/bin/core.mjs",
-    "bytes": 1169135,
-    "sha256": "5a5a62832d8a18da84202f5ca043f6a40587e3b92140e3348ac7a5ca88344f8c"
+    "bytes": 1169569,
+    "sha256": "24539aa95b1d388e7e3ed8ca927b9f61c04718ae0cd51d2beb4a5b6062e24a4c"
   },
   {
     "name": "extension/portable/bin/extension.cjs",
-    "bytes": 482108,
-    "sha256": "31f90cf1bb73694de27b7e45d01b22892b62bcb12cbb274bcbae76cc982e04e1"
+    "bytes": 482910,
+    "sha256": "a19bb5deb2fbd16617030ae0ecf4bfc089002fbab45abc5e8be2e0f546ce1c32"
   },
   {
     "name": "extension/portable/bin/frontend-host.cjs",
-    "bytes": 437586,
-    "sha256": "d476bd39e8e688b652dc94dd32e4aa080184af59fc98e8ed6d93a3cc38bd0645"
+    "bytes": 438373,
+    "sha256": "469353994f1f52ee6f0f1bfb0ad5aaf17579391f8e9e7705945103b93cafb832"
   },
   {
     "name": "extension/portable/bin/guard.mjs",
@@ -86,8 +86,8 @@
   },
   {
     "name": "extension/portable/bin/kiro-hook.mjs",
-    "bytes": 6280,
-    "sha256": "3e583c30263a4db90d436946662c5ef23af1fe822b2c883b71f9601f4b5efb1c"
+    "bytes": 6557,
+    "sha256": "79bbd6f62e7a70e5ba23aa4c02f57e195045c7515a35729fae8e74297bedb2bf"
   },
   {
     "name": "extension/portable/bin/lifecycle.cjs",
@@ -232,7 +232,7 @@
   {
     "name": "extension/portable/manifest.json",
     "bytes": 10931,
-    "sha256": "f8fbe5bfab64fa14774cc5284d344a4ff4417d2c8411c9d1b6f91dfee06552b2"
+    "sha256": "f2599f0c67ee2f87dbfb11bade92b0b6e09f13914a59020ff37fdcde5f9f3fdb"
   },
   {
     "name": "extension/portable/node_modules/better-sqlite3/lib/binding.js",
