@@ -454,6 +454,10 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
     - 미리보기(실제 Kiro 밝은·어두운 테마 변수, 300px)에서 14개 상태 모두 가로 넘침이 없다.
     - 테스트 Kiro 실측은 [K23 기록](../tests/eval/results/kiro-0.2.13-k23-panel.md)에 있다. 크레딧 253.55 → 264.81.
   - **오전 수정(사용자 확인 중):** "만드는 중" 카드에 Kiro 채팅의 최근 진행 메모(Core Live Context)를 보인다. 메모를 조용한 아래쪽 칸으로 바꿨다. 펼쳐지는 곳마다 화살표, 마우스 반응, 초점 표시를 넣었다(program `65992d2`, `6ce8a0b`). 크레딧은 289.05다.
+  - **창마다 자기 Project(사용자 지시, 2026-10-18 오후):**
+    - 패널은 확장 전체의 "마지막 Project"(`bhlr.lastProjectId`)를 열었다. 예선에서 Project가 폴더보다 먼저 생기고 창을 옮겨 다녀서 둔 값이다. 그래서 A Project 폴더 창에서도 B가 열릴 수 있었다.
+    - 이제 host `windowProject()`가 폴더 hook에서 이 창의 Project id를 읽고, 패널은 그 Project를 먼저 연다. 이 창이 Project 폴더가 아니거나 그 Project를 열 수 없을 때만 마지막 Project를 연다(backend `60fd12a`, program `46ac898`).
+    - 실측: 마지막 Project를 빵집으로 바꾼 뒤 물품 대여 폴더 창을 재시작하자 물품 대여가 열렸다.
   - **남은 것:** 사용자 확인과 수정, Mac 0.2.13 release 커밋, Windows 빌드(사용자 또는 frontend), 두 플랫폼 다운로드 가이드.
 
 ## 3. 예선 작업 요약
