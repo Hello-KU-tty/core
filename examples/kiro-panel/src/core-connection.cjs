@@ -9,11 +9,16 @@ const RECOVERABLE_STREAM_CODES = new Set([
   'STREAM_DISCONNECTED_RESTORE_PROJECT',
 ])
 
+// Reads that change nothing in Core. They work while the agent side is not
+// ready (no kiro-cli login, a failed preparation) and are retried on a rotated
+// connection. K25: Next Move and the learner profile are reads too.
 const READ_ONLY_UI_KINDS = new Set([
   'UI_LIST_PROJECTS',
   'UI_RESTORE_PROJECT_SESSION',
   'UI_READ_ANALYSIS_JOBS',
   'UI_READ_EVIDENCE_TRACE',
+  'UI_READ_NEXT_MOVE',
+  'UI_READ_LEARNER_PROFILE',
 ])
 
 function codedError(code, cause) {

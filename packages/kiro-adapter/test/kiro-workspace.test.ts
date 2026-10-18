@@ -242,7 +242,7 @@ describe('Kiro-native workspace adapter', () => {
   })
 
   it('steers decisions to the moment they arise, recorded before they are asked (since 0.5.0)', () => {
-    expect(templates.version).toBe('0.9.6')
+    expect(templates.version).toBe('0.9.7')
     const scoped = renderLearnerSteering(templates, binding, {
       learnerFocus: [],
       agentSupport: [],
@@ -347,6 +347,16 @@ describe('Kiro-native workspace adapter', () => {
     expect(learner).toContain('the Vibe Helper panel shows the learner')
     expect(learner).not.toContain('helper tab')
     expect(learner).toContain('"다음 작업후보 2번 진행해"')
+  })
+
+  it('does not repeat a refused tool call and sends a reload to a new chat session (0.9.7)', () => {
+    const learner = renderLearnerSteering(templates, binding)
+    // Windows 0.2.13: after a window reload the same chat session sent an empty `tool_call`
+    // eight times. 0.9.6 told the learner to "continue this chat" after the reload.
+    expect(learner).toContain('Never repeat a call that Kiro refused as not available.')
+    expect(learner).toContain('call the Vibe Helper tool directly by its own name once')
+    expect(learner).toContain('continue in a new Kiro chat session (the + button), not in this one')
+    expect(learner).not.toContain('and continue this chat after it')
   })
 
   it('invites a question before every choice and keeps /vibe-helper turns read-only (0.9.6)', () => {

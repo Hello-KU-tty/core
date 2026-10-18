@@ -148,7 +148,7 @@ describe('Kiro binding manager', () => {
     expect(steering).not.toContain(ids.task)
     expect(steering).toContain('`save_choice`')
     expect(steering).toContain('What the learner owns')
-    expect(steering).toContain('steering 0.9.6.')
+    expect(steering).toContain('steering 0.9.7.')
     // 0.7.0: the Spec's agent-support areas reach the Builder, which decides there itself.
     expect(steering).toContain(
       'Agent support (choose these yourself; in chat, say only what you chose):\n- Local application shell',

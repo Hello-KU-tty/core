@@ -12,7 +12,7 @@ const refuse = error => ({ status: 409, body: { success: false, error } })
 
 function harness({ trusted = true, installed = true, loggedIn = true, fail: failing = false, platform = 'darwin',
   binds = [ok({ workspace })], openFolders = [], answers = {}, bound = false, boundTo = projectId, hookSep = '/', consent, env = process.env,
-  installedAt = () => true } = {}) {
+  installedAt = () => true, terminalFails = null } = {}) {
   let listener, trustListener, stopped = 0, starts = 0, mutations = 0, terminals = 0
   // `fail: true` fails every start, a number fails that many starts first.
   let failures = failing === true ? Infinity : Number(failing)
@@ -87,7 +87,10 @@ function harness({ trusted = true, installed = true, loggedIn = true, fail: fail
     './core-connection.cjs': { ...require('../src/core-connection.cjs'),
       createCoreConnectionManager: () => ({ client: rawClient, onDidRotate() {}, dispose() {} }) },
     './native-worker-handle.cjs': require('../src/native-worker-handle.cjs'),
-    './project-terminal-environment.cjs': { prepareProjectTerminal: async () => { terminals++ } },
+    './project-terminal-environment.cjs': { prepareProjectTerminal: async () => {
+      terminals++
+      if (terminalFails) throw new Error(terminalFails)
+    } },
   }
   const module = { exports: {} }
   const queue = [...binds]
@@ -107,6 +110,30 @@ function harness({ trusted = true, installed = true, loggedIn = true, fail: fail
     counters: () => ({ stopped, starts, mutations, terminals }) }
 }
 const settle = () => new Promise(resolve => setImmediate(resolve))
+
+test('a failed Project terminal preparation leaves the agent side ready and says so once (K25)', async () => {
+  const h = harness({ terminalFails: 'PRIVATE_DIRECTORY_UNSAFE' }), host = await h.create()
+  await host.prepare()
+  assert.equal(host.getStatus().native, 'WORKER_READY')
+  assert.equal(host.getStatus().terminalErrorCode, 'PRIVATE_DIRECTORY_UNSAFE')
+  const warnings = () => h.dialogs.filter(item => item.kind === 'warning' && item.text.includes('PRIVATE_DIRECTORY_UNSAFE'))
+  assert.equal(warnings().length, 1)
+  // Mutations still need a ready agent side, and it is ready.
+  await host.client.startRun({})
+  assert.equal(h.counters().mutations, 1)
+  await host.dispose()
+})
+
+test('Next Move and the learner profile stay readable while the agent side is not ready (K25)', async () => {
+  const h = harness({ loggedIn: false }), host = await h.create()
+  await host.prepare()
+  assert.equal(host.getStatus().native, 'UNAVAILABLE')
+  await host.client.execute({ kind: 'UI_READ_NEXT_MOVE', projectId })
+  await host.client.execute({ kind: 'UI_READ_LEARNER_PROFILE' })
+  assert.equal(h.counters().mutations, 2)
+  await assert.rejects(host.client.execute({ kind: 'UI_RETRY_NEXT_MOVE', projectId }), /KIRO_CLI_LOGIN_REQUIRED/)
+  await host.dispose()
+})
 
 test('host runs Core as managed-kiro with the installed kiro-cli and becomes ready after login', async () => {
   const h = harness(), host = await h.create()

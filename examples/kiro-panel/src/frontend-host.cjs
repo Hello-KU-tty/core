@@ -101,7 +101,7 @@ async function createFrontendHost(context) {
   const connection = createCoreConnectionManager({ connectionFile, connect: connectLocalCore })
   // Kiro-native mode has no IDE-internal worker; the handle reports no status and no questions.
   const worker = createNativeWorkerHandle()
-  let preparation, disposal, terminalPrepared = false, stopped = false
+  let preparation, disposal, terminalPrepared = false, terminalNoticed = false, stopped = false
   // K18: a window on a Vibe Helper Project folder keeps Core up for Kiro chat's MCP bridge, panel
   // or not, and says so once when Core cannot be reached.
   let boundWindow = false, prepareFailed = false, failureNoticed = false
@@ -157,13 +157,28 @@ async function createFrontendHost(context) {
       kiroCli = await findKiroCli()
       const ready = await lifecycle.start()
       if (stopped) throw new Error('FRONTEND_HOST_STOPPED')
-      try {
-        // Generated Project folders get the packaged Node/pnpm in their terminals,
-        // which Kiro chat also uses for shell commands.
-        if (!terminalPrepared && vscode.workspace.isTrusted) {
+      // Generated Project folders get the packaged Node/pnpm in their terminals,
+      // which Kiro chat also uses for shell commands. A failure here only costs
+      // those terminals the packaged tools; Core, Kiro chat and the panel still
+      // work, so it never makes the agent side unavailable (K25: a Windows PC
+      // with inherited-ACL project-tools folders lost the panel's Next Move).
+      if (!terminalPrepared && vscode.workspace.isTrusted) {
+        try {
           await prepareProjectTerminal(vscode, context, ready, api)
           terminalPrepared = true
+          if (status.terminalErrorCode) emit({ terminalErrorCode: null })
+        } catch (error) {
+          const code = safeCode(error)
+          emit({ terminalErrorCode: code })
+          if (!terminalNoticed) {
+            terminalNoticed = true
+            void vscode.window.showWarningMessage(
+              `이 프로젝트 터미널에 Hello Vibe의 Node·npm을 준비하지 못했어요 (${code}). Kiro 채팅의 설치·테스트 명령이 실패할 수 있어요. 창을 다시 로드하면 다시 시도해요.`,
+            )
+          }
         }
+      }
+      try {
         if (!await kiroCliLoggedIn(kiroCli)) throw new Error('KIRO_CLI_LOGIN_REQUIRED')
         if (stopped) throw new Error('FRONTEND_HOST_STOPPED')
         emit({ native: 'WORKER_READY', helperMode: 'KIRO_CLI', nativeErrorCode: null })

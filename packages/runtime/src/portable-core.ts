@@ -225,6 +225,17 @@ export function currentCoreRuntime(): CoreRuntimeDescriptor {
   })
 }
 
+async function repairableOnWindows(
+  path: string,
+  existing: Awaited<ReturnType<typeof lstat>>,
+): Promise<boolean> {
+  if (process.platform !== 'win32' || !existing.isDirectory() || existing.isSymbolicLink())
+    return false
+  const canonical = await realpath(path).catch(() => null)
+  if (canonical === null || !sameRuntimePath(canonical, resolve(path))) return false
+  return isPrivateDirectory(resolve(path, '..'))
+}
+
 export async function ownedPrivateDirectory(path: string): Promise<string> {
   if (!isAbsolute(path) || resolve(path) === resolve(path, '..')) fail('PRIVATE_PATH_REQUIRED')
   const existing = await lstat(path).catch((error) => {
@@ -232,7 +243,14 @@ export async function ownedPrivateDirectory(path: string): Promise<string> {
     throw error
   })
   if (existing) {
-    if (!(await isPrivateDirectory(path))) fail('PRIVATE_DIRECTORY_UNSAFE')
+    if (!(await isPrivateDirectory(path))) {
+      // K25: on Windows a folder made by another tool (PowerShell, npm) keeps the inherited ACL.
+      // Inside a private parent no other user could have made it, so tighten it like a new one;
+      // the check below still refuses a folder another user owns.
+      if (!(await repairableOnWindows(path, existing))) fail('PRIVATE_DIRECTORY_UNSAFE')
+      await privateDirectory(path)
+      if (!(await isPrivateDirectory(path))) fail('PRIVATE_DIRECTORY_UNSAFE')
+    }
   } else {
     if (!sameRuntimePath(await realpath(resolve(path, '..')), resolve(path, '..')))
       fail('PRIVATE_PARENT_UNSAFE')
