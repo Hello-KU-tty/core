@@ -74,13 +74,13 @@ Kiro IDE
 
 ## 다운로드·설치
 
-본선 설치물은 Kiro-native **0.2.12**(Apple Silicon Mac, Windows x64)이다. 준비물, 내려받기, 첫 프로젝트, 업데이트와 문제 해결은 [**설치 가이드**](docs/DOWNLOAD_GUIDE.md)에 있다.
+본선 설치물은 Kiro-native **0.2.13**(Apple Silicon Mac)과 **0.2.12**(Windows x64, 0.2.13 준비 중)이다. 준비물, 내려받기, 첫 프로젝트, 업데이트와 문제 해결은 [**설치 가이드**](docs/DOWNLOAD_GUIDE.md)에 있다.
 
-**[Mac용 0.2.12 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/kiro-native/builder-helper-agent-panel-0.2.12-darwin-arm64.vsix)** · **[Windows용 0.2.12 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/windows/kiro-native/builder-helper-agent-panel-0.2.12-win32-x64.vsix)**
+**[Mac용 0.2.13 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/kiro-native/builder-helper-agent-panel-0.2.13-darwin-arm64.vsix)** · **[Windows용 0.2.12 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/windows/kiro-native/builder-helper-agent-panel-0.2.12-win32-x64.vsix)**
 
 1. [Kiro IDE](https://kiro.dev/downloads/) 최신판과 Kiro CLI(2.21.1 이상)를 설치하고 둘 다 로그인한다.
 2. Kiro Extensions → `…` → `Install from VSIX…`로 설치한 뒤 다시 로드한다.
-3. Agent Panel에서 배우고 싶은 것을 입력해 프로젝트를 고르고, **이걸로 시작** 뒤 Kiro 채팅의 새 세션에서 만든다.
+3. Vibe Helper 패널에서 배우고 싶은 것을 입력해 프로젝트를 고르고, **이걸로 시작** 뒤 Kiro 채팅의 새 세션에서 만든다.
 
 별도 서비스 계정이나 API Key는 없고, 모델 사용량은 본인 Kiro 계정에서 차감된다. Node·pnpm 수동 설치도 필요 없다. 예선 설치물(Mac 0.1.4, Windows 0.0.18, Kiro 1.1.70 전용)과 개발자 ZIP은 [예선 다운로드 가이드](docs/archive/preliminary/DOWNLOAD_GUIDE_PRELIMINARY.md)에 남아 있다. 아래 "최근 검증 결과"는 예선 설치물 기준이고, 본선 설치물의 확인 기록은 [본선 인계 문서](docs/FRONTEND_KIRO_NATIVE_HANDOFF.md)에 있다.
 

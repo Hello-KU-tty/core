@@ -412,7 +412,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
     - 첫 Task의 `BUILD_TASK` Episode 2개가 `OPEN`으로 남는 것.
     - 확장 호스트 분리(`extensionDependencies`). frontend PC에서는 활성화가 4.5초였다. 사용자 PC는 19초였으므로 부스 PC 리허설에서 다시 보고 판단한다.
 
-### [~] K23. 0.2.13 패널 화면 정리 (backend가 frontend까지 맡음)
+### [x] K23. 0.2.13 패널 화면 정리 (backend가 frontend까지 맡음)
 
 - **출처:** backend 패널 구성안(2026-10-17, 사용자에게만 공유한 비공개 페이지)과 사용자 Windows 0.2.11 체험(K22 "이어지는 것"). frontend 담당자가 "사용자가 알아서 작업까지" 하라고 넘겼다.
 - **결정(사용자, 2026-10-18 01:40):**
@@ -464,7 +464,11 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
     - 테스트: program 869 통과, backend unit 177·integration 563 통과.
     - 실측: 새 채팅 세션에서 `save_choice` 뒤 `DIRECTION_CHANGE` 메모가 남았다. 기존 세션은 0.9.4를 계속 썼다([K23 기록](../tests/eval/results/kiro-0.2.13-k23-panel.md)).
   - **"이렇게 진행돼요" 3단계와 미리 승인(사용자 결정, 2026-10-18 오후):** 3단계를 "만드는 동안 묻는 선택에 답하기"로 바꿨다(program `dff0099`). 이 컴퓨터 주소로 가는 curl의 여러 형태와 `set -e`를 미리 승인한다. kiro-cli 판정기로 오늘 승인 창 명령을 다시 판정했다([K23 기록](../tests/eval/results/kiro-0.2.13-k23-panel.md)).
-  - **남은 것:** 사용자 확인과 수정, Mac 0.2.13 release 커밋(업그레이드 뒤 새 채팅 세션 안내 포함), Windows 빌드(사용자 또는 frontend), 두 플랫폼 다운로드 가이드.
+  - **배포(사용자 승인 "0.2.13 내자", 2026-10-18):**
+    - program `feat/k23-panel-cleanup`을 `main`에 합쳤다(`d314006`, K24 포함).
+    - Mac 0.2.13 release: 깨끗한 worktree(backend `eb7a130`, program `d314006`)에서 빌드했다. 41,625,387 bytes, SHA-256 `7a1218213f93aa13c5cdd9df157bf1a7ceac57272776ef1db9e2be89a9b39b92`, 76항목. Mac 포장 검사 9 PASS. 실측 후보 `k24a`와 코드가 같다(번들 안 의존성 경로 주석만 다름).
+    - README와 설치 가이드는 Mac 0.2.13, Windows 0.2.12다. 설치 가이드를 0.2.13 패널 화면(Vibe Helper 패널, 진행 탭, 복사 문구, 결정 순간 질문)에 맞추고, 업데이트 뒤 새 채팅 세션을 열라는 안내를 넣었다.
+    - Windows 0.2.13 빌드는 [0.2.13 프론트 인계](FRONTEND_HANDOFF_0.2.13.md)로 넘겼다(확인 31~36).
 
 ### [x] K24. 결정 순간 Helper 안내 (0.2.13에 함께)
 
