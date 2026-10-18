@@ -466,7 +466,7 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
   - **"이렇게 진행돼요" 3단계와 미리 승인(사용자 결정, 2026-10-18 오후):** 3단계를 "만드는 동안 묻는 선택에 답하기"로 바꿨다(program `dff0099`). 이 컴퓨터 주소로 가는 curl의 여러 형태와 `set -e`를 미리 승인한다. kiro-cli 판정기로 오늘 승인 창 명령을 다시 판정했다([K23 기록](../tests/eval/results/kiro-0.2.13-k23-panel.md)).
   - **남은 것:** 사용자 확인과 수정, Mac 0.2.13 release 커밋(업그레이드 뒤 새 채팅 세션 안내 포함), Windows 빌드(사용자 또는 frontend), 두 플랫폼 다운로드 가이드.
 
-### [~] K24. 결정 순간 Helper 안내 (0.2.13에 함께)
+### [x] K24. 결정 순간 Helper 안내 (0.2.13에 함께)
 
 - **출처:** 사용자 질문(2026-10-18 오후). 처음 쓰는 사람은 선택을 받으면 모르면 안 된다고 생각해 바로 번호를 말할 수 있다. Helper가 핵심인데 결정 순간 Helper로 이끄는 것이 없다.
   - Builder 질문은 "고르고 이유를 말해 달라"로 끝났다(사용자 체험 첫 채팅도 같았다).
@@ -490,6 +490,16 @@ MVP는 단순 화면 시제품이 아니라 `Discovery → Learning Spec → Bui
 - **완료 조건:**
   - kiro-adapter와 program 테스트, 패널 CJS 테스트 통과.
   - 실제 Kiro: 첫 결정과 다음 결정 모두 안내가 나온다. 붙여 넣은 `/vibe-helper` 질문에 Builder가 수정·명령·기록 없이 답하고 다시 묻는다. Core가 Helper 질문으로 기록하고 그 결정에 연결한다. 패널 답 기다림 화면과 복사.
+- **진행(2026-10-18 오후):**
+  - **구현:** backend `af40f29`(Steering 0.9.6과 테스트), `c32979d`(DECISIONS·SPEC·TASKS). program `feat/k23-panel-cleanup` `d314006`.
+  - **테스트:** backend unit 177·integration 565 통과, 패널 CJS 196 중 194 통과·2 skip. program 타입 검사와 871 통과.
+  - **실측:** 0.2.13 후보 `k24a`, 처음 보는 목표(Personal Need 없음)([K24 기록](../tests/eval/results/kiro-0.2.13-k24-helper-invite.md)).
+    - 두 결정 모두 몰라도 된다는 말, 그 결정에 맞춘 `/vibe-helper` 예시, 자기 말로 묻기 권유가 마지막 질문 앞에 나왔다.
+    - 패널 "예시 복사"가 문구를 그대로 복사했다. 그 문구를 채팅에 그대로 넣자 Kiro가 Helper Steering을 붙였고, 도구 호출 0번으로 답한 뒤 정해지면 보내 달라고 끝냈다.
+    - Core가 그 질문을 Helper 탭 발언으로 첫 결정에 연결했다.
+    - 300·360px, 두 테마에서 가로 넘침이 없다.
+    - 채팅 턴 3.77크레딧.
+  - **배포:** K23과 함께 Mac 0.2.13 release와 Windows 빌드로 나간다.
 
 ## 3. 예선 작업 요약
 
