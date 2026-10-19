@@ -13,9 +13,11 @@ Hello Vibe는 코딩 초보자가 배우고 싶은 기술 하나로 시작해 �
 
 ## 소개 영상
 
-https://github.com/user-attachments/assets/aacdf659-c0f1-465a-b23b-72a0256fe466
+[![Hello Vibe 본선 소개 영상 (45초) — 눌러서 보기](docs/assets/hello-vibe-finals-45s-poster.jpg)](docs/assets/hello-vibe-finals-45s.mp4)
 
-예선 때 실제 Kiro IDE에서 진행한 한 프로젝트의 흐름이다. 예선 설치물은 Builder와 Helper가 패널 안에서 돌았고, 본선 설치물은 같은 흐름을 Kiro 채팅에서 진행한다(아래 "사용자 흐름"). 배우고 싶은 것 입력 → 프로젝트 후보 10개 → Learning Spec → Builder가 실제 결정을 사용자에게 넘김 → Helper에게 질문 → 이유를 적어 선택 → Evidence가 사용자의 이유만 이해 근거로 인정(질문만 한 것과 Agent가 작성한 코드는 제외) → 선택대로 완성된 앱이 새로고침 후에도 데이터를 유지한다.
+본선 설치물로 실제 Kiro IDE에서 새 프로젝트 하나를 처음부터 진행한 흐름이다(45초, [영상 파일](docs/assets/hello-vibe-finals-45s.mp4)). 배우고 싶은 것과 개인 사정 입력 → 그 기술이 꼭 필요한 프로젝트 후보 10개 → 대화로 두 후보를 합쳐 하나로 좁힘 → Learning Spec(내가 배울 것 · Agent가 맡을 것 · 이번엔 뺄 것) → 학습자의 Kiro 채팅 Agent가 만들다가 실제 갈림길에서 멈추고 질문 → `/vibe-helper`에 자기 상황을 붙여 질문(Helper는 읽기 전용) → 번호와 이유를 자기 말로 답함 → 학습 기록은 학습자가 쓴 이유만 이해 근거로 인정하고, Helper에게 질문만 한 것과 AI가 작성한 코드의 개념은 근거로 세지 않음 → 고른 기준대로 완성된 선착순 신청 앱(같은 학번 중복 신청 거절, 10명이 동시에 신청해도 정원 5명만 접수) → 다음 프로젝트 추천 3개.
+
+[예선 제출 때 영상](https://github.com/user-attachments/assets/aacdf659-c0f1-465a-b23b-72a0256fe466)은 Builder와 Helper가 패널 안에서 돌던 예선 설치물의 흐름이다.
 
 ## 해결하려는 문제
 
