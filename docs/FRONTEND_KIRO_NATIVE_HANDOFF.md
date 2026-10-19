@@ -366,7 +366,12 @@ Windows 0.2.14와 같은 커밋으로 Mac 0.2.14를 빌드해 0.2.13을 바꿨�
 - **빌드:** 깨끗한 worktree의 backend `main` `748ea92`, program `main` `fc1ff89`(그 뒤 `e6c1505`은 문서만 더함). Node 24.19.0, pnpm 11.13.1.
 - **결과물:** 41,626,220 bytes, SHA-256 `665d796471845dbc03b6c947a1988061fdf76ccea1750222420a73538104cfdb`, 76 entries. 포장 Steering은 0.9.7이다.
 - **자동 검사(Mac):** backend typecheck, unit 177 통과·3 skip, integration 566 통과·11 skip, 패널 CJS 196 통과·2 skip. program typecheck와 vitest 875 통과. 포장 Core에 `scripts/test-macos-package.mjs` 9개 PASS.
-- **실제 Kiro:** Mac에서는 아직 확인하지 않았다. 본선 당일이라 공용 테스트 Kiro를 다시 시작하지 않았다. 바뀐 점 중 ACL 복구는 Windows에서만 돈다. 나머지(터미널 준비 실패 처리, 읽기 전용 2종, Steering 0.9.7, 시작 화면 코드)는 Windows 0.2.14에서 확인됐다.
+- **실제 Kiro**(올린 뒤 10:47~10:51, Kiro 1.2.56, 0.2.13 위에 설치):
+  - **시작:** k24-ws Project의 Steering이 0.9.7로 다시 써졌고, 패널은 진행 탭과 다음 작업후보 3개로 정상이었다.
+  - **새 세션:** Steering 0.9.7이 들어갔고 `check_progress`가 바로 성공했다(0.40크레딧).
+  - **다시 로드 뒤 같은 세션:** 첫 `tool_call`이 "not available"로 거절되자 Builder가 `mcp_vibe_helper_check_progress`를 이름으로 한 번 불러 성공했다. 같은 호출을 되풀이하지 않았다(0.42크레딧).
+  - **터미널 준비 실패:** `project-tools/state`를 일부러 0755로 바꾸고 다른 Project(빵집 예약 주문 API)의 생성 폴더 창을 열었다. 경고는 `PRIVATE_DIRECTORY_UNSAFE`와 함께 한 번 보였다. host는 `WORKER_READY`, `terminalErrorCode`는 `PRIVATE_DIRECTORY_UNSAFE`였고 패널의 다음 작업후보는 그대로 보였다. 0700으로 되돌리고 다시 로드하자 `terminalErrorCode`가 비고 경고도 없었다.
+  - **보지 못한 것:** 시작 화면의 모르는 Core 코드 표시(program 테스트가 다룬다). ACL 복구는 Windows에서만 돈다.
 
 ## 0.2.14 Windows 확인 (2026-10-19, frontend가 먼저)
 
