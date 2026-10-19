@@ -9,7 +9,7 @@ Hello Vibe는 코딩 초보자가 배우고 싶은 기술 하나로 시작해 �
 | 저장소 | 역할 |
 | --- | --- |
 | [Hello-KU-tty/core](https://github.com/Hello-KU-tty/core) (이 저장소) | TypeScript Core, SQLite 저장소, 역할별 MCP, Agent prompt, Kiro native 연동, 평가·테스트 |
-| [Hello-KU-tty/program](https://github.com/Hello-KU-tty/program) | Kiro 확장 frontend: Discovery, Spec, Builder, Helper, History 화면 |
+| [Hello-KU-tty/program](https://github.com/Hello-KU-tty/program) | Kiro 확장 frontend: Vibe Helper 패널(프로젝트 찾기 · Learning Spec · 진행 · 학습 기록) |
 
 ## 소개 영상
 
@@ -82,7 +82,7 @@ Kiro IDE
 2. Kiro Extensions → `…` → `Install from VSIX…`로 설치한 뒤 다시 로드한다.
 3. Vibe Helper 패널에서 배우고 싶은 것을 입력해 프로젝트를 고르고, **이걸로 시작** 뒤 Kiro 채팅의 새 세션에서 만든다.
 
-별도 서비스 계정이나 API Key는 없고, 모델 사용량은 본인 Kiro 계정에서 차감된다. Node·pnpm 수동 설치도 필요 없다. 예선 설치물(Mac 0.1.4, Windows 0.0.18, Kiro 1.1.70 전용)과 개발자 ZIP은 [예선 다운로드 가이드](docs/archive/preliminary/DOWNLOAD_GUIDE_PRELIMINARY.md)에 남아 있다. 아래 "최근 검증 결과"는 예선 설치물 기준이고, 본선 설치물의 확인 기록은 [본선 인계 문서](docs/FRONTEND_KIRO_NATIVE_HANDOFF.md)에 있다.
+별도 서비스 계정이나 API Key는 없고, 모델 사용량은 본인 Kiro 계정에서 차감된다. Node·pnpm 수동 설치도 필요 없다. 예선 설치물(Mac 0.1.4, Windows 0.0.18, Kiro 1.1.70 전용)과 개발자 ZIP은 [예선 다운로드 가이드](docs/archive/preliminary/DOWNLOAD_GUIDE_PRELIMINARY.md)에 남아 있다. 본선 0.2.14의 검증은 아래 "본선 0.2.14 검증"과 [본선 인계 문서](docs/FRONTEND_KIRO_NATIVE_HANDOFF.md)에 있고, 그 아래 표는 예선 설치물 기준이다.
 
 ## 개발 환경과 검증
 
@@ -107,7 +107,16 @@ node scripts/test-program-consumer.mjs <program checkout 경로>
 
 실제 모델을 쓰는 live probe(`pnpm test:eval:live-*`)는 Kiro 로그인 환경에서 본인 계정 사용량을 소비한다. 평가 실행법은 [tests/eval/README.md](tests/eval/README.md)에 있다.
 
-### 최근 검증 결과 (macOS arm64, Node 24.19.0)
+### 본선 0.2.14 검증
+
+| 검사 | 결과 |
+| --- | --- |
+| Mac 자동 검사 (Node 24.19.0) | backend typecheck, unit 177, integration 566, 패널 196 PASS; program typecheck, 875 tests PASS; Mac 포장 검사 9개 PASS |
+| Windows 자동 검사 (Windows 11 x64) | backend unit 179, integration 562, 패널 197 PASS; program 875 tests PASS |
+| Mac 실제 Kiro (1.2.56, 0.2.13에서 업그레이드) | Steering 0.9.7 적용, 새 채팅 세션의 Vibe Helper 도구 호출, 창을 다시 로드한 뒤 거절된 호출을 되풀이하지 않음, Project 터미널 준비가 실패해도 패널과 다음 작업후보 유지 |
+| Windows 실제 Kiro (1.2.56, 0.2.13에서 업그레이드) | 상속 권한 폴더를 시작 때 바로잡고 진행 탭 정상, 새 채팅 세션에서 Task 완료 → 다음 작업후보 → 다음 Task 시작, 승인 창 없음 |
+
+### 예선 설치물 검증 결과 (macOS arm64, Node 24.19.0)
 
 | 검사 | 결과 |
 | --- | --- |
