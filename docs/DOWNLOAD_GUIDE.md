@@ -1,6 +1,6 @@
 # Hello Vibe 설치 가이드
 
-Hello Vibe는 Kiro IDE 확장입니다. Vibe Helper 패널에서 배우고 싶은 것을 바탕으로 만들 프로젝트를 고르고, 실제 만들기는 Kiro 채팅에서 합니다. 이 문서는 본선 설치물 Mac **0.2.13**, Windows **0.2.14** 기준입니다. Windows 0.2.14는 0.2.13에 연결 안정성 수정(아래 6장)을 더한 것이고 화면은 같습니다.
+Hello Vibe는 Kiro IDE 확장입니다. Vibe Helper 패널에서 배우고 싶은 것을 바탕으로 만들 프로젝트를 고르고, 실제 만들기는 Kiro 채팅에서 합니다. 이 문서는 본선 설치물 **0.2.14**(Mac, Windows) 기준입니다. 0.2.14는 0.2.13에 연결 안정성 수정(아래 6장)을 더한 것이고 화면은 같습니다.
 
 ## 1. 준비물
 
@@ -16,7 +16,7 @@ Hello Vibe 계정이나 API 키는 없습니다. Node.js, pnpm 같은 개발 도
 
 | 운영체제 | 설치 파일 |
 | --- | --- |
-| Mac (Apple Silicon) | **[0.2.13 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/kiro-native/builder-helper-agent-panel-0.2.13-darwin-arm64.vsix)** (약 40MB) |
+| Mac (Apple Silicon) | **[0.2.14 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/macos/kiro-native/builder-helper-agent-panel-0.2.14-darwin-arm64.vsix)** (약 40MB) |
 | Windows (x64) | **[0.2.14 내려받기](https://github.com/Hello-KU-tty/core/raw/refs/heads/main/releases/windows/kiro-native/builder-helper-agent-panel-0.2.14-win32-x64.vsix)** (약 2.5MB) |
 
 링크를 누르면 `.vsix` 파일이 바로 내려받아집니다. [Windows 설치 파일 폴더](../releases/windows/kiro-native/)에서도 받을 수 있습니다.
@@ -26,13 +26,13 @@ Hello Vibe 계정이나 API 키는 없습니다. Node.js, pnpm 같은 개발 도
 
 | 파일 | SHA-256 |
 | --- | --- |
-| Mac 0.2.13 | `7a1218213f93aa13c5cdd9df157bf1a7ceac57272776ef1db9e2be89a9b39b92` |
+| Mac 0.2.14 | `665d796471845dbc03b6c947a1988061fdf76ccea1750222420a73538104cfdb` |
 | Windows 0.2.14 | `9501810e74d229c62a4b99b49ec35c3aec3ac266e1fed27601bfacc1295ed927` |
 
 Mac 터미널:
 
 ```sh
-shasum -a 256 ~/Downloads/builder-helper-agent-panel-0.2.13-darwin-arm64.vsix
+shasum -a 256 ~/Downloads/builder-helper-agent-panel-0.2.14-darwin-arm64.vsix
 ```
 
 Windows PowerShell:
@@ -119,8 +119,8 @@ Windows에서는 첫 실행 때 Hello Vibe가 Node.js 24.19.0을 내려받아 �
 - **"Kiro CLI를 찾지 못했어요"**: 3단계의 Kiro CLI를 설치하고, Kiro를 완전히 종료했다가 연 뒤 **Vibe Helper: Retry Core Connection**을 실행합니다.
 - **"Kiro CLI 로그인이 필요해요"**: 터미널에서 `kiro-cli login`을 실행한 뒤 **Retry Core Connection**을 실행합니다. 이전 기록은 계속 볼 수 있습니다.
 - **"Core 준비 실패"**: **재시도** 또는 **Retry Core Connection**을 누릅니다. 코드가 `KIRO_NATIVE_HOST_PLATFORM_UNSUPPORTED`이면 지원하지 않는 컴퓨터입니다.
-- **"Core에 연결할 수 없어요 (코드)"**(Windows 0.2.14부터 코드가 함께 보입니다): 먼저 **Retry Core Connection**을 실행하고, 그래도 같으면 괄호 안 코드를 알려 주세요.
-- **"이 프로젝트 터미널에 Hello Vibe의 Node·npm을 준비하지 못했어요"**(Windows 0.2.14부터): 패널과 Kiro 채팅은 그대로 쓸 수 있습니다. Kiro 채팅의 설치·테스트 명령이 실패하면 창을 다시 로드하고 새 세션에서 이어 갑니다.
+- **"Core에 연결할 수 없어요 (코드)"**(0.2.14부터 코드가 함께 보입니다): 먼저 **Retry Core Connection**을 실행하고, 그래도 같으면 괄호 안 코드를 알려 주세요.
+- **"이 프로젝트 터미널에 Hello Vibe의 Node·npm을 준비하지 못했어요"**(0.2.14부터): 패널과 Kiro 채팅은 그대로 쓸 수 있습니다. Kiro 채팅의 설치·테스트 명령이 실패하면 창을 다시 로드하고 새 세션에서 이어 갑니다.
 - **"Vibe Helper Core에 연결하지 못했어요"**(0.2.10부터, 프로젝트 폴더 창): Hello Vibe가 잠시 뒤 저절로 다시 시도합니다. 바로 다시 시도하려면 알림의 **다시 연결**을 누릅니다.
 - **"Kiro 사용량 한도에 도달했어요"**: Kiro 계정의 크레딧을 확인합니다.
 - **"계획을 확정하고 작업이 준비된 뒤에 … 열 수 있어요"**: 4단계 4번의 **이걸로 시작**을 먼저 누릅니다.

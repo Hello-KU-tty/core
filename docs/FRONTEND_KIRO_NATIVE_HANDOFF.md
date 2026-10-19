@@ -359,9 +359,18 @@ host API 형식은 [`examples/kiro-panel/src/frontend-host.d.cts`](../examples/k
   - 남은 것: "화면 레이아웃·스타일은 제가 알아서 정할게요"처럼 담당을 말하는 표현이 약하게 남았다. 한 번은 예고한 선택의 코드를 먼저 써 두고 그 안을 추천했다.
   - 채팅 약 25.7크레딧.
 
+## 0.2.14 Mac 빌드 (2026-10-19, backend)
+
+Windows 0.2.14와 같은 커밋으로 Mac 0.2.14를 빌드해 0.2.13을 바꿨다.
+
+- **빌드:** 깨끗한 worktree의 backend `main` `748ea92`, program `main` `fc1ff89`(그 뒤 `e6c1505`은 문서만 더함). Node 24.19.0, pnpm 11.13.1.
+- **결과물:** 41,626,220 bytes, SHA-256 `665d796471845dbc03b6c947a1988061fdf76ccea1750222420a73538104cfdb`, 76 entries. 포장 Steering은 0.9.7이다.
+- **자동 검사(Mac):** backend typecheck, unit 177 통과·3 skip, integration 566 통과·11 skip, 패널 CJS 196 통과·2 skip. program typecheck와 vitest 875 통과. 포장 Core에 `scripts/test-macos-package.mjs` 9개 PASS.
+- **실제 Kiro:** Mac에서는 아직 확인하지 않았다. 본선 당일이라 공용 테스트 Kiro를 다시 시작하지 않았다. 바뀐 점 중 ACL 복구는 Windows에서만 돈다. 나머지(터미널 준비 실패 처리, 읽기 전용 2종, Steering 0.9.7, 시작 화면 코드)는 Windows 0.2.14에서 확인됐다.
+
 ## 0.2.14 Windows 확인 (2026-10-19, frontend가 먼저)
 
-Windows 0.2.13 확인([이슈 #5](https://github.com/Hello-KU-tty/core/issues/5))에서 나온 문제를 frontend가 고쳐(K25: core [#6](https://github.com/Hello-KU-tty/core/pull/6), program [#14](https://github.com/Hello-KU-tty/program/pull/14)) Windows 0.2.14를 먼저 냈다. **Mac은 0.2.13 그대로이며, 같은 커밋으로 다시 빌드해야 한다.**
+Windows 0.2.13 확인([이슈 #5](https://github.com/Hello-KU-tty/core/issues/5))에서 나온 문제를 frontend가 고쳐(K25: core [#6](https://github.com/Hello-KU-tty/core/pull/6), program [#14](https://github.com/Hello-KU-tty/program/pull/14)) Windows 0.2.14를 먼저 냈다. Mac 0.2.14는 위와 같이 같은 커밋으로 다시 빌드했다.
 
 - **빌드:** backend `main` `748ea92`(버전 0.2.14), program `main` `fc1ff89`. 두 checkout 모두 깨끗했다.
 - **결과물:** 2,620,956 bytes, SHA-256 `9501810e74d229c62a4b99b49ec35c3aec3ac266e1fed27601bfacc1295ed927`, 75 entries.
