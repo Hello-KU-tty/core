@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Hello Vibe booth wallpaper</title>
+<!-- Rendered to wallpaper.png (1920x1080) by render-assets.mjs. The left 400px stays empty for the desktop icons. -->
+<style>
+  :root { --p: #8b5cf6; --c: #22d3ee; --g: #4ade80; --bg: #07050d; --ink: #f5f3ff; --dim: #a5a3b8; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1920px; height: 1080px; background: var(--bg); overflow: hidden; }
+  body {
+    font-family: "Apple SD Gothic Neo", "Pretendard", "Malgun Gothic", sans-serif; color: var(--ink); word-break: keep-all;
+    background:
+      radial-gradient(900px 600px at 78% 18%, rgba(139, 92, 246, .28), transparent 70%),
+      radial-gradient(700px 520px at 92% 92%, rgba(34, 211, 238, .18), transparent 70%),
+      var(--bg);
+  }
+  .hint {
+    position: absolute; left: 400px; top: 64px; display: flex; align-items: center; gap: 14px;
+    font-size: 26px; color: var(--c); font-weight: 600;
+  }
+  .hint .arrow { font-size: 40px; line-height: 1; }
+  main { position: absolute; left: 520px; top: 170px; width: 1260px; }
+  .brand { font-size: 96px; font-weight: 800; letter-spacing: -2px;
+    background: linear-gradient(90deg, var(--p), var(--c)); -webkit-background-clip: text; color: transparent; }
+  .tag { margin-top: 8px; font-size: 36px; font-weight: 600; }
+  .sub { margin-top: 10px; font-size: 22px; color: var(--dim); }
+  .cards { margin-top: 64px; display: grid; grid-template-columns: 1fr 1fr; gap: 36px; }
+  .card { border-radius: 28px; padding: 40px 40px 36px; background: rgba(255, 255, 255, .045);
+    border: 1px solid rgba(255, 255, 255, .09); }
+  .card.one { box-shadow: inset 0 6px 0 var(--p); }
+  .card.two { box-shadow: inset 0 6px 0 var(--c); }
+  .num { width: 76px; height: 76px; border-radius: 22px; display: grid; place-items: center;
+    font-size: 44px; font-weight: 800; color: #fff; }
+  .one .num { background: linear-gradient(135deg, #a78bfa, #7c3aed); }
+  .two .num { background: linear-gradient(135deg, #67e8f9, #0891b2); }
+  .card h2 { margin-top: 24px; font-size: 40px; font-weight: 800; }
+  .card p { margin-top: 14px; font-size: 25px; line-height: 1.5; color: #d9d6ea; }
+  .time { margin-top: 22px; display: inline-block; font-size: 20px; padding: 6px 16px; border-radius: 999px;
+    background: rgba(255, 255, 255, .08); color: var(--dim); }
+  footer { position: absolute; left: 520px; bottom: 72px; width: 1260px; font-size: 22px; color: var(--dim); line-height: 1.6; }
+  footer b { color: var(--ink); font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="hint"><span class="arrow">←</span> 왼쪽 위 아이콘 ① 또는 ②를 두 번 클릭해 시작하세요</div>
+  <main>
+    <div class="brand">Hello Vibe</div>
+    <div class="tag">만들면서, 이해의 근거를 남기는 바이브코딩</div>
+    <div class="sub">Kiro IDE 확장 · 고려대학교 × AWS AI Innovators Challenge · 팀 Hello-KU-tty</div>
+    <div class="cards">
+      <section class="card one">
+        <div class="num">1</div>
+        <h2>처음부터 만들어 보기</h2>
+        <p>배우고 싶은 기술을 적으면, 그 기술이 꼭 필요한 프로젝트를 찾아 AI와 함께 만들어요.</p>
+        <span class="time">5분부터</span>
+      </section>
+      <section class="card two">
+        <div class="num">2</div>
+        <h2>결정하는 순간 체험하기</h2>
+        <p>만들다 멈춘 프로젝트에서, AI가 묻는 선택에 내 이유로 답해 봐요. 그 이유가 이해의 근거로 남아요.</p>
+        <span class="time">2~3분</span>
+      </section>
+    </div>
+  </main>
+  <footer>
+    <b>막히거나 처음부터 하고 싶으면</b> Kiro 창을 닫고 아이콘을 다시 누르세요.<br>
+    10분 동안 아무 입력이 없으면 이 화면으로 돌아와요.
+  </footer>
+</body>
+</html>

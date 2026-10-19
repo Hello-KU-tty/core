@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Hello Vibe booth icon</title>
+<!-- render-assets.mjs opens icon.html?mode=start|decision at 256x256 and wraps the PNG into an .ico. -->
+<style>
+  * { margin: 0; box-sizing: border-box; }
+  html, body { width: 256px; height: 256px; background: transparent; }
+  .tile { width: 256px; height: 256px; border-radius: 56px; display: grid; place-items: center;
+    font: 800 168px/1 "Apple SD Gothic Neo", "Pretendard", sans-serif; color: #fff; }
+  .start { background: linear-gradient(135deg, #a78bfa, #6d28d9); }
+  .decision { background: linear-gradient(135deg, #67e8f9, #0e7490); }
+</style>
+</head>
+<body>
+  <div class="tile" id="tile"></div>
+  <script>
+    const mode = new URLSearchParams(location.search).get('mode') === 'decision' ? 'decision' : 'start'
+    const tile = document.getElementById('tile')
+    tile.className = 'tile ' + mode
+    tile.textContent = mode === 'decision' ? '2' : '1'
+  </script>
+</body>
+</html>

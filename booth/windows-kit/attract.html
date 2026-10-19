@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hello Vibe 부스</title>
+<!-- For the booth's big monitor: open in Edge on that screen and press F11. Loops the 45 s intro video. -->
+<style>
+  :root { --p: #8b5cf6; --c: #22d3ee; --bg: #07050d; --ink: #f5f3ff; --dim: #a5a3b8; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--ink); overflow: hidden; }
+  body {
+    font-family: "Malgun Gothic", "Apple SD Gothic Neo", "Pretendard", sans-serif; word-break: keep-all;
+    display: grid; grid-template-columns: 1fr 34vw; gap: 3vw; align-items: center; padding: 4vh 4vw;
+    background: radial-gradient(60vw 50vh at 85% 10%, rgba(139, 92, 246, .25), transparent 70%), var(--bg);
+  }
+  video { width: 100%; max-height: 92vh; border-radius: 1.4vw; background: #000; object-fit: contain; }
+  .brand { font-size: 4.6vw; font-weight: 800; letter-spacing: -.1vw;
+    background: linear-gradient(90deg, var(--p), var(--c)); -webkit-background-clip: text; color: transparent; }
+  .tag { margin-top: .8vh; font-size: 1.6vw; font-weight: 700; }
+  ol { list-style: none; padding: 0; margin-top: 5vh; display: grid; gap: 2.4vh; }
+  li { padding: 2.4vh 1.6vw; border-radius: 1vw; background: rgba(255, 255, 255, .05); border-left: .4vw solid var(--p); }
+  li.two { border-left-color: var(--c); }
+  li b { display: block; font-size: 1.5vw; }
+  li span { display: block; margin-top: .8vh; font-size: 1.1vw; line-height: 1.5; color: #d9d6ea; }
+  .foot { margin-top: 4vh; font-size: 1.05vw; color: var(--dim); line-height: 1.6; }
+</style>
+</head>
+<body>
+  <video src="../../docs/assets/hello-vibe-finals-45s.mp4" autoplay muted loop playsinline></video>
+  <aside>
+    <div class="brand">Hello Vibe</div>
+    <div class="tag">만들면서, 이해의 근거를 남기는 바이브코딩</div>
+    <ol>
+      <li><b>① 처음부터 만들어 보기</b><span>배우고 싶은 기술을 적으면, 그 기술이 꼭 필요한 프로젝트를 찾아 AI와 함께 만들어요.</span></li>
+      <li class="two"><b>② 결정하는 순간 체험하기</b><span>만들다 멈춘 프로젝트에서 AI가 묻는 선택에 내 이유로 답해 봐요.</span></li>
+    </ol>
+    <p class="foot">앞의 노트북 바탕화면에서 ① 또는 ② 아이콘을 눌러 직접 써 보세요.</p>
+  </aside>
+</body>
+</html>
